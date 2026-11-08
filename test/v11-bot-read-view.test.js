@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX13';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B16-M11-FIX14';
 import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
@@ -55,11 +55,13 @@ function mounted(overrides={}){
   return {target,view,calls,publish:state=>publish(state),jump:ref=>jump(ref),snapshot:()=>snapshot,
     buttons:all(target,'button').filter(node=>['Bots aktualisieren','Botansicht sperren'].includes(node.text))};
 }
-test('fresh rows use bounded labels, UTC time, correct side and no arbitrary data',()=>{
+test('fresh rows use bounded labels, local time with exact UTC provenance, correct side and no arbitrary data',()=>{
   const target=root();assert.equal(renderBotReadState(target,fresh()),'fresh');
   assert.match(target.textContent,/BTC/);assert.match(target.textContent,/Richtung: Short/);
   assert.match(target.textContent,/Kategorie: COIN-M/);assert.doesNotMatch(target.textContent,/NEVER DISPLAY/);
   assert.equal(all(target,'li').length,1);assert.equal(all(target,'time')[0].getAttribute('datetime'),'2026-10-12T20:00:00Z');
+  assert.equal(all(target,'time')[0].textContent,new Date(fresh().model.snapshotAt).toLocaleString('de-AT'));
+  assert.equal(all(target,'time')[0].getAttribute('title'),'UTC: '+fresh().model.snapshotAt);
   const live=all(target,'div').find(x=>x.getAttribute('role')==='status');
   assert.equal(live.getAttribute('aria-live'),'polite');assert.equal(live.getAttribute('aria-atomic'),'true');
 });
@@ -612,7 +614,7 @@ test('Command equal-symbol equal-loss actions have distinct references and direc
   const detailNames=all(target,'summary').filter(node=>node.getAttribute('aria-label')?.startsWith('Details zu'));
   assert.deepEqual(detailNames.map(node=>node.getAttribute('aria-label')),[
     'Details zu BTC · Long · Referenz '+'a'.repeat(20),'Details zu BTC · Short · Referenz '+'b'.repeat(20)]);
-  assert.match(target.textContent,/18\.10\.2026, 10:00 UTC/);
+  assert.ok(target.textContent.includes(new Intl.DateTimeFormat('de-AT',{dateStyle:'medium',timeStyle:'short'}).format(new Date('2026-10-18T10:00:00Z'))+' (lokale Zeit)'));
   assert.equal(all(target,'time')[0].textContent,'2026-10-18T10:00:00Z');
   assert.equal(all(target,'time')[0].getAttribute('datetime'),'2026-10-18T10:00:00Z');
   assert.match(target.textContent,/Quelle & Zeit/);assert.match(target.textContent,/Long 1 · Short 1 · Neutral 0 · Unbekannt 0/);
@@ -943,4 +945,26 @@ test('new filters combine, preserve disclosure and Command return, reset and cle
   h.publish({...coverageSnapshot(),readIdentity:2});assert.equal(tp.value,'all');assert.equal(pnl.value,'all');
   assert.ok(all(h.target,'details').every(n=>n.getAttribute('open')===null));assert.equal(h.calls.refresh,0);
   h.view.dispose();assert.equal(tp.listeners.get('change').size,0);assert.equal(pnl.listeners.get('change').size,0);
+});
+
+
+test('unlocked not_loaded state reaches bot and command views without private values',()=>{
+  const target=root(),command=root();
+  renderBotReadState(target,{status:'not_loaded'});renderCommandBotOverview(command,{status:'not_loaded'});
+  for(const node of [target,command]){assert.match(node.textContent,/Noch nicht geladen/);assert.doesNotMatch(node.textContent,/Gesperrt|App mit Meridian-Passwort öffnen/);}
+});
+
+
+test('Bot portfolio valuation and source clocks stay distinct in local time with exact UTC attributes',()=>{
+  const model={status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,totalUsd:42,currency:'USD/USDT',
+    snapshotAt:'2026-10-12T19:59:00.000Z',sourceAt:'2026-10-12T19:58:00.000Z',
+    source:'SERVER_PIONEX_CURRENT',expiresAt:Date.parse('2026-10-12T20:13:00.000Z')};
+  publishDepotPortfolioState({status:'fresh',model});const h=mounted();
+  const times=all(h.target,'time');
+  for(const raw of [model.snapshotAt,model.sourceAt,new Date(model.expiresAt).toISOString()]){
+    const node=times.find(t=>t.getAttribute('datetime')===raw);assert.ok(node);
+    assert.equal(node.textContent,new Date(raw).toLocaleString('de-AT'));assert.equal(node.getAttribute('title'),'UTC: '+raw);
+  }
+  assert.match(h.target.textContent,/Stand \(lokale Zeit\)/);assert.match(h.target.textContent,/Quellzeit \(lokale Zeit\)/);
+  assert.match(h.target.textContent,/Gültig bis \(lokale Zeit\)/);h.view.dispose();
 });

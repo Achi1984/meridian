@@ -512,25 +512,66 @@ test("unexpected exit and result are captured as partial evidence without a seco
 
 test("late filesystem completion cannot dispatch a proof or clear the claim", async t => {
   const harness = await fixture(t);
+  const openEntered = deferred();
+  const releaseOpen = deferred();
+  const closeCompleted = deferred();
+  const signalSource = new EventEmitter();
+  let monotonicMs = 0;
   let spawnCount = 0;
   let delayedOpen = false;
+  let closeAttempts = 0;
   const delayedFs = {
     open: async (...args) => {
       if (path.basename(args[0]) === "batch-claim.json" && !delayedOpen) {
         delayedOpen = true;
-        await new Promise(resolve => setTimeout(resolve, 50));
+        openEntered.resolve();
+        await releaseOpen.promise;
+        const handle = await open(...args);
+        return {
+          close: async () => {
+            closeAttempts += 1;
+            try { return await handle.close(); }
+            finally { closeCompleted.resolve(); }
+          },
+          writeFile: (...values) => handle.writeFile(...values),
+          sync: () => handle.sync()
+        };
       }
       return open(...args);
     }
   };
-  const timedOut = await execute(harness, {
-    timeoutMs: 15,
+  const pending = execute(harness, {
+    timeoutMs: 60_000,
+    monotonicNow: () => monotonicMs,
+    signalSource,
     fileSystem: delayedFs,
     spawnImpl: () => { spawnCount += 1; return fakeSpawn()(); }
   });
+  let deadlineAdvanced = false;
+  let timedOut;
+  try {
+    await boundedWait(openEntered.promise, 10_000,
+      "claim open was not entered before the watchdog");
+    // Expire only after the exclusive open is in flight. Setup speed must not
+    // decide whether this test actually exercises a late claim completion.
+    monotonicMs = 60_001;
+    deadlineAdvanced = true;
+    releaseOpen.resolve();
+    timedOut = await boundedWait(pending, 10_000,
+      "batch deadline did not return before the watchdog");
+  } finally {
+    if (!deadlineAdvanced) signalSource.emit("SIGTERM");
+    releaseOpen.resolve();
+    await boundedWait(pending, 10_000,
+      "batch did not settle after releasing the delayed claim open");
+  }
   assert.equal(timedOut.status, "UNKNOWN");
+  assert.equal(timedOut.code, "BATCH_DEADLINE_EXCEEDED");
+  assert.equal(timedOut.executionStarted, false);
   assert.equal(spawnCount, 0);
-  await new Promise(resolve => setTimeout(resolve, 70));
+  await boundedWait(closeCompleted.promise, 10_000,
+    "the late claim descriptor was not closed before the watchdog");
+  assert.equal(closeAttempts, 1);
   assert.ok(await lstat(path.join(harness.storageRoot, "batch-claim.json")));
   const restart = await execute(harness, {
     spawnImpl: () => { spawnCount += 1; return fakeSpawn()(); }

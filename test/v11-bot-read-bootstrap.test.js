@@ -10,10 +10,11 @@ class Target{
   fire(name){for(const fn of this.listeners.get(name)||[])fn();}
 }
 function makeAccess(){
-  let credential=null;const readers=new Map();
+  let credential=null;const readers=new Map(),subscribers=new Set();
   return {
     getToken:()=>credential,isUnlocked:()=>credential!==null,
-    set(value){credential=value;},
+    subscribe(fn){subscribers.add(fn);fn({status:credential?'unlocked':'locked'});return()=>subscribers.delete(fn);},
+    set(value){credential=value;for(const fn of subscribers)fn({status:value?'unlocked':'locked'});},
     lock(){credential=null;for(const clear of readers.keys())clear();},
     revalidateReaders(){if(!credential)return false;for(const revalidate of readers.values())revalidate();return true;},
     registerReader(clear,revalidate=()=>{}){readers.set(clear,revalidate);return ()=>readers.delete(clear);}
@@ -108,4 +109,17 @@ test('401 and 403 from a manual bot read revoke the shared credential',async()=>
 test('disposing a reader mount revokes shared access and reader ownership',()=>{
   const h=setup();h.access.set('verified-password');h.mounted.dispose();
   assert.equal(h.access.getToken(),null);
+});
+
+
+test('central unlock changes Bots to not_loaded without requests; failure remains unavailable',async()=>{
+  let reads=0;
+  const h=setup({createClient:options=>createBotReadClient({...options,fetchImpl:async()=>{reads++;return new Response('',{status:500});}})});
+  h.access.set('verified-password');
+  assert.equal(h.commandProjection.at(-1),'not_loaded');assert.equal(reads,0);
+  await h.client().refresh();assert.equal(h.commandProjection.at(-1),'unavailable');
+  h.access.revalidateReaders();assert.equal(h.commandProjection.at(-1),'unavailable');assert.equal(reads,1);
+  h.access.lock();assert.equal(h.commandProjection.at(-1),'locked');
+  h.access.set('verified-password');assert.equal(h.commandProjection.at(-1),'not_loaded');
+  h.mounted.dispose();
 });

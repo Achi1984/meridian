@@ -154,6 +154,7 @@ test("durable bounded research supervisor synthetic suite", () => {
     const remainingMs = totalDeadline - performance.now();
     assert.ok(remainingMs > 0, `aggregate supervisor test budget expired before ${group.name}`);
     const timeoutMs = Math.max(1, Math.floor(Math.min(group.timeoutMs, remainingMs)));
+    console.log("RESEARCH_SUPERVISOR_GROUP_START", JSON.stringify({name: group.name, timeoutMs, remainingMs: Math.floor(remainingMs)}));
     const groupStartedAt = performance.now();
     const result = runPython([pythonSuite, "-v",
       ...group.methods.map(method => `ResearchSupervisorTests.${method}`)], timeoutMs, group.name);
@@ -163,6 +164,7 @@ test("durable bounded research supervisor synthetic suite", () => {
       `${group.name} must pass without skips\n${tail(result.stderr)}`);
     assert.doesNotMatch(result.stderr, /skipped=/, `${group.name} must not skip tests`);
     const durationMs = Math.round(performance.now() - groupStartedAt);
+    console.log("RESEARCH_SUPERVISOR_GROUP_COMPLETE", JSON.stringify({name: group.name, count: group.methods.length, durationMs}));
     timings.push({name: group.name, count: group.methods.length, durationMs});
   }
 

@@ -28,8 +28,16 @@ function staticServer(){
   const requests=[];
   const server=createServer((request,response)=>{
     const url=new URL(request.url,'http://localhost');
-    requests.push({method:request.method,path:url.pathname});
+    const authorization=request.headers.authorization;
+    const authorized=typeof authorization==='string'&&authorization.startsWith('Bearer ')&&authorization.length>7;
+    requests.push({method:request.method,path:url.pathname,authorized});
     if(request.method!=='GET'){response.writeHead(405);response.end();return;}
+    if(url.pathname==='/host8h-summary'){
+      response.writeHead(authorized?503:401,
+        {'content-type':'application/json','cache-control':'no-store'});
+      response.end(JSON.stringify({error:authorized?
+        'host8h_transport_not_provisioned':'unauthorized'}));return;
+    }
     if(url.pathname==='/app-access'){
       response.writeHead(200,{'content-type':'application/json','cache-control':'no-store'});
       response.end(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}));return;
@@ -45,6 +53,12 @@ function staticServer(){
       let body=readFileSync(path);
       if(path===join(v11,'app-access.js')){
         body=body.toString().replace('https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w','/app-access');
+      }
+      if(path===join(v11,'spot-paper-host8h-controller.js')){
+        const production='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-host8h-report';
+        body=body.toString();
+        assert.equal(body.split(production).length,2,'only the exact host8h endpoint is rewritten for the offline browser fixture');
+        body=body.replace(production,'/host8h-summary');
       }
       const type=path.endsWith('.html')?'text/html; charset=utf-8':
         path.endsWith('.json')?'application/json; charset=utf-8':'text/javascript; charset=utf-8';
@@ -312,6 +326,18 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           if(await evaluate(`document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]').length===12`))break;
           await new Promise(resolve=>setTimeout(resolve,25));
         }
+        const paperLayout=await evaluate(`(()=>{
+          const host=document.getElementById('spot-paper-host8h-root');
+          const history=document.getElementById('paper-history-section');
+          const research=document.getElementById('paper-research-section');
+          return {hostVisible:host.getBoundingClientRect().height>0,
+            hostFirst:!!(host.compareDocumentPosition(history)&Node.DOCUMENT_POSITION_FOLLOWING),
+            historyClosed:!history.open,researchClosed:!research.open,
+            legacyGrouped:!!history.querySelector('#spot-paper-cockpit-root')&&!!history.querySelector('#paper-cockpit-root'),
+            researchGrouped:!!research.querySelector('#paper-readiness-root')&&!!research.querySelector('#strategy-catalog')&&!!research.querySelector('#strategy-arena-root')};
+        })()`);
+        assert.deepEqual(paperLayout,{hostVisible:true,hostFirst:true,historyClosed:true,researchClosed:true,legacyGrouped:true,researchGrouped:true});
+        await evaluate(`document.querySelector('#paper-research-section > summary').click()`);
         // Measure settled layout, not the active view's translateY appearance animation.
         // With reduced motion getAnimations() is empty and this resolves immediately.
         await evaluate(`(async()=>{
@@ -371,13 +397,15 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
             text:panel.innerText,groups:groups.map(node=>({id:node.dataset.paperReadiness,open:node.open,
               height:node.querySelector('summary').getBoundingClientRect().height})),
             interactiveActions:panel.querySelectorAll('button,input,select,form,a').length,
+            scopeWraps:getComputedStyle(panel.querySelector('.limited')).whiteSpace==='normal',
+            scopeFits:panel.querySelector('.limited').getBoundingClientRect().right<=panel.getBoundingClientRect().right,
             overflow:panel.scrollWidth>panel.clientWidth+1||document.documentElement.scrollWidth>innerWidth+1,
             requests:performance.getEntriesByType('resource').length};
         })()`);
         assert.equal(paperReadiness.count,1);
         assert.equal(paperReadiness.visible,true);
         assert.equal(paperReadiness.precedesCatalog,true);
-        assert.match(paperReadiness.text,/kein laufender Paper-Betrieb/);
+        assert.match(paperReadiness.text,/keine Aussage zum aktuellen Paper-Lauf/);
         assert.match(paperReadiness.text,/Paperstart gesperrt · Echtgeldhandel nicht freigegeben/);
         assert.match(paperReadiness.text,/D2 ohne Edge; Qualifikation offen/);
         assert.match(paperReadiness.text,/Quellenstand 2026-10-31/);
@@ -386,6 +414,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.deepEqual(paperReadiness.groups.map(row=>row.id),['prepared','gates','choices']);
         assert.ok(paperReadiness.groups.every(row=>!row.open&&row.height>=44));
         assert.equal(paperReadiness.interactiveActions,0);
+        assert.equal(paperReadiness.scopeWraps,true);
+        assert.equal(paperReadiness.scopeFits,true);
         assert.equal(paperReadiness.overflow,false);
         await evaluate(`document.querySelector('[data-paper-readiness="choices"] summary').focus()`);
         await key('Enter','Enter',13);
@@ -1072,7 +1102,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         const hostilePresentation=await evaluate(`(async()=>{
-          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B16-M11-FIX13');
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B16-M11-FIX14');
           const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
           const root=document.createElement('div');
           root.style.cssText='max-width:100%;min-width:0';
@@ -1097,7 +1127,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B16-M11-FIX13');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B16-M11-FIX14');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});
@@ -1210,6 +1240,10 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true);
         const requestPaths=hosted.requests.map(request=>request.path);
         assert.ok(!requestPaths.some(path=>/\/v10\/|\/api\/|\/klines|\/ticker|\/market/i.test(path)));
+        const host8hReads=hosted.requests.filter(request=>request.path==='/host8h-summary');
+        assert.ok(host8hReads.length>0,'host8h uses only the local unavailable transport fixture');
+        assert.ok(host8hReads.every(request=>request.method==='GET'&&request.authorized),
+           'the local host8h fixture requires the authenticated read-only request');
         return {width:size.width,sourceFetches:requestPaths.filter(path=>path==='/docs/strategy-lab/campaign-20261013.json').length,
           families:catalog.families,models:arena.cards,overflow:catalog.overflow,synthetic:true,
           explorerPaths:44,selectionLimit:2,quarterlyValues:'producer-exact',importReset:true,

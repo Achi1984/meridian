@@ -10,8 +10,10 @@ maintenance instance until the writer is independently confirmed stopped.**
 | Identity | Value |
 | --- | --- |
 | Northflank project ID | `meridian` |
-| Northflank job ID | `meridian-btc-paper-host-8h` |
+| Original writer Northflank job ID | `meridian-btc-paper-host-8h` |
 | Reviewed image/build label | `stiff-run-1846` |
+| Exact reviewed image reference | `registry.northflank.com/northflank/job/6af0572ec4d97f88cd5701ac:6af076b823f0573613d5d2ab` |
+| Evidence volume | `meridian-btc-paper-data` / `6af056c2164923835bd1846d` / 6144 MiB / ReadWriteOnce |
 | Source revision bound to that image | `473943fb20d8ef25a5822c89a5abfb216437d782` |
 | Writer Northflank run ID | `e7916ab3-3b3e-43f8-a07a-27204c066c15` |
 | Writer Northflank instance name | `meridian-btc-paper-host-8h-6af07e22a8cdd5b245eb83af-ncb4m` |
@@ -36,6 +38,20 @@ Prior transport rehearsals are limited proofs, not pilot results:
   retrieval hold was intentionally ended; its completed download and independent
   byte checks remain verified. This is not a full-size archive test.
 
+Gateway transport was subsequently provisioned and verified in
+[PR #1293, comment 6725436689](https://github.com/Achi1984/meridian/pull/1293#issuecomment-6725436689).
+At that receipt, gateway `meridian/achi-meridian` ran source `a5223b897a00b51356e4467455c9d6b8cc60dff7`;
+the unauthenticated read returned `401 read_token_required` and the authenticated
+read returned `404 host8h_report_not_found`. Thus transport was connected with
+**no report stored**. The dedicated publisher secret remained unattached. Only
+the gateway was restarted; the writer remained running. These are dated
+receipts, not a current status check or permission to retrieve active evidence.
+No new database migration or credential replacement is part of this handoff.
+The latest metadata review found the volume BOUND and attached only to the
+writer Job. Do not attach it to maintenance while the writer is active. Reuse
+the exact image reference above, not a rebuild from the old branch or a moving
+image tag. Volume contents have not been read as part of this preparation.
+
 ## Controlled post-run sequence
 
 1. **Independently establish that the writer is terminal.** Check the Northflank
@@ -45,7 +61,7 @@ Prior transport rehearsals are limited proofs, not pilot results:
    Do not abort, retry, relaunch, or replace the writer or its evidence.
 
 2. **Read packaged status and report from the retained volume.** Use the reviewed
-   image as a separate, read-only inspection instance, with custom entrypoint
+   image in a **separate maintenance Job with its own job ID**, as a read-only inspection instance, with custom entrypoint
    `node`, no schedule/restart/retry, and the original persistent volume mounted
    read-only at `/evidence-root`. The actual evidence argument is
    `/evidence-root/btc-eur-paper-001` (not the generic `/var/lib/...` examples in
@@ -68,8 +84,12 @@ Prior transport rehearsals are limited proofs, not pilot results:
    from the persistent volume.
 
 4. **Package once in a separate bounded maintenance run.** Only after step 1,
-   start a manual instance of the same reviewed job/image with the same volume
-   mounted read-only at `/evidence-root`, custom entrypoint `node`, schedules,
+   use a **separate maintenance Job**, with a job ID different from
+   `meridian-btc-paper-host-8h`, using the same reviewed image and volume.
+   Do not edit, reuse, restart, or replace the writer Job. Record the maintenance
+   Job ID as `MAINTENANCE_JOB_ID`; this is an operator-selected existing or newly
+   reviewed maintenance resource, not an ID to infer from the writer run.
+   Start its one manual packaging run with the volume mounted read-only at `/evidence-root`, custom entrypoint `node`, schedules,
    CI/CD, restart, and retry disabled, and no public port. Use the existing
    package command and distinct temporary outputs:
 
@@ -88,7 +108,7 @@ Prior transport rehearsals are limited proofs, not pilot results:
 
    The five-minute hold is required because the native file-copy command needs
    a running container. Configure a one-attempt maintenance run with an external
-   timeout of at least 390 seconds (60-second cooperative package budget, 300
+   timeout of 390 seconds (60-second cooperative package budget, 300
    seconds of retrieval window, and 30-second exit margin); do not add an
    automatic retry. Keep this maintenance run distinct from the original writer
    run and from both rehearsal runs. Provide at least 84 MiB of temporary
@@ -103,29 +123,31 @@ Prior transport rehearsals are limited proofs, not pilot results:
 
 6. **Pin the exact active maintenance instance and download both files.** Record
    the run ID and instance name returned when the packaging maintenance run is
-   started. Use that maintenance `instanceName` with the actual Northflank
-   `--jobId` option. Do not use the writer's instance name, the job name as an
+   started. Use both that maintenance Job ID and its exact `instanceName` in
+   the Northflank command. Do not use the writer's instance name, the job name as an
    instance name, or either rehearsal instance. Create separate empty local
    destination directories first; observed `--localPath` semantics treat its
    value as a **destination directory** and append the remote basename.
-   Keep one local shell session open through steps 6–9 so the private staging
+   Keep one local shell session open through steps 6–12 so the private staging
    path remains available.
 
    ```sh
    set -euo pipefail
    umask 077
    stage="$(mktemp -d)"
+   : "${MAINTENANCE_JOB_ID:?set this to the separate maintenance Job ID}"
+   test "$MAINTENANCE_JOB_ID" != meridian-btc-paper-host-8h
    : "${MAINTENANCE_INSTANCE_NAME:?set this to the exact instance name from the packaging run}"
    mkdir "$stage/archive" "$stage/manifest"
    northflank download job file \
      --projectId meridian \
-     --jobId meridian-btc-paper-host-8h \
+     --jobId "$MAINTENANCE_JOB_ID" \
      --instanceName "$MAINTENANCE_INSTANCE_NAME" \
      --remotePath /tmp/btc-eur-paper-001.tar \
      --localPath "$stage/archive"
    northflank download job file \
      --projectId meridian \
-     --jobId meridian-btc-paper-host-8h \
+     --jobId "$MAINTENANCE_JOB_ID" \
      --instanceName "$MAINTENANCE_INSTANCE_NAME" \
      --remotePath /tmp/btc-eur-paper-001.manifest.json \
      --localPath "$stage/manifest"
@@ -348,6 +370,88 @@ Prior transport rehearsals are limited proofs, not pilot results:
    `UNKNOWN` or `FAILED` as reported. Do not substitute `-` for the expected
    context to obtain a more favorable result. The assessor makes no network
    requests and does not repair evidence.
+
+10. **Export a bounded terminal summary locally, after mandatory assessment.**
+    `host8h-presentation.mjs` exports a function; it is not a command-line tool.
+    Use the existing function from the reviewed checkout with the same evidence
+    and independent context. It reinspects the evidence and reruns the assessor.
+    The following invocation also compares its outcome with the separately
+    retained assessment from step 9. It writes only a new private summary file
+    outside the extracted evidence; it makes no provider requests:
+
+    ```sh
+    node --input-type=module - "$stage/extracted" \
+      /absolute/path/to/independently-retained/expected-host-context.json \
+      /absolute/path/to/review/host-assessment.json \
+      "$stage/host8h-summary.json" <<'JS'
+    import {readFile, writeFile} from 'node:fs/promises';
+    import {exportSpotPaperHost8hSummary} from './scripts/spot-paper-report-bridge/host8h-presentation.mjs';
+    import {normalizeSpotPaperHost8hReport} from './scripts/spot-paper-report-bridge/host8h-contract.mjs';
+    const [evidenceDir, contextPath, assessmentPath, outputPath] = process.argv.slice(2);
+    const context = JSON.parse(await readFile(contextPath, 'utf8'));
+    const retained = JSON.parse(await readFile(assessmentPath, 'utf8'));
+    if (retained.assessment?.terminalVerified !== true) {
+      throw new Error('TERMINAL_ASSESSMENT_REQUIRED');
+    }
+    const summary = await exportSpotPaperHost8hSummary({evidenceDir, expectedHostContext: context});
+    const checked = normalizeSpotPaperHost8hReport(summary);
+    if (!checked || checked.snapshot.status !== 'VERIFIED_TERMINAL' ||
+        checked.assessment.outcome !== retained.outcome ||
+        checked.assessment.assessment.outcome !== retained.assessment.outcome ||
+        ['runId', 'profileId', 'sourceSha'].some(key =>
+          checked.identity[key] !== retained.assessment[key])) {
+      throw new Error('TERMINAL_SUMMARY_REVIEW_REQUIRED');
+    }
+    await writeFile(outputPath, JSON.stringify(checked), {flag: 'wx', mode: 0o600});
+    console.log('TERMINAL_SUMMARY_EXPORTED');
+    JS
+    ```
+
+    An incomplete or nonterminal assessment stops this terminal-publication
+    path; retain its actual result and investigate without fabricating terminal
+    metrics. A verified terminal `FAILED` or `UNKNOWN` assessment must keep that
+    outcome; do not promote it to `COMPLETED`. Inspect the exported fees, net PnL,
+    inventory, EUR units, actual duration, coverage and outcome before publishing.
+
+11. **Validate the exact summary without uploading.** The existing publisher
+    defaults to dry-run and does not read the upload credential:
+
+    ```sh
+    node scripts/spot-paper-report-bridge/host8h-publisher.mjs \
+      --summary "$stage/host8h-summary.json" \
+      --endpoint https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-host8h-report/upload
+    ```
+
+    Require `DRY_RUN` / `VALIDATED_NO_UPLOAD`. The regular-file and full transfer
+    envelope ceilings are 256 KiB. Retain the reviewed summary unchanged.
+    The exporter observation time describes this evidence inspection; the
+    duration and lifecycle fields describe the historical run. Never edit the
+    observation time or regenerate an old summary merely to clear a stale label.
+
+12. **Publish once from the separate authorized publisher environment, then
+    verify authenticated readback.** Provision access to the already stored
+    publisher secret only for that reviewed external publisher. It supplies
+    `MERIDIAN_SPOT_PAPER_HOST8H_REPORT_UPLOAD_TOKEN` through its secret environment;
+    do not grant it to the original writer, the evidence-packaging Job, or the
+    browser. The provisioning receipt did not attach this secret to a publisher.
+    After the exact summary and destination are reviewed, run the same command
+    from step 11 with `--publish` appended, using the unchanged private summary
+    path accessible to that publisher. Do not put credentials in arguments,
+    artifacts, logs or chat, and do not add a retry loop or scheduler.
+
+    Require `ACCEPTED` with a matching HTTP 201 receipt, or `IDEMPOTENT` with a
+    matching HTTP 200 receipt. These prove transport acknowledgement, not a
+    successful strategy. On `UNKNOWN`, timeout, or redirect rejection, inspect
+    destination state before deciding any later action: the POST may have been
+    stored even if the receipt was not received. Preserve stale/conflict/terminal
+    regression rejection reasons rather than altering evidence to force success.
+
+    Read `/api/private/spot-paper-host8h-report` through the existing authenticated
+    dashboard/read client. Confirm the pinned run ID, original `observedAt`,
+    sequence, terminal outcome and all summary values match the reviewed file.
+    Then verify the Strategies card displays the corresponding actual result,
+    modeled fees, EUR units and freshness. An accepted stored report is not
+    continuous live extraction, USD trading, or permission for a new run.
 
 ## Review checklist and decision boundary
 
