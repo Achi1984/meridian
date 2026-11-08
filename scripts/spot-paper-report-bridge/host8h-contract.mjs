@@ -164,6 +164,8 @@ export function normalizeSpotPaperHost8hReport(input, {now = Date.now()} = {}) {
         report.assessment.assessment.runId !== identity.runId ||
         report.assessment.assessment.profileId !== identity.profileId ||
         report.assessment.assessment.sourceSha !== identity.sourceSha ||
+        typeof report.assessment.assessment.boundedTermination !== 'boolean' ||
+        report.assessment.outcome !== report.assessment.assessment.outcome ||
         report.assessment.assessment.outcome !== report.sourceEvidence.assessmentOutcome ||
         report.assessment.assessment.outcome === 'NOT_RUN' ||
         !validMetrics(report.metrics, {provisional: false})) return null;

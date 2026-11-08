@@ -43,6 +43,7 @@ function assessment(overrides = {}) {
       sourceSha: identity.sourceSha,
       terminalVerified: true,
       boundedTermination: true,
+      outcome: 'COMPLETED',
       elapsedMs: 12_300_000,
       durationCoverage: 12_300_000 / 28_800_000,
       durationStatus: 'PARTIAL_BOUNDED_DURATION',
@@ -86,6 +87,40 @@ function harness() {
   const root = new Element(document, 'section');
   return {root, document};
 }
+
+test('contradictory terminal evidence cannot display completed or verified metrics', () => {
+  const mutations = [
+    value => { value.assessment.assessment.outcome = 'FAILED'; },
+    value => { value.assessment.outcome = 'FAILED'; },
+    value => { value.sourceEvidence = {assessmentOutcome: 'FAILED'}; },
+    ...[null, 'true', 1, undefined].map(boundedTermination => value => {
+      value.assessment.assessment.boundedTermination = boundedTermination;
+    })
+  ];
+  for (const mutate of mutations) {
+    const value = input('VERIFIED_TERMINAL');
+    value.assessment = assessment();
+    mutate(value);
+    const model = presentSpotPaperHost8h(value, {now: NOW, staleAfterMs: 60_000});
+    assert.equal(model.completed, false);
+    assert.notEqual(model.statusTone, 'tone-safe');
+    assert.equal(model.metrics, null);
+    const {root, document} = harness();
+    renderSpotPaperHost8h(root, value, document, {now: NOW, staleAfterMs: 60_000});
+    assert.doesNotMatch(root.textContent, /Abgeschlossen · Assessment verifiziert/);
+  }
+  for (const outcome of ['FAILED', 'UNKNOWN']) {
+    const value = input('VERIFIED_TERMINAL');
+    value.assessment = assessment({outcome});
+    value.assessment.outcome = outcome;
+    value.sourceEvidence = {assessmentOutcome: outcome};
+    const model = presentSpotPaperHost8h(value, {now: NOW, staleAfterMs: 60_000});
+    assert.equal(model.completed, false);
+    assert.equal(model.assessmentOutcome, outcome);
+    assert.equal(model.status, outcome === 'FAILED' ? 'FAILED' : 'VERIFIED_TERMINAL');
+    assert.ok(model.metrics);
+  }
+});
 
 test('running host observation is not a terminal report or completed result', () => {
   const model = presentSpotPaperHost8h(input(), {now: NOW, staleAfterMs: 60_000});

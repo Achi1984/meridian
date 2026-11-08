@@ -161,6 +161,42 @@ function request(method, url, token, body) {
 
 const authorizedRead = req => req.headers.authorization === 'Bearer ' + READ_TOKEN;
 
+test('gateway rejects contradictory terminal outcomes and nonboolean termination before storing', async () => {
+  const mutations = [
+    report => {
+      report.assessment.assessment.outcome = 'FAILED';
+      report.sourceEvidence.assessmentOutcome = 'FAILED';
+    },
+    report => { report.assessment.outcome = 'FAILED'; },
+    report => { report.sourceEvidence.assessmentOutcome = 'FAILED'; },
+    ...[null, 'true', 1, undefined].map(value => report => {
+      report.assessment.assessment.boundedTermination = value;
+    })
+  ];
+  let writes = 0;
+  for (const mutate of mutations) {
+    const report = summary('VERIFIED_TERMINAL');
+    mutate(report);
+    assert.equal(normalizeSpotPaperHost8hReport(report, {now: NOW}), null);
+    const response = await handleSpotPaperHost8hReportGatewayRequest(request('POST',
+      '/api/private/spot-paper-host8h-report/upload', UPLOAD_TOKEN,
+      canonical({schema: SPOT_PAPER_HOST8H_TRANSFER_SCHEMA, runId: identity.runId, report})), {
+      config: gatewayConfig(), authorizedRead, now: () => NOW,
+      getStore: () => ({putLatest: async () => { writes++; return 'INSERTED'; }})
+    });
+    assert.equal(response.status, 400);
+  }
+  assert.equal(writes, 0);
+  for (const outcome of ['COMPLETED', 'FAILED', 'UNKNOWN']) {
+    const report = summary('VERIFIED_TERMINAL');
+    report.assessment.outcome = outcome;
+    report.assessment.assessment.outcome = outcome;
+    report.sourceEvidence.assessmentOutcome = outcome;
+    report.assessment.assessment.boundedTermination = false;
+    assert.ok(normalizeSpotPaperHost8hReport(report, {now: NOW}));
+  }
+});
+
 class Store {
   row = null;
   conflictNext = false;

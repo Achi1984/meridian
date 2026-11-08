@@ -71,13 +71,18 @@ function cents(value, signed = false) {
   };
 }
 
-function verifiedAssessment(assessment, identity) {
+function verifiedAssessment(assessment, identity, sourceEvidence) {
   if (!isRecord(assessment) ||
       assessment.schemaVersion !== 'SPOT_PAPER_HOST_OFFLINE_ASSESSMENT_V1' ||
       !isRecord(assessment.assessment)) return null;
   const result = assessment.assessment;
   if (result.terminalVerified !== true || result.runId !== identity.runId ||
-      result.profileId !== identity.profileId || result.sourceSha !== identity.sourceSha) {
+      result.profileId !== identity.profileId || result.sourceSha !== identity.sourceSha ||
+      typeof result.boundedTermination !== 'boolean' ||
+      !['COMPLETED', 'FAILED', 'UNKNOWN'].includes(result.outcome) ||
+      result.outcome !== assessment.outcome ||
+      sourceEvidence !== undefined &&
+        sourceEvidence?.assessmentOutcome !== result.outcome) {
     return null;
   }
   return result;
@@ -179,7 +184,7 @@ export function presentSpotPaperHost8h(input, {
   }
 
   const snapshot = value.snapshot;
-  const assessment = verifiedAssessment(value.assessment, identity);
+  const assessment = verifiedAssessment(value.assessment, identity, value.sourceEvidence);
   let status = snapshot.status;
   if (status === 'DISABLED') status = 'UNAVAILABLE';
   if (status === 'VERIFIED_TERMINAL' && snapshot.verifiedTerminal !== true) {
