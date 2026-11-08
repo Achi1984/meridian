@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
+import {spawnSync} from 'node:child_process';
 import {mkdtemp, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
@@ -42,6 +43,8 @@ function arm(role, {fills = [], equity = 100_000, fees = 0, slippage = 0,
     tradingStatus: stoppedAt === null ? 'ACTIVE' : 'STOPPED',
     stoppedAt,
     stopReason,
+    decisions: Array.from({length: 480}, () => ({})),
+    riskStates: Array.from({length: 480}, () => ({})),
     fills,
     valuation: {
       startingCapitalCents: 100_000,
@@ -69,7 +72,7 @@ function fixture() {
         {side: 'SELL', grossCents: 10_000, feeCents: 50}
       ],
       equity: 99_900, fees: 100, slippage: 20, turnover: 20_000,
-      drawdown: 200, stoppedAt: 50_000, stopReason: 'SESSION_LOSS_LIMIT'
+      drawdown: 200, stoppedAt: 28_750_000, stopReason: 'SESSION_LOSS_LIMIT'
     }),
     arm('challenger', {equity: 99_500, drawdown: 500}),
     arm('cash', {})
@@ -88,35 +91,37 @@ function fixture() {
     outcome: 'COMPLETED_BOUNDED',
     stopReason: 'CYCLE_LIMIT',
     startedAt: 1_000,
-    endedAt: 61_000,
-    elapsedMs: 60_000,
-    wallClockElapsedMs: 60_000,
+    endedAt: 28_801_000,
+    elapsedMs: 28_800_000,
+    wallClockElapsedMs: 28_800_000,
     failureReason: null,
-    fullEightHourCompletion: false,
-    coverage: 'PARTIAL',
-    cycles: 2,
-    requests: 4,
+    fullEightHourCompletion: true,
+    coverage: 'CONFIGURED_DURATION_REACHED',
+    cycles: 480,
+    requests: 960,
     deliveredBytes: 1_000,
-    commonHorizon: {available: true, quoteReceivedAt: 59_999, effectAt: 60_000},
+    commonHorizon: {
+      available: true, quoteReceivedAt: 28_801_000, effectAt: 28_801_000
+    },
     assumptions: {feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false},
     arms: reportArms,
     comparison: {
       schemaVersion: 'SPOT_PAPER_SMA_COMPARISON_V1',
       status: 'COMPARISON_AVAILABLE',
-      commonHorizonAt: 60_000,
+      commonHorizonAt: 28_801_000,
       arms: {
         baseline: {
-          strategyId: models[0].modelId, valuationAt: 60_000,
+          strategyId: models[0].modelId, valuationAt: 28_801_000,
           finalNetEquityCents: 99_900, fillCount: 2, feesCents: 100,
           grossTurnoverCents: 20_000
         },
         challenger: {
-          strategyId: models[1].modelId, valuationAt: 60_000,
+          strategyId: models[1].modelId, valuationAt: 28_801_000,
           finalNetEquityCents: 99_500, fillCount: 0, feesCents: 0,
           grossTurnoverCents: 0
         },
         cash: {
-          strategyId: 'CASH_NO_TRADE', valuationAt: 60_000,
+          strategyId: 'CASH_NO_TRADE', valuationAt: 28_801_000,
           finalNetEquityCents: 100_000, fillCount: 0, feesCents: 0,
           grossTurnoverCents: 0
         }
@@ -144,8 +149,23 @@ function fixture() {
   };
   const events = [
     {id: 'paired-start', type: 'start', at: report.startedAt},
-    {id: 'shared:1', type: 'shared_observation'},
-    {id: 'shared:2', type: 'shared_observation'},
+    ...Array.from({length: report.cycles}, (_, index) => ({
+      id: `shared:${index + 1}`,
+      type: 'shared_observation',
+      cycle: index + 1,
+      decisionAt: report.startedAt + (index + 1) * 60_000,
+      effectAt: report.startedAt + (index + 1) * 60_000,
+      observedAt: report.startedAt + (index + 1) * 60_000,
+      ohlc: {path: `responses/${'a'.repeat(64)}.json`, sha256: 'a'.repeat(64), bytes: 100},
+      ticker: {path: `responses/${'b'.repeat(64)}.json`, sha256: 'b'.repeat(64), bytes: 100},
+      decisions: models.map(model => ({role: model.role})),
+      fills: models.map((model, roleIndex) => ({
+        role: model.role,
+        fills: index === 0 ? structuredClone(reportArms[roleIndex].fills) : []
+      })),
+      riskStates: models.map(model => ({role: model.role})),
+      valuations: models.map(model => ({role: model.role}))
+    })),
     {id: 'paired-terminal', type: 'terminal', at: report.endedAt,
       report: structuredClone(report)}
   ];
@@ -176,6 +196,9 @@ test('projects a compatible synthetic terminal run without winner or cost double
   assert.equal(output.arms.baseline.netPnlCents, -100);
   assert.equal(output.arms.baseline.bookedFeesCents, 100);
   assert.equal(output.arms.baseline.modeledSlippageCents, 20);
+  assert.equal(output.arms.baseline.hypotheticalExitFeeCents, null);
+  assert.equal(output.arms.baseline.metricReasons.hypotheticalExitFeeCents,
+    'NOT_REPORTED_BY_REPORT_SCHEMA');
   assert.equal(output.arms.baseline.cashCents, null);
   assert.equal(output.arms.challenger.fillCount, 0);
   assert.equal(output.arms.challenger.netPnlCents, -500);
@@ -183,10 +206,10 @@ test('projects a compatible synthetic terminal run without winner or cost double
   assert.equal(output.deltas.challengerMinusBaseline.netPnlCents, -400);
   assert.equal(output.deltas.challengerMinusCash.netPnlCents, -500);
   assert.equal(output.timing.requestedDurationMs, 28_800_000);
-  assert.equal(output.timing.observedCoverageMs, 59_000);
-  assert.equal(output.timing.runStoppedAt, 61_000);
-  assert.equal(output.timing.valuationAt, 60_000);
-  assert.equal(output.arms.baseline.tradingStoppedAt, 50_000);
+  assert.equal(output.timing.observedCoverageMs, 28_800_000);
+  assert.equal(output.timing.runStoppedAt, 28_801_000);
+  assert.equal(output.timing.valuationAt, 28_801_000);
+  assert.equal(output.arms.baseline.tradingStoppedAt, 28_750_000);
   assert.equal(output.decision, 'NO_WINNER_OR_PROMOTION');
   assert.deepEqual(Object.keys(output), [
     'schemaVersion', 'evidenceStatus', 'evidenceQualification', 'reasonCode',
@@ -207,8 +230,8 @@ test('retains a verified interrupted report and keeps stop time separate from va
   const output = evaluatePairedPaperEvidence(input);
   assert.equal(output.evidenceStatus, 'INTERRUPTED');
   assert.equal(output.timing.stopReason, 'OPERATOR_STOP');
-  assert.equal(output.arms.baseline.tradingStoppedAt, 50_000);
-  assert.equal(output.timing.valuationAt, 60_000);
+  assert.equal(output.arms.baseline.tradingStoppedAt, 28_750_000);
+  assert.equal(output.timing.valuationAt, 28_801_000);
 });
 
 test('labels a reported running snapshot as provisional and not final evidence', () => {
@@ -279,7 +302,6 @@ test('does not compare stale or missing common-horizon marks for open inventory'
 test('keeps missing horizon marks and zero-trade outcomes unknown rather than coercing them', () => {
   const missingMark = fixture();
   missingMark.report.commonHorizon.available = false;
-  missingMark.report.commonHorizon.effectAt = null;
   missingMark.report.arms[0].valuation.openPositions = [{quantitySat: 100}];
   missingMark.report.arms[0].valuation.markAgeMs = null;
   missingMark.report.arms[0].valuation.netEquityCents = null;
@@ -298,6 +320,11 @@ test('keeps missing horizon marks and zero-trade outcomes unknown rather than co
     reportArm.valuation.slippageCents = 0;
     reportArm.valuation.modeledCostsCents = 0;
     reportArm.valuation.turnoverCents = 0;
+  }
+  for (const event of zeroTrades.journal.events) {
+    if (event.type === 'shared_observation') {
+      event.fills = models.map(model => ({role: model.role, fills: []}));
+    }
   }
   zeroTrades.report.arms[0].valuation.netEquityCents = 100_000;
   zeroTrades.report.arms[0].valuation.markedEquityCents = 100_000;
@@ -340,6 +367,12 @@ test('checks journal checksums and enforces bounded, regular, read-only input fi
     await writeFile(expectedIdentityPath, JSON.stringify(input.expectedIdentity));
     await writeFile(reportPath, JSON.stringify(input.report));
     await writeFile(journalPath, JSON.stringify(input.journal));
+    const cli = spawnSync(process.execPath, [
+      'scripts/spot-paper-paired-report/cli.mjs',
+      expectedIdentityPath, reportPath, journalPath
+    ], {encoding: 'utf8'});
+    assert.equal(cli.status, 0, cli.stderr);
+    assert.equal(JSON.parse(cli.stdout).evidenceStatus, 'VERIFIED_COMPLETE');
     const fileOutput = await evaluatePairedPaperFiles({
       expectedIdentityPath, reportPath, journalPath
     });

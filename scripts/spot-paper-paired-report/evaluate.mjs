@@ -27,6 +27,8 @@ const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const isRecord = value => value !== null && typeof value === 'object' &&
   !Array.isArray(value);
 const isInteger = Number.isSafeInteger;
+const exactKeys = (value, keys) => isRecord(value) &&
+  Object.keys(value).sort().join(',') === [...keys].sort().join(',');
 
 function stableJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -40,7 +42,10 @@ function fail(reasonCode) {
 }
 
 function validExpectedIdentity(expected) {
-  if (!isRecord(expected) ||
+  if (!exactKeys(expected, [
+        'schemaVersion', 'runId', 'pair', 'sourceSha256', 'configSha256',
+        'researchSourceSha256', 'feedSourceId', 'comparisonEngineId', 'models'
+      ]) ||
       expected.schemaVersion !== SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA ||
       !RUN_ID.test(expected.runId ?? '') || expected.pair !== 'BTC/EUR' ||
       !HASH.test(expected.sourceSha256 ?? '') ||
@@ -52,7 +57,8 @@ function validExpectedIdentity(expected) {
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(expected.comparisonEngineId) ||
       !Array.isArray(expected.models) || expected.models.length !== 3) return false;
   return expected.models.every((model, index) =>
-    isRecord(model) && model.role === SPOT_PAPER_PAIRED_ROLES[index] &&
+    exactKeys(model, ['role', 'modelId', 'accountId']) &&
+    model.role === SPOT_PAPER_PAIRED_ROLES[index] &&
     MODEL_ID.test(model.modelId ?? '') &&
     typeof model.accountId === 'string' &&
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(model.accountId));
@@ -150,6 +156,8 @@ function reportIsValid(report, expected) {
         ['CYCLE_LIMIT', 'DURATION_LIMIT'].includes(report.stopReason) ||
       report.liveTrading !== false || report.executionImpact !== false ||
       report.autoPromotion !== false ||
+      typeof report.testOnly !== 'boolean' ||
+      report.testOnly !== (report.feedSourceId === 'SYNTHETIC_TEST_ONLY') ||
       !isRecord(report.assumptions) ||
       report.assumptions.feeBpsPerSide !== 50 ||
       report.assumptions.slippageBpsPerSide !== 10 ||
@@ -221,7 +229,38 @@ function validateTerminalJournal(journal, report, expected) {
   }
   const terminal = payload.events.at(-1);
   const observations = payload.events.filter(event =>
-    event?.type === 'shared_observation').length;
+    event?.type === 'shared_observation');
+  const validResponseRef = response => isRecord(response) &&
+    typeof response.path === 'string' &&
+    /^responses\/[a-f0-9]{64}\.json$/.test(response.path) &&
+    response.path === `responses/${response.sha256}.json` &&
+    isInteger(response.bytes) && response.bytes > 0;
+  const eventRoles = (items, roleField = 'role') =>
+    Array.isArray(items) && items.length === 3 &&
+    items.every((item, index) => item?.[roleField] === SPOT_PAPER_PAIRED_ROLES[index]);
+  let priorEffectAt = null;
+  const observationStreamValid = observations.every((event, index) => {
+    const valid = event?.cycle === index + 1 &&
+      event.id === `shared:${index + 1}` &&
+      isInteger(event.decisionAt) && isInteger(event.effectAt) &&
+      event.decisionAt <= event.effectAt && event.observedAt === event.effectAt &&
+      (priorEffectAt === null || event.effectAt > priorEffectAt) &&
+      validResponseRef(event.ohlc) && validResponseRef(event.ticker) &&
+      eventRoles(event.decisions) && eventRoles(event.fills) &&
+      eventRoles(event.riskStates) && eventRoles(event.valuations) &&
+      event.fills.every(item => Array.isArray(item.fills));
+    if (valid) priorEffectAt = event.effectAt;
+    return valid;
+  });
+  const reportArmsReconcile = report.arms.every(arm =>
+    Array.isArray(arm.decisions) && arm.decisions.length === report.cycles &&
+    Array.isArray(arm.riskStates) && arm.riskStates.length === report.cycles);
+  const fillCountsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, index) =>
+    report.arms[index].fills.length === observations.reduce((sum, event) => {
+      const group = Array.isArray(event.fills) ?
+        event.fills.find(item => item?.role === role) : null;
+      return sum + (Array.isArray(group?.fills) ? group.fills.length : 0);
+    }, 0));
   if (terminal?.type !== 'terminal' || terminal.id !== 'paired-terminal' ||
       terminal.at !== report.endedAt ||
       stableJson(terminal.report) !== stableJson(report) ||
@@ -229,7 +268,14 @@ function validateTerminalJournal(journal, report, expected) {
       payload.checkpoint.stopReason !== report.stopReason ||
       payload.checkpoint.counters?.requests !== report.requests ||
       payload.checkpoint.counters?.bytes !== report.deliveredBytes ||
-      observations !== report.cycles ||
+      observations.length !== report.cycles ||
+      payload.events[0]?.type !== 'start' ||
+      payload.events[0]?.id !== 'paired-start' ||
+      !observationStreamValid ||
+      report.cycles > 0 &&
+        priorEffectAt !== report.commonHorizon.effectAt ||
+      report.cycles === 0 && report.commonHorizon.effectAt !== null ||
+      !reportArmsReconcile || !fillCountsReconcile ||
       !identityMatches(report, payload, expected)) {
     return {error: 'JOURNAL_REPORT_MISMATCH'};
   }
