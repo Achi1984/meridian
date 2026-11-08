@@ -5,14 +5,26 @@ import { readFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { execFileSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { createKrakenProvider } from "../scripts/spot-paper-pilot/provider.mjs";
 import { assessObservationEvidence } from "../scripts/spot-paper-pilot/evidence-assessment.mjs";
 import { assessPaperEvidence, ACCEPTED_PAPER_SOURCE_SHA } from
   "../scripts/spot-paper-pilot/paper-evidence-assessment.mjs";
 import {
-  DEFAULT_PAPER_EVIDENCE_PROFILE_ID, getPaperEvidenceProfile
+  DEFAULT_PAPER_EVIDENCE_PROFILE_ID, HOST_EIGHT_HOUR_PROFILE_ID,
+  getPaperEvidenceProfile
 } from "../scripts/spot-paper-pilot/evidence-profiles.mjs";
+import {
+  HOST_LAUNCH_MANIFEST, inspectHostRun, readLaunchManifest
+} from "../scripts/spot-paper-pilot/host-entrypoint.mjs";
+import {
+  EXPECTED_HOST_CONTEXT_SCHEMA
+} from "../scripts/spot-paper-pilot/host-context.mjs";
+import {
+  assessHostEvidence, main as hostEvidenceAssessmentMain
+} from "../scripts/spot-paper-pilot/host-evidence-assessment.mjs";
+import { replaySpotPaperSignals } from "../scripts/spot-paper-pilot/signal-replay.mjs";
 import { createRunJournal, readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { runSpotPaperPilot } from "../scripts/spot-paper-pilot/runner.mjs";
 import { main as pilotCli } from "../scripts/spot-paper-pilot/cli.mjs";
@@ -288,6 +300,109 @@ function fourHourPaperFixture({ withFill = false } = {}) {
   return fixture;
 }
 
+async function hostAssessmentFixture(t, {
+  elapsedMs, mutate, pending = false, profileLimits
+} = {}) {
+  const root = await temporaryRoot(t);
+  const evidenceDir = join(root, "host-evidence");
+  await mkdir(evidenceDir);
+  const hostManifest = await readLaunchManifest();
+  const profile = getPaperEvidenceProfile(HOST_EIGHT_HOUR_PROFILE_ID, { hostManifest });
+  const fixture = structuredClone(paperEvidenceFixture());
+  const report = fixture.report;
+  report.runId = hostManifest.runId;
+  report.endedAt = report.startedAt + (elapsedMs ?? hostManifest.maxDurationMs);
+  fixture.readback.runId = hostManifest.runId;
+  fixture.readback.manifest.startedAt = report.startedAt;
+  fixture.readback.manifest.limits = {
+    maxCycles: profile.maxCycles,
+    maxRequests: profile.maxRequests,
+    maxBytes: profile.maxBytes,
+    maxResponseBytes: profile.maxResponseBytes,
+    requestTimeoutMs: profile.requestTimeoutMs,
+    maxDurationMs: profile.maxDurationMs,
+    pollIntervalMs: profile.pollIntervalMs,
+    ...profileLimits
+  };
+  const observation = fixture.readback.events[1];
+  const ohlcRaw = fixture.responseBodies[observation.ohlc.sha256];
+  const parsed = parseKrakenOhlc({
+    raw: ohlcRaw,
+    sha256: observation.ohlc.sha256,
+    requestStartedAt: observation.ohlc.requestStartedAt,
+    receivedAt: observation.ohlc.receivedAt,
+    data: JSON.parse(ohlcRaw)
+  }, observation.ohlc.receivedAt);
+  fixture.readback.checkpoint.strategy =
+    advanceStrategy(createStrategyState(), parsed.candles).state;
+  fixture.readback.events[0].at = report.startedAt;
+  fixture.readback.events.at(-1).at = report.endedAt;
+  fixture.readback.events.at(-1).report = report;
+  fixture.readback.report = report;
+  fixture.readback.eventCount = fixture.readback.events.length;
+  fixture.readback.checkpoint.stopReason = report.stopReason;
+  fixture.readback.checkpoint.counters = {
+    requests: report.requests, bytes: report.deliveredBytes
+  };
+  mutate?.({ fixture, hostManifest, profile });
+
+  const journal = await createRunJournal({
+    dataRoot: join(evidenceDir, "runtime"),
+    runId: hostManifest.runId,
+    manifest: fixture.readback.manifest
+  });
+  const initialCheckpoint = {
+    strategy: createStrategyState(),
+    ledger: createLedger(),
+    counters: { requests: 0, bytes: 0 },
+    cycle: 0
+  };
+  await journal.append(fixture.readback.events[0], initialCheckpoint);
+  for (const [hash, raw] of Object.entries(fixture.responseBodies)) {
+    const reference = [observation.ohlc, observation.ticker]
+      .find(item => item.sha256 === hash);
+    await journal.persistResponse({
+      raw, sha256: hash, bytes: Buffer.byteLength(raw),
+      requestStartedAt: reference.requestStartedAt,
+      receivedAt: reference.receivedAt
+    });
+  }
+  await journal.append(observation, fixture.readback.checkpoint);
+  await journal.append(fixture.readback.events.at(-1), fixture.readback.checkpoint);
+  await journal.close();
+  const hostState = {
+    schemaVersion: "SPOT_PAPER_HOST_STATE_V1",
+    runId: hostManifest.runId,
+    runtimeSourceSha256: hostManifest.runtimeSourceSha256,
+    status: "CHILD_EXITED",
+    childPid: null,
+    childExitCode: 0,
+    childSignal: null,
+    interruptedBy: null,
+    ...fixture.hostState
+  };
+  await writeFile(join(evidenceDir, "host-state.json"), JSON.stringify(hostState));
+  if (pending) {
+    await writeFile(join(evidenceDir, "runtime", hostManifest.runId, "journal.pending"), "{}");
+  }
+  const manifestBytes = await readFile(new URL(
+    "../scripts/spot-paper-pilot/host-launch-manifest.json", import.meta.url));
+  const expectedHostContext = {
+    schemaVersion: EXPECTED_HOST_CONTEXT_SCHEMA,
+    profileId: HOST_EIGHT_HOUR_PROFILE_ID,
+    hostRunId: hostManifest.runId,
+    launchManifestSha256: createHash("sha256").update(manifestBytes).digest("hex"),
+    runtimeSourceSha256: hostManifest.runtimeSourceSha256,
+    imageDigest: null,
+    hostIdentity: null
+  };
+  return {
+    root, evidenceDir, hostManifest, fixture, hostState, expectedHostContext,
+    assessmentPath: join(root, "assessment.json"),
+    contextPath: join(root, "expected-host-context.json")
+  };
+}
+
 test("paper evidence accepts zero fills without validating a fill path or profitability", () => {
   const fixture = paperEvidenceFixture();
   const assessment = assessPaperEvidence({
@@ -428,6 +543,249 @@ test("four-hour allowlisted assessment reports partial duration, unresolved inve
     provenance: fixture.provenance, responseBodies: fixture.responseBodies,
     profileId: "constructor"
   }), /UNKNOWN_PAPER_EVIDENCE_PROFILE/);
+});
+
+test("host eight-hour assessment binds a clean terminal journal and reports only content evidence", async t => {
+  const evidence = await hostAssessmentFixture(t);
+  assert.equal(HOST_LAUNCH_MANIFEST.runId, evidence.hostManifest.runId);
+  const profile = getPaperEvidenceProfile(HOST_EIGHT_HOUR_PROFILE_ID, {
+    hostManifest: evidence.hostManifest
+  });
+  assert.deepEqual({
+    runId: profile.runId,
+    runtimeSourceSha256: profile.runtimeSourceSha256,
+    maxCycles: profile.maxCycles,
+    maxRequests: profile.maxRequests,
+    maxDurationMs: profile.maxDurationMs
+  }, {
+    runId: HOST_LAUNCH_MANIFEST.runId,
+    runtimeSourceSha256: HOST_LAUNCH_MANIFEST.runtimeSourceSha256,
+    maxCycles: 480,
+    maxRequests: 960,
+    maxDurationMs: 28_800_000
+  });
+  const result = await assessHostEvidence({
+    evidenceDir: evidence.evidenceDir,
+    expectedHostContext: evidence.expectedHostContext
+  });
+  assert.equal(result.outcome, "COMPLETED", JSON.stringify(result));
+  assert.equal(result.assessment.runClassification, "COMPLETED_EIGHT_HOURS");
+  assert.equal(result.assessment.durationStatus, "FULL_REQUESTED_DURATION");
+  assert.equal(result.assessment.elapsedMs, 28_800_000);
+  assert.equal(result.assessment.positionStatus, "FLAT");
+  assert.equal(result.assessment.feesCents, 0);
+  assert.equal(result.assessment.profitability, "NOT_ASSESSED");
+  assert.equal(result.signalReplay.outcome, "PASS");
+  assert.equal(result.hostContextBinding, "CONTENT_BOUND");
+  assert.equal(result.imageIdentity, "NOT_AVAILABLE");
+  assert.equal(result.hostIdentity, "NOT_AVAILABLE");
+  assert.equal(result.sourceAuthenticity, "UNATTESTED");
+  assert.equal(result.clockAuthenticity, "UNATTESTED");
+  assert.equal(result.providerAuthenticity, "UNATTESTED");
+  assert.equal(result.launchReadiness, "NOT_ASSESSED");
+});
+
+test("missing and forged host expectations fail closed without GitHub identity", async t => {
+  const missing = await hostAssessmentFixture(t, {
+    mutate: ({ fixture }) => {
+      fixture.hostState = { expectedHostContext: { arbitrary: "artifact claim" } };
+    }
+  });
+  assert.equal((await assessHostEvidence({ evidenceDir: missing.evidenceDir })).outcome,
+    "UNKNOWN");
+
+  for (const change of [
+    context => { context.runtimeSourceSha256 = "f".repeat(64); },
+    context => { context.launchManifestSha256 = "e".repeat(64); },
+    context => { context.hostRunId = "spot-paper-12345-1"; },
+    context => { context.workflowRunId = "12345"; }
+  ]) {
+    const evidence = await hostAssessmentFixture(t);
+    const forged = structuredClone(evidence.expectedHostContext);
+    change(forged);
+    const result = await assessHostEvidence({
+      evidenceDir: evidence.evidenceDir, expectedHostContext: forged
+    });
+    assert.equal(result.outcome, "FAILED", JSON.stringify(result));
+  }
+});
+
+test("host assessment CLI requires external context and accepts a separately supplied file", async t => {
+  const evidence = await hostAssessmentFixture(t, {
+    mutate: ({ fixture }) => {
+      fixture.hostState = { expectedHostContext: { arbitrary: "self-attested" } };
+    }
+  });
+  await assert.rejects(hostEvidenceAssessmentMain([
+    evidence.evidenceDir,
+    join(evidence.evidenceDir, "expected-host-context.json"),
+    evidence.assessmentPath
+  ], { stdout: { write() {} } }), /EXPECTED_HOST_CONTEXT_MUST_BE_EXTERNAL/);
+
+  await writeFile(evidence.contextPath, JSON.stringify(evidence.expectedHostContext));
+  let output = "";
+  const previousExitCode = process.exitCode;
+  try {
+    const result = await hostEvidenceAssessmentMain([
+      evidence.evidenceDir, evidence.contextPath, evidence.assessmentPath
+    ], { stdout: { write: value => { output += value; } } });
+    assert.equal(result.outcome, "COMPLETED");
+    assert.equal(JSON.parse(output).signalReplay.outcome, "PASS");
+    assert.deepEqual(JSON.parse(await readFile(evidence.assessmentPath, "utf8")), result);
+  } finally {
+    process.exitCode = previousExitCode;
+  }
+});
+
+test("host assessment rejects interruptions, failed children, pending journals, and old-profile mixes", async t => {
+  for (const { mutate, pending } of [
+    { mutate: ({ fixture }) => { fixture.hostState = { interruptedBy: "SIGTERM" }; } },
+    { mutate: ({ fixture }) => { fixture.hostState = { childExitCode: 7 }; } },
+    { pending: true }
+  ]) {
+    const evidence = await hostAssessmentFixture(t, { mutate, pending });
+    assert.equal((await assessHostEvidence({
+      evidenceDir: evidence.evidenceDir,
+      expectedHostContext: evidence.expectedHostContext
+    })).outcome, "UNKNOWN");
+  }
+
+  for (const profileId of [
+    DEFAULT_PAPER_EVIDENCE_PROFILE_ID, "BTC_EUR_PAPER_4H_V1"
+  ]) {
+    const oldProfile = getPaperEvidenceProfile(profileId);
+    const mixed = await hostAssessmentFixture(t, {
+      profileLimits: {
+        maxCycles: oldProfile.maxCycles,
+        maxRequests: oldProfile.maxRequests,
+        maxDurationMs: oldProfile.maxDurationMs,
+        pollIntervalMs: oldProfile.pollIntervalMs
+      }
+    });
+    assert.equal((await assessHostEvidence({
+      evidenceDir: mixed.evidenceDir,
+      expectedHostContext: mixed.expectedHostContext
+    })).outcome, "UNKNOWN", profileId);
+  }
+});
+
+test("host assessment rejects timestamp, budget, accounting, and replay discrepancies", async t => {
+  const timestamp = await hostAssessmentFixture(t, { elapsedMs: 28_806_000 });
+  const timestampResult = await assessHostEvidence({
+    evidenceDir: timestamp.evidenceDir,
+    expectedHostContext: timestamp.expectedHostContext
+  });
+  assert.equal(timestampResult.outcome, "FAILED", JSON.stringify(timestampResult));
+  assert.ok(timestampResult.assessment.reasons.includes("RUNTIME_BOUND_OR_TIMESTAMP_INVALID"));
+
+  const budget = await hostAssessmentFixture(t, {
+    mutate: ({ fixture }) => { fixture.report.requests++; }
+  });
+  assert.equal((await assessHostEvidence({
+    evidenceDir: budget.evidenceDir,
+    expectedHostContext: budget.expectedHostContext
+  })).outcome, "UNKNOWN");
+
+  const accounting = await hostAssessmentFixture(t, {
+    mutate: ({ fixture }) => { fixture.report.feesCents++; }
+  });
+  const accountingResult = await assessHostEvidence({
+    evidenceDir: accounting.evidenceDir,
+    expectedHostContext: accounting.expectedHostContext
+  });
+  assert.equal(accountingResult.outcome, "FAILED", JSON.stringify(accountingResult));
+  assert.ok(accountingResult.assessment.reasons.includes(
+    "INTEGER_LEDGER_OR_CAUSAL_FILL_RECONCILIATION_FAILED"));
+
+  const replay = await hostAssessmentFixture(t, {
+    mutate: ({ fixture }) => {
+      const event = fixture.readback.events[1];
+      event.signals = [{
+        id: "forged-signal", direction: "ENTRY", candleAt: 1,
+        closeNano: "1", signalKnownAt: 2
+      }];
+      fixture.report.signals = event.signals;
+    }
+  });
+  const replayResult = await assessHostEvidence({
+    evidenceDir: replay.evidenceDir,
+    expectedHostContext: replay.expectedHostContext
+  });
+  assert.equal(replayResult.signalReplay.outcome, "FAILED");
+  assert.equal(replayResult.outcome, "FAILED");
+});
+
+test("host terminal shorter than eight hours is never labeled full duration", async t => {
+  const evidence = await hostAssessmentFixture(t, { elapsedMs: 7 * 60 * 60 * 1000 });
+  const result = await assessHostEvidence({
+    evidenceDir: evidence.evidenceDir,
+    expectedHostContext: evidence.expectedHostContext
+  });
+  assert.equal(result.assessment.durationStatus, "PARTIAL_BOUNDED_DURATION");
+  assert.notEqual(result.assessment.runClassification, "COMPLETED_EIGHT_HOURS");
+  assert.equal(result.assessment.profitability, "NOT_ASSESSED");
+});
+
+test("480-cycle host evidence ending before eight hours remains partial", async t => {
+  const evidence = await hostAssessmentFixture(t, { elapsedMs: 7 * 60 * 60 * 1000 });
+  const readback = evidence.fixture.readback;
+  const report = readback.report;
+  const observation = readback.events[1];
+  observation.cycle = 480;
+  observation.id = `observation:480:${observation.ohlc.latestClosedAt}:${observation.ticker.sha256}`;
+  const gaps = Array.from({ length: 479 }, (_, index) => {
+    const cycle = index + 1;
+    return {
+      id: `gap:${cycle}:${cycle * 2}:HTTP_429`,
+      type: "data_gap",
+      reason: "HTTP_429",
+      cycle,
+      signals: [],
+      fills: []
+    };
+  });
+  report.dataGaps = 479;
+  report.requests = 960;
+  report.stopReason = "CYCLE_LIMIT";
+  readback.events = [
+    readback.events[0], ...gaps, observation,
+    { ...readback.events.at(-1), at: report.endedAt, report }
+  ];
+  readback.eventCount = readback.events.length;
+  readback.checkpoint = {
+    ...readback.checkpoint,
+    cycle: 480,
+    counters: { requests: 960, bytes: report.deliveredBytes },
+    stopReason: "CYCLE_LIMIT"
+  };
+  readback.report = report;
+  const paperAssessment = assessPaperEvidence({
+    paperExitCode: 0,
+    paperReport: report,
+    readback,
+    provenance: null,
+    responseBodies: evidence.fixture.responseBodies,
+    profileId: HOST_EIGHT_HOUR_PROFILE_ID,
+    expectedHostContext: evidence.expectedHostContext,
+    hostManifest: evidence.hostManifest,
+    hostManifestSha256: evidence.expectedHostContext.launchManifestSha256,
+    hostState: evidence.hostState
+  });
+  const replay = replaySpotPaperSignals({
+    readback,
+    provenance: null,
+    responseBodies: evidence.fixture.responseBodies,
+    profileId: HOST_EIGHT_HOUR_PROFILE_ID,
+    expectedHostContext: evidence.expectedHostContext,
+    hostManifest: evidence.hostManifest,
+    hostManifestSha256: evidence.expectedHostContext.launchManifestSha256,
+    hostState: evidence.hostState
+  });
+  assert.equal(paperAssessment.outcome, "COMPLETED", JSON.stringify(paperAssessment));
+  assert.equal(paperAssessment.cycleCoverage, 1);
+  assert.equal(paperAssessment.durationStatus, "PARTIAL_BOUNDED_DURATION");
+  assert.equal(paperAssessment.runClassification, "PARTIAL_BOUNDED_RUN");
+  assert.equal(replay.outcome, "PASS", JSON.stringify(replay));
 });
 
 test("paper evidence rejects observation records missing either or both raw market references", () => {

@@ -24,6 +24,29 @@ const COMMON = Object.freeze({
 
 export const DEFAULT_PAPER_EVIDENCE_PROFILE_ID = "BTC_EUR_PAPER_1H_V1";
 export const DEFAULT_SIGNAL_REPLAY_PROFILE_ID = "BTC_EUR_RUN_42395522899_V1";
+export const HOST_EIGHT_HOUR_PROFILE_ID = "BTC_EUR_PAPER_HOST_8H_V1";
+
+function hostProfile(hostManifest) {
+  if (!hostManifest || hostManifest.schemaVersion !== "SPOT_PAPER_HOST_LAUNCH_V1") {
+    throw new Error("VERIFIED_HOST_LAUNCH_MANIFEST_REQUIRED");
+  }
+  return Object.freeze({
+    ...COMMON,
+    profileId: HOST_EIGHT_HOUR_PROFILE_ID,
+    runId: hostManifest.runId,
+    runtimeSourceSha256: hostManifest.runtimeSourceSha256,
+    model: hostManifest.model,
+    mode: hostManifest.mode,
+    pair: hostManifest.pair,
+    maxCycles: hostManifest.maxCycles,
+    maxRequests: hostManifest.maxRequests,
+    maxDurationMs: hostManifest.maxDurationMs,
+    pollIntervalMs: hostManifest.pollIntervalMs,
+    maxBytes: hostManifest.maxBytes,
+    maxResponseBytes: hostManifest.maxResponseBytes,
+    requestTimeoutMs: hostManifest.requestTimeoutMs
+  });
+}
 
 export const PAPER_EVIDENCE_PROFILES = Object.freeze({
   [DEFAULT_PAPER_EVIDENCE_PROFILE_ID]: Object.freeze({
@@ -63,7 +86,9 @@ export const SIGNAL_REPLAY_PROFILES = Object.freeze({
   })
 });
 
-export function getPaperEvidenceProfile(profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID) {
+export function getPaperEvidenceProfile(profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID,
+  { hostManifest } = {}) {
+  if (profileId === HOST_EIGHT_HOUR_PROFILE_ID) return hostProfile(hostManifest);
   if (!Object.hasOwn(PAPER_EVIDENCE_PROFILES, profileId)) {
     throw new Error("UNKNOWN_PAPER_EVIDENCE_PROFILE");
   }
@@ -71,7 +96,9 @@ export function getPaperEvidenceProfile(profileId = DEFAULT_PAPER_EVIDENCE_PROFI
   return profile;
 }
 
-export function getSignalReplayProfile(profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID) {
+export function getSignalReplayProfile(profileId = DEFAULT_SIGNAL_REPLAY_PROFILE_ID,
+  { hostManifest } = {}) {
+  if (profileId === HOST_EIGHT_HOUR_PROFILE_ID) return hostProfile(hostManifest);
   if (!Object.hasOwn(SIGNAL_REPLAY_PROFILES, profileId)) {
     throw new Error("UNKNOWN_SIGNAL_REPLAY_PROFILE");
   }

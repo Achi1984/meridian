@@ -5,8 +5,10 @@ import {
   parseKrakenOhlc, parseKrakenTicker, sha256, SPOT_PAPER_PILOT_LIMITS
 } from "./core.mjs";
 import {
-  DEFAULT_PAPER_EVIDENCE_PROFILE_ID, getPaperEvidenceProfile
+  DEFAULT_PAPER_EVIDENCE_PROFILE_ID, HOST_EIGHT_HOUR_PROFILE_ID,
+  getPaperEvidenceProfile
 } from "./evidence-profiles.mjs";
+import { verifyExpectedHostContext } from "./host-context.mjs";
 import {
   expectedDispatchFromEnvironment, FOUR_HOUR_DISPATCH_PROFILE_ID,
   verifyFourHourDispatchIdentity
@@ -251,9 +253,11 @@ function verifyLedger(events, checkpoint, report, parsedQuotes) {
 
 export function assessPaperEvidence({
   paperExitCode, paperReport, readback, provenance, responseBodies,
-  profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID, expectedDispatch
+  profileId = DEFAULT_PAPER_EVIDENCE_PROFILE_ID, expectedDispatch,
+  expectedHostContext, hostManifest, hostManifestSha256, hostState
 }) {
-  const expected = getPaperEvidenceProfile(profileId);
+  const isHostProfile = profileId === HOST_EIGHT_HOUR_PROFILE_ID;
+  const expected = getPaperEvidenceProfile(profileId, { hostManifest });
   const report = readback?.report;
   const events = readback?.events;
   const terminal = Array.isArray(events) ? events.at(-1) : null;
@@ -263,16 +267,29 @@ export function assessPaperEvidence({
     terminal?.id === "run-terminal" && same(terminal.report, report) &&
     same(paperReport, report) && report?.schemaVersion === "SPOT_PAPER_PILOT_REPORT_V1";
   const failures = [];
+  const hostContextVerification = isHostProfile ? verifyExpectedHostContext({
+    expectedHostContext, hostManifest, hostManifestSha256, hostState, readback
+  }) : null;
   const dispatchIdentity = profileId === FOUR_HOUR_DISPATCH_PROFILE_ID ?
     verifyFourHourDispatchIdentity({
       expectedDispatch, provenance,
       runIds: [readback?.runId, report?.runId].filter(value => value !== undefined)
-    }) : "PASS";
+    }) : isHostProfile ? "NOT_APPLICABLE" : "PASS";
+  const contextStatus = isHostProfile ? hostContextVerification.status : dispatchIdentity;
   let marketEvidence = { valid: false, acceptedObservations: 0, parsedQuotes: new Map() };
 
   if (terminalVerified) {
     if (dispatchIdentity === "FAILED") failures.push("TRUSTED_DISPATCH_IDENTITY_MISMATCH");
-    if (!verifyProvenance(provenance, report.runId, expected) ||
+    if (isHostProfile) {
+      if (hostContextVerification.status === "FAILED") {
+        failures.push(hostContextVerification.reason);
+      }
+      if (hostState?.schemaVersion !== "SPOT_PAPER_HOST_STATE_V1" ||
+          hostState.status !== "CHILD_EXITED" || hostState.childExitCode !== 0 ||
+          hostState.childSignal !== null || hostState.interruptedBy !== null) {
+        failures.push("HOST_CHILD_TERMINATION_UNVERIFIED");
+      }
+    } else if (!verifyProvenance(provenance, report.runId, expected) ||
         provenance.runId !== report.runId) {
       failures.push("SOURCE_OR_FRESH_RUN_BINDING_FAILED");
     }
@@ -335,13 +352,13 @@ export function assessPaperEvidence({
   }
 
   const bounded = terminalVerified && failures.length === 0 &&
-    dispatchIdentity === "PASS" &&
+    contextStatus === "PASS" &&
     paperExitCode === 0 && report.operationalStatus === "COMPLETED_BOUNDED" &&
     ["CYCLE_LIMIT", "DURATION_LIMIT"].includes(report.stopReason);
   const completed = bounded && marketEvidence.valid &&
     marketEvidence.acceptedObservations > 0;
-  const outcome = dispatchIdentity === "FAILED" ? "FAILED" :
-    !terminalVerified || dispatchIdentity === "UNKNOWN" ?
+  const outcome = contextStatus === "FAILED" ? "FAILED" :
+    !terminalVerified || contextStatus === "UNKNOWN" ?
       "UNKNOWN" : completed ? "COMPLETED" : "FAILED";
   const reasons = Array.isArray(events) ? events
     .filter(event => event.type === "data_gap" && (event.reason || event.dataGap))
@@ -358,13 +375,14 @@ export function assessPaperEvidence({
     elapsedMs / expected.maxDurationMs;
   const riskStop = ["SAMPLED_2PCT_BID_STOP", "SESSION_LOSS_LIMIT"]
     .includes(report?.stopReason);
-  const runClassification = dispatchIdentity === "FAILED" ? "FAILED_EVIDENCE" :
-    !terminalVerified || dispatchIdentity === "UNKNOWN" ? "UNKNOWN" :
+  const runClassification = contextStatus === "FAILED" ? "FAILED_EVIDENCE" :
+    !terminalVerified || contextStatus === "UNKNOWN" ? "UNKNOWN" :
     riskStop ? "RISK_STOP" : failures.length || paperExitCode !== 0 ?
       "FAILED_EVIDENCE" : completed && report.stopReason === "DURATION_LIMIT" &&
         elapsedMs >= expected.maxDurationMs ?
         expected.maxDurationMs === 3_600_000 ? "COMPLETED_HOUR" :
-          "COMPLETED_FOUR_HOURS" : completed ? "PARTIAL_BOUNDED_RUN" :
+          expected.maxDurationMs === 14_400_000 ? "COMPLETED_FOUR_HOURS" :
+            "COMPLETED_EIGHT_HOURS" : completed ? "PARTIAL_BOUNDED_RUN" :
           bounded ? "FAILED_DATA_ACCEPTANCE" : "STOPPED_OR_LIMITED";
   const fills = Array.isArray(report?.fills) ? report.fills : [];
   const fillRows = fills.map(fill => ({
@@ -391,6 +409,14 @@ export function assessPaperEvidence({
     outcome,
     profileId: expected.profileId,
     dispatchIdentity,
+    expectedHostContext: hostContextVerification?.status ?? "NOT_APPLICABLE",
+    hostContextBinding: hostContextVerification?.binding ?? "NOT_APPLICABLE",
+    imageIdentity: hostContextVerification?.imageIdentity ?? "NOT_APPLICABLE",
+    hostIdentity: hostContextVerification?.hostIdentity ?? "NOT_APPLICABLE",
+    sourceAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_APPLICABLE",
+    clockAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
+    providerAuthenticity: isHostProfile ? "UNATTESTED" : "NOT_ASSESSED",
+    launchReadiness: "NOT_ASSESSED",
     runClassification,
     terminalVerified,
     boundedTermination: bounded,
@@ -445,8 +471,10 @@ export function assessPaperEvidence({
     ],
     validationCriteria: {
       pinnedSourceAndFreshRun: terminalVerified &&
-        dispatchIdentity === "PASS" &&
-        !failures.includes("SOURCE_OR_FRESH_RUN_BINDING_FAILED"),
+        contextStatus === "PASS" &&
+        (isHostProfile ?
+          hostContextVerification.binding === "CONTENT_BOUND" :
+          !failures.includes("SOURCE_OR_FRESH_RUN_BINDING_FAILED")),
       requestedModeAndBounds: terminalVerified &&
         !failures.includes("ENGINE_MANIFEST_MISMATCH") &&
         !failures.includes("REPORT_SAFETY_OR_IDENTITY_MISMATCH") &&
