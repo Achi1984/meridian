@@ -154,7 +154,7 @@ and expose no public port. Do not run this job while a writer may still be
 active. Its volume mount is read-only; the package and manifest are written
 only to the Job's temporary filesystem. Use a single 90-second Job timeout
 (with no automatic retry) to allow the package tool's 60-second work ceiling
-and bounded process exit.
+and bounded process exit, and reserve at least 80 MiB for its temporary archive.
 
 Before attempting the full package, use Northflank's authenticated CLI file
 copy to download the small retained `probe.bin` from the mounted volume, then
@@ -173,9 +173,21 @@ sha256sum ./probe.bin
 
 Only after that small download and hash comparison succeeds should the operator
 use the same authenticated file-copy mechanism to fetch the TAR and manifest
-from `/tmp` in the maintenance Job. Compare the downloaded TAR hash with the
-packager's small `archiveSha256` result; retain the manifest and verify the
-listed file hashes offline. Northflank describes this file-copy workflow in
+from `/tmp` in the maintenance Job:
+
+```sh
+northflank download job file --projectId <PROJECT_ID> --job <MAINTENANCE_JOB> \
+  --remotePath /tmp/btc-eur-paper-001.tar \
+  --localPath ./btc-eur-paper-001.tar
+northflank download job file --projectId <PROJECT_ID> --job <MAINTENANCE_JOB> \
+  --remotePath /tmp/btc-eur-paper-001.manifest.json \
+  --localPath ./btc-eur-paper-001.manifest.json
+sha256sum ./btc-eur-paper-001.tar
+```
+
+Compare the downloaded TAR hash with the packager's small `archiveSha256`
+result; retain the manifest and verify the listed file hashes offline.
+Northflank describes this file-copy workflow in
 [Copy files](https://northflank.com/docs/v1/api/copy-files) and
 [Transfer data to and from containers](https://northflank.com/docs/v1/application/run/transfer-data-to-and-from-containers).
 This source package has not established that the current account, project,
