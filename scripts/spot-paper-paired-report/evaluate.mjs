@@ -1,8 +1,7 @@
 import {createHash} from 'node:crypto';
 import {constants} from 'node:fs';
-import {lstat, open, readFile, realpath} from 'node:fs/promises';
-import {basename, join, resolve} from 'node:path';
-import {readRunJournal} from '../spot-paper-pilot/journal.mjs';
+import {open} from 'node:fs/promises';
+import {resolve} from 'node:path';
 import {
   createUnknownSpotPaperPairedDashboard,
   projectSpotPaperPairedDashboard,
@@ -13,8 +12,7 @@ import {
 
 export const SPOT_PAPER_PAIRED_REPORT_SCHEMA = 'SPOT_PAPER_PAIRED_REPORT_V1';
 export const SPOT_PAPER_PAIRED_JOURNAL_SCHEMA = 'SPOT_PAPER_PILOT_JOURNAL_V1';
-export const SPOT_PAPER_PAIRED_MAX_REPORT_BYTES = 8 * 1024 * 1024;
-export const SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES = 16 * 1024 * 1024;
+export const SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES = 16 * 1024 * 1024;
 export const SPOT_PAPER_PAIRED_MAX_IDENTITY_BYTES = 16 * 1024;
 
 const MAX_DURATION_MS = 28_800_000;
@@ -22,9 +20,7 @@ const MAX_CYCLES = 480;
 const MAX_REQUESTS = 960;
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_QUOTE_AGE_MS = 10_000;
-const MAX_PENDING_BYTES = 16 * 1024;
 const MAX_RESPONSE_BYTES = 256 * 1024;
-const MAX_EXPORT_IO_MS = 5_000;
 const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -41,22 +37,24 @@ function stableJson(value) {
     `${JSON.stringify(key)}:${stableJson(value[key])}`).join(',')}}`;
 }
 
-function reportInput(input, expectedIdentity) {
-  if (!isRecord(input) ||
-      input.schemaVersion !== 'SPOT_PAPER_PAIRED_HOST_STATUS_V1') {
-    return {report: input, snapshotStatus: null};
+function reportInput(input, expectedIdentity, suppliedJournal) {
+  if (!isRecord(input)) return {report: input, journal: suppliedJournal};
+  if (input.schemaVersion === 'SPOT_PAPER_PAIRED_HOST_EXPORT_V1') {
+    if (input.runId !== expectedIdentity?.runId ||
+        !['TERMINAL_JOURNAL_VERIFIED', 'WRITER_LOCK_PRESENT',
+          'INCOMPLETE_UNKNOWN', 'NOT_FOUND'].includes(input.status) ||
+        input.report !== null && !isRecord(input.report) ||
+        input.journal !== null && !isRecord(input.journal)) {
+      return {invalid: true};
+    }
+    return {
+      report: input.report,
+      journal: input.journal,
+      hostStatus: input.status,
+      hostReconciliationStatus: input.reconciliationStatus
+    };
   }
-  if (input.runId !== expectedIdentity?.runId ||
-      !['TERMINAL_JOURNAL_VERIFIED', 'WRITER_LOCK_PRESENT',
-        'INCOMPLETE_UNKNOWN', 'NOT_FOUND'].includes(input.status)) {
-    return {invalid: true};
-  }
-  const snapshotStatus = input.status === 'WRITER_LOCK_PRESENT' ?
-    'RUNNING_SNAPSHOT' : null;
-  return {
-    report: isRecord(input.report) ? input.report : null,
-    snapshotStatus
-  };
+  return {report: input, journal: suppliedJournal};
 }
 
 function fail(reasonCode) {
@@ -252,7 +250,7 @@ function reportIsValid(report, expected) {
 function validateTerminalJournal(journal, report, expected) {
   const journalInfo = getJournalPayload(journal);
   if (!journalInfo) return {error: 'INVALID_JOURNAL'};
-  const {payload, reconciliationStatus, snapshotStatus} = journalInfo;
+  const {payload, reconciliationStatus} = journalInfo;
   if (payload.schemaVersion !== SPOT_PAPER_PAIRED_JOURNAL_SCHEMA ||
       payload.runId !== expected.runId || !isInteger(payload.sequence) ||
       !Array.isArray(payload.events) || payload.sequence !== payload.events.length ||
@@ -261,14 +259,6 @@ function validateTerminalJournal(journal, report, expected) {
       !Array.isArray(payload.events) ||
       new Set(payload.events.map(event => event?.id)).size !== payload.events.length) {
     return {error: 'INVALID_JOURNAL'};
-  }
-  if (snapshotStatus === 'RUNNING_SNAPSHOT' &&
-      !payload.events.some(event => event?.type === 'terminal')) {
-    return {status: 'RUNNING_SNAPSHOT', payload, reconciliationStatus};
-  }
-  if (snapshotStatus === 'INTERRUPTED' &&
-      !payload.events.some(event => event?.type === 'terminal')) {
-    return {status: 'INTERRUPTED', payload, reconciliationStatus};
   }
   if (!report || reconciliationStatus !== 'READ_ONLY_VERIFIED') {
     return {error: 'JOURNAL_NOT_READ_ONLY_VERIFIED'};
@@ -631,32 +621,43 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
     createUnknownSpotPaperPairedDashboard('DTO_PROJECTION_FAILED');
 }
 
-function runningSnapshotDto(journal, expected, status, reason) {
+function nonFinalSnapshotDto(journal, expected, reason) {
   const result = createUnknownSpotPaperPairedDashboard(reason);
-  result.evidenceStatus = status;
   result.identity = expectedPublicIdentity(expected);
   for (const model of expected.models) {
     result.arms[model.role].modelId = model.modelId;
   }
   const payload = getJournalPayload(journal)?.payload;
-  if (isInteger(payload?.manifest?.startedAt)) {
-    result.timing.runStoppedAt = null;
-  }
   result.timing.attemptedCycles = null;
-  result.timing.completedCycles = Array.isArray(payload?.events) ?
+  const observations = Array.isArray(payload?.events) ?
     payload.events.filter(event => event?.type === 'shared_observation').length : null;
+  result.timing.completedCycles = isInteger(observations) &&
+      observations <= MAX_CYCLES && payload?.runId === expected.runId &&
+      payload.sequence === payload.events.length ? observations : null;
   return projectSpotPaperPairedDashboard(result) ??
     createUnknownSpotPaperPairedDashboard('DTO_PROJECTION_FAILED');
 }
 
-export function evaluatePairedPaperEvidence({expectedIdentity, report: rawReport, journal} = {}) {
+export function evaluatePairedPaperEvidence({
+  expectedIdentity, report: rawReport, journal: suppliedJournal
+} = {}) {
   if (!validExpectedIdentity(expectedIdentity)) return fail('EXPECTED_IDENTITY_INVALID');
-  const normalizedReport = reportInput(rawReport, expectedIdentity);
+  const normalizedReport = reportInput(rawReport, expectedIdentity, suppliedJournal);
   if (normalizedReport.invalid) return fail('REPORT_WRAPPER_INVALID');
   const report = normalizedReport.report;
-  if (normalizedReport.snapshotStatus === 'RUNNING_SNAPSHOT') {
-    return runningSnapshotDto(journal, expectedIdentity, 'RUNNING_SNAPSHOT',
-      'WRITER_LOCK_PRESENT_SNAPSHOT_ONLY');
+  const journal = normalizedReport.journal;
+  if (normalizedReport.hostStatus &&
+      normalizedReport.hostStatus !== 'TERMINAL_JOURNAL_VERIFIED') {
+    const reason = normalizedReport.hostStatus === 'WRITER_LOCK_PRESENT' ?
+      'UNKNOWN_WRITER_OR_INTERRUPTED' :
+      normalizedReport.hostStatus === 'INCOMPLETE_UNKNOWN' ?
+        'INCOMPLETE_OR_UNKNOWN' : 'HOST_REPORT_NOT_FOUND';
+    return nonFinalSnapshotDto(journal, expectedIdentity, reason);
+  }
+  if (normalizedReport.hostStatus === 'TERMINAL_JOURNAL_VERIFIED' &&
+      normalizedReport.hostReconciliationStatus !== undefined &&
+      normalizedReport.hostReconciliationStatus !== 'READ_ONLY_VERIFIED') {
+    return fail('HOST_EXPORT_RECONCILIATION_MISMATCH');
   }
   if (report !== null && report !== undefined &&
       (!isRecord(report) || report.schemaVersion !== SPOT_PAPER_PAIRED_REPORT_SCHEMA)) {
@@ -664,17 +665,10 @@ export function evaluatePairedPaperEvidence({expectedIdentity, report: rawReport
   }
   if (report === null || report === undefined) {
     const journalInfo = getJournalPayload(journal);
-    if (normalizedReport.snapshotStatus === 'RUNNING_SNAPSHOT') {
-      return runningSnapshotDto(journal, expectedIdentity, 'RUNNING_SNAPSHOT',
-        'WRITER_LOCK_PRESENT_SNAPSHOT_ONLY');
-    }
-    if (journalInfo?.snapshotStatus === 'RUNNING_SNAPSHOT') {
-      return runningSnapshotDto(journal, expectedIdentity, 'RUNNING_SNAPSHOT',
-        'TERMINAL_REPORT_NOT_YET_AVAILABLE');
-    }
-    if (journalInfo?.snapshotStatus === 'INTERRUPTED') {
-      return runningSnapshotDto(journal, expectedIdentity, 'INTERRUPTED',
-        'INTERRUPTED_WITHOUT_TERMINAL_REPORT');
+    if (journalInfo && Array.isArray(journalInfo.payload.events)) {
+      return nonFinalSnapshotDto(journal, expectedIdentity,
+        journalInfo.payload.snapshotStatus ? 'UNVERIFIED_SNAPSHOT_STATUS' :
+          'TERMINAL_REPORT_NOT_YET_AVAILABLE');
     }
     return fail('TERMINAL_REPORT_MISSING');
   }
@@ -685,10 +679,6 @@ export function evaluatePairedPaperEvidence({expectedIdentity, report: rawReport
   const accountingError = validateAccounting(report);
   if (accountingError) return fail(accountingError);
   const terminal = validateTerminalJournal(journal, report, expectedIdentity);
-  if (terminal.status === 'RUNNING_SNAPSHOT') {
-    return runningSnapshotDto(journal, expectedIdentity, 'RUNNING_SNAPSHOT',
-      'RUNNING_SNAPSHOT_NOT_FINAL_EVIDENCE');
-  }
   if (terminal.error) return fail(terminal.error);
   const status = report.outcome === 'COMPLETED_BOUNDED' ?
     'VERIFIED_COMPLETE' : 'INTERRUPTED';
@@ -715,7 +705,7 @@ export async function readBoundedJsonFile(path, maxBytes) {
 }
 
 export async function evaluatePairedPaperFiles({
-  expectedIdentityPath, reportPath, journalPath
+  expectedIdentityPath, reportPath
 } = {}) {
   let expectedIdentity;
   try {
@@ -727,71 +717,9 @@ export async function evaluatePairedPaperFiles({
   let report;
   try {
     report = await readBoundedJsonFile(reportPath,
-      SPOT_PAPER_PAIRED_MAX_REPORT_BYTES);
+      SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES);
   } catch {
-    return fail('REPORT_FILE_INVALID_OR_OVERSIZED');
+    return fail('HOST_EXPORT_FILE_INVALID_OR_OVERSIZED');
   }
-  let journal;
-  try {
-    journal = await readBoundedJsonFile(journalPath,
-      SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES);
-  } catch {
-    return fail('JOURNAL_FILE_INVALID_OR_OVERSIZED');
-  }
-  return evaluatePairedPaperEvidence({expectedIdentity, report, journal});
-}
-
-function boundedJournalIo() {
-  function fileLimit(path) {
-    const name = basename(path);
-    if (name === 'journal.json') return SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES;
-    if (name === 'journal.pending') return MAX_PENDING_BYTES;
-    if (/^[a-f0-9]{64}\.json$/.test(name)) return MAX_RESPONSE_BYTES;
-    return null;
-  }
-  async function checkedInfo(path) {
-    const info = await lstat(path);
-    if (info.isSymbolicLink()) throw new Error('JOURNAL_EXPORT_SYMLINK');
-    const limit = fileLimit(path);
-    if (limit !== null && (!info.isFile() || info.size > limit)) {
-      throw new Error('JOURNAL_EXPORT_FILE_LIMIT');
-    }
-    return info;
-  }
-  return {
-    lstat: checkedInfo,
-    async readFile(path) {
-      await checkedInfo(path);
-      const bytes = await readFile(path);
-      const limit = fileLimit(path);
-      if (limit !== null && bytes.byteLength > limit) {
-        throw new Error('JOURNAL_EXPORT_FILE_LIMIT');
-      }
-      return bytes;
-    }
-  };
-}
-
-export async function exportReadOnlyPairedJournal({dataRoot, runId} = {}) {
-  if (typeof dataRoot !== 'string' || !dataRoot.startsWith('/') ||
-      resolve(dataRoot) !== dataRoot ||
-      !RUN_ID.test(runId ?? '')) throw new Error('INVALID_JOURNAL_EXPORT_LOCATION');
-  const rootInfo = await lstat(dataRoot);
-  if (!rootInfo.isDirectory() || rootInfo.isSymbolicLink() ||
-      await realpath(dataRoot) !== dataRoot) {
-    throw new Error('INVALID_JOURNAL_EXPORT_ROOT');
-  }
-  const monotonicNow = () => performance.now();
-  const journal = await readRunJournal({
-    dataRoot,
-    runId,
-    deadlineAt: monotonicNow() + MAX_EXPORT_IO_MS,
-    monotonicNow,
-    io: boundedJournalIo()
-  });
-  if (Buffer.byteLength(JSON.stringify(journal), 'utf8') >
-      SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES) {
-    throw new Error('JOURNAL_EXPORT_SIZE_LIMIT');
-  }
-  return journal;
+  return evaluatePairedPaperEvidence({expectedIdentity, report});
 }

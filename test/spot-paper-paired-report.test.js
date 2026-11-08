@@ -1,18 +1,16 @@
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {spawnSync} from 'node:child_process';
-import {mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {mkdtemp, rm, truncate, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {test} from 'node:test';
 import {
-  exportReadOnlyPairedJournal,
   evaluatePairedPaperEvidence,
   evaluatePairedPaperFiles,
   readBoundedJsonFile,
-  SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES
+  SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES
 } from '../scripts/spot-paper-paired-report/evaluate.mjs';
-import {createRunJournal} from '../scripts/spot-paper-pilot/journal.mjs';
 import {
   SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA
 } from '../scripts/spot-paper-paired-report/contract.mjs';
@@ -249,31 +247,49 @@ test('preserves fractional performance-clock milliseconds without threshold roun
   }
 });
 
-test('accepts #1301 host report wrappers only alongside reconciled journal evidence', () => {
+test('accepts combined host exports and keeps lock-only snapshots unknown', () => {
   const input = fixture();
   input.report = {
-    schemaVersion: 'SPOT_PAPER_PAIRED_HOST_STATUS_V1',
-    status: 'TERMINAL_JOURNAL_VERIFIED',
+    schemaVersion: 'SPOT_PAPER_PAIRED_HOST_EXPORT_V1',
     runId: input.expectedIdentity.runId,
+    status: 'TERMINAL_JOURNAL_VERIFIED',
     verifiedTerminal: true,
-    report: input.report
+    reconciliationStatus: 'READ_ONLY_VERIFIED',
+    report: input.report,
+    journal: input.journal
   };
-  assert.equal(evaluatePairedPaperEvidence(input).evidenceStatus,
+  assert.equal(evaluatePairedPaperEvidence({
+    expectedIdentity: input.expectedIdentity, report: input.report
+  }).evidenceStatus,
     'VERIFIED_COMPLETE');
+  const mismatchedExport = structuredClone(input.report);
+  mismatchedExport.reconciliationStatus = 'UNKNOWN_WRITER_OR_INTERRUPTED';
+  assert.equal(evaluatePairedPaperEvidence({
+    expectedIdentity: input.expectedIdentity, report: mismatchedExport
+  }).reasonCode, 'HOST_EXPORT_RECONCILIATION_MISMATCH');
 
-  const running = fixture();
-  running.report = {
-    schemaVersion: 'SPOT_PAPER_PAIRED_HOST_STATUS_V1',
+  const killedWriter = fixture();
+  killedWriter.journal.events.pop();
+  killedWriter.journal.sequence = killedWriter.journal.events.length;
+  killedWriter.journal.reconciliationStatus = 'UNKNOWN_WRITER_OR_INTERRUPTED';
+  killedWriter.report = {
+    schemaVersion: 'SPOT_PAPER_PAIRED_HOST_EXPORT_V1',
+    runId: killedWriter.expectedIdentity.runId,
     status: 'WRITER_LOCK_PRESENT',
-    runId: running.expectedIdentity.runId,
-    verifiedTerminal: false
+    verifiedTerminal: false,
+    reconciliationStatus: 'UNKNOWN_WRITER_OR_INTERRUPTED',
+    report: null,
+    journal: killedWriter.journal
   };
-  running.journal.events.pop();
-  running.journal.sequence = running.journal.events.length;
-  assert.equal(evaluatePairedPaperEvidence(running).evidenceStatus,
-    'RUNNING_SNAPSHOT');
-  assert.equal(evaluatePairedPaperEvidence(running).reasonCode,
-    'WRITER_LOCK_PRESENT_SNAPSHOT_ONLY');
+  const unknown = evaluatePairedPaperEvidence({
+    expectedIdentity: killedWriter.expectedIdentity,
+    report: killedWriter.report
+  });
+  assert.equal(unknown.evidenceStatus, 'CORRUPT_UNKNOWN');
+  assert.equal(unknown.reasonCode, 'UNKNOWN_WRITER_OR_INTERRUPTED');
+  assert.equal(unknown.timing.completedCycles, 480);
+  assert.equal(unknown.arms.baseline.netEquityCents, null);
+  assert.equal(unknown.timing.runStoppedAt, null);
 });
 
 test('retains a verified interrupted report and keeps stop time separate from valuation time', () => {
@@ -349,15 +365,15 @@ test('separates attempted from completed cycles when a shared-feed cycle fails',
     'JOURNAL_REPORT_MISMATCH');
 });
 
-test('labels a reported running snapshot as provisional and not final evidence', () => {
+test('does not trust a self-declared running snapshot without fresh liveness evidence', () => {
   const input = fixture();
   input.report = null;
   input.journal.snapshotStatus = 'RUNNING_SNAPSHOT';
   input.journal.events.pop();
   input.journal.sequence = input.journal.events.length;
   const output = evaluatePairedPaperEvidence(input);
-  assert.equal(output.evidenceStatus, 'RUNNING_SNAPSHOT');
-  assert.equal(output.reasonCode, 'TERMINAL_REPORT_NOT_YET_AVAILABLE');
+  assert.equal(output.evidenceStatus, 'CORRUPT_UNKNOWN');
+  assert.equal(output.reasonCode, 'UNVERIFIED_SNAPSHOT_STATUS');
   assert.equal(output.arms.baseline.netEquityCents, null);
   assert.equal(output.timing.attemptedCycles, null);
   assert.equal(output.timing.completedCycles, 480);
@@ -480,65 +496,67 @@ test('checks journal checksums and enforces bounded, regular, read-only input fi
   const directory = await mkdtemp(join(tmpdir(), 'spot-paired-report-'));
   try {
     const expectedIdentityPath = join(directory, 'expected.json');
-    const reportPath = join(directory, 'report.json');
-    const journalPath = join(directory, 'journal.json');
+    const exportPath = join(directory, 'host-export.json');
     await writeFile(expectedIdentityPath, JSON.stringify(input.expectedIdentity));
-    await writeFile(reportPath, JSON.stringify(input.report));
-    await writeFile(journalPath, JSON.stringify(input.journal));
+    await writeFile(exportPath, JSON.stringify({
+      schemaVersion: 'SPOT_PAPER_PAIRED_HOST_EXPORT_V1',
+      runId: input.expectedIdentity.runId,
+      status: 'TERMINAL_JOURNAL_VERIFIED',
+      verifiedTerminal: true,
+      reconciliationStatus: 'READ_ONLY_VERIFIED',
+      report: input.report,
+      journal: input.journal
+    }));
     const cli = spawnSync(process.execPath, [
       'scripts/spot-paper-paired-report/cli.mjs',
-      expectedIdentityPath, reportPath, journalPath
+      expectedIdentityPath, exportPath
     ], {encoding: 'utf8'});
     assert.equal(cli.status, 0, cli.stderr);
     assert.equal(JSON.parse(cli.stdout).evidenceStatus, 'VERIFIED_COMPLETE');
     const fileOutput = await evaluatePairedPaperFiles({
-      expectedIdentityPath, reportPath, journalPath
+      expectedIdentityPath, reportPath: exportPath
     });
     assert.equal(fileOutput.evidenceStatus, 'VERIFIED_COMPLETE');
 
-    await writeFile(journalPath, 'x'.repeat(SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES + 1));
-    await assert.rejects(readBoundedJsonFile(journalPath,
-      SPOT_PAPER_PAIRED_MAX_JOURNAL_BYTES), /INPUT_FILE_LIMIT/);
+    await truncate(exportPath, SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES + 1);
+    await assert.rejects(readBoundedJsonFile(exportPath,
+      SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES), /INPUT_FILE_LIMIT/);
     assert.equal((await evaluatePairedPaperFiles({
-      expectedIdentityPath, reportPath, journalPath
-    })).reasonCode, 'JOURNAL_FILE_INVALID_OR_OVERSIZED');
+      expectedIdentityPath, reportPath: exportPath
+    })).reasonCode, 'HOST_EXPORT_FILE_INVALID_OR_OVERSIZED');
 
-    await writeFile(reportPath, '{invalid');
+    await writeFile(exportPath, '{invalid');
     assert.equal((await evaluatePairedPaperFiles({
-      expectedIdentityPath, reportPath, journalPath
-    })).reasonCode, 'REPORT_FILE_INVALID_OR_OVERSIZED');
+      expectedIdentityPath, reportPath: exportPath
+    })).reasonCode, 'HOST_EXPORT_FILE_INVALID_OR_OVERSIZED');
   } finally {
     await rm(directory, {recursive: true, force: true});
   }
 });
 
-test('exports read-only journal evidence through the CLI using the shared journal reader', async () => {
-  const directory = await mkdtemp(join(tmpdir(), 'spot-paired-journal-export-'));
-  const dataRoot = join(directory, 'evidence');
-  const runId = 'export-readonly-001';
+test('evaluates the canonical combined host export from bounded files via the CLI', async () => {
+  const directory = await mkdtemp(join(tmpdir(), 'spot-paired-host-export-'));
   try {
-    const journal = await createRunJournal({
-      dataRoot,
-      runId,
-      manifest: {schemaVersion: 'SPOT_PAPER_PAIRED_MANIFEST_V1', runId}
-    });
-    await journal.append(
-      {id: 'paired-start', type: 'start', at: 1_000},
-      {states: [], counters: {requests: 0, bytes: 0}, cycle: 0}
-    );
-    await journal.close();
-    const direct = await exportReadOnlyPairedJournal({dataRoot, runId});
-    assert.equal(direct.reconciliationStatus, 'READ_ONLY_VERIFIED');
-    assert.equal(direct.sequence, 1);
+    const input = fixture();
+    const expectedIdentityPath = join(directory, 'expected-identity.json');
+    const exportPath = join(directory, 'host-export.json');
+    await writeFile(expectedIdentityPath, JSON.stringify(input.expectedIdentity));
+    await writeFile(exportPath, JSON.stringify({
+      schemaVersion: 'SPOT_PAPER_PAIRED_HOST_EXPORT_V1',
+      runId: input.expectedIdentity.runId,
+      status: 'TERMINAL_JOURNAL_VERIFIED',
+      verifiedTerminal: true,
+      reconciliationStatus: 'READ_ONLY_VERIFIED',
+      report: input.report,
+      journal: input.journal
+    }));
 
     const cli = spawnSync(process.execPath, [
       'scripts/spot-paper-paired-report/cli.mjs',
-      'export-journal', dataRoot, runId
+      expectedIdentityPath, exportPath
     ], {encoding: 'utf8'});
     assert.equal(cli.status, 0, cli.stderr);
-    const exported = JSON.parse(cli.stdout);
-    assert.equal(exported.reconciliationStatus, 'READ_ONLY_VERIFIED');
-    assert.equal(exported.events[0].id, 'paired-start');
+    assert.equal(JSON.parse(cli.stdout).evidenceStatus, 'VERIFIED_COMPLETE');
   } finally {
     await rm(directory, {recursive: true, force: true});
   }

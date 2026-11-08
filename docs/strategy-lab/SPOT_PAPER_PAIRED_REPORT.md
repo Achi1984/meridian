@@ -65,14 +65,13 @@ accounting, and journal/report reconciliation only. Every DTO states
 `independentAuthentication: "NOT_ESTABLISHED"`:
 report/journal checksums and self-declared source/config hashes do not
 independently authenticate the producer or prove the expected identity was
-reviewed. A running snapshot is never final evidence. Since the current
-`readRunJournal` output combines active and interrupted writers as
-`UNKNOWN_WRITER_OR_INTERRUPTED`, a running label requires an explicit
-`snapshotStatus: "RUNNING_SNAPSHOT"` in the supplied export; absent that
-distinction the evaluator fails closed as unknown.
-For a running snapshot, completed cycles count journaled shared observations;
-attempted cycles stay null because the journal checkpoint has no live attempt
-counter.
+reviewed. A writer lock is not process-liveness evidence: the host's
+`WRITER_LOCK_PRESENT` export is projected as `CORRUPT_UNKNOWN` with
+`UNKNOWN_WRITER_OR_INTERRUPTED`, never as running or interrupted. Only a
+separately supplied, fresh liveness observation that is explicitly validated
+could establish `RUNNING_SNAPSHOT`; the current host export supplies none.
+Non-final snapshots expose at most the bounded count of committed shared
+observations; attempted cycles and arm metrics remain null.
 
 ## Expected identity and local evaluation
 
@@ -83,44 +82,36 @@ reviewed run/config packet. It must contain exactly the identity values to bind:
 `role`, `modelId`, and `accountId`. Do not populate it from an unreviewed
 report. Account IDs are used only for matching and are excluded from the DTO.
 
-Supply the report JSON and read-only journal export. The #1301 `report` command
-emits a `SPOT_PAPER_PAIRED_HOST_STATUS_V1` wrapper; pass it directly as the
-report input. To produce the journal export without editing or asserting status
-fields, use the evaluator's bounded read-only export command on the same
-evidence directory:
+Use #1301's canonical combined `export` command. It emits one
+`SPOT_PAPER_PAIRED_HOST_EXPORT_V1` object containing the report, read-only
+journal payload, reconciliation result, and host status. Do not separately
+reconstruct or edit those fields:
 
 ```sh
-node scripts/spot-paper-paired/host.mjs report \
+node scripts/spot-paper-paired/host.mjs export \
   --data-root /absolute/path/evidence-root --run-id "$RUN_ID" \
-  > /absolute/path/report-wrapper.json
-node scripts/spot-paper-paired-report/cli.mjs export-journal \
-  /absolute/path/evidence-root "$RUN_ID" \
-  > /absolute/path/journal-export.json
+  > /absolute/path/host-export.json
 node scripts/spot-paper-paired-report/cli.mjs \
   /absolute/path/expected-identity.json \
-  /absolute/path/report-wrapper.json \
-  /absolute/path/journal-export.json
+  /absolute/path/host-export.json
 ```
 
-`export-journal` calls the existing `readRunJournal` helper with bounded,
-symlink-rejecting reads; it writes only its JSON result to stdout. It does not
-modify the evidence tree or claim that a writer is stopped. A host wrapper's
-`verifiedTerminal` boolean is not independently trusted: terminal acceptance
-requires the exported journal's read-only reconciliation status and exact
-terminal report/checkpoint match as well. A host status with a writer lock is
-projected as `RUNNING_SNAPSHOT`, never final evidence.
+The evaluator independently checks the export's journal reconciliation status,
+terminal report/checkpoint match, counters, shared observations, and identity;
+the host's `verifiedTerminal` flag is not accepted as authentication. Its file
+input is bounded at 16 MiB, matching the producer's combined-export bound. The
+evaluator does not write or export evidence.
 
-The evaluator checks regular, non-symlink files with these byte limits:
-16 KiB expected identity, 8 MiB report wrapper, and 16 MiB journal export. It
-performs no writes.
+The host inspection cap remains 8 MiB for `journal.json`; the integrated
+480-observation artifact fits within that explicit bound.
 
 The CLI prints only the sanitized DTO. An invalid or oversized input produces
 `CORRUPT_UNKNOWN` and a nonzero exit; it never includes paths, provider bodies,
 credentials, account IDs, raw failure details, or host identifiers in the
-output. A journal export without the helper's read-only reconciliation status
-cannot establish a complete terminal record. The evaluator checks the terminal
-report copy, sequence, shared-observation count, checkpoint counters, checksums
-when included, and the expected identity against both report and manifest.
+output. An export without the read-only reconciliation status cannot establish
+a complete terminal record. The evaluator checks the terminal report copy,
+sequence, shared-observation count, checkpoint counters, checksums when
+included, and the expected identity against both report and manifest.
 
 The requested horizon is eight hours/480 cycles. `observedCoverageMs` ends at
 the common valuation observation; `actualElapsedMs` and `runStoppedAt` describe
@@ -154,15 +145,34 @@ node --test test/spot-paper-paired-report.test.js
 
 Fixtures are synthetic and labelled `testOnly`; they validate this projection
 and fail-closed behavior, not a strategy result or accepted live integration.
-In an isolated temporary composition, #1301 candidate
-`bb00a41f3eb65ece13ec0cfcb54b02ef710edb01` was run with actual #1299 exports
-from merged commit `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`. Its synthetic
-completed multi-cycle trade run and interrupted multi-cycle trade run were
-passed through the real host report wrapper, this CLI's read-only journal
-export command, and this file evaluator CLI; metrics and deltas reconciled.
-No research simulator, hand-edited wrapper, or production source pin was used.
-The host report wrapper's own 8 MiB journal bound means this validation used a
-bounded 120-cycle run for file-CLI composition; the producer's separate
-480-cycle actual-export/cooldown test also passed in the same isolated
-candidate. Structural reconciliation is not independent authentication, live
+An earlier isolated composition used #1301 candidate
+`bb00a41f3eb65ece13ec0cfcb54b02ef710edb01` with actual #1299 exports from
+merged commit `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`; completed and
+interrupted multi-cycle files passed through the evaluator, but its file-CLI
+composition was shortened to 120 cycles. This is not acceptance of the
+intended 480-cycle artifact. Current #1301 head `3308394a2bd1e9d3d022da48f90a246cb3a20546`
+provides a single combined `export` command but caps journal inspection at
+8 MiB. The updated #1301 head `5f25f771cd45dab41ec642660cce18cbdb324ef3`
+removes redundant cumulative state from terminal decision summaries while
+retaining causal decisions, risk, fills, valuations, and checkpoint evidence.
+In an isolated composition of that exact producer with actual #1299 exports
+from merged commit `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`, a 480-observation
+run passed through the host's combined `export` and this file CLI as
+`VERIFIED_COMPLETE:TERMINAL_REPORT_RECONCILED`. Measured bytes were: journal
+1,627,285; read-only payload 1,627,241; standalone report 279,371; report
+wrapper 279,688; compact combined export 1,906,788; pretty-printed host CLI
+export consumed by this evaluator 3,541,918; packaged archive 4,319,232. The
+host/export limits were unchanged. A two-cycle interrupted run using the same
+actual research exports passed as
+`INTERRUPTED:INTERRUPTED_TERMINAL_RECONCILED`.
+
+Producer identity: #1301 `5f25f771cd45dab41ec642660cce18cbdb324ef3`;
+research identity: merged #1299 `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`.
+Evaluator source identities:
+`evaluate.mjs` `b60f8cc455912df28c95f15b659e6b48374d6cedf7bebb87b7e32ac5cc97c3bc`,
+`cli.mjs` `2df32fcb945495b10558d088ee1af86e0988a26c4fb07c978cedda0dd767f541`,
+and `contract.mjs`
+`70bb9780c9d62d6ae653122fddfbaac8b09c71382e104ef565ca6449cd97579d`.
+No research simulator, hand-edited export, production source pin, or live run
+was used. Structural reconciliation is not independent authentication, live
 acceptance, or readiness.
