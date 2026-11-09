@@ -13,6 +13,13 @@ accepted the integrated adapter and its research source; the exact merged #1299
 source digest is pinned below. That source acceptance does not authorize or
 establish a live run.
 
+This page documents the earlier SMA(5/20) versus CONFIRM2 experiment and its
+historical V1 evidence. It does not describe or relabel that run as the next
+composition. The separately versioned next-run pair is CONFIRM2/COOLDOWN10
+versus the causal five-minute trend challenger, plus cash, under the explicit
+V2 cost assumption; see
+`/home/runner/work/meridian/meridian/docs/operations/BTC_EUR_NEXT_RUN_COMPOSITION.md`.
+
 ## Frozen experiment contract
 
 The eventual comparison is three independent EUR 1,000 accounts on the same
@@ -206,7 +213,8 @@ The minimal host composition and concrete local commands are now in
 
 ```sh
 node scripts/spot-paper-paired/host.mjs disabled
-node scripts/spot-paper-paired/host.mjs run --data-root /evidence-root --run-id <new-unique-run-id> --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2
+node scripts/spot-paper-paired/host.mjs identity --data-root /evidence-root --run-id <new-unique-run-id> --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2 --model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1
+node scripts/spot-paper-paired/host.mjs run --data-root /evidence-root --run-id <new-unique-run-id> --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2 --model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1
 node scripts/spot-paper-paired/host.mjs status --data-root /evidence-root --run-id <run-id>
 node scripts/spot-paper-paired/host.mjs report --data-root /evidence-root --run-id <run-id>
 node scripts/spot-paper-paired/host.mjs export --data-root /evidence-root --run-id <run-id>
@@ -214,11 +222,13 @@ node scripts/spot-paper-paired/host.mjs package --data-root /evidence-root --run
 ```
 
 The `run` command requires an existing absolute evidence root, a fresh run ID,
-and rejects an existing output path. It computes the source/config identities
-from frozen defaults and maps SIGTERM to the runner's `AbortSignal`; today it
-fails closed with `RESEARCH_INTEGRATION_NOT_ACCEPTED` before network access
-because the production pin is null. The other commands are read-only except
-`package`, which exclusively creates outputs via the existing verified
+and rejects an existing output path. The next-run selection requires both
+`--account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2` and
+`--model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1`; it verifies all three
+research source files against their distinct accepted source digest before
+network access. `identity` emits the expected report identity without starting
+the feed, and `run` maps SIGTERM to the runner's `AbortSignal`. The other
+commands are read-only except `package`, which exclusively creates outputs via the existing verified
 `packageHostEvidence` helper, refuses writer-lock/pending state, and holds the
 maintenance process open for the requested retrieval window. They do not verify
 that a remote writer process has stopped: an operator must independently verify
@@ -380,7 +390,7 @@ This measured reduction comes from omitting each decision's cumulative internal
 account `state` snapshot from the terminal report; causal decisions, risk,
 fills, valuations, and structured state remain in journal events/checkpoints.
 The same test runs host `report`, `export`, and `package` on that 480-cycle
-evidence. The candidate #1304 file CLI evaluated these report/export artifacts
+evidence. The merged report CLI evaluates these report/export artifacts
 as `VERIFIED_COMPLETE`; a separate operator-interrupted synthetic fixture
 remained `INTERRUPTED` with unavailable deltas. The evaluator was composed
 temporarily from candidate `1feea98a1fd2c602fccb1824c71d19e253c28376`; this is
@@ -391,9 +401,10 @@ candidate `bb00a41f3eb65ece13ec0cfcb54b02ef710edb01` and #1299 reviewed source
 `4f5c4a3c8489129c514cd57c4b71f37ee05bcddf`). These synthetic and host-helper
 tests do not establish live readiness. Lead accepted the integrated source and
 the production pin is `4c60b1ccccbd495d93006a6838593423c27caac8104a0239fa23fd97a716f82d`.
-The corrected #1304 evaluator candidate `5700feb6f1b82257b18e5c50f527a3e2f80d175a`
-accepts the single `SPOT_PAPER_PAIRED_HOST_EXPORT_V1` artifact directly; repeat
-the evaluator compatibility check with that CLI after it is merged to main.
+The merged evaluator accepts the single `SPOT_PAPER_PAIRED_HOST_EXPORT_V1`
+artifact directly. The new trend composition uses a separate three-source
+research digest and explicit model-pair identity; the earlier V1 source pin and
+all historical V1/V2 reports remain unchanged.
 The existing
 [BTC/EUR post-run retrieval runbook](../operations/BTC_EUR_8H_POSTRUN_20261108.md)
 describes that sequence for the old run identity only; it is not approval or

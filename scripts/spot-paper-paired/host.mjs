@@ -8,16 +8,14 @@ import { packageHostEvidence } from "../spot-paper-pilot/package-host-evidence.m
 import { readRunJournal } from "../spot-paper-pilot/journal.mjs";
 import {
   SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
   createBaselineArm, createCashControlArm, createChallengerArm,
   pairedConfigDigest, pairedResearchSourceDigest, runSpotPaperPaired,
   resolveSpotPaperPairedAccountContract,
   SPOT_PAPER_PAIRED, SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256,
   SPOT_PAPER_PAIRED_SOURCE_ID, SPOT_PAPER_RESEARCH_COMPARISON_ID
 } from "./forward.mjs";
-import {
-  applySpotPaperPairedFeeObservation,
-  compareSpotPaperFeeScenarioObservations
-} from "./fee-scenario.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/;
@@ -31,7 +29,10 @@ const SOURCE_FILES = [
   "scripts/spot-paper-paired/feed.mjs",
   "scripts/spot-paper-pilot/core.mjs",
   "scripts/spot-paper-pilot/journal.mjs",
-  "scripts/spot-paper-pilot/provider.mjs"
+  "scripts/spot-paper-pilot/provider.mjs",
+  "scripts/spot-paper-paired-report/contract.mjs",
+  "scripts/spot-paper-paired-report/evaluate.mjs",
+  "scripts/spot-paper-paired-report/cli.mjs"
 ];
 
 export const SPOT_PAPER_PAIRED_HOST_DEFAULTS = Object.freeze({
@@ -77,7 +78,33 @@ async function assertWritableRunLocation(dataRoot, runId) {
   return runDirectory;
 }
 
-async function readResearchModules() {
+async function readResearchModules(modelPairId) {
+  if (modelPairId === SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR) {
+    const [comparisonBytes, entryConfirmationBytes, fiveMinuteTrendBytes] =
+      await Promise.all([
+        readFile(join(ROOT, "scripts/spot-paper-research/comparison.mjs")),
+        readFile(join(ROOT, "scripts/spot-paper-research/entry-confirmation.mjs")),
+        readFile(join(ROOT, "scripts/spot-paper-research/five-minute-trend.mjs"))
+      ]);
+    assert([comparisonBytes, entryConfirmationBytes, fiveMinuteTrendBytes]
+      .every(bytes => bytes.byteLength <= MAX_SOURCE_BYTES), "RESEARCH_SOURCE_TOO_LARGE");
+    const {nextRunResearchSourceDigest} =
+      await import("./next-run-composition.mjs");
+    const researchSourceSha256 = nextRunResearchSourceDigest({
+      comparisonBytes, entryConfirmationBytes, fiveMinuteTrendBytes
+    });
+    assert(researchSourceSha256 ===
+      SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256,
+    "RESEARCH_SOURCE_IDENTITY_MISMATCH");
+    const [comparisonExports, confirmationExports, trendExports] = await Promise.all([
+      import("../spot-paper-research/comparison.mjs"),
+      import("../spot-paper-research/entry-confirmation.mjs"),
+      import("../spot-paper-research/five-minute-trend.mjs")
+    ]);
+    return {comparisonExports, confirmationExports, trendExports,
+      researchSourceSha256};
+  }
+  assert(modelPairId === undefined, "UNKNOWN_MODEL_PAIR");
   if (!/^[a-f0-9]{64}$/.test(
     SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256 ?? "")) {
     throw new Error("RESEARCH_INTEGRATION_NOT_ACCEPTED");
@@ -101,9 +128,14 @@ async function readResearchModules() {
   return { comparisonExports, challengerExports, researchSourceSha256 };
 }
 
-async function sourceDigest() {
+async function sourceDigest(modelPairId) {
   const hash = createHash("sha256");
-  for (const relativePath of SOURCE_FILES) {
+  const paths = modelPairId === SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR ? [
+    ...SOURCE_FILES,
+    "scripts/spot-paper-paired/next-run-composition.mjs",
+    "scripts/spot-paper-research/five-minute-trend.mjs"
+  ] : SOURCE_FILES;
+  for (const relativePath of paths) {
     const bytes = await readFile(join(ROOT, relativePath));
     assert(bytes.byteLength <= MAX_SOURCE_BYTES, "HOST_SOURCE_TOO_LARGE");
     hash.update(relativePath).update("\0").update(bytes).update("\0");
@@ -112,51 +144,74 @@ async function sourceDigest() {
 }
 
 export async function composeSpotPaperPairedHost({
-  dataRoot, runId, accountContractId
+  dataRoot, runId, accountContractId, modelPairId
 } = {}) {
   const runDirectory = await assertWritableRunLocation(dataRoot, runId);
   assert(typeof accountContractId === "string", "ACCOUNT_CONTRACT_SELECTION_REQUIRED");
   const accountContract = resolveSpotPaperPairedAccountContract(accountContractId);
-  const { comparisonExports, challengerExports, researchSourceSha256 } =
-    await readResearchModules();
+  if (accountContract.version === 2) {
+    assert(modelPairId === SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+      "MODEL_PAIR_SELECTION_REQUIRED");
+  } else {
+    assert(modelPairId === undefined, "MODEL_PAIR_ACCOUNT_CONTRACT_MISMATCH");
+  }
+  const {comparisonExports, challengerExports, confirmationExports, trendExports,
+    researchSourceSha256} = await readResearchModules(modelPairId);
   const accountIds = {
     baseline: `${runId}-baseline`,
     challenger: `${runId}-challenger`,
     cash: `${runId}-cash`
   };
-  const comparisonEngine = {
-    id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
-    compare: accountContract.contractId ===
-      SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId ?
-      observations => compareSpotPaperFeeScenarioObservations(observations, {
-        feeBpsPerSide: accountContract.feeBpsPerSide
-      }) : comparisonExports.compareSpotPaperStrategies
+  const sourceSha256 = await sourceDigest(modelPairId);
+  let config;
+  if (modelPairId === SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR) {
+    const {createSpotPaperPairedNextRunConfig} =
+      await import("./next-run-composition.mjs");
+    config = createSpotPaperPairedNextRunConfig({
+      runId, dataRoot, sourceSha256, researchSourceSha256,
+      provider: {sourceId: SPOT_PAPER_PAIRED_SOURCE_ID},
+      confirmationExports, trendExports, accountIds, testOnly: false,
+      ...SPOT_PAPER_PAIRED_HOST_DEFAULTS
+    });
+  } else {
+    const comparisonEngine = {
+      id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
+      compare: comparisonExports.compareSpotPaperStrategies
+    };
+    const arms = [
+      createBaselineArm(accountIds.baseline, accountContract),
+      createChallengerArm(challengerExports, accountIds.challenger,
+        accountContract),
+      createCashControlArm(accountIds.cash, accountContract)
+    ];
+    assert(arms.every(arm =>
+      JSON.stringify(arm.accountContract) === JSON.stringify(accountContract)),
+    "ACCOUNT_CONTRACT_MISMATCH");
+    config = {
+      runId, dataRoot, sourceSha256, researchSourceSha256,
+      configSha256: "0".repeat(64),
+      provider: {sourceId: SPOT_PAPER_PAIRED_SOURCE_ID},
+      accountContract, arms, challengerExports, comparisonExports, comparisonEngine,
+      ...SPOT_PAPER_PAIRED_HOST_DEFAULTS,
+      feeBpsPerSide: accountContract.feeBpsPerSide
+    };
+    config.configSha256 = pairedConfigDigest(config);
+  }
+  const expectedIdentity = {
+    schemaVersion: "SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1",
+    runId, pair: SPOT_PAPER_PAIRED.pair,
+    sourceSha256: config.sourceSha256,
+    configSha256: config.configSha256,
+    researchSourceSha256: config.researchSourceSha256,
+    feedSourceId: config.provider.sourceId,
+    comparisonEngineId: config.comparisonEngine.id,
+    ...(modelPairId ? {modelPairId} : {}),
+    models: config.arms.map(({role, modelId, accountId}) =>
+      ({role, modelId, accountId}))
   };
-  const feeScenarioCompare = accountContract.version === 2 ?
-    comparisonEngine.compare : undefined;
-  const feeScenarioApply = accountContract.version === 2 ?
-    applySpotPaperPairedFeeObservation : undefined;
-  const arms = [
-    createBaselineArm(accountIds.baseline, accountContract, feeScenarioApply),
-    createChallengerArm(challengerExports, accountIds.challenger,
-      accountContract, feeScenarioApply),
-    createCashControlArm(accountIds.cash, accountContract)
-  ];
-  assert(arms.every(arm =>
-    JSON.stringify(arm.accountContract) === JSON.stringify(accountContract)),
-  "ACCOUNT_CONTRACT_MISMATCH");
-  const config = {
-    runId, dataRoot, sourceSha256: await sourceDigest(), researchSourceSha256,
-    configSha256: "0".repeat(64), provider: { sourceId: SPOT_PAPER_PAIRED_SOURCE_ID },
-    accountContract,
-    ...(feeScenarioCompare ? {feeScenarioCompare, feeScenarioApply} : {}),
-    arms, challengerExports, comparisonExports, comparisonEngine,
-    ...SPOT_PAPER_PAIRED_HOST_DEFAULTS,
-    feeBpsPerSide: accountContract.feeBpsPerSide
-  };
-  config.configSha256 = pairedConfigDigest(config);
   return {
     runId, dataRoot, runDirectory, accountIds,
+    ...(modelPairId ? {modelPairId} : {}),
     accountContract,
     accountContractId: accountContract.contractId ?? "BTC_EUR_PAIRED_PAPER_V1",
     accountContractVersion: accountContract.version ?? 1,
@@ -164,6 +219,7 @@ export async function composeSpotPaperPairedHost({
     slippageBpsPerSide: accountContract.slippageBpsPerSide,
     sourceSha256: config.sourceSha256,
     researchSourceSha256, configSha256: config.configSha256,
+    expectedIdentity,
     maxCycles: config.maxCycles, maxRequests: config.maxRequests,
     maxBytes: config.maxBytes, maxResponseBytes: config.maxResponseBytes,
     maxDurationMs: config.maxDurationMs,
@@ -270,13 +326,14 @@ export async function inspectSpotPaperPairedRun({ dataRoot, runId } = {}, {
 
 function parseArgs(argv) {
   const [command = "disabled", ...rest] = argv;
-  assert(["disabled", "run", "status", "report", "export", "package"].includes(command),
+  assert(["disabled", "identity", "run", "status", "report", "export", "package"]
+    .includes(command),
     "UNKNOWN_HOST_COMMAND");
   const values = {};
   for (let index = 0; index < rest.length; index++) {
     const key = rest[index];
     assert(["--data-root",     "--run-id", "--archive", "--manifest", "--account-contract",
-      "--retrieval-window-ms"].includes(key),
+      "--model-pair", "--retrieval-window-ms"].includes(key),
       `UNKNOWN_ARGUMENT:${key}`);
     assert(!Object.hasOwn(values, key), `DUPLICATE_ARGUMENT:${key}`);
     const value = rest[++index];
@@ -285,7 +342,9 @@ function parseArgs(argv) {
   }
   const allowed = command === "package" ?
     ["--data-root", "--run-id", "--archive", "--manifest", "--retrieval-window-ms"] :
-    ["--data-root", "--run-id", ...(command === "run" ? ["--account-contract"] : [])];
+    ["--data-root", "--run-id",
+      ...(command === "run" || command === "identity" ?
+        ["--account-contract", "--model-pair"] : [])];
   assert(Object.keys(values).every(key => allowed.includes(key)),
     "ARGUMENT_NOT_VALID_FOR_COMMAND");
   if (command === "disabled") {
@@ -293,8 +352,15 @@ function parseArgs(argv) {
   } else {
     assert(values["--data-root"], "DATA_ROOT_REQUIRED");
     if (command !== "package") assert(values["--run-id"], "RUN_ID_REQUIRED");
-    if (command === "run") {
+    if (command === "run" || command === "identity") {
       assert(values["--account-contract"], "ACCOUNT_CONTRACT_SELECTION_REQUIRED");
+      if (values["--account-contract"] ===
+          SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId) {
+        assert(values["--model-pair"], "MODEL_PAIR_SELECTION_REQUIRED");
+      } else {
+        assert(values["--model-pair"] === undefined,
+          "MODEL_PAIR_ACCOUNT_CONTRACT_MISMATCH");
+      }
     }
     if (command === "package") {
       assert(values["--run-id"] && values["--archive"] && values["--manifest"],
@@ -319,7 +385,8 @@ export async function main(argv = process.argv.slice(2), {
   const { command, values } = parseArgs(argv);
   const {
     "--data-root": dataRoot, "--run-id": runId,
-    "--account-contract": accountContractId
+    "--account-contract": accountContractId,
+    "--model-pair": modelPairId
   } = values;
   let result;
   let retrievalWindowMs = 0;
@@ -332,8 +399,13 @@ export async function main(argv = process.argv.slice(2), {
     };
   } else if (command === "run") {
     result = await runSpotPaperPairedHost({
-      dataRoot, runId, accountContractId
+      dataRoot, runId, accountContractId, modelPairId
     }, { signalSource });
+  } else if (command === "identity") {
+    const composition = await composeSpotPaperPairedHost({
+      dataRoot, runId, accountContractId, modelPairId
+    });
+    result = composition.expectedIdentity;
   } else if (command === "status" || command === "report" || command === "export") {
     result = await inspectSpotPaperPairedRun({ dataRoot, runId }, {
       includeReport: command !== "status",

@@ -30,7 +30,9 @@ are not relabelled.
 The config digest binds the three model identities, account IDs, V2 fee
 contract, and bounded run settings. The new research-source digest includes the
 comparison, CONFIRM2, and five-minute-trend source bytes under their repository
-paths; it does not replace the historical two-source pin.
+paths; the accepted digest is
+`dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25`. It does
+not replace the historical two-source pin.
 
 ## Synthetic verification
 
@@ -40,41 +42,63 @@ Run the end-to-end shared-runner fixture without network access:
 node --test test/spot-paper-paired-next-run-composition.test.js
 ```
 
-The test uses the real paired runtime and 20-bps fee ledger with deterministic
-provider receipts. Its injected trend-export fixture validates adapter wiring
-and replay reconciliation; it is not a substitute for re-running the test
-against the actual five-minute research exports after #1311 merges. It covers
-different entry outcomes on identical market inputs, fees/slippage, stop and
-exit handling, common-horizon replay, interruption, and stale-quote rejection.
-
-The existing paired report and offline evaluator support the V2 fee assumptions
-and three-arm identity fields. However, the production host and evidence
-evaluator do not yet bind this new model-pair source to the trend exports.
+The test uses the actual CONFIRM2 and merged five-minute trend exports, the real
+paired runtime and 20-bps fee ledger, and deterministic provider receipts. It
+covers divergent entry filtering on identical inputs, unfiltered exits and risk
+stops, fee/slippage application, replay-to-runtime agreement, common-horizon
+marking, interruption, stale/missing data rejection, and the complete 480-cycle
+bound. The trend diagnostic remains `PARTIAL_COVERAGE` because its fixed
+24-hour measurement window is longer than the eight-hour run limit.
 
 ## Host and image handoff status
 
-**Do not run the host for this model pair yet.** The current host accepts an
-explicit `--account-contract` but composes the existing SMA baseline and
-CONFIRM2 challenger. Invoking its current command with the V2 contract would
-therefore run the wrong pair:
+The existing paired host now selects the new pair only when both the V2 account
+contract and explicit model-pair ID are supplied. It pins the source bytes for
+all three research modules; it does not change the fixed legacy V1 pair or the
+historical two-source research pin. The host remains inert unless `run` is
+explicitly selected.
 
 ```text
-run --data-root /evidence-root --run-id <new-run-id> \
-  --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2
+RUN_ID=${RUN_ID:?set a fresh, unique run ID}
+docker build --file Dockerfile.spot-paper-paired \
+  --tag "${IMAGE:?set the approved registry/image:immutable-tag}" .
+
+node scripts/spot-paper-paired/host.mjs identity \
+  --data-root /evidence-root --run-id "$RUN_ID" \
+  --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2 \
+  --model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1 \
+  > "/tmp/$RUN_ID.expected-identity.json"
+
+node scripts/spot-paper-paired/host.mjs run \
+  --data-root /evidence-root --run-id "$RUN_ID" \
+  --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2 \
+  --model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1
+node scripts/spot-paper-paired/host.mjs status \
+  --data-root /evidence-root --run-id "$RUN_ID"
+node scripts/spot-paper-paired/host.mjs export \
+  --data-root /evidence-root --run-id "$RUN_ID" \
+  > "/tmp/$RUN_ID.host-export.json"
+node scripts/spot-paper-paired/fee-scenario.mjs \
+  "/tmp/$RUN_ID.expected-identity.json" \
+  "/tmp/$RUN_ID.host-export.json" /evidence-root
+node scripts/spot-paper-paired-report/cli.mjs \
+  "/tmp/$RUN_ID.expected-identity.json" \
+  "/tmp/$RUN_ID.host-export.json"
 ```
 
-The current `Dockerfile.spot-paper-paired` also does not include
-`next-run-composition.mjs` or the unmerged five-minute trend module. No image
-build, registry push, job creation, deployment, or live-feed run is an approved
-handoff from this preparation.
+The `identity` command emits the exact expected identity to retain with the
+evidence; the host manifest binds the three selected model/account IDs, model
+pair, 20/10-bps assumptions, and source/config hashes. Fee-scenario replay now
+reconstructs the selected CONFIRM2 and trend strategies from journaled shared
+observations and requires its 20-bps replay to match the original run. The report
+evaluator then reconciles the host export against the expected identity. These
+are preparation commands only: this change did not build/push an image, create a
+job, access a live feed, or launch a host.
 
-After #1311 merges, the remaining code handoff is to bind its exact exports and
-source digest in the live host and offline replay/evaluator, expose a host
-selection that requires both the V2 account contract and the exact model-pair
-ID, include the required modules in the paired image, and add an actual-export
-integration test. Only then should the final run command and manifest be
-published. The final host command must preserve the existing one-shot bounds,
-new-volume isolation, and no-retry/no-resume policy in
+Lead retains image build/digest verification, approved registry/project/job/
+volume identifiers, writable unprivileged volume verification, final host
+acceptance, and any later launch decision. Any host run must preserve the
+existing one-shot bounds, new-volume isolation, and no-retry/no-resume policy in
 `/home/runner/work/meridian/meridian/docs/operations/BTC_EUR_PAIRED_LAUNCH.md`.
 
 The trend's fixed 24-hour activity diagnostic must remain
@@ -83,4 +107,5 @@ extend the deadline or force trades to meet the activity threshold. Remaining
 host-only prerequisites include final-head CI, immutable image build and digest,
 approved registry/project/job/volume identifiers, writable unprivileged volume
 verification, and Lead's final host acceptance. No host acceptance or launch
-readiness is claimed here.
+readiness is claimed here. The 20-bps account contract is a model assumption,
+not a verified personal or Kraken account fee schedule.

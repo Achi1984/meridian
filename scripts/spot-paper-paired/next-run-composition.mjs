@@ -3,7 +3,8 @@ import {
   createCashControlArm, createChallengerArm, pairedConfigDigest,
   SPOT_PAPER_PAIRED,
   SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
-  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR, SPOT_PAPER_PAIRED_SOURCE_ID,
+  SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
   SPOT_PAPER_PAIRED_TREND_MODEL, SPOT_PAPER_RESEARCH_COMPARISON_ID
 } from "./forward.mjs";
 import {
@@ -41,7 +42,8 @@ function adapterFor(role, exports) {
     exports?.SPOT_PAPER_5M_TREND_FILTER_ID === expectedId &&
       typeof exports.createFiveMinuteTrendState === "function" &&
       typeof exports.advanceFiveMinuteTrendEntry === "function" &&
-      typeof exports.recordFiveMinuteTrendSell === "function";
+      typeof exports.recordFiveMinuteTrendSell === "function" &&
+      typeof exports.diagnoseFiveMinuteTrendActivity === "function";
   if (!valid) throw new Error(`${role.toUpperCase()}_STRATEGY_EXPORTS_REQUIRED`);
   const adapter = role === "baseline" ? {
     modelId: expectedId,
@@ -52,7 +54,8 @@ function adapterFor(role, exports) {
     modelId: expectedId,
     createState: exports.createFiveMinuteTrendState,
     advance: exports.advanceFiveMinuteTrendEntry,
-    recordSell: exports.recordFiveMinuteTrendSell
+    recordSell: exports.recordFiveMinuteTrendSell,
+    diagnoseActivity: exports.diagnoseFiveMinuteTrendActivity
   };
   adapter.bridge = {
     SPOT_PAPER_ENTRY_CONFIRMATION_ID: SPOT_PAPER_PAIRED.challengerModel,
@@ -72,7 +75,10 @@ export function createSpotPaperPairedNextRunConfig({
   if (!HASH.test(sourceSha256 ?? "") || !HASH.test(researchSourceSha256 ?? "")) {
     throw new Error("FROZEN_IDENTITY_REQUIRED");
   }
-  if (testOnly !== true) throw new Error("NEXT_RUN_SYNTHETIC_ONLY");
+  if (typeof testOnly !== "boolean") throw new Error("RUN_MODE_REQUIRED");
+  const expectedSourceId = testOnly ? SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID :
+    SPOT_PAPER_PAIRED_SOURCE_ID;
+  if (provider?.sourceId !== expectedSourceId) throw new Error("PROVIDER_REQUIRED");
   if (!accountIds || ["baseline", "challenger", "cash"].some(role =>
     typeof accountIds[role] !== "string" || accountIds[role].length === 0) ||
     new Set(Object.values(accountIds)).size !== 3) {
@@ -111,6 +117,7 @@ export function createSpotPaperPairedNextRunConfig({
     runId, dataRoot, sourceSha256, researchSourceSha256,
     configSha256: "0".repeat(64), accountContract, provider, arms,
     strategyAdapters,
+    trendActivityDiagnostic: challengerAdapter.diagnoseActivity,
     modelPair: {
       id: SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
       models: [

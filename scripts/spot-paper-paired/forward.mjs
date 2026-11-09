@@ -6,6 +6,8 @@ import {
   SPOT_PAPER_PILOT_VERSION
 } from "../spot-paper-pilot/core.mjs";
 
+const MAX_RESEARCH_SOURCE_BYTES = 1024 * 1024;
+
 export const SPOT_PAPER_PAIRED = Object.freeze({
   pair: "BTC/EUR",
   baselineModel: SPOT_PAPER_PILOT_VERSION,
@@ -41,6 +43,8 @@ export const SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR =
   "BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1";
 export const SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256 =
   "4c60b1ccccbd495d93006a6838593423c27caac8104a0239fa23fd97a716f82d";
+export const SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256 =
+  "dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25";
 export const SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT = Object.freeze({
   initialCashCents: SPOT_PAPER_PAIRED.initialCashCents,
   maxEntryCents: SPOT_PAPER_PAIRED.maxEntryCents,
@@ -103,6 +107,7 @@ export function pairedConfigDigest(config) {
     })),
     accountContract,
     comparisonEngineId: config.comparisonEngine.id,
+    ...(config.modelPair ? {modelPairId: config.modelPair.id} : {}),
     limits: {
       maxCycles: config.maxCycles ?? SPOT_PAPER_PAIRED.maxCycles,
       maxRequests: config.maxRequests ?? SPOT_PAPER_PAIRED.maxRequests,
@@ -276,6 +281,8 @@ function validateBindings(config, testOnly) {
     }
     assert(config.arms[1].modelId === SPOT_PAPER_PAIRED_TREND_MODEL,
       "TREND_MODEL_ID_MISMATCH");
+    assert(typeof config.trendActivityDiagnostic === "function",
+      "TREND_ACTIVITY_DIAGNOSTIC_REQUIRED");
   } else {
     assert(config.challengerExports?.SPOT_PAPER_ENTRY_CONFIRMATION_ID ===
       SPOT_PAPER_PAIRED.challengerModel &&
@@ -416,7 +423,10 @@ export function createChallengerArm(
         decidedAt: at,
         metadata: { newCandleCount: advanced.newCandleCount,
           missedDecisionWindow: Boolean(advanced.missedDecisionWindow),
-          discarded: advanced.discarded ?? null }
+          discarded: advanced.discarded ?? null,
+          ...(advanced.blockedEntryReason ?
+            {blockedEntryReason: advanced.blockedEntryReason} : {}),
+          ...(advanced.trendFilter ? {trendFilter: advanced.trendFilter} : {}) }
       };
     },
     apply({ state, decision, quote, at, stopped }) {
@@ -712,6 +722,7 @@ async function runPairedForward(input, testOnly) {
     researchSourceSha256: config.researchSourceSha256,
     integrationStatus: testOnly ? SPOT_PAPER_PAIRED_INTEGRATION :
       SPOT_PAPER_PAIRED_PINNED_INTEGRATION,
+    ...(config.modelPair ? {modelPairId: config.modelPair.id} : {}),
     models: config.arms.map(({ role, modelId, accountId }) => ({ role, modelId, accountId })),
     comparisonEngineId: config.comparisonEngine.id,
     assumptions: accountAssumptions(config.accountContract),
@@ -1105,6 +1116,7 @@ async function runPairedForward(input, testOnly) {
     const report = {
       schemaVersion: "SPOT_PAPER_PAIRED_REPORT_V1",
       runId: config.runId, pair: SPOT_PAPER_PAIRED.pair,
+      ...(config.modelPair ? {modelPairId: config.modelPair.id} : {}),
       models: manifest.models, comparisonEngineId: config.comparisonEngine.id,
       feedSourceId: config.provider.sourceId,
       sourceSha256: config.sourceSha256, configSha256: config.configSha256,
@@ -1125,6 +1137,12 @@ async function runPairedForward(input, testOnly) {
         quoteReceivedAt: lastQuote?.receivedAt ?? null, effectAt: sharedHorizonAt,
         quoteAgeAtEffectMs, terminalQuoteAgeMs, quoteFreshAtShutdown },
       assumptions: manifest.assumptions,
+      ...(config.modelPair ? {
+        trendActivityDiagnostic: config.trendActivityDiagnostic({
+          completedRoundTripCount: fills[1].filter(fill => fill.side === "SELL").length,
+          observedCoverageMs: Math.floor(elapsedMs)
+        })
+      } : {}),
       arms: config.arms.map((arm, index) => ({
         role: arm.role, modelId: arm.modelId, accountId: arm.accountId,
         tradingStatus: states[index].stopped ? "STOPPED" : "ACTIVE",
@@ -1167,12 +1185,54 @@ async function runPairedForward(input, testOnly) {
 }
 
 export async function runSpotPaperPaired(input) {
+  assert(isRecord(input), "CONFIG_REQUIRED");
+  if (input.modelPairId === SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR) {
+    if (input.accountContract?.contractId !==
+        SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId ||
+        input.researchSourceSha256 !==
+          SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256) {
+      throw new Error("NEXT_RUN_IDENTITY_REQUIRED");
+    }
+    assert(!Object.hasOwn(input, "provider"), "PROVIDER_INJECTION_FORBIDDEN");
+    const [comparisonBytes, entryConfirmationBytes, fiveMinuteTrendBytes] =
+      await Promise.all([
+        readFile(new URL("../spot-paper-research/comparison.mjs", import.meta.url)),
+        readFile(new URL("../spot-paper-research/entry-confirmation.mjs", import.meta.url)),
+        readFile(new URL("../spot-paper-research/five-minute-trend.mjs", import.meta.url))
+      ]);
+    assert([comparisonBytes, entryConfirmationBytes, fiveMinuteTrendBytes]
+      .every(bytes => bytes.byteLength <= MAX_RESEARCH_SOURCE_BYTES),
+    "RESEARCH_SOURCE_TOO_LARGE");
+    const {nextRunResearchSourceDigest} =
+      await import("./next-run-composition.mjs");
+    const researchSourceSha256 = nextRunResearchSourceDigest({
+      comparisonBytes, entryConfirmationBytes, fiveMinuteTrendBytes
+    });
+    if (researchSourceSha256 !==
+        SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256) {
+      throw new Error("RESEARCH_SOURCE_IDENTITY_MISMATCH");
+    }
+    const [comparisonExports, confirmationExports, trendExports] = await Promise.all([
+      import("../spot-paper-research/comparison.mjs"),
+      import("../spot-paper-research/entry-confirmation.mjs"),
+      import("../spot-paper-research/five-minute-trend.mjs")
+    ]);
+    const {createSpotPaperPairedKrakenProvider} = await import("./feed.mjs");
+    const provider = createSpotPaperPairedKrakenProvider({signal: input.signal});
+    const {createSpotPaperPairedNextRunConfig} =
+      await import("./next-run-composition.mjs");
+    const config = createSpotPaperPairedNextRunConfig({
+      ...input, researchSourceSha256, provider, confirmationExports, trendExports,
+      testOnly: false
+    });
+    return runPairedForward(config, false);
+  }
+  if (input.modelPairId !== undefined) throw new Error("UNKNOWN_MODEL_PAIR");
   const acceptedResearchSource = SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256;
   if (!fingerprint(acceptedResearchSource) ||
       input?.researchSourceSha256 !== acceptedResearchSource) {
     throw new Error("RESEARCH_INTEGRATION_NOT_ACCEPTED");
   }
-  assert(isRecord(input), "CONFIG_REQUIRED");
   assert(!Object.hasOwn(input, "provider"), "PROVIDER_INJECTION_FORBIDDEN");
   const comparisonPath = new URL("../spot-paper-research/comparison.mjs", import.meta.url);
   const confirmationPath = new URL("../spot-paper-research/entry-confirmation.mjs", import.meta.url);

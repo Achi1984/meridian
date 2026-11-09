@@ -323,6 +323,29 @@ test('dashboard projection allowlists legacy and V2 fee assumptions', () => {
   });
 
   const v2 = structuredClone(legacy);
+  v2.identity.modelPairId = 'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1';
+  v2.identity.models = [
+    {role: 'baseline', modelId: 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1'},
+    {role: 'challenger',
+      modelId: 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1'},
+    {role: 'cash', modelId: 'CASH_CONTROL_V1'}
+  ];
+  for (const role of ['baseline', 'challenger', 'cash']) {
+    const model = v2.identity.models.find(item => item.role === role);
+    v2.arms[role].modelId = model.modelId;
+  }
+  v2.trendActivityDiagnostic = {
+    schemaVersion: 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1',
+    status: 'PARTIAL_COVERAGE',
+    completedRoundTripCount: 0,
+    requiredCompletedRoundTrips: 5,
+    observedCoverageMs: 28_800_000,
+    requiredCoverageMs: 86_400_000,
+    completeWindow: false,
+    forcedTrades: false,
+    deadlineExtensionAllowed: false,
+    profitability: 'NOT_ASSESSED'
+  };
   v2.assumptions = {
     feeBpsPerSide: 20,
     slippageBpsPerSide: 10,
@@ -349,6 +372,14 @@ test('dashboard projection allowlists legacy and V2 fee assumptions', () => {
     accountTier: 'UNKNOWN',
     accountingEngine: 'PAIRED_FEE_SCENARIO_LEDGER_V1'
   });
+  assert.equal(safeV2.identity.modelPairId,
+    'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1');
+  assert.deepEqual(safeV2.identity.models, v2.identity.models);
+  assert.equal(safeV2.trendActivityDiagnostic.status, 'PARTIAL_COVERAGE');
+  assert.equal(projectSpotPaperPairedDashboard({
+    ...v2,
+    identity: {...v2.identity, modelPairId: 'UNRECOGNIZED'}
+  }), null);
   assert.equal(projectSpotPaperPairedDashboard({
     ...v2,
     assumptions: {...v2.assumptions, accountingEngine: 'UNRECOGNIZED'}
