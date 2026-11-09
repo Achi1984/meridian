@@ -52,11 +52,13 @@ bound. The trend diagnostic remains `PARTIAL_COVERAGE` because its fixed
 
 ## Host and image handoff status
 
-The existing paired host now selects the new pair only when both the V2 account
-contract and explicit model-pair ID are supplied. It pins the source bytes for
-all three research modules; it does not change the fixed legacy V1 pair or the
-historical two-source research pin. The host remains inert unless `run` is
-explicitly selected.
+The host keeps account-cost identity separate from strategy-pair identity.
+V2 with no `--model-pair` preserves the legacy SMA5/SMA20-vs-CONFIRM2 pairing
+and binds its 20-bp fee-aware ledger. The new CONFIRM2-vs-five-minute-trend
+composition is opt-in and requires the explicit model-pair ID shown below; it
+pins all three research modules without changing the fixed V1 pair or historical
+two-source research pin. The host remains inert unless `run` is explicitly
+selected.
 
 ```text
 RUN_ID=${RUN_ID:?set a fresh, unique run ID}

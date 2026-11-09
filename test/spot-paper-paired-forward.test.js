@@ -539,8 +539,12 @@ test("versioned 20-bps contract drives paper fills and shared comparison", async
     import("../scripts/spot-paper-research/entry-confirmation.mjs")
   ]);
   const accountContract = SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT;
-  const compare = observations => compareSpotPaperFeeScenarioObservations(
-    observations, {feeBpsPerSide: accountContract.feeBpsPerSide});
+  let feeReplayObservations;
+  const compare = observations => {
+    feeReplayObservations = structuredClone(observations);
+    return compareSpotPaperFeeScenarioObservations(
+      observations, {feeBpsPerSide: accountContract.feeBpsPerSide});
+  };
   const feeProbe = createBaselineArm("fee-probe", accountContract,
     applySpotPaperPairedFeeObservation);
   const feeProbeState = feeProbe.initialize();
@@ -607,8 +611,31 @@ test("versioned 20-bps contract drives paper fills and shared comparison", async
     feedSourceId: report.feedSourceId,
     comparisonEngineId: report.comparisonEngineId, models: report.models
   };
+  const replay = replaySpotPaperFeeScenarioObservations(
+    feeReplayObservations, {feeBpsPerSide: 20});
+  for (const [index, replayArm] of replay.arms.entries()) {
+    const reportArm = report.arms[index];
+    assert.deepEqual(replayArm.decisions, reportArm.decisions);
+    assert.deepEqual(replayArm.fills, reportArm.fills);
+    assert.equal(replayArm.valuation.feesCents, reportArm.valuation.feesCents);
+    assert.equal(replayArm.valuation.netEquityCents,
+      reportArm.valuation.netEquityCents);
+  }
   assert.equal(evaluatePairedPaperEvidence({
     expectedIdentity, report: hostExport
+  }).evidenceStatus, "VERIFIED_COMPLETE");
+  assert.notEqual(evaluatePairedPaperEvidence({
+    expectedIdentity,
+    report: {
+      ...hostExport,
+      report: {
+        ...hostExport.report,
+        assumptions: {
+          ...hostExport.report.assumptions,
+          accountContractId: "BTC_EUR_PAIRED_PAPER_V1"
+        }
+      }
+    }
   }).evidenceStatus, "VERIFIED_COMPLETE");
 });
 

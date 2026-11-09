@@ -71,15 +71,34 @@ test("host composition rejects an existing evidence path before integration or f
   }), /EVIDENCE_PATH_ALREADY_EXISTS/);
 });
 
-test("host composition requires explicit versioned costs and model-pair selection", async t => {
+test("host composition preserves legacy V2 and makes the trend pair opt-in", async t => {
   const dataRoot = await rootFixture(t);
   const runId = "paired-host-next-fee-contract";
   await assert.rejects(composeSpotPaperPairedHost({dataRoot, runId}),
     /ACCOUNT_CONTRACT_SELECTION_REQUIRED/);
-  await assert.rejects(composeSpotPaperPairedHost({
+  const legacyV2 = await composeSpotPaperPairedHost({
     dataRoot, runId,
     accountContractId: SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId
-  }), /MODEL_PAIR_SELECTION_REQUIRED/);
+  });
+  assert.equal(legacyV2.accountContractVersion, 2);
+  assert.equal(legacyV2.feeBpsPerSide, 20);
+  assert.equal(legacyV2.slippageBpsPerSide, 10);
+  assert.equal(Object.hasOwn(legacyV2.expectedIdentity, "modelPairId"), false);
+  assert.deepEqual(legacyV2.expectedIdentity.models.map(model => model.modelId), [
+    "BTC_EUR_SMA5_SMA20_V1",
+    "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1",
+    "CASH_CONTROL_V1"
+  ]);
+  await assert.rejects(composeSpotPaperPairedHost({
+    dataRoot, runId: "paired-host-v1-trend",
+    accountContractId: "BTC_EUR_PAIRED_PAPER_V1",
+    modelPairId: "BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1"
+  }), /MODEL_PAIR_ACCOUNT_CONTRACT_MISMATCH/);
+  await assert.rejects(composeSpotPaperPairedHost({
+    dataRoot, runId: "paired-host-unknown-pair",
+    accountContractId: SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId,
+    modelPairId: "UNKNOWN_PAIR"
+  }), /UNKNOWN_MODEL_PAIR/);
   const composition = await composeSpotPaperPairedHost({
     dataRoot, runId,
     accountContractId: SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId,
@@ -101,11 +120,16 @@ test("host composition requires explicit versioned costs and model-pair selectio
     "dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25");
 
   const output = { value: "", write(text) { this.value += text; } };
-  await assert.rejects(main([
-    "run", "--data-root", dataRoot, "--run-id", "unselected-contract",
+  const legacyIdentity = await main([
+    "identity", "--data-root", dataRoot, "--run-id", "legacy-v2-identity",
     "--account-contract", SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId
-  ], { output }), /MODEL_PAIR_SELECTION_REQUIRED/);
-  assert.equal(output.value, "");
+  ], { output });
+  assert.equal(Object.hasOwn(legacyIdentity, "modelPairId"), false);
+  assert.deepEqual(legacyIdentity.models.map(model => model.modelId), [
+    "BTC_EUR_SMA5_SMA20_V1",
+    "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1",
+    "CASH_CONTROL_V1"
+  ]);
 
   const identity = await main([
     "identity", "--data-root", dataRoot, "--run-id", "identity-export",

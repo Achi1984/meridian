@@ -728,6 +728,7 @@ export async function replayVerifiedSpotPaperFeeScenarios({
     hostExport.report.testOnly === false, "LIVE_KRAKEN_EVIDENCE_REQUIRED");
   const nextRun = expectedIdentity.modelPairId ===
     SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR;
+  const versionedV2 = hostExport.report.assumptions?.accountContractVersion === 2;
   const researchBytes = await Promise.all([
     readFile(new URL("../spot-paper-research/comparison.mjs", import.meta.url)),
     readFile(new URL("../spot-paper-research/entry-confirmation.mjs", import.meta.url)),
@@ -756,7 +757,8 @@ export async function replayVerifiedSpotPaperFeeScenarios({
   "RESEARCH_SOURCE_IDENTITY_MISMATCH");
   let strategyAdapters;
   let modelIds;
-  let scenarioRates = SPOT_PAPER_PAIRED_FEE_RATES_BPS;
+  let scenarioRates = versionedV2 ?
+    [20, 50, 10] : SPOT_PAPER_PAIRED_FEE_RATES_BPS;
   if (nextRun) {
     const trendExports =
       await import("../spot-paper-research/five-minute-trend.mjs");
@@ -864,12 +866,12 @@ export async function replayVerifiedSpotPaperFeeScenarios({
       feeBpsPerSide, strategyAdapters, modelIds
     }));
   assertOriginalReplayMatches(originalReport, scenarios[0],
-    nextRun ? "ORIGINAL_20BPS_REPLAY_MISMATCH" :
+    nextRun || versionedV2 ? "ORIGINAL_20BPS_REPLAY_MISMATCH" :
       "ORIGINAL_50BPS_REPLAY_MISMATCH");
   const scenarioDescriptions = {
-    50: nextRun ? "COUNTERFACTUAL_50BPS_TAKER" :
+    50: nextRun || versionedV2 ? "COUNTERFACTUAL_50BPS_TAKER" :
       "ORIGINAL_PAIRED_RUN_ASSUMPTION",
-    20: nextRun ? "ORIGINAL_PAIRED_RUN_ASSUMPTION" :
+    20: nextRun || versionedV2 ? "ORIGINAL_PAIRED_RUN_ASSUMPTION" :
       "COUNTERFACTUAL_REGULAR_EEA_SPOT_TAKER",
     10: "COUNTERFACTUAL_X_PERPS_ACCOUNT_SPOT_TAKER"
   };

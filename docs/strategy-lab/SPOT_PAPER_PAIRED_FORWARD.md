@@ -40,11 +40,14 @@ side. The user-specific fee tier remains unknown; this setting is not a
 verified account rate and does not alter historical evidence.
 
 V2 is selected by contract ID, not by an implicit fee default:
-`BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2`. Its version, fee assumption, source, and
-account-tier status are included in the config digest and report assumptions.
-The host `run` command requires an explicit `--account-contract` argument; no
-run is authorized or started by documenting this selection. V1/50-bp reports
-remain valid under the existing report and replay paths.
+`BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2`. Account-cost identity is separate from
+strategy-pair identity. Selecting V2 without `--model-pair` preserves the
+original SMA5/SMA20-vs-CONFIRM2 composition and applies the versioned 20-bp
+fee-aware ledger to both trading arms. The explicit
+`BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1` model pair is an opt-in V2
+composition; it does not redefine the default V2 pair. V1/50-bp reports remain
+valid under the existing report and replay paths, and no run is authorized or
+started by documenting these selections.
 
 The hard run limits are eight hours, 480 cycles, 960 total public requests
 across the entire run (including warmup), 64 MiB total response bytes, 256 KiB
@@ -213,6 +216,8 @@ The minimal host composition and concrete local commands are now in
 
 ```sh
 node scripts/spot-paper-paired/host.mjs disabled
+node scripts/spot-paper-paired/host.mjs identity --data-root /evidence-root --run-id <new-legacy-v2-id> --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2
+node scripts/spot-paper-paired/host.mjs run --data-root /evidence-root --run-id <new-legacy-v2-id> --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2
 node scripts/spot-paper-paired/host.mjs identity --data-root /evidence-root --run-id <new-unique-run-id> --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2 --model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1
 node scripts/spot-paper-paired/host.mjs run --data-root /evidence-root --run-id <new-unique-run-id> --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2 --model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1
 node scripts/spot-paper-paired/host.mjs status --data-root /evidence-root --run-id <run-id>
@@ -222,12 +227,13 @@ node scripts/spot-paper-paired/host.mjs package --data-root /evidence-root --run
 ```
 
 The `run` command requires an existing absolute evidence root, a fresh run ID,
-and rejects an existing output path. The next-run selection requires both
-`--account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2` and
-`--model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1`; it verifies all three
-research source files against their distinct accepted source digest before
-network access. `identity` emits the expected report identity without starting
-the feed, and `run` maps SIGTERM to the runner's `AbortSignal`. The other
+and rejects an existing output path. V2 without `--model-pair` selects the
+legacy SMA5/SMA20-vs-CONFIRM2 pair with 20-bp fees; the opt-in trend pair
+requires both `--account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2` and
+`--model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1`. That selection verifies
+all three research source files against their distinct accepted source digest
+before network access. `identity` emits the expected report identity without
+starting the feed, and `run` maps SIGTERM to the runner's `AbortSignal`. The other
 commands are read-only except `package`, which exclusively creates outputs via the existing verified
 `packageHostEvidence` helper, refuses writer-lock/pending state, and holds the
 maintenance process open for the requested retrieval window. They do not verify

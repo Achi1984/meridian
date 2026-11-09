@@ -149,11 +149,10 @@ export async function composeSpotPaperPairedHost({
   const runDirectory = await assertWritableRunLocation(dataRoot, runId);
   assert(typeof accountContractId === "string", "ACCOUNT_CONTRACT_SELECTION_REQUIRED");
   const accountContract = resolveSpotPaperPairedAccountContract(accountContractId);
-  if (accountContract.version === 2) {
+  if (modelPairId !== undefined) {
+    assert(accountContract.version === 2, "MODEL_PAIR_ACCOUNT_CONTRACT_MISMATCH");
     assert(modelPairId === SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
-      "MODEL_PAIR_SELECTION_REQUIRED");
-  } else {
-    assert(modelPairId === undefined, "MODEL_PAIR_ACCOUNT_CONTRACT_MISMATCH");
+      "UNKNOWN_MODEL_PAIR");
   }
   const {comparisonExports, challengerExports, confirmationExports, trendExports,
     researchSourceSha256} = await readResearchModules(modelPairId);
@@ -178,10 +177,18 @@ export async function composeSpotPaperPairedHost({
       id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
       compare: comparisonExports.compareSpotPaperStrategies
     };
+    const feeScenario = accountContract.version === 2 ?
+      await import("./fee-scenario.mjs") : null;
+    const feeScenarioApply = feeScenario?.applySpotPaperPairedFeeObservation;
+    const feeScenarioCompare = feeScenario ? observations =>
+      feeScenario.compareSpotPaperFeeScenarioObservations(observations, {
+        feeBpsPerSide: accountContract.feeBpsPerSide
+      }) : null;
+    if (feeScenarioCompare) comparisonEngine.compare = feeScenarioCompare;
     const arms = [
-      createBaselineArm(accountIds.baseline, accountContract),
+      createBaselineArm(accountIds.baseline, accountContract, feeScenarioApply),
       createChallengerArm(challengerExports, accountIds.challenger,
-        accountContract),
+        accountContract, feeScenarioApply),
       createCashControlArm(accountIds.cash, accountContract)
     ];
     assert(arms.every(arm =>
@@ -193,7 +200,8 @@ export async function composeSpotPaperPairedHost({
       provider: {sourceId: SPOT_PAPER_PAIRED_SOURCE_ID},
       accountContract, arms, challengerExports, comparisonExports, comparisonEngine,
       ...SPOT_PAPER_PAIRED_HOST_DEFAULTS,
-      feeBpsPerSide: accountContract.feeBpsPerSide
+      feeBpsPerSide: accountContract.feeBpsPerSide,
+      ...(feeScenario ? {feeScenarioApply, feeScenarioCompare} : {})
     };
     config.configSha256 = pairedConfigDigest(config);
   }
@@ -354,10 +362,8 @@ function parseArgs(argv) {
     if (command !== "package") assert(values["--run-id"], "RUN_ID_REQUIRED");
     if (command === "run" || command === "identity") {
       assert(values["--account-contract"], "ACCOUNT_CONTRACT_SELECTION_REQUIRED");
-      if (values["--account-contract"] ===
+      if (values["--account-contract"] !==
           SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId) {
-        assert(values["--model-pair"], "MODEL_PAIR_SELECTION_REQUIRED");
-      } else {
         assert(values["--model-pair"] === undefined,
           "MODEL_PAIR_ACCOUNT_CONTRACT_MISMATCH");
       }
