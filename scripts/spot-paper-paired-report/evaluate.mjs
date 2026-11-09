@@ -103,6 +103,24 @@ function exactModels(actual, expected) {
       model.accountId === expected.models[index].accountId);
 }
 
+function validFeeAssumptions(assumptions) {
+  if (!isRecord(assumptions) || assumptions.slippageBpsPerSide !== 10 ||
+      assumptions.ratesVerified !== false) return false;
+  if (assumptions.feeBpsPerSide === 50) {
+    return !Object.hasOwn(assumptions, 'accountContractId') &&
+      !Object.hasOwn(assumptions, 'accountContractVersion');
+  }
+  return assumptions.feeBpsPerSide === 20 &&
+    assumptions.accountContractId === 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2' &&
+    assumptions.accountContractVersion === 2 &&
+    assumptions.feeBasis === 'EEA_SPOT_ONLY_TAKER_ASSUMPTION' &&
+    assumptions.feeSource ===
+      'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea' &&
+    assumptions.feeAsOf === '2026-11-09' &&
+    assumptions.accountTier === 'UNKNOWN' &&
+    assumptions.accountingEngine === 'PAIRED_FEE_SCENARIO_LEDGER_V1';
+}
+
 function getJournalPayload(journal) {
   if (!isRecord(journal)) return null;
   if (isRecord(journal.payload)) {
@@ -146,9 +164,8 @@ function identityMatches(report, payload, expected) {
     manifest.feedSourceId === expected.feedSourceId &&
     manifest.comparisonEngineId === expected.comparisonEngineId &&
     exactModels(manifest.models, expected) &&
-    manifest.assumptions?.feeBpsPerSide === 50 &&
-    manifest.assumptions?.slippageBpsPerSide === 10 &&
-    manifest.assumptions?.ratesVerified === false &&
+    stableJson(manifest.assumptions) === stableJson(report.assumptions) &&
+    validFeeAssumptions(manifest.assumptions) &&
     isRecord(limits) &&
     isInteger(limits.maxCycles) && limits.maxCycles > 0 &&
       limits.maxCycles <= MAX_CYCLES && report.cycles <= limits.maxCycles &&
@@ -197,10 +214,7 @@ function reportIsValid(report, expected) {
       report.autoPromotion !== false ||
       typeof report.testOnly !== 'boolean' ||
       report.testOnly !== (report.feedSourceId === 'SYNTHETIC_TEST_ONLY') ||
-      !isRecord(report.assumptions) ||
-      report.assumptions.feeBpsPerSide !== 50 ||
-      report.assumptions.slippageBpsPerSide !== 10 ||
-      report.assumptions.ratesVerified !== false ||
+      !validFeeAssumptions(report.assumptions) ||
       !isRecord(report.commonHorizon) ||
       typeof report.commonHorizon.available !== 'boolean' ||
       !Array.isArray(report.arms) || report.arms.length !== 3) {
@@ -221,12 +235,45 @@ function reportIsValid(report, expected) {
         report.commonHorizon.effectAt < report.startedAt ||
         report.commonHorizon.effectAt > report.endedAt ||
         report.commonHorizon.quoteReceivedAt > report.commonHorizon.effectAt ||
-        report.endedAt - report.commonHorizon.quoteReceivedAt > MAX_QUOTE_AGE_MS) {
+        report.commonHorizon.effectAt -
+          report.commonHorizon.quoteReceivedAt > MAX_QUOTE_AGE_MS) {
       return 'INVALID_COMMON_HORIZON';
     }
   } else if (report.commonHorizon.effectAt !== null &&
       !isInteger(report.commonHorizon.effectAt)) {
     return 'INVALID_COMMON_HORIZON';
+  }
+  const horizon = report.commonHorizon;
+  const horizonMetadata = [
+    'reason', 'quoteAgeAtEffectMs', 'terminalQuoteAgeMs',
+    'quoteFreshAtShutdown'
+  ];
+  const hasHorizonMetadata = horizonMetadata.some(key =>
+    Object.hasOwn(horizon, key));
+  if (hasHorizonMetadata) {
+    if (!horizonMetadata.every(key => Object.hasOwn(horizon, key)) ||
+        horizon.available && horizon.reason !== null ||
+        !horizon.available && horizon.reason !== 'NO_VALID_COMMON_OBSERVATION' ||
+        horizon.quoteAgeAtEffectMs !== null &&
+          (!isInteger(horizon.quoteAgeAtEffectMs) ||
+            horizon.effectAt === null ||
+            horizon.quoteAgeAtEffectMs !==
+              horizon.effectAt - (horizon.quoteReceivedAt ?? 0)) ||
+        horizon.terminalQuoteAgeMs !== null &&
+          (!isInteger(horizon.terminalQuoteAgeMs) ||
+            horizon.quoteReceivedAt === null ||
+            horizon.terminalQuoteAgeMs !== report.endedAt - horizon.quoteReceivedAt) ||
+        typeof horizon.quoteFreshAtShutdown !== 'boolean' ||
+        horizon.quoteFreshAtShutdown !==
+          (horizon.terminalQuoteAgeMs !== null &&
+            horizon.terminalQuoteAgeMs >= 0 &&
+            horizon.terminalQuoteAgeMs <= MAX_QUOTE_AGE_MS) ||
+        horizon.available &&
+          (horizon.quoteAgeAtEffectMs === null ||
+            horizon.quoteAgeAtEffectMs < 0 ||
+            horizon.quoteAgeAtEffectMs > MAX_QUOTE_AGE_MS)) {
+      return 'INVALID_COMMON_HORIZON';
+    }
   }
   for (let index = 0; index < SPOT_PAPER_PAIRED_ROLES.length; index++) {
     const role = SPOT_PAPER_PAIRED_ROLES[index];
@@ -274,27 +321,83 @@ function validateTerminalJournal(journal, report, expected) {
     typeof response.path === 'string' &&
     /^responses\/[a-f0-9]{64}\.json$/.test(response.path) &&
     response.path === `responses/${response.sha256}.json` &&
-    isInteger(response.bytes) && response.bytes > 0;
+    isInteger(response.bytes) && response.bytes > 0 &&
+    isInteger(response.requestStartedAt) &&
+    isInteger(response.receivedAt) &&
+    response.receivedAt >= response.requestStartedAt;
   const eventRoles = (items, roleField = 'role') =>
     Array.isArray(items) && items.length === 3 &&
     items.every((item, index) => item?.[roleField] === SPOT_PAPER_PAIRED_ROLES[index]);
-  let priorEffectAt = null;
+  let priorEffectAt = report.startedAt;
   const observationStreamValid = observations.every((event, index) => {
     const valid = event?.cycle === index + 1 &&
       isInteger(event.decisionAt) && isInteger(event.effectAt) &&
       event.decisionAt <= event.effectAt && event.observedAt === event.effectAt &&
       (priorEffectAt === null || event.effectAt > priorEffectAt) &&
       validResponseRef(event.ohlc) && validResponseRef(event.ticker) &&
+      event.ohlc.requestStartedAt >= priorEffectAt &&
+      event.ohlc.receivedAt <= event.decisionAt &&
+      event.decisionAt <= event.ticker.requestStartedAt &&
+      event.ticker.receivedAt <= event.effectAt &&
+      event.effectAt - event.ticker.receivedAt <= MAX_QUOTE_AGE_MS &&
       event.id === `shared:${index + 1}:${event.ticker.sha256}` &&
       eventRoles(event.decisions) && eventRoles(event.fills) &&
       eventRoles(event.riskStates) && eventRoles(event.valuations) &&
-      event.fills.every(item => Array.isArray(item.fills));
+      event.decisionAt === Math.max(...event.decisions.map(item => item.decidedAt)) &&
+      event.decisions.every(item => isInteger(item.decidedAt) &&
+        Object.hasOwn(item, 'decision') &&
+        (item.skippedReason === null || typeof item.skippedReason === 'string') &&
+        (item.metadata === null || isRecord(item.metadata)) &&
+        event.ohlc.receivedAt <= item.decidedAt &&
+        item.decidedAt <= event.ticker.requestStartedAt &&
+        item.decidedAt <= event.effectAt) &&
+      event.fills.every(item => Array.isArray(item.fills)) &&
+      event.riskStates.every(item => isRecord(item.state) &&
+        (item.stopReason === null || typeof item.stopReason === 'string') &&
+        (item.stoppedAt === null || isInteger(item.stoppedAt)));
     if (valid) priorEffectAt = event.effectAt;
     return valid;
   });
   const reportArmsReconcile = report.arms.every(arm =>
     Array.isArray(arm.decisions) && arm.decisions.length === observations.length &&
     Array.isArray(arm.riskStates) && arm.riskStates.length === observations.length);
+  const normalizeDecision = decision => Object.fromEntries(
+    Object.entries(decision ?? {}).filter(([key, value]) =>
+      key !== 'state' && key !== 'role' && value !== null && value !== undefined));
+  const decisionsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, roleIndex) =>
+    stableJson(report.arms[roleIndex].decisions.map(normalizeDecision)) ===
+    stableJson(observations.map(event => normalizeDecision(
+      event.decisions.find(item => item.role === role)))));
+  const fillsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, roleIndex) => {
+    const journalFills = observations.flatMap(event => {
+      const group = event.fills.find(item => item.role === role);
+      return group.fills.map(fill => ({...fill, executionAt: event.effectAt}));
+    });
+    return stableJson(report.arms[roleIndex].fills) === stableJson(journalFills);
+  });
+  const riskStatesReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, roleIndex) => {
+    const journalRiskStates = observations.map(event => {
+      const item = event.riskStates.find(value => value.role === role);
+      return {
+        ...item.state,
+        ...(item.stopReason !== null ? {stopReason: item.stopReason} : {}),
+        ...(item.stoppedAt !== null ? {stoppedAt: item.stoppedAt} : {})
+      };
+    });
+    return stableJson(report.arms[roleIndex].riskStates) ===
+      stableJson(journalRiskStates);
+  });
+  const terminalArmStatesReconcile = SPOT_PAPER_PAIRED_ROLES.every(
+    (role, roleIndex) => {
+      const arm = report.arms[roleIndex];
+      const finalRisk = observations.at(-1)?.riskStates.find(item =>
+        item.role === role);
+      const stopped = typeof finalRisk?.stopReason === 'string';
+      return (!finalRisk?.state?.stopped || stopped) &&
+        arm.tradingStatus === (stopped ? 'STOPPED' : 'ACTIVE') &&
+        arm.stopReason === (stopped ? finalRisk.stopReason : null) &&
+        arm.stoppedAt === (stopped ? finalRisk.stoppedAt : null);
+    });
   const fillCountsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, index) =>
     report.arms[index].fills.length === observations.reduce((sum, event) => {
       const group = Array.isArray(event.fills) ?
@@ -327,11 +430,16 @@ function validateTerminalJournal(journal, report, expected) {
       failures.length === 1 &&
         payload.events.at(-2)?.type !== 'shared_feed_failure' ||
       !observationStreamValid ||
-      report.cycles > 0 &&
-        observations.length > 0 &&
-          priorEffectAt !== report.commonHorizon.effectAt ||
-      observations.length === 0 && report.commonHorizon.effectAt !== null ||
-      !reportArmsReconcile || !fillCountsReconcile ||
+      observations.length > 0 &&
+        (priorEffectAt !== report.commonHorizon.effectAt ||
+          observations.at(-1).ticker.receivedAt !==
+            report.commonHorizon.quoteReceivedAt) ||
+      observations.length === 0 &&
+        (report.commonHorizon.effectAt !== null ||
+          report.commonHorizon.quoteReceivedAt !== null) ||
+      !reportArmsReconcile || !decisionsReconcile || !fillsReconcile ||
+      !riskStatesReconcile || !terminalArmStatesReconcile ||
+      !fillCountsReconcile ||
       !identityMatches(report, payload, expected)) {
     return {error: 'JOURNAL_REPORT_MISMATCH'};
   }
@@ -594,6 +702,12 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
   const elapsed = safeDuration(report?.elapsedMs);
   const coverage = isInteger(report?.startedAt) && isInteger(horizon) ?
     horizon - report.startedAt : null;
+  const legacyQuoteAgeAtValuation = isInteger(horizon) &&
+      isInteger(report?.commonHorizon?.quoteReceivedAt) ?
+    horizon - report.commonHorizon.quoteReceivedAt : null;
+  const legacyTerminalQuoteAge = isInteger(report?.endedAt) &&
+      isInteger(report?.commonHorizon?.quoteReceivedAt) ?
+    report.endedAt - report.commonHorizon.quoteReceivedAt : null;
   const dto = {
     schemaVersion: SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA,
     evidenceStatus: status,
@@ -608,6 +722,20 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
       actualElapsedMs: elapsed,
       runStoppedAt: safeNumber(report?.endedAt),
       valuationAt: safeNumber(horizon),
+      quoteAgeAtValuationMs: safeNumber(
+        report?.commonHorizon?.quoteAgeAtEffectMs ?? legacyQuoteAgeAtValuation),
+      terminalQuoteAgeMs: safeNumber(
+        report?.commonHorizon?.terminalQuoteAgeMs ?? legacyTerminalQuoteAge),
+      quoteFreshAtShutdown:
+        typeof report?.commonHorizon?.quoteFreshAtShutdown === 'boolean' ?
+          report.commonHorizon.quoteFreshAtShutdown :
+          legacyTerminalQuoteAge !== null &&
+            legacyTerminalQuoteAge >= 0 &&
+            legacyTerminalQuoteAge <= MAX_QUOTE_AGE_MS,
+      commonHorizonAvailable: report?.commonHorizon?.available === true,
+      commonHorizonReason: report?.commonHorizon?.reason ??
+        (report?.commonHorizon?.available === true ? null :
+          'COMMON_HORIZON_UNAVAILABLE'),
       requestedCycles: MAX_CYCLES,
       attemptedCycles: safeNumber(report?.cycles),
       completedCycles: safeNumber(reportValid ? report._completedCycles : null),
