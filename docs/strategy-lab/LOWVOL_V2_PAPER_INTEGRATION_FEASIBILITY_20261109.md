@@ -3,10 +3,11 @@
 ## Disposition
 
 **Feasible as a separately scoped derivatives-Paper project; not a small bot
-integration and not ready to launch.** The smallest safe packet here is this
-source-backed handoff. It adds no code, acquires no data, starts no campaign,
-reruns no historical result, and changes no authorization or frozen artifact.
-It does not delay or modify #1309, #1311, or #1313.
+integration and not ready to launch.** The owner-authorized preparation in this
+packet is limited to this source-backed handoff and a pure target-weight
+adapter. It acquires no data, starts no campaign, reruns no historical result,
+and changes no authorization or frozen strategy artifact. It does not delay or
+modify #1309, #1311, or #1313.
 
 The frozen V2 result is
 `HOLDOUT_PASS_PROSPECTIVE_PAPER_REVIEW_ONLY`. It is evidence for the frozen
@@ -26,7 +27,7 @@ revived as shortcuts.
 | Holding and accounting | One Saturday-to-Saturday week; open-to-open price return and exact funding events in `(t, t + 7d]`. Funding contribution is `-weight * funding_sum`. Turnover is absolute target-weight change; the historical engine charges the initial opening and a mandatory terminal close. No stop, take-profit, DCA, martingale, regime filter, asset selection, or leverage multiplier is part of the frozen rules. |
 | Existing forward evidence | `research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-SHADOW-IMPLEMENTATION.md` and `research/LOW-VOLATILITY-RANK-WEIGHTED-V2-PROSPECTIVE-START-EVIDENCE.md` specify shadow-only monitoring from the predeclared 10 October 2026 boundary and a fixed first-12-week/84-day gate ending 2 January 2027. That is not an operational Paper account or authorization. The shadow implementation/start records differ on the 12h/Saturday versus 36h/Sunday collection contract; `docs/strategy-lab/LOWVOL_RECEIPT_VERIFICATION_20261014.md` leaves the older text reconciliation and independent authority provenance open. Preserve both records; do not silently choose, rewrite, restart, or backfill the evidence. |
 
-The V2 implementation is in
+The frozen V2 implementation is in
 [`research/low_volatility_rank_weighted_v2.py`](../../research/low_volatility_rank_weighted_v2.py);
 its frozen feature parent is
 [`research/cross_sectional_low_volatility_v1.py`](../../research/cross_sectional_low_volatility_v1.py).
@@ -36,6 +37,13 @@ The corresponding Python tests are
 [`test/test_low_volatility_rank_weighted_v2.py`](../../test/test_low_volatility_rank_weighted_v2.py)
 and
 [`test/test_low_volatility_rank_weighted_v2_prospective.py`](../../test/test_low_volatility_rank_weighted_v2_prospective.py).
+
+The isolated pure adapter is now implemented at
+[`research/low_volatility_rank_weighted_v2_targets.py`](../../research/low_volatility_rank_weighted_v2_targets.py);
+its deterministic input-contract and parity tests are in
+[`test/test_low_volatility_rank_weighted_v2_targets.py`](../../test/test_low_volatility_rank_weighted_v2_targets.py).
+It imports the frozen V1 feature engine and V2 rank weighting; neither frozen
+module is modified.
 
 ## Collector and evidence gaps
 
@@ -74,29 +82,55 @@ spot-specific fee assumptions into this integration.
 
 ## Minimum technical scope and relative effort
 
-1. **Small, isolated target-weight adapter — S, optional and independently
-   reviewable.** A pure function may wrap the frozen V1 feature and V2 rank
-   weighting without modifying either frozen engine:
+1. **Small, isolated target-weight adapter — S, implemented for focused
+   preparation review.** Its pure function wraps the frozen V1 feature and V2
+   rank weighting without modifying either frozen engine:
 
    ```text
-   computeLowVolV2Targets({ decisionAt, hourlyByAsset })
-     -> { ruleset, decisionAt, targets: [{ asset, weight }], grossExposure, netExposure }
+   compute_targets(decision_at, hourly_by_asset)
+     -> {
+          schemaVersion, ruleset, instrumentType, quoteCurrency, decisionAt,
+          targets: [{ asset, symbol, weight }],
+          grossExposure, netExposure, researchOnly,
+          executionAuthorized, paperAuthorized, liveAuthorized, autoPromotion
+        }
    ```
 
-   `decisionAt` must be a Saturday 00:00 UTC anchor. `hourlyByAsset` must have
-   exactly the 12 frozen assets and exactly 673 ordered, unique, fully closed,
-   contiguous hourly source rows per asset, ending at `decisionAt - 1h`. The
-   adapter returns all 12 signed weights only when gross is 1 and net is 0
-   within the frozen tolerance; missing/extra assets, stale or open bars,
-   duplicates, gaps, non-finite prices, bad anchor, and degenerate ranks fail
-   closed. It does not consume forward returns/funding, produce orders, choose
-   fills/costs, persist state, or authorize execution.
+   Practical invocation from the repository root, using caller-provided
+   in-memory hourly rows:
 
-   Focused tests for that adapter would compare its weights against the frozen
-   engine on deterministic fixtures, verify the full-universe/gross/net and tie
-   invariants, and reject each invalid-input case above. These tests are not
-   added here: an isolated target calculator would not itself connect a bot or
-   satisfy Paper accounting/readiness.
+   ```sh
+   PYTHONPATH=research python3 - <<'PY'
+   import json
+   from low_volatility_rank_weighted_v2_targets import compute_targets
+
+   with open("hourly-input.json", encoding="utf-8") as source:
+       payload = json.load(source)
+   result = compute_targets(payload["decisionAt"], payload["hourlyByAsset"])
+   print(json.dumps(result, sort_keys=True))
+   PY
+   ```
+
+   `decision_at` is Unix milliseconds at a Saturday 00:00 UTC anchor.
+   `hourly_by_asset` maps exactly the 12 frozen asset codes to 673 five-column
+   rows `[open_time_ms, open, high, low, close]`, ordered hourly from
+   `decision_at - 673h` through `decision_at - 1h`; those fully closed rows are
+   the only market inputs. The result binds schema
+   `MERIDIAN-LOWVOL-V2-TARGETS-V1`, frozen ruleset
+   `LOW-VOLATILITY-RANK-WEIGHTED-V2-FROZEN`, instrument type
+   `USD_M_PERPETUAL`, quote currency `USDT`, anchor, and all 12 ordered
+   `<asset>USDT` target weights. It also reports gross/net exposure, marks the
+   result research-only, and sets execution, Paper, live, and auto-promotion
+   authority false. No capital, contract quantity, fee, funding, forward return,
+   quote, order, fill, or persistence data are accepted or inferred.
+
+   The focused tests compare outputs to the actual frozen feature/weight
+   functions, assert deterministic ordered results, full-universe and
+   gross/net invariants, average-rank tie behavior and frozen degenerate-rank
+   rejection, and fail-closed handling for bad anchors, universe, row count,
+   row shape, chronology/gaps, and invalid closes. Passing these tests validates
+   only the pure target function; it does not connect a bot or establish Paper
+   accounting/readiness.
 
 2. **Perpetual market/execution model — M/L.** A separate adapter needs fresh,
    timestamped public data for all 12 native USDT perpetuals; frozen closed
@@ -169,10 +203,10 @@ weekly multi-asset strategy.
 
 ## Recommendation
 
-Publish this as the single bounded feasibility/handoff packet. Do not code an
-account connector or launch a Paper campaign in this change. If the owner wants
-an incremental implementation next, review and test only the optional pure
-target adapter first; treat the full Paper bot as a separate, explicitly
-authorized project after resolving the collector/evidence timing and
-provenance questions and specifying the derivative account/cost/recovery
-contract. The frozen V2 result remains research evidence, not a launch decision.
+The owner-authorized preparation step in this bounded packet is complete: the
+feasibility handoff and isolated pure target adapter are implemented and
+focused-testable. Do not add an account connector or launch a Paper campaign
+here. A full Paper bot remains a separate, explicitly authorized project after
+resolving the collector/evidence timing and provenance questions and specifying
+the derivative feed, account, cost, margin/liquidation, and recovery contracts.
+The frozen V2 result remains research evidence, not a launch decision.
