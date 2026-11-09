@@ -11,16 +11,18 @@ export const SPOT_PAPER_PAIRED_EVIDENCE_STATUSES = Object.freeze([
   'RUNNING_SNAPSHOT',
   'CORRUPT_UNKNOWN'
 ]);
+export const SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR =
+  'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1';
+export const SPOT_PAPER_PAIRED_NEXT_RUN_MODELS = Object.freeze([
+  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1',
+  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1',
+  'CASH_CONTROL_V1'
+]);
 
 const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
 const REASON_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
-const NEXT_RUN_MODELS = [
-  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1',
-  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1',
-  'CASH_CONTROL_V1'
-];
 const ARM_STOP_REASONS = new Set([
   'SAMPLED_2PCT_BID_STOP', 'SESSION_LOSS_LIMIT'
 ]);
@@ -40,7 +42,7 @@ function safeIdentity(identity) {
       !HASH.test(identity.configSha256 ?? '') ||
       !HASH.test(identity.researchSourceSha256 ?? '') ||
       identity.modelPairId !== undefined &&
-        identity.modelPairId !== 'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1' ||
+        identity.modelPairId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR ||
       !Array.isArray(identity.models) || identity.models.length !== 3) return null;
   const models = identity.models.map((model, index) => {
     if (!isRecord(model) || model.role !== SPOT_PAPER_PAIRED_ROLES[index] ||
@@ -48,8 +50,12 @@ function safeIdentity(identity) {
     return {role: model.role, modelId: model.modelId};
   });
   if (models.some(model => model === null)) return null;
+  const usesTrendModel = models.some(model =>
+    model.modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[1]);
+  if (usesTrendModel && !identity.modelPairId) return null;
   if (identity.modelPairId &&
-      models.some((model, index) => model.modelId !== NEXT_RUN_MODELS[index])) return null;
+      models.some((model, index) =>
+        model.modelId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[index])) return null;
   return {
     runId: identity.runId,
     pair: 'BTC/EUR',
@@ -267,6 +273,10 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
       identity.models.find(model => model.role === role).modelId);
     if (!arms[role]) return null;
   }
+  if (trendActivityDiagnostic &&
+      arms.challenger.fillCount !== null &&
+      trendActivityDiagnostic.completedRoundTripCount >
+        arms.challenger.fillCount) return null;
   const deltas = {
     status: input.deltas.status,
     reason: input.deltas.status === 'UNAVAILABLE' ?

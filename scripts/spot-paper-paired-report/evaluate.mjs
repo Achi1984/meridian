@@ -7,7 +7,9 @@ import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA,
   SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA,
-  SPOT_PAPER_PAIRED_ROLES
+  SPOT_PAPER_PAIRED_ROLES,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODELS
 } from './contract.mjs';
 
 export const SPOT_PAPER_PAIRED_REPORT_SCHEMA = 'SPOT_PAPER_PAIRED_REPORT_V1';
@@ -21,12 +23,6 @@ const MAX_REQUESTS = 960;
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_QUOTE_AGE_MS = 10_000;
 const MAX_RESPONSE_BYTES = 256 * 1024;
-const NEXT_RUN_MODEL_PAIR = 'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1';
-const NEXT_RUN_MODELS = [
-  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1',
-  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1',
-  'CASH_CONTROL_V1'
-];
 const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -67,7 +63,7 @@ function fail(reasonCode) {
   return createUnknownSpotPaperPairedDashboard(reasonCode);
 }
 
-function validExpectedIdentity(expected) {
+export function isValidSpotPaperPairedExpectedIdentity(expected) {
   const keys = [
     'schemaVersion', 'runId', 'pair', 'sourceSha256', 'configSha256',
     'researchSourceSha256', 'feedSourceId', 'comparisonEngineId', 'models',
@@ -84,7 +80,7 @@ function validExpectedIdentity(expected) {
       typeof expected.comparisonEngineId !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(expected.comparisonEngineId) ||
       expected.modelPairId !== undefined &&
-        expected.modelPairId !== NEXT_RUN_MODEL_PAIR ||
+        expected.modelPairId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR ||
       !Array.isArray(expected.models) || expected.models.length !== 3) return false;
   return expected.models.every((model, index) =>
     exactKeys(model, ['role', 'modelId', 'accountId']) &&
@@ -92,7 +88,10 @@ function validExpectedIdentity(expected) {
     MODEL_ID.test(model.modelId ?? '') &&
     typeof model.accountId === 'string' &&
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(model.accountId) &&
-    (!expected.modelPairId || model.modelId === NEXT_RUN_MODELS[index]));
+    (expected.modelPairId ||
+      model.modelId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[1]) &&
+    (!expected.modelPairId ||
+      model.modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[index]));
 }
 
 function expectedPublicIdentity(expected) {
@@ -301,13 +300,11 @@ function reportIsValid(report, expected) {
         horizon.available && horizon.reason !== null ||
         !horizon.available && horizon.reason !== 'NO_VALID_COMMON_OBSERVATION' ||
         horizon.quoteAgeAtEffectMs !== null &&
-          (!isInteger(horizon.quoteAgeAtEffectMs) ||
-            horizon.effectAt === null ||
+          (!isInteger(horizon.quoteAgeAtEffectMs) || horizon.effectAt === null ||
             horizon.quoteAgeAtEffectMs !==
               horizon.effectAt - (horizon.quoteReceivedAt ?? 0)) ||
         horizon.terminalQuoteAgeMs !== null &&
-          (!isInteger(horizon.terminalQuoteAgeMs) ||
-            horizon.quoteReceivedAt === null ||
+          (!isInteger(horizon.terminalQuoteAgeMs) || horizon.quoteReceivedAt === null ||
             horizon.terminalQuoteAgeMs !== report.endedAt - horizon.quoteReceivedAt) ||
         typeof horizon.quoteFreshAtShutdown !== 'boolean' ||
         horizon.quoteFreshAtShutdown !==
@@ -819,7 +816,9 @@ function nonFinalSnapshotDto(journal, expected, reason) {
 export function evaluatePairedPaperEvidence({
   expectedIdentity, report: rawReport, journal: suppliedJournal
 } = {}) {
-  if (!validExpectedIdentity(expectedIdentity)) return fail('EXPECTED_IDENTITY_INVALID');
+  if (!isValidSpotPaperPairedExpectedIdentity(expectedIdentity)) {
+    return fail('EXPECTED_IDENTITY_INVALID');
+  }
   const normalizedReport = reportInput(rawReport, expectedIdentity, suppliedJournal);
   if (normalizedReport.invalid) return fail('REPORT_WRAPPER_INVALID');
   const report = normalizedReport.report;

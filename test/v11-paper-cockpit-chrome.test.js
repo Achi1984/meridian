@@ -338,8 +338,14 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root > details > summary')`),
           true,'primary Paper source details follow its refresh');
         await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-section > summary')`),
+          true,'Paper-bot overview disclosure follows the primary report details');
+        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paired-paper-report-section > summary')`),
+          true,'paired Paper disclosure follows the bot overview');
+        await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-history-section > summary')`),
-          true,'the history disclosure precedes its expanded report controls');
+          true,'the history disclosure follows the new Paper-bot sections');
         await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-cockpit-root button')`),
           true,'Strategies card exposes its manual BTC/EUR refresh before the legacy Paper card');

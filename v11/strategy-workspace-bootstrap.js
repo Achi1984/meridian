@@ -4,6 +4,7 @@ import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B16-M11-FIX14';
 import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B16-M11-FIX14';
 import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B16-M11-FIX14';
 import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX14';
+import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B16-M11-FIX14';
 
 const catalogRoot = document.getElementById('strategy-catalog');
 const catalogStatus = document.getElementById('strategy-load-status');
@@ -12,14 +13,31 @@ const arena = createStrategyArenaView(arenaRoot);
 let paperCockpit = null;
 let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
+let paperBotReportWorkspace = null;
 if(catalogRoot?.parentNode){
   const workspace=catalogRoot.parentNode;
+  const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
+  const botOverviewRoot=document.createElement('section');
+  botOverviewRoot.id='paper-bot-overview-root';
+  botReports.append(botOverviewRoot);
+  const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
+  const pairedSourceStatus=document.createElement('p');
+  pairedSourceStatus.id='paired-paper-source-status';
+  pairedSourceStatus.setAttribute('role','status');
+  pairedSourceStatus.textContent='Kein gepaarter Bericht abgerufen. Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt, bis ein authentifizierter Bericht manuell geprüft wird.';
+  pairedReports.append(pairedSourceStatus);
+  const pairedRoot=document.createElement('section');
+  pairedRoot.id='paired-paper-report-root';
+  pairedReports.append(pairedRoot);
+  paperBotReportWorkspace=mountPaperBotReportWorkspace(
+    botOverviewRoot,pairedRoot,document,{pairedStatus:pairedSourceStatus}
+  );
   const host8hRoot=document.createElement('section');
   host8hRoot.id='spot-paper-host8h-root';
   workspace.insertBefore(host8hRoot,catalogStatus || catalogRoot);
   spotPaperHost8hDashboard=mountSpotPaperHost8hDashboard(host8hRoot,document,window);
 
-  function collapsedSection(id,label){
+  function collapsedSection(id,label,before=catalogRoot){
     const section=document.createElement('details');
     section.id=id;
     section.className='card';
@@ -27,7 +45,7 @@ if(catalogRoot?.parentNode){
     summary.textContent=label;
     summary.setAttribute('style','min-height:44px;padding:10px 0;box-sizing:border-box;cursor:pointer');
     section.append(summary);
-    workspace.insertBefore(section,catalogRoot);
+    workspace.insertBefore(section,before);
     return section;
   }
   const history=collapsedSection('paper-history-section','Frühere Paper-Berichte');
@@ -80,6 +98,7 @@ document.getElementById('nav')?.addEventListener('click',event=>{
   if(button) paperCockpit?.setActive(button.dataset.v==='strategies');
   if(button) spotPaperCockpit?.setActive(button.dataset.v==='strategies');
   if(button) spotPaperHost8hDashboard?.setActive(button.dataset.v==='strategies');
+  if(button) paperBotReportWorkspace?.setActive(button.dataset.v==='strategies');
   if (button?.dataset.v==='strategies') loadWorkspace();
 });
 
@@ -95,5 +114,6 @@ if (document.querySelector('#nav button[data-v="strategies"][aria-current="page"
   paperCockpit?.setActive(true);
   spotPaperCockpit?.setActive(true);
   spotPaperHost8hDashboard?.setActive(true);
+  paperBotReportWorkspace?.setActive(true);
   loadWorkspace();
 }

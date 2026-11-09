@@ -10,15 +10,97 @@ This delivery owns read-only Paper cards and their focused verification:
 - `scripts/spot-paper-report-bridge/contract.mjs` — versioned BTC/EUR display and transfer contracts.
 - `spot-paper-report-gateway.mjs` — separate disabled-by-default authenticated route.
 - `migrations/20261107_meridian_spot_paper_reports.sql` — isolated immutable report table.
+- `v11/spot-paper-paired-report-connector.js` and
+  `spot-paper-paired-report-gateway.mjs` — separate bounded authenticated paired
+  read path; it has no upload route.
+- `migrations/20261109_meridian_spot_paper_paired_reports.sql` — private,
+  bounded paired-report table.
 - `v11/strategy-workspace-bootstrap.js` — mounts the panel at the top of the existing Strategies workspace.
 - `test/v11-spot-paper-cockpit.test.js` and `test/spot-paper-report-*.test.js` — generated BTC/EUR contract, gateway, and cockpit tests.
 - `test/v11-module-cache-identity.test.js` — served V11 module graph assertion.
+- `test/spot-paper-paired-report-gateway.test.js` and
+  `test/v11-paper-bot-report-bootstrap.test.js` — paired transport, identity,
+  lifecycle, and unsupported-source checks.
 - `docs/v11/M11_PAPER_COCKPIT.md` — scope and connection contract.
 
 The cards use existing M11 Strategies navigation and add no dashboard route.
 BTC/EUR has a separate gateway route and table; the memecoin validator is
 unchanged. No worker, filesystem, report producer, workflow, or runtime-control
 path is changed.
+
+The reviewed Paper-bot overview and paired comparison are mounted separately
+inside the same Strategies workspace. Each has an explicit manual read and uses
+the app-access bearer only while unlocked. Lock and navigation clear both DTOs,
+abort in-flight reads, and dispose their connectors.
+
+The overview reads the existing authenticated `/api/private/spot-paper-report`
+route. Its DTO is pinned to `BTC_EUR_SMA5_SMA20_V1`; it is not evidence for the
+`BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1` candidate. The
+overview keeps the candidate's intended identity on its card and reports the
+received legacy identity only as a mismatch detail; runtime status and metrics
+remain unknown. USD Lives remains `UNKNOWN`, and LowVol V2 remains `PREPARED`
+in its native USDT unit.
+
+The paired panel reads only the separate authenticated
+`/api/private/spot-paper-paired-report` route. That route validates the
+`SPOT_PAPER_PAIRED_DASHBOARD_V1` DTO and binds run ID, pair, source/config/
+research hashes, and ordered baseline/challenger/cash model identities to the
+server's expected-identity configuration. It does not widen or relabel the
+legacy BTC/EUR or host8h route. The UI distinguishes an unprovisioned
+transport, no published report, an identity mismatch, an unsupported schema or
+identity, and an authentication failure.
+
+## Paired report source and handoff
+
+The source pipeline is:
+
+1. The reviewed paired host writes its journal and produces a bounded host
+   export:
+   `node scripts/spot-paper-paired/host.mjs export --data-root "$PRIVATE_DATA_ROOT" --run-id "$RUN_ID" > "$WORK_DIR/host-export.json"`.
+2. The operator supplies an independently pinned
+   `SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1` JSON, bound to the reviewed manifest
+   and model/account configuration, and runs:
+   `node scripts/spot-paper-paired-report/cli.mjs "$WORK_DIR/expected-identity.json" "$WORK_DIR/host-export.json" > "$WORK_DIR/paired-dashboard.json"`.
+   This invokes `evaluatePairedPaperEvidence` and emits only the sanitized
+   dashboard DTO; the host export and journal are not browser inputs.
+3. Validate the sanitized DTO and its identity using the bounded ingestion
+   command. It defaults to a no-write dry run and can be run without database
+   credentials:
+   `node scripts/spot-paper-paired-report/ingest.mjs "$WORK_DIR/expected-identity.json" "$WORK_DIR/paired-dashboard.json"`.
+   Only after an explicit operator decision, the reviewed database migration,
+   and expected server identity configuration are in place, the operator may
+   opt in to one immutable insert:
+   `node scripts/spot-paper-paired-report/ingest.mjs "$WORK_DIR/expected-identity.json" "$WORK_DIR/paired-dashboard.json" --write`.
+   The command uses `DATABASE_URL` and the existing
+   `MERIDIAN_PAPER_REPORT_DATABASE_CA` TLS configuration from the environment;
+   it does not accept credentials as arguments or print database errors that
+   could contain them. Identical run/digest rows are idempotent, different
+   content for an existing run is rejected, and an uncertain write outcome is
+   reported without an automatic retry. The authenticated GET then reads the
+   row through the existing bounded private-report store and revalidates its
+   digest and configured identity before returning it.
+
+The route is read-only: it adds no upload endpoint, token, automatic publisher,
+or production publication. The ingestion command is operator-invoked code
+preparation only; this change does not connect to a database, apply migrations,
+or publish a report. Provisioning is not complete: no production
+expected-identity configuration or paired database row is supplied. Therefore
+the production UI must continue to say “not provisioned” or “not published”;
+it may not infer that a historic run does not exist. The route requires an applied
+`migrations/20261109_meridian_spot_paper_paired_reports.sql` migration and
+server-side `MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED=true`,
+`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED=true`, and
+`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON` matching the report.
+These settings and data have not been provisioned.
+
+The existing paired DTO is not independent authentication and must retain its
+`STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED` qualification. The
+current reviewed #1319 model-pair contract is accepted only with its canonical
+`modelPairId`, ordered baseline/trend/cash model IDs, fee assumptions, and
+activity diagnostic; a trend model ID without that identity is rejected. This
+contract support does not establish that a run occurred or that a report is
+published. No real paired results are synthesized; test-only fixtures are
+visibly labeled `SYNTHETIC FIXTURE`.
 
 ## Evidence shown
 
