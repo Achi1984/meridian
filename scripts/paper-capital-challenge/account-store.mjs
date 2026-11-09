@@ -242,10 +242,11 @@ export class UsdAccountJournalStore {
   #replay;
   #records;
   #tip;
+  #createdNew;
   #blocked = false;
   #closed = false;
 
-  constructor(store, directory, binding, journal, replay, records, tip) {
+  constructor(store, directory, binding, journal, replay, records, tip, createdNew) {
     this.#store = store;
     this.#directory = directory;
     this.#binding = binding;
@@ -253,6 +254,7 @@ export class UsdAccountJournalStore {
     this.#replay = replay;
     this.#records = records;
     this.#tip = tip;
+    this.#createdNew = createdNew;
   }
 
   static async createNew(directory, {binding, onPhase} = {}) {
@@ -284,7 +286,7 @@ export class UsdAccountJournalStore {
       const journal = createUsdAccountJournal(normalizedBinding);
       return new UsdAccountJournalStore(
         store, directory, normalizedBinding, journal, replayUsdAccount(journal), records,
-        makeTip(normalizedBinding, commit.sequence, commit.hash)
+        makeTip(normalizedBinding, commit.sequence, commit.hash), true
       );
     } catch (error) {
       if (error.code !== "ACCOUNT_COMMIT_UNKNOWN") {
@@ -321,7 +323,7 @@ export class UsdAccountJournalStore {
           binding: decoded.binding,
           events: Object.freeze(decoded.replay.entries.map(entry => entry.event))
         }),
-        decoded.replay, decoded.records, decoded.tip
+        decoded.replay, decoded.records, decoded.tip, false
       );
     } catch (error) {
       await store.close().catch(() => {});
@@ -332,6 +334,11 @@ export class UsdAccountJournalStore {
   get binding() {
     this.#assertUsable();
     return this.#binding;
+  }
+
+  get createdNew() {
+    this.#assertUsable();
+    return this.#createdNew;
   }
 
   get replay() {
