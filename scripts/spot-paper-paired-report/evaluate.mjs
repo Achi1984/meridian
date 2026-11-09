@@ -314,13 +314,14 @@ function validateTerminalJournal(journal, report, expected) {
   const eventRoles = (items, roleField = 'role') =>
     Array.isArray(items) && items.length === 3 &&
     items.every((item, index) => item?.[roleField] === SPOT_PAPER_PAIRED_ROLES[index]);
-  let priorEffectAt = null;
+  let priorEffectAt = report.startedAt;
   const observationStreamValid = observations.every((event, index) => {
     const valid = event?.cycle === index + 1 &&
       isInteger(event.decisionAt) && isInteger(event.effectAt) &&
       event.decisionAt <= event.effectAt && event.observedAt === event.effectAt &&
       (priorEffectAt === null || event.effectAt > priorEffectAt) &&
       validResponseRef(event.ohlc) && validResponseRef(event.ticker) &&
+      event.ohlc.requestStartedAt >= priorEffectAt &&
       event.ohlc.receivedAt <= event.decisionAt &&
       event.decisionAt <= event.ticker.requestStartedAt &&
       event.ticker.receivedAt <= event.effectAt &&
@@ -372,6 +373,17 @@ function validateTerminalJournal(journal, report, expected) {
     return stableJson(report.arms[roleIndex].riskStates) ===
       stableJson(journalRiskStates);
   });
+  const terminalArmStatesReconcile = SPOT_PAPER_PAIRED_ROLES.every(
+    (role, roleIndex) => {
+      const arm = report.arms[roleIndex];
+      const finalRisk = observations.at(-1)?.riskStates.find(item =>
+        item.role === role);
+      const stopped = typeof finalRisk?.stopReason === 'string';
+      return (!finalRisk?.state?.stopped || stopped) &&
+        arm.tradingStatus === (stopped ? 'STOPPED' : 'ACTIVE') &&
+        arm.stopReason === (stopped ? finalRisk.stopReason : null) &&
+        arm.stoppedAt === (stopped ? finalRisk.stoppedAt : null);
+    });
   const fillCountsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, index) =>
     report.arms[index].fills.length === observations.reduce((sum, event) => {
       const group = Array.isArray(event.fills) ?
@@ -412,7 +424,8 @@ function validateTerminalJournal(journal, report, expected) {
         (report.commonHorizon.effectAt !== null ||
           report.commonHorizon.quoteReceivedAt !== null) ||
       !reportArmsReconcile || !decisionsReconcile || !fillsReconcile ||
-      !riskStatesReconcile || !fillCountsReconcile ||
+      !riskStatesReconcile || !terminalArmStatesReconcile ||
+      !fillCountsReconcile ||
       !identityMatches(report, payload, expected)) {
     return {error: 'JOURNAL_REPORT_MISMATCH'};
   }

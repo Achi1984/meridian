@@ -703,12 +703,15 @@ export async function replayVerifiedSpotPaperFeeScenarios({
   const runDirectory = join(dataRoot, expectedIdentity.runId);
   const marketObservations = [];
   let responseBytes = 0;
+  let priorEffectAt = originalReport.startedAt;
   for (let index = 0; index < observations.length; index++) {
     const event = observations[index];
     assert(event.cycle === index + 1 &&
       Number.isSafeInteger(event.decisionAt) &&
       Number.isSafeInteger(event.effectAt) &&
-      event.observedAt === event.effectAt,
+      event.observedAt === event.effectAt &&
+      event.ohlc?.requestStartedAt >= priorEffectAt &&
+      event.effectAt > priorEffectAt,
     "INVALID_JOURNAL_OBSERVATION");
     const [ohlc, ticker] = await Promise.all([
       readEvidenceResponse(runDirectory, event.ohlc),
@@ -720,6 +723,7 @@ export async function replayVerifiedSpotPaperFeeScenarios({
       decisionAt: event.decisionAt, decisions: event.decisions,
       effectAt: event.effectAt, ohlc, ticker
     });
+    priorEffectAt = event.effectAt;
   }
   const lastObservation = marketObservations.at(-1);
   const quoteAgeAtEffectMs =

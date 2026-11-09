@@ -46,7 +46,8 @@ function arm(role, {fills = [], equity = 100_000, fees = 0, slippage = 0,
     decisions: Array.from({length: 480}, (_, index) => ({
       decision: null, decidedAt: 1_000 + (index + 1) * 60_000 - 2
     })),
-    riskStates: Array.from({length: 480}, () => ({})),
+    riskStates: Array.from({length: 480}, (_, index) =>
+      stoppedAt !== null && index === 479 ? {stopReason, stoppedAt} : {}),
     fills,
     valuation: {
       startingCapitalCents: 100_000,
@@ -185,9 +186,14 @@ function fixture() {
         fills: index === 0 ? structuredClone(reportArms[roleIndex].fills.map(
           ({executionAt, ...fill}) => fill)) : []
       })),
-      riskStates: models.map(model => ({
-        role: model.role, state: {}, stopReason: null, stoppedAt: null, skipped: false
-      })),
+      riskStates: models.map((model, roleIndex) => {
+        const state = reportArms[roleIndex].riskStates[index];
+        return {
+          role: model.role, state: {},
+          stopReason: state.stopReason ?? null,
+          stoppedAt: state.stoppedAt ?? null, skipped: false
+        };
+      }),
       valuations: models.map(model => ({role: model.role}))
     })),
     {id: 'paired-terminal', type: 'terminal', at: report.endedAt,
@@ -343,13 +349,26 @@ test('rejects stale intermediate quotes and report/journal content mismatches', 
   for (const mutate of [
     input => { input.journal.events[1].decisions[0].decision = {direction: 'ENTRY'}; },
     input => { input.journal.events[1].fills[0].fills[0].grossCents++; },
-    input => { input.journal.events[1].riskStates[0].state.lossLimitReached = true; }
+    input => { input.journal.events[1].riskStates[0].state.lossLimitReached = true; },
+    input => { input.journal.events[1].ohlc.requestStartedAt =
+      input.report.startedAt - 1; },
+    input => { input.journal.events[2].ohlc.requestStartedAt =
+      input.journal.events[1].effectAt - 1; }
   ]) {
     const input = fixture();
     mutate(input);
     assert.equal(evaluatePairedPaperEvidence(input).reasonCode,
       'JOURNAL_REPORT_MISMATCH');
   }
+
+  const mismatchedStop = fixture();
+  mismatchedStop.report.arms[0].tradingStatus = 'ACTIVE';
+  mismatchedStop.report.arms[0].stopReason = null;
+  mismatchedStop.report.arms[0].stoppedAt = null;
+  mismatchedStop.journal.events.at(-1).report =
+    structuredClone(mismatchedStop.report);
+  assert.equal(evaluatePairedPaperEvidence(mismatchedStop).reasonCode,
+    'JOURNAL_REPORT_MISMATCH');
 });
 
 test('accepts combined host exports and keeps lock-only snapshots unknown', () => {
