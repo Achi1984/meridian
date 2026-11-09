@@ -18,6 +18,7 @@ const VALUATION_KEYS = [
 ];
 const ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
 const VERSION_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/;
+const TRUSTED_STATES = new WeakSet();
 
 function assertRecord(value, expectedKeys, name) {
   if (!value || typeof value !== "object" || Array.isArray(value) ||
@@ -56,6 +57,12 @@ function freezeDeep(value) {
     Object.freeze(value);
   }
   return value;
+}
+
+function freezeState(value) {
+  const state = freezeDeep(value);
+  TRUSTED_STATES.add(state);
+  return state;
 }
 
 function stableJson(value) {
@@ -198,13 +205,13 @@ function validateJournalLength(observations, { requireCapacity = false } = {}) {
 }
 
 export function createChallengeState(identity) {
-  return freezeDeep(initialState(validateIdentity(identity)));
+  return freezeState(initialState(validateIdentity(identity)));
 }
 
 export function replayChallengeState({ campaignId, currency, policyVersion, observations } = {}) {
   const identity = validateIdentity({ campaignId, currency, policyVersion });
   validateJournalLength(observations);
-  return freezeDeep(replayNormalized(identity, observations));
+  return freezeState(replayNormalized(identity, observations));
 }
 
 function validateState(state) {
@@ -218,17 +225,19 @@ function validateState(state) {
 }
 
 export function advanceChallengeState(previousState, inputObservation) {
-  const previous = validateState(previousState);
+  const previous = TRUSTED_STATES.has(previousState)
+    ? previousState
+    : validateState(previousState);
   const observation = normalizeObservation(inputObservation, previous);
   const duplicate = previous.observations.find(item => item.id === observation.id);
   if (duplicate) {
     if (stableJson(duplicate) !== stableJson(observation)) {
       throw new Error("CONTRADICTORY_DUPLICATE_OBSERVATION");
     }
-    return freezeDeep(previous);
+    return freezeState(previous);
   }
   validateJournalLength(previous.observations, { requireCapacity: true });
-  return freezeDeep(advanceValidated(previous, observation, { duplicateChecked: true }));
+  return freezeState(advanceValidated(previous, observation, { duplicateChecked: true }));
 }
 
 export function getExposureGate(state, nowMs) {

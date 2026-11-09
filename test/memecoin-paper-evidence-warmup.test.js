@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import {createHash} from "node:crypto";
-import {lstat, mkdir, mkdtemp, open, rm, symlink} from "node:fs/promises";
+import {lstat, mkdir, mkdtemp, open, rm, rmdir, symlink, unlink} from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import test from "node:test";
@@ -672,36 +672,55 @@ test("read and publish filesystem waits obey one deadline and late work cannot a
   for (const delayedMethod of ["writeFile", "sync"]) {
     const delayRoot = path.join(root, `delayed-${delayedMethod}`);
     const linkCalls = [];
+    const pendingFsOps = new Set();
+    const trackFsOp = operation => {
+      const pending = Promise.resolve(operation);
+      pendingFsOps.add(pending);
+      void pending.then(
+        () => pendingFsOps.delete(pending),
+        () => pendingFsOps.delete(pending)
+      );
+      return pending;
+    };
+    const drainFsOps = async () => {
+      while (pendingFsOps.size > 0) {
+        await Promise.allSettled([...pendingFsOps]);
+      }
+    };
     const delayed = new EvidenceWarmupStore(delayRoot, {
       enabled: true,
       limits: {maxElapsedMs: 15},
       fsOps: {
-        open: async (filename, ...args) => {
+        open: (filename, ...args) => trackFsOp((async () => {
           const handle = await defaultOpen(filename, ...args);
           if (!filename.endsWith(".evidence-warmup-pending")) return handle;
           return new Proxy(handle, {
             get(target, key) {
               const value = Reflect.get(target, key, target);
-              if (key === delayedMethod) {
-                return async (...methodArgs) => {
+              if (typeof value !== "function") return value;
+              return (...methodArgs) => trackFsOp((async () => {
+                if (key === delayedMethod) {
                   await new Promise(resolve => setTimeout(resolve, 60));
-                  return value.apply(target, methodArgs);
-                };
-              }
-              return typeof value === "function" ? value.bind(target) : value;
+                }
+                return value.apply(target, methodArgs);
+              })());
             }
           });
-        },
+        })()),
+        lstat: (...args) => trackFsOp(lstat(...args)),
+        mkdir: (...args) => trackFsOp(mkdir(...args)),
+        rmdir: (...args) => trackFsOp(rmdir(...args)),
+        unlink: (...args) => trackFsOp(unlink(...args)),
         link: async (...args) => {
           linkCalls.push(args);
           const {link: actualLink} = await import("node:fs/promises");
-          return actualLink(...args);
+          return trackFsOp(actualLink(...args));
         }
       }
     });
     const result = await delayed.publish({...bundle, datasetId: delayedMethod});
     assert.equal(result.reason, "DEADLINE");
-    await new Promise(resolve => setTimeout(resolve, 80));
+    await drainFsOps();
     assert.equal(linkCalls.length, 0);
     await assert.rejects(lstat(path.join(delayRoot, "evidence-warmup.json")), {code: "ENOENT"});
   }
