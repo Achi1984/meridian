@@ -18,20 +18,29 @@ only accepts `OFFLINE_CALLER_ASSERTION`, which is not provider authentication
 or independent quote verification.
 
 Illustrative host scheduling handoff with the #1317 runner and store. The host
-must schedule one sample per minute and persist each observation immediately;
-it must stop on any adapter/runner error. This is not a deployment recipe or
-evidence of a live request:
+must first create a new store or reopen it with an independently retained tip.
+For every continuation, #1317 requires the exact persisted observation prefix
+before the new suffix; a singleton-only call is not a valid incremental
+continuation. Persist/retain each returned tip independently and stop on any
+adapter/runner error. This is not a deployment recipe or evidence of a live
+request:
 
 ```js
 const feed = createKrakenUsdPublicFeed();
 for (;;) {
   const scheduledAt = Date.now();
+  const prefix = store.replay.entries.map(({event}) => ({
+    id: event.id,
+    observedAtMs: event.observedAtMs,
+    quote: event.quote
+  }));
   const observation = await feed.fetchObservation();
   const result = await runUsdOfflineStream({
-    store, observations: [observation], decide
+    store, observations: [...prefix, observation], decide
   });
   await retainRestartTipIndependently(result.tip);
-  await sleep(Math.max(0, 60_000 - (Date.now() - scheduledAt)));
+  await new Promise(resolve =>
+    setTimeout(resolve, Math.max(0, 60_000 - (Date.now() - scheduledAt))));
 }
 ```
 
@@ -39,8 +48,10 @@ The adapter admits only closed one-minute bars, preserves ticker decimal
 strings, rejects wrong pair keys, stale/future timing, and malformed responses,
 and bounds each response to 128 KiB, cumulative raw HTTP response bytes to
 32 MiB per adapter instance, requests to 512, observations to 256, each request
-to at most 5 seconds, and sampling to one observation per minute. The
-deterministic 720-row OHLC fixture is 82,854 JSON bytes: it fits the individual
+to at most 5 seconds, and sampling to one observation per minute. The admitted
+quote age is `PAPER_CAPITAL_CHALLENGE_POLICY.maxValuationAgeMs` (10,000 ms);
+the adapter reads this policy value rather than maintaining a second age
+setting. A deterministic 720-row OHLC fixture is 82,854 JSON bytes: it fits the individual
 response limit, while 256 such OHLC responses would total 21,210,624 bytes
 before ticker bodies. That fixture is synthetic and does not establish typical
 provider history size or availability.
@@ -52,7 +63,9 @@ budget does not enlarge the journal byte bound. The 256-event cap sampled once
 per minute covers only about 4 hours 16 minutes, not 24-hour minute-feed
 readiness. Both components fail closed at their own limits; recreating an
 adapter is not permission to extend a campaign, reset a store, or continue
-past either bound.
+past either bound. The runner receives the full persisted observation prefix
+plus only the newly acquired suffix; the store replays the prior prefix without
+calling the decision function again.
 
 Tests use clearly synthetic provider-shaped responses only. No live request,
 authentication, private endpoint, order method, deployment, or market-data

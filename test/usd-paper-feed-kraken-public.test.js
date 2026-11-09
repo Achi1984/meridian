@@ -1,9 +1,16 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { mkdtemp, rm } from "node:fs/promises";
+import os from "node:os";
+import path from "node:path";
 import {
   appendUsdAccountEvent, createUsdAccountJournal, replayUsdAccount
 } from "../scripts/paper-capital-challenge/account.mjs";
 import { USD_MODELED_COSTS } from "../scripts/paper-capital-challenge/account-contract.mjs";
+import {
+  UsdAccountJournalStore
+} from "../scripts/paper-capital-challenge/account-store.mjs";
+import { runUsdOfflineStream } from "../scripts/paper-capital-challenge/offline-runner.mjs";
 import { PAPER_CAPITAL_CHALLENGE_POLICY as POLICY } from "../scripts/paper-capital-challenge/policy.mjs";
 import {
   createKrakenUsdPublicFeed, USD_PAPER_FEED_LIMITS
@@ -90,6 +97,7 @@ function feed(options = {}) {
 }
 
 test("construction is inert and one native USD sample emits the offline-runner shape", async () => {
+  assert.equal(USD_PAPER_FEED_LIMITS.maxQuoteAgeMs, POLICY.maxValuationAgeMs);
   let fetches = 0;
   let clockReads = 0;
   const provider = createKrakenUsdPublicFeed({
@@ -154,6 +162,63 @@ test("valid provider-shaped quote replays through the actual USD account and val
   assert.equal(replay.entries[0].observation.valuation.currency, "USD");
   assert.equal(replay.entries[0].observation.netEquityCents, POLICY.initialCapitalCents);
   assert.equal(replay.authorization.executionAuthorized, false);
+});
+
+test("two feed observations resume through the actual store and runner using the retained tip", async t => {
+  const parent = await mkdtemp(path.join(os.tmpdir(), "usd-feed-runner-"));
+  t.after(() => rm(parent, { recursive: true, force: true }));
+  const directory = path.join(parent, "account");
+  let current = RECEIVED_AT;
+  const feedProvider = createKrakenUsdPublicFeed({
+    now: () => current,
+    monotonicNow: () => 1,
+    fetchImpl: async url => url.pathname.endsWith("/Ticker") ?
+      jsonResponse(ticker()) : jsonResponse(ohlcAt(current))
+  });
+  let store = await UsdAccountJournalStore.createNew(directory, { binding: BINDING });
+  const firstObservation = await feedProvider.fetchObservation();
+  let decisionCalls = 0;
+  const decide = () => {
+    decisionCalls++;
+    return { action: "HOLD", quantityBtc: null, reason: null };
+  };
+  const firstRun = await runUsdOfflineStream({
+    store, observations: [firstObservation], decide
+  });
+  const independentlyRetainedTip = structuredClone(firstRun.tip);
+  assert.equal(firstRun.replay.entries.length, 1);
+  assert.equal(decisionCalls, 1);
+  await store.close();
+
+  current += USD_PAPER_FEED_LIMITS.minSampleIntervalMs;
+  const secondObservation = await feedProvider.fetchObservation();
+  store = await UsdAccountJournalStore.reopenExisting(directory, {
+    binding: BINDING, expectedTip: independentlyRetainedTip
+  });
+  let resumedDecisionCalls = 0;
+  const resumed = await runUsdOfflineStream({
+    store,
+    observations: [firstObservation, secondObservation],
+    decide(context) {
+      resumedDecisionCalls++;
+      return decide(context);
+    }
+  });
+  assert.equal(resumedDecisionCalls, 1);
+  assert.equal(resumed.replay.entries.length, 2);
+  assert.deepEqual(resumed.replay.entries.map(entry => entry.event.id), [
+    firstObservation.id, secondObservation.id
+  ]);
+  assert.deepEqual(resumed.replay.entries[1].event.quote, secondObservation.quote);
+  const finalTip = structuredClone(resumed.tip);
+  await store.close();
+
+  store = await UsdAccountJournalStore.reopenExisting(directory, {
+    binding: BINDING, expectedTip: finalTip
+  });
+  assert.equal(store.replay.entries.length, 2);
+  assert.deepEqual(store.tip, finalTip);
+  await store.close();
 });
 
 test("720-row synthetic history fixture fits the bounded response size and admits a quote", async () => {
