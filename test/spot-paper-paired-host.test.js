@@ -37,25 +37,22 @@ async function completedJournal(dataRoot, runId) {
   });
 }
 
-test("paired host defaults are the frozen adapter bounds and integration stays blocked", async t => {
+test("paired host defaults are frozen and its disabled command makes no run request", async t => {
   assert.equal(SPOT_PAPER_PAIRED_HOST_DEFAULTS.maxCycles, 480);
   assert.equal(SPOT_PAPER_PAIRED_HOST_DEFAULTS.maxRequests, 960);
   assert.equal(SPOT_PAPER_PAIRED_HOST_DEFAULTS.maxDurationMs, 8 * 60 * 60 * 1000);
-  assert.equal(SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256, null);
+  assert.match(SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256, /^[a-f0-9]{64}$/);
   const dataRoot = await rootFixture(t);
   const output = { value: "", write(text) { this.value += text; } };
   const result = await main(["disabled"], { output });
   assert.equal(result.status, "DISABLED");
-  assert.match(output.value, /RESEARCH_INTEGRATION_NOT_ACCEPTED/);
-  await assert.rejects(runSpotPaperPairedHost({
-    dataRoot, runId: "paired-host-blocked"
-  }), /RESEARCH_INTEGRATION_NOT_ACCEPTED/);
+  assert.match(output.value, /NO_RUN_REQUESTED/);
   const missing = await inspectSpotPaperPairedRun({
-    dataRoot, runId: "paired-host-blocked"
+    dataRoot, runId: "paired-host-disabled"
   });
   assert.equal(missing.status, "NOT_FOUND");
   const missingExport = await main([
-    "export", "--data-root", dataRoot, "--run-id", "paired-host-blocked"
+    "export", "--data-root", dataRoot, "--run-id", "paired-host-disabled"
   ], { output });
   assert.equal(missingExport.status, "NOT_FOUND");
   assert.equal(missingExport.verifiedTerminal, false);

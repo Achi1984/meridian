@@ -10,6 +10,7 @@ import {
   runSpotPaperPairedSynthetic,
   pairedConfigDigest, pairedResearchSourceDigest,
   SPOT_PAPER_PAIRED, SPOT_PAPER_PAIRED_SOURCE_ID,
+  SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256,
   SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
   SPOT_PAPER_PAIRED_INTEGRATION, SPOT_PAPER_RESEARCH_COMPARISON_ID
 } from "../scripts/spot-paper-paired/forward.mjs";
@@ -256,10 +257,17 @@ test("missing research exports or comparison engine block integration before fee
   assert.deepEqual(invalidFeed.order, []);
 });
 
-test("live runner stays disabled until an accepted #1299 source hash is pinned", async t => {
+test("live runner rejects missing or mismatched research identity before feed access", async t => {
   const setup = await fixture(t);
-  await assert.rejects(runSpotPaperPairedLive(setup.config),
-    /RESEARCH_INTEGRATION_NOT_ACCEPTED/);
+  for (const researchSourceSha256 of [undefined, "0".repeat(64)]) {
+    const config = { ...setup.config, researchSourceSha256 };
+    await assert.rejects(runSpotPaperPairedLive(config),
+      /RESEARCH_INTEGRATION_NOT_ACCEPTED/);
+  }
+  await assert.rejects(runSpotPaperPairedLive({
+    ...setup.config,
+    researchSourceSha256: SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256
+  }), /PROVIDER_INJECTION_FORBIDDEN/);
   assert.deepEqual(setup.order, []);
 });
 
@@ -467,14 +475,29 @@ test("paired Kraken provider construction is inert and starts with an unused bud
   assert.deepEqual(provider.counters(), { requests: 0, bytes: 0 });
 });
 
-test("research source pin hashes the exact sorted paths and file bytes", () => {
-  const comparisonBytes = Buffer.from("comparison source");
-  const entryConfirmationBytes = Buffer.from("confirmation source");
-  const actual = pairedResearchSourceDigest({ comparisonBytes, entryConfirmationBytes });
+test("research source pin matches the exact merged #1299 bytes and rejects changed bytes", async () => {
+  const [comparisonBytes, entryConfirmationBytes] = await Promise.all([
+    readFile(new URL("../scripts/spot-paper-research/comparison.mjs", import.meta.url)),
+    readFile(new URL("../scripts/spot-paper-research/entry-confirmation.mjs", import.meta.url))
+  ]);
+  const accepted = pairedResearchSourceDigest({ comparisonBytes, entryConfirmationBytes });
+  assert.equal(accepted, SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256);
+  assert.notEqual(pairedResearchSourceDigest({
+    comparisonBytes: Buffer.concat([comparisonBytes, Buffer.from("\n")]),
+    entryConfirmationBytes
+  }), SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256);
+
+  const sampleComparisonBytes = Buffer.from("comparison source");
+  const sampleEntryConfirmationBytes = Buffer.from("confirmation source");
+  const actual = pairedResearchSourceDigest({
+    comparisonBytes: sampleComparisonBytes,
+    entryConfirmationBytes: sampleEntryConfirmationBytes
+  });
   const expected = sha256(Buffer.concat([
     Buffer.from("scripts/spot-paper-research/comparison.mjs\0"),
-    comparisonBytes, Buffer.from("\0scripts/spot-paper-research/entry-confirmation.mjs\0"),
-    entryConfirmationBytes, Buffer.from("\0")
+    sampleComparisonBytes,
+    Buffer.from("\0scripts/spot-paper-research/entry-confirmation.mjs\0"),
+    sampleEntryConfirmationBytes, Buffer.from("\0")
   ]));
   assert.equal(actual, expected);
 });
