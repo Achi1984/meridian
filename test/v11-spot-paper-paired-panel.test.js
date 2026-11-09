@@ -9,6 +9,8 @@ import {withMobileChrome} from './helpers/v11-cdp.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {
   projectSpotPaperPairedDashboard,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODELS,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
 } from '../scripts/spot-paper-paired-report/contract.mjs';
 import {presentSpotPaperPairedReport} from '../v11/spot-paper-paired-model.js';
@@ -137,6 +139,31 @@ function dto(overrides = {}) {
   };
 }
 
+function trendDto() {
+  const input = dto();
+  input.identity.modelPairId = SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR;
+  input.identity.models = input.identity.models.map((model, index) => ({
+    ...model,
+    modelId: SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[index]
+  }));
+  for (const [index, role] of ['baseline', 'challenger', 'cash'].entries()) {
+    input.arms[role].modelId = SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[index];
+  }
+  input.trendActivityDiagnostic = {
+    schemaVersion: 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1',
+    status: 'PARTIAL_COVERAGE',
+    completedRoundTripCount: 0,
+    requiredCompletedRoundTrips: 5,
+    observedCoverageMs: input.timing.actualElapsedMs,
+    requiredCoverageMs: 86_400_000,
+    completeWindow: false,
+    forcedTrades: false,
+    deadlineExtensionAllowed: false,
+    profitability: 'NOT_ASSESSED'
+  };
+  return input;
+}
+
 const visit = element => [element, ...element.children.flatMap(visit)];
 
 test('binds the shared projector and maps its canonical evidence DTO', () => {
@@ -146,6 +173,7 @@ test('binds the shared projector and maps its canonical evidence DTO', () => {
   const model = presentSpotPaperPairedReport(input);
   assert.equal(model.available, true);
   assert.equal(model.status, 'VERIFIED_COMPLETE');
+  assert.equal(model.challengerLabel, 'CONFIRM2_COOLDOWN10');
   assert.equal(model.qualification,
     'STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED');
   assert.equal(model.authentication, 'NOT_ESTABLISHED');
@@ -264,6 +292,59 @@ test('unknown or invalid DTOs fail closed and loading remains host-controlled', 
   panel.dispose();
   assert.equal(loading.root.children.length, 0);
   assert.equal(panel.render(), null);
+});
+
+test('empty paired states stay distinct from invalid non-null DTOs', () => {
+  for (const [state, expectedState, expectedStatus] of [
+    ['ready', 'idle', 'NOT_REQUESTED'],
+    ['loading', 'loading', 'LOADING'],
+    ['transport_unavailable', 'unprovisioned', 'TRANSPORT_UNAVAILABLE'],
+    ['not_found', 'empty', 'NO_PUBLISHED_REPORT']
+  ]) {
+    const model = presentSpotPaperPairedReport(null, {state});
+    assert.equal(model.available, false);
+    assert.equal(model.state, expectedState);
+    assert.equal(model.status, expectedStatus);
+  }
+
+  const {root, document} = harness();
+  renderSpotPaperPaired(root, null, document, {state: 'loading', loading: true});
+  assert.equal(root.attrs['data-state'], 'loading');
+  assert.match(root.textContent, /Bericht wird geladen/);
+  assert.doesNotMatch(root.textContent, /CORRUPT_UNKNOWN|Report-Projektor/);
+
+  renderSpotPaperPaired(root, null, document, {state: 'transport_unavailable'});
+  assert.equal(root.attrs['data-state'], 'unprovisioned');
+  assert.match(root.textContent, /Transport nicht provisioniert/);
+  assert.match(root.textContent, /Kennzahlen und Identität bleiben/);
+  assert.doesNotMatch(root.textContent, /CORRUPT_UNKNOWN|Report-Projektor/);
+
+  renderSpotPaperPaired(root, {schemaVersion: 'wrong'}, document);
+  assert.equal(root.attrs['data-state'], 'error');
+  assert.match(root.textContent, /CORRUPT_UNKNOWN/);
+  assert.match(root.textContent, /Fehler: gemeinsamer Bericht konnte nicht geprüft werden/);
+
+  renderSpotPaperPaired(root, {schemaVersion: 'wrong'}, document, {
+    state: 'loading',
+    loading: true
+  });
+  assert.equal(root.attrs['data-state'], 'error');
+  assert.match(root.textContent, /CORRUPT_UNKNOWN/);
+});
+
+test('challenger identity and validated trend diagnostic survive presentation', () => {
+  const input = trendDto();
+  const model = presentSpotPaperPairedReport(input);
+  assert.equal(model.identity.modelPairId, SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR);
+  assert.deepEqual(model.trendActivityDiagnostic, input.trendActivityDiagnostic);
+  assert.equal(model.challengerLabel, 'CONFIRM2_COOLDOWN10 · 5M-SMA20-Trend');
+
+  const {root, document} = harness();
+  renderSpotPaperPaired(root, input, document);
+  assert.match(root.textContent, /CONFIRM2_COOLDOWN10 · 5M-SMA20-Trend/);
+  assert.match(root.textContent, new RegExp(SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR));
+  assert.match(root.textContent, /0\/5 abgeschlossene Rundreisen/);
+  assert.match(root.textContent, /Profitabilität: NOT_ASSESSED/);
 });
 
 test('panel source has no implicit network, timer, storage, or HTML injection paths', () => {

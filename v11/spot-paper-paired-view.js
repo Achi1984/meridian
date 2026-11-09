@@ -62,12 +62,12 @@ function inventoryLabel(status) {
     'Unbekannt';
 }
 
-function renderArm(document, parent, arm, definition) {
+function renderArm(document, parent, arm, definition, label = definition.label) {
   const card = document.createElement('section');
-  card.setAttribute('aria-label', `${definition.label} Arm`);
+  card.setAttribute('aria-label', `${label} Arm`);
   card.setAttribute('style',
     'border:1px solid currentColor;border-radius:12px;padding:12px;min-width:0;overflow-wrap:anywhere');
-  node(document, card, 'h3', definition.label);
+  node(document, card, 'h3', label);
   field(document, card, 'Modell-ID', arm.modelId || 'Unbekannt');
   field(document, card, 'Virtuelles Startkapital', '1.000,00 €');
   const metrics = document.createElement('div');
@@ -90,6 +90,8 @@ function renderArm(document, parent, arm, definition) {
 }
 
 function renderModel(root, model, document, {loading = false} = {}) {
+  const isError = model.state === 'error';
+  const isLoading = loading && !isError;
   root.replaceChildren();
   root.setAttribute('style',
     'box-sizing:border-box;display:grid;gap:12px;min-width:0;max-width:100%;padding:12px;overflow-wrap:anywhere');
@@ -111,19 +113,18 @@ function renderModel(root, model, document, {loading = false} = {}) {
     'Virtuelle Werte sind strikt von tatsächlichen Beständen getrennt; dieses Panel liest keine Kontobestände.',
     'caption');
   const status = node(document, root, 'p',
-    loading ? 'Bericht wird geladen …' :
-      model.available ? model.statusLabel :
-        `${model.status} · gemeinsamer Report-Projektor oder DTO nicht verfügbar.`,
+    isLoading ? 'Bericht wird geladen …' :
+      model.statusLabel,
     'paired-status');
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
-  root.setAttribute('data-state', loading ? 'loading' : model.state);
+  root.setAttribute('data-state', isLoading ? 'loading' : model.state);
 
   if (!model.available) {
-    node(document, root, 'p', loading ?
-      'Berichtsdaten werden für das Panel vorbereitet.' :
-      'Fehler: gemeinsamer Bericht konnte nicht geprüft werden. Fehlende Werte bleiben unbekannt.');
+    node(document, root, 'p', model.state === 'error' ?
+      'Fehler: gemeinsamer Bericht konnte nicht geprüft werden. Fehlende Werte bleiben unbekannt.' :
+      'Kennzahlen und Identität bleiben bis zu einem gültigen Bericht unbekannt.');
     return {status: model.status};
   }
 
@@ -138,6 +139,19 @@ function renderModel(root, model, document, {loading = false} = {}) {
   field(document, qualification, 'Aktualität',
     `${freshnessLabel(model.freshness)} — ${model.freshness.reason}`);
   field(document, qualification, 'Run-ID', model.identity.runId);
+  if (model.identity.modelPairId) {
+    field(document, qualification, 'Modellpaar-ID', model.identity.modelPairId);
+  }
+  if (model.trendActivityDiagnostic) {
+    const diagnostic = model.trendActivityDiagnostic;
+    field(document, qualification, '5-Minuten-Trend-Aktivität',
+      `${diagnostic.completedRoundTripCount}/${diagnostic.requiredCompletedRoundTrips} abgeschlossene Rundreisen · ` +
+      `${elapsed(diagnostic.observedCoverageMs)} von 24 Std. · ${diagnostic.status} · ` +
+      `Fenster vollständig: ${diagnostic.completeWindow ? 'ja' : 'nein'} · ` +
+      `erzwungene Trades: ${diagnostic.forcedTrades ? 'ja' : 'nein'} · ` +
+      `Verlängerung: ${diagnostic.deadlineExtensionAllowed ? 'ja' : 'nein'} · ` +
+      `Profitabilität: ${diagnostic.profitability}`);
+  }
   field(document, qualification, 'Datenzeitpunkt · Bewertung in Europe/Wien',
     model.timing.valuationAtLabel || 'Unbekannt — Bewertungszeitpunkt fehlt');
   root.append(qualification);
@@ -165,7 +179,8 @@ function renderModel(root, model, document, {loading = false} = {}) {
   cards.setAttribute('style',
     'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px;min-width:0');
   for (const definition of ARM_DEFINITIONS) {
-    renderArm(document, cards, model.arms[definition.id], definition);
+    renderArm(document, cards, model.arms[definition.id], definition,
+      definition.id === 'challenger' ? model.challengerLabel : definition.label);
   }
   root.append(cards);
 
@@ -208,7 +223,8 @@ function elapsed(ms) {
   return parts.join(' ');
 }
 
-export function renderSpotPaperPaired(root, input, document = root?.ownerDocument, options = {}) {
+export function renderSpotPaperPaired(root, input, document = root?.ownerDocument,
+  {state = 'idle', ...options} = {}) {
   if (!root || !document) return null;
-  return renderModel(root, presentSpotPaperPairedReport(input), document, options);
+  return renderModel(root, presentSpotPaperPairedReport(input, {state}), document, options);
 }
