@@ -20,6 +20,20 @@ BTC/EUR has a separate gateway route and table; the memecoin validator is
 unchanged. No worker, filesystem, report producer, workflow, or runtime-control
 path is changed.
 
+The reviewed Paper-bot overview and paired comparison are mounted separately
+inside the same Strategies workspace. The overview's explicit manual read uses
+the existing authenticated `/api/private/spot-paper-report` endpoint through
+the existing BTC/EUR report connector. That endpoint's DTO is pinned to
+`BTC_EUR_SMA5_SMA20_V1`; it is not evidence for the
+`BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1` candidate, so the
+new candidate remains `UNKNOWN` and no values are copied across identities.
+USD Lives remains `UNKNOWN`, and LowVol V2 remains `PREPARED` in its native
+USDT unit. The paired panel mounts against the shared paired DTO contract but
+has no authenticated paired-report route or composed report source yet; its
+status and all run/source/profile/fingerprint/host identities remain unknown.
+It performs no paired fetch. Neither component is shown as a completed
+production integration or deployment confirmation.
+
 ## Evidence shown
 
 The adapter consumes the `MEMECOIN_PAPER_OPERATOR_REPORT_V1` DTO described by
