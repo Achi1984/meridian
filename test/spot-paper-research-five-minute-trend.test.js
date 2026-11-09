@@ -1,8 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
-  aggregateClosedFiveMinuteCandles, advanceFiveMinuteTrendEntry,
-  createFiveMinuteTrendState, evaluateFiveMinuteTrend,
+  ACTIVITY_DIAGNOSTIC_WINDOW_MS, aggregateClosedFiveMinuteCandles,
+  advanceFiveMinuteTrendEntry, createFiveMinuteTrendState,
+  diagnoseFiveMinuteTrendActivity, evaluateFiveMinuteTrend,
+  MAX_ONE_MINUTE_CANDLES,
   recordFiveMinuteTrendSell, SPOT_PAPER_5M_TREND_FILTER_ID
 } from "../scripts/spot-paper-research/five-minute-trend.mjs";
 import {
@@ -65,6 +67,18 @@ test("aggregation rejects duplicate, out-of-order, and missing one-minute bars",
   assert.throws(() => aggregateClosedFiveMinuteCandles(
     [valid[0], valid[2]], { decisionAt: BASE + 10 * MINUTE }),
   /GAP_IN_ONE_MINUTE_CANDLES/);
+});
+
+test("adapter bounds candle and price inputs before trend arithmetic", () => {
+  assert.throws(() => evaluateFiveMinuteTrend(
+    oneMinuteCandles(Array(MAX_ONE_MINUTE_CANDLES + 1).fill(100)), {
+      decisionAt: BASE + MAX_ONE_MINUTE_CANDLES * MINUTE
+    }), /ONE_MINUTE_CANDLE_LIMIT/);
+  const oversizedPrice = oneMinuteCandles([100]);
+  oversizedPrice[0].closeNano = "9007199254740992";
+  assert.throws(() => evaluateFiveMinuteTrend(oversizedPrice, {
+    decisionAt: BASE + MINUTE
+  }), /INVALID_ONE_MINUTE_CANDLE/);
 });
 
 test("only fully closed 5-minute bars as of decisionAt are selected", () => {
@@ -135,6 +149,102 @@ test("candidate preserves confirmation2 and admits only the rising 5-minute tren
   assert.equal(blocked.blockedEntryReason,
     "FIVE_MINUTE_SMA20_TREND_NOT_CONFIRMED");
   assert.equal(blocked.discarded, blocked.blockedEntryReason);
+});
+
+test("current or future minutes cannot mutate confirmation state or emit entry/exit", () => {
+  const rising = oneMinuteCandles([
+    ...Array(104).fill(100), 120, 130, 1, 1
+  ]);
+  let entryState = advanceFiveMinuteTrendEntry(createFiveMinuteTrendState(),
+    rising.slice(0, 21), { decisionAt: BASE + 21 * MINUTE }).state;
+  for (let index = 21; index <= 104; index++) {
+    entryState = advanceFiveMinuteTrendEntry(entryState,
+      rising.slice(0, index + 1), {
+        decisionAt: rising[index].timestamp + MINUTE
+      }).state;
+  }
+  assert.equal(entryState.pending?.crossCandleAt, rising[104].timestamp);
+  const entryUnclosed = advanceFiveMinuteTrendEntry(entryState, rising.slice(0, 106), {
+    decisionAt: rising[105].timestamp + MINUTE / 2
+  });
+  assert.deepEqual(entryUnclosed.state, entryState);
+  assert.deepEqual(entryUnclosed.signals, []);
+
+  const entryClosed = advanceFiveMinuteTrendEntry(entryState, rising.slice(0, 106), {
+    decisionAt: rising[105].timestamp + MINUTE
+  });
+  assert.equal(entryClosed.newCandleCount, 1);
+  assert.equal(entryClosed.signals[0]?.direction, "ENTRY");
+  assert.deepEqual(advanceFiveMinuteTrendEntry(entryClosed.state, rising.slice(0, 106), {
+    decisionAt: rising[105].timestamp + 2 * MINUTE
+  }).signals, []);
+  assert.equal(advanceFiveMinuteTrendEntry(entryClosed.state, rising.slice(0, 106), {
+    decisionAt: rising[105].timestamp + 2 * MINUTE
+  }).newCandleCount, 0);
+
+  const exitUnclosed = advanceFiveMinuteTrendEntry(entryClosed.state, rising, {
+    decisionAt: rising[106].timestamp + MINUTE / 2,
+    held: true
+  });
+  assert.deepEqual(exitUnclosed.state, entryClosed.state);
+  assert.deepEqual(exitUnclosed.signals, []);
+  const exitClosed = advanceFiveMinuteTrendEntry(entryClosed.state, rising, {
+    decisionAt: rising[106].timestamp + MINUTE,
+    held: true
+  });
+  assert.equal(exitClosed.newCandleCount, 1);
+  assert.equal(exitClosed.signals[0]?.direction, "EXIT");
+  const repeatedExitCandle = advanceFiveMinuteTrendEntry(exitClosed.state, rising, {
+    decisionAt: rising[107].timestamp + MINUTE / 2,
+    held: true
+  });
+  assert.deepEqual(repeatedExitCandle.signals, []);
+  assert.equal(repeatedExitCandle.newCandleCount, 0);
+});
+
+test("adapter result equals its closed prefix and explicitly rejects closed-prefix gaps", () => {
+  const candles = oneMinuteCandles([...Array(104).fill(100), 120, 130, 999, 998]);
+  const state = advanceFiveMinuteTrendEntry(createFiveMinuteTrendState(),
+    candles.slice(0, 21), { decisionAt: BASE + 21 * MINUTE }).state;
+  const decisionAt = candles[105].timestamp + MINUTE / 2;
+  const prefix = candles.slice(0, 105);
+  assert.deepEqual(
+    advanceFiveMinuteTrendEntry(state, candles, { decisionAt }),
+    advanceFiveMinuteTrendEntry(state, prefix, { decisionAt })
+  );
+  assert.throws(() => advanceFiveMinuteTrendEntry(state, [
+    ...prefix.slice(0, 22), ...prefix.slice(23)
+  ], { decisionAt }), /GAP_IN_ONE_MINUTE_CANDLES/);
+});
+
+test("fixed-window activity diagnostic distinguishes threshold, insufficiency, and partial coverage", () => {
+  const belowThreshold = diagnoseFiveMinuteTrendActivity({
+    completedRoundTripCount: 4,
+    observedCoverageMs: ACTIVITY_DIAGNOSTIC_WINDOW_MS
+  });
+  assert.equal(belowThreshold.status, "ACTIVITY_INSUFFICIENT");
+  assert.equal(belowThreshold.forcedTrades, false);
+  assert.equal(belowThreshold.deadlineExtensionAllowed, false);
+
+  const atThreshold = diagnoseFiveMinuteTrendActivity({
+    completedRoundTripCount: 5,
+    observedCoverageMs: ACTIVITY_DIAGNOSTIC_WINDOW_MS
+  });
+  assert.equal(atThreshold.status, "ACTIVITY_THRESHOLD_MET_DIAGNOSTIC_ONLY");
+  assert.equal(atThreshold.profitability, "NOT_ASSESSED");
+  assert.equal(atThreshold.forcedTrades, false);
+
+  const partial = diagnoseFiveMinuteTrendActivity({
+    completedRoundTripCount: 8,
+    observedCoverageMs: ACTIVITY_DIAGNOSTIC_WINDOW_MS - 1
+  });
+  assert.equal(partial.status, "PARTIAL_COVERAGE");
+  assert.equal(partial.completeWindow, false);
+  assert.equal(partial.forcedTrades, false);
+  assert.throws(() => diagnoseFiveMinuteTrendActivity({
+    completedRoundTripCount: 5,
+    observedCoverageMs: ACTIVITY_DIAGNOSTIC_WINDOW_MS + 1
+  }), /INVALID_ACTIVITY_DIAGNOSTIC_INPUT/);
 });
 
 test("exit signals and downstream ledger risk behavior remain unchanged", () => {

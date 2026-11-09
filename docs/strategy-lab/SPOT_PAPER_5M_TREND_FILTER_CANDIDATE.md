@@ -54,6 +54,13 @@ Exports for a future integration are `createFiveMinuteTrendState`,
 delegates directly to the existing cooldown recorder. The risk/ledger adapter
 must remain the existing engine's implementation.
 
+The adapter admits no more than 720 one-minute candles per call (matching the
+existing comparison snapshot bound) and validates positive close prices against
+the existing safe-integer price ceiling before any BigInt arithmetic. It first
+normalizes and validates the input, then sends only the causal closed prefix to
+the existing confirmation engine. A call with no fully closed candles is a
+no-op. Gaps, duplicates, and out-of-order candles remain explicit errors.
+
 ## Preregistered diagnostic and reporting
 
 Before any new test, freeze one 24-hour UTC evaluation window and report actual
@@ -63,6 +70,13 @@ five completed round trips in that fixed window. Fewer than five is
 cherry-pick data, force trades, or override a risk pause. The requirement for
 active trading remains: if activity is persistently insufficient, assess a
 newly versioned rule rather than treating inactivity as success.
+
+`diagnoseFiveMinuteTrendActivity` provides a pure machine-readable result from
+completed-round-trip count and observed coverage. It returns
+`ACTIVITY_INSUFFICIENT` only for a complete fixed window below the threshold,
+`ACTIVITY_THRESHOLD_MET_DIAGNOSTIC_ONLY` at/above the threshold, and
+`PARTIAL_COVERAGE` for a shorter window. None of these statuses asserts
+profitability, forces a trade, or extends a deadline.
 
 Use three separate EUR-only paper accounts on identical accepted BTC/EUR data,
 decision/quote timing, fills, and risk mechanics:
