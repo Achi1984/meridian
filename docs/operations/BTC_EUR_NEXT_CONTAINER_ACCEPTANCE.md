@@ -113,11 +113,13 @@ identity-only, imports, and invalid-selection/path checks ran with networking
 disabled and did not create a run journal. These tests are synthetic/offline.
 No full repository suite was repeated.
 
-Release Safety run `42674276430` for final-source HEAD
-`cbf5db1fefa49192f3243975b79d2a8a6585f6c9` was still in progress when this
-record was updated; its latest observed completed steps were deterministic
-install, release coordination guard, backend/frontend syntax, and frozen
-research lineage. Refresh this status after the workflow completes.
+The merged #1319 composition passed Release Safety run `42670199776`
+(`SUCCESS`, tested head `54647ef9b7ee8b0574550c085dddf1ff3a79b4f5`). On this
+acceptance branch, run `42674276430` for source commit
+`cbf5db1fefa49192f3243975b79d2a8a6585f6c9` was cancelled when the evidence
+record commit superseded it. The current final-head Release Safety run is
+`42674603529` for `e2b466d5419ea5f332aa10aff0abe437588ce32f`, observed
+**in progress**; no final result is claimed.
 
 ## Northflank handoff — do not launch from this record
 
