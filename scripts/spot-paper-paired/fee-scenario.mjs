@@ -933,7 +933,7 @@ export async function replayVerifiedSpotPaperFeeScenarios({
       }
     },
     originalReport,
-    replayAgreement: nextRun ?
+    replayAgreement: nextRun || versionedV2 ?
       "ORIGINAL_20BPS_STRATEGIES_DECISIONS_FILLS_RISK_AND_ACCOUNTING_MATCHED" :
       "ORIGINAL_50BPS_DECISIONS_FILLS_RISK_AND_ACCOUNTING_MATCHED",
     scenarios
