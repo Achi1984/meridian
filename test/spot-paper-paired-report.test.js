@@ -12,6 +12,7 @@ import {
   SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES
 } from '../scripts/spot-paper-paired-report/evaluate.mjs';
 import {
+  projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA
 } from '../scripts/spot-paper-paired-report/contract.mjs';
 
@@ -43,8 +44,11 @@ function arm(role, {fills = [], equity = 100_000, fees = 0, slippage = 0,
     tradingStatus: stoppedAt === null ? 'ACTIVE' : 'STOPPED',
     stoppedAt,
     stopReason,
-    decisions: Array.from({length: 480}, () => ({})),
-    riskStates: Array.from({length: 480}, () => ({})),
+    decisions: Array.from({length: 480}, (_, index) => ({
+      decision: null, decidedAt: 1_000 + (index + 1) * 60_000 - 2
+    })),
+    riskStates: Array.from({length: 480}, (_, index) =>
+      stoppedAt !== null && index === 479 ? {stopReason, stoppedAt} : {}),
     fills,
     valuation: {
       startingCapitalCents: 100_000,
@@ -68,8 +72,8 @@ function fixture() {
   const reportArms = [
     arm('baseline', {
       fills: [
-        {side: 'BUY', grossCents: 10_000, feeCents: 50},
-        {side: 'SELL', grossCents: 10_000, feeCents: 50}
+        {side: 'BUY', grossCents: 10_000, feeCents: 50, executionAt: 61_000},
+        {side: 'SELL', grossCents: 10_000, feeCents: 50, executionAt: 61_000}
       ],
       equity: 99_900, fees: 100, slippage: 20, turnover: 20_000,
       drawdown: 200, stoppedAt: 28_750_000, stopReason: 'SESSION_LOSS_LIMIT'
@@ -158,17 +162,39 @@ function fixture() {
       id: `shared:${index + 1}:${'b'.repeat(64)}`,
       type: 'shared_observation',
       cycle: index + 1,
-      decisionAt: report.startedAt + (index + 1) * 60_000,
+      decisionAt: report.startedAt + (index + 1) * 60_000 - 2,
       effectAt: report.startedAt + (index + 1) * 60_000,
       observedAt: report.startedAt + (index + 1) * 60_000,
-      ohlc: {path: `responses/${'a'.repeat(64)}.json`, sha256: 'a'.repeat(64), bytes: 100},
-      ticker: {path: `responses/${'b'.repeat(64)}.json`, sha256: 'b'.repeat(64), bytes: 100},
-      decisions: models.map(model => ({role: model.role})),
+      ohlc: {
+        path: `responses/${'a'.repeat(64)}.json`, sha256: 'a'.repeat(64),
+        bytes: 100,
+        requestStartedAt: report.startedAt + (index + 1) * 60_000 - 4,
+        receivedAt: report.startedAt + (index + 1) * 60_000 - 3
+      },
+      ticker: {
+        path: `responses/${'b'.repeat(64)}.json`, sha256: 'b'.repeat(64),
+        bytes: 100,
+        requestStartedAt: report.startedAt + (index + 1) * 60_000 - 1,
+        receivedAt: report.startedAt + (index + 1) * 60_000
+      },
+      decisions: models.map(model => ({
+        role: model.role,
+        decidedAt: report.startedAt + (index + 1) * 60_000 - 2,
+        decision: null, skippedReason: null, metadata: null
+      })),
       fills: models.map((model, roleIndex) => ({
         role: model.role,
-        fills: index === 0 ? structuredClone(reportArms[roleIndex].fills) : []
+        fills: index === 0 ? structuredClone(reportArms[roleIndex].fills.map(
+          ({executionAt, ...fill}) => fill)) : []
       })),
-      riskStates: models.map(model => ({role: model.role})),
+      riskStates: models.map((model, roleIndex) => {
+        const state = reportArms[roleIndex].riskStates[index];
+        return {
+          role: model.role, state: {},
+          stopReason: state.stopReason ?? null,
+          stoppedAt: state.stoppedAt ?? null, skipped: false
+        };
+      }),
       valuations: models.map(model => ({role: model.role}))
     })),
     {id: 'paired-terminal', type: 'terminal', at: report.endedAt,
@@ -217,6 +243,10 @@ test('projects a compatible synthetic terminal run without winner or cost double
   assert.equal(output.timing.observedCoverageMs, 28_800_000);
   assert.equal(output.timing.runStoppedAt, 28_801_000);
   assert.equal(output.timing.valuationAt, 28_801_000);
+  assert.equal(output.timing.commonHorizonAvailable, true);
+  assert.equal(output.timing.quoteAgeAtValuationMs, 0);
+  assert.equal(output.timing.terminalQuoteAgeMs, 0);
+  assert.equal(output.timing.quoteFreshAtShutdown, true);
   assert.equal(output.arms.baseline.tradingStoppedAt, 28_750_000);
   assert.equal(output.decision, 'NO_WINNER_OR_PROMOTION');
   assert.deepEqual(Object.keys(output), [
@@ -245,6 +275,143 @@ test('preserves fractional performance-clock milliseconds without threshold roun
     assert.equal(output.timing.actualElapsedMs, elapsedMs);
     assert.equal(output.reasonCode, 'TERMINAL_REPORT_RECONCILED');
   }
+});
+
+test('accepts a historically fresh common horizon with a stale terminal quote', () => {
+  const input = fixture();
+  const horizon = input.report.endedAt - 32_712;
+  const observation = input.journal.events.at(-2);
+  observation.decisionAt = horizon - 2;
+  observation.decisions.forEach((item, index) => {
+    item.decidedAt = horizon - 2;
+    input.report.arms[index].decisions.at(-1).decidedAt = horizon - 2;
+  });
+  observation.effectAt = horizon;
+  observation.observedAt = horizon;
+  observation.ohlc.receivedAt = horizon - 3;
+  observation.ohlc.requestStartedAt = horizon - 4;
+  observation.ticker.requestStartedAt = horizon - 1;
+  observation.ticker.receivedAt = horizon;
+  input.report.commonHorizon = {
+    available: true, reason: null,
+    quoteReceivedAt: horizon, effectAt: horizon,
+    quoteAgeAtEffectMs: 0, terminalQuoteAgeMs: 32_712,
+    quoteFreshAtShutdown: false
+  };
+  input.report.comparison.commonHorizonAt = horizon;
+  for (const arm of Object.values(input.report.comparison.arms)) {
+    arm.valuationAt = horizon;
+  }
+  input.journal.events.at(-1).report = structuredClone(input.report);
+
+  const output = evaluatePairedPaperEvidence(input);
+  assert.equal(output.evidenceStatus, 'VERIFIED_COMPLETE');
+  assert.equal(output.timing.valuationAt, horizon);
+  assert.equal(output.timing.quoteAgeAtValuationMs, 0);
+  assert.equal(output.timing.terminalQuoteAgeMs, 32_712);
+  assert.equal(output.timing.quoteFreshAtShutdown, false);
+  assert.equal(output.timing.commonHorizonAvailable, true);
+});
+
+test('dashboard projection allowlists legacy and V2 fee assumptions', () => {
+  const legacy = evaluatePairedPaperEvidence(fixture());
+  legacy.assumptions.privateMetadata = {nested: {secret: 'not-for-browser'}};
+  legacy.assumptions.unrecognized = 'drop';
+  const safeLegacy = projectSpotPaperPairedDashboard(legacy);
+  assert.deepEqual(safeLegacy.assumptions, {
+    feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false
+  });
+
+  const v2 = structuredClone(legacy);
+  v2.assumptions = {
+    feeBpsPerSide: 20,
+    slippageBpsPerSide: 10,
+    ratesVerified: false,
+    accountContractId: 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2',
+    accountContractVersion: 2,
+    feeBasis: 'EEA_SPOT_ONLY_TAKER_ASSUMPTION',
+    feeSource: 'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea',
+    feeAsOf: '2026-11-09',
+    accountTier: 'UNKNOWN',
+    accountingEngine: 'PAIRED_FEE_SCENARIO_LEDGER_V1',
+    privateMetadata: {nested: {secret: 'not-for-browser'}}
+  };
+  const safeV2 = projectSpotPaperPairedDashboard(v2);
+  assert.deepEqual(safeV2.assumptions, {
+    feeBpsPerSide: 20,
+    slippageBpsPerSide: 10,
+    ratesVerified: false,
+    accountContractId: 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2',
+    accountContractVersion: 2,
+    feeBasis: 'EEA_SPOT_ONLY_TAKER_ASSUMPTION',
+    feeSource: 'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea',
+    feeAsOf: '2026-11-09',
+    accountTier: 'UNKNOWN',
+    accountingEngine: 'PAIRED_FEE_SCENARIO_LEDGER_V1'
+  });
+  assert.equal(projectSpotPaperPairedDashboard({
+    ...v2,
+    assumptions: {...v2.assumptions, accountingEngine: 'UNRECOGNIZED'}
+  }), null);
+});
+
+test('rejects shared observations whose common decision time is not the latest arm decision', () => {
+  const input = fixture();
+  input.journal.events[1].decisions[0].decidedAt++;
+  assert.equal(evaluatePairedPaperEvidence(input).reasonCode,
+    'JOURNAL_REPORT_MISMATCH');
+});
+
+test('rejects stale intermediate quotes and report/journal content mismatches', () => {
+  const stale = fixture();
+  for (let index = 1; index < stale.journal.events.length - 1; index++) {
+    const event = stale.journal.events[index];
+    event.effectAt += 10_001;
+    event.observedAt = event.effectAt;
+    if (index > 1) {
+      event.ticker.requestStartedAt += 10_001;
+      event.ticker.receivedAt += 10_001;
+    }
+  }
+  stale.report.startedAt += 10_001;
+  stale.report.endedAt += 10_001;
+  stale.report.commonHorizon.effectAt += 10_001;
+  stale.report.commonHorizon.quoteReceivedAt += 10_001;
+  stale.report.comparison.commonHorizonAt += 10_001;
+  for (const arm of Object.values(stale.report.comparison.arms)) {
+    arm.valuationAt += 10_001;
+  }
+  stale.journal.manifest.startedAt = stale.report.startedAt;
+  stale.journal.createdAt = stale.report.startedAt;
+  stale.journal.events[0].at = stale.report.startedAt;
+  stale.journal.events.at(-1).at = stale.report.endedAt;
+  stale.journal.events.at(-1).report = structuredClone(stale.report);
+  assert.equal(evaluatePairedPaperEvidence(stale).reasonCode,
+    'JOURNAL_REPORT_MISMATCH');
+
+  for (const mutate of [
+    input => { input.journal.events[1].decisions[0].decision = {direction: 'ENTRY'}; },
+    input => { input.journal.events[1].fills[0].fills[0].grossCents++; },
+    input => { input.journal.events[1].riskStates[0].state.lossLimitReached = true; },
+    input => { input.journal.events[1].ohlc.requestStartedAt =
+      input.report.startedAt - 1; },
+    input => { input.journal.events[2].ohlc.requestStartedAt =
+      input.journal.events[1].effectAt - 1; }
+  ]) {
+    const input = fixture();
+    mutate(input);
+    assert.equal(evaluatePairedPaperEvidence(input).reasonCode,
+      'JOURNAL_REPORT_MISMATCH');
+  }
+
+  const mismatchedStop = fixture();
+  mismatchedStop.report.arms[0].tradingStatus = 'ACTIVE';
+  mismatchedStop.report.arms[0].stopReason = null;
+  mismatchedStop.report.arms[0].stoppedAt = null;
+  mismatchedStop.journal.events.at(-1).report =
+    structuredClone(mismatchedStop.report);
+  assert.equal(evaluatePairedPaperEvidence(mismatchedStop).reasonCode,
+    'JOURNAL_REPORT_MISMATCH');
 });
 
 test('accepts combined host exports and keeps lock-only snapshots unknown', () => {

@@ -7,12 +7,17 @@ import { fileURLToPath } from "node:url";
 import { packageHostEvidence } from "../spot-paper-pilot/package-host-evidence.mjs";
 import { readRunJournal } from "../spot-paper-pilot/journal.mjs";
 import {
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
   createBaselineArm, createCashControlArm, createChallengerArm,
   pairedConfigDigest, pairedResearchSourceDigest, runSpotPaperPaired,
+  resolveSpotPaperPairedAccountContract,
   SPOT_PAPER_PAIRED, SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256,
-  SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT, SPOT_PAPER_PAIRED_SOURCE_ID,
-  SPOT_PAPER_RESEARCH_COMPARISON_ID
+  SPOT_PAPER_PAIRED_SOURCE_ID, SPOT_PAPER_RESEARCH_COMPARISON_ID
 } from "./forward.mjs";
+import {
+  applySpotPaperPairedFeeObservation,
+  compareSpotPaperFeeScenarioObservations
+} from "./fee-scenario.mjs";
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const RUN_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]{0,47}$/;
@@ -22,6 +27,7 @@ const MAX_STATUS_MS = 5_000;
 const SOURCE_FILES = [
   "scripts/spot-paper-paired/host.mjs",
   "scripts/spot-paper-paired/forward.mjs",
+  "scripts/spot-paper-paired/fee-scenario.mjs",
   "scripts/spot-paper-paired/feed.mjs",
   "scripts/spot-paper-pilot/core.mjs",
   "scripts/spot-paper-pilot/journal.mjs",
@@ -105,8 +111,12 @@ async function sourceDigest() {
   return hash.digest("hex");
 }
 
-export async function composeSpotPaperPairedHost({ dataRoot, runId } = {}) {
+export async function composeSpotPaperPairedHost({
+  dataRoot, runId, accountContractId
+} = {}) {
   const runDirectory = await assertWritableRunLocation(dataRoot, runId);
+  assert(typeof accountContractId === "string", "ACCOUNT_CONTRACT_SELECTION_REQUIRED");
+  const accountContract = resolveSpotPaperPairedAccountContract(accountContractId);
   const { comparisonExports, challengerExports, researchSourceSha256 } =
     await readResearchModules();
   const accountIds = {
@@ -116,25 +126,42 @@ export async function composeSpotPaperPairedHost({ dataRoot, runId } = {}) {
   };
   const comparisonEngine = {
     id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
-    compare: comparisonExports.compareSpotPaperStrategies
+    compare: accountContract.contractId ===
+      SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId ?
+      observations => compareSpotPaperFeeScenarioObservations(observations, {
+        feeBpsPerSide: accountContract.feeBpsPerSide
+      }) : comparisonExports.compareSpotPaperStrategies
   };
+  const feeScenarioCompare = accountContract.version === 2 ?
+    comparisonEngine.compare : undefined;
+  const feeScenarioApply = accountContract.version === 2 ?
+    applySpotPaperPairedFeeObservation : undefined;
   const arms = [
-    createBaselineArm(accountIds.baseline),
-    createChallengerArm(challengerExports, accountIds.challenger),
-    createCashControlArm(accountIds.cash)
+    createBaselineArm(accountIds.baseline, accountContract, feeScenarioApply),
+    createChallengerArm(challengerExports, accountIds.challenger,
+      accountContract, feeScenarioApply),
+    createCashControlArm(accountIds.cash, accountContract)
   ];
   assert(arms.every(arm =>
-    JSON.stringify(arm.accountContract) === JSON.stringify(SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT)),
+    JSON.stringify(arm.accountContract) === JSON.stringify(accountContract)),
   "ACCOUNT_CONTRACT_MISMATCH");
   const config = {
     runId, dataRoot, sourceSha256: await sourceDigest(), researchSourceSha256,
     configSha256: "0".repeat(64), provider: { sourceId: SPOT_PAPER_PAIRED_SOURCE_ID },
+    accountContract,
+    ...(feeScenarioCompare ? {feeScenarioCompare, feeScenarioApply} : {}),
     arms, challengerExports, comparisonExports, comparisonEngine,
-    ...SPOT_PAPER_PAIRED_HOST_DEFAULTS
+    ...SPOT_PAPER_PAIRED_HOST_DEFAULTS,
+    feeBpsPerSide: accountContract.feeBpsPerSide
   };
   config.configSha256 = pairedConfigDigest(config);
   return {
     runId, dataRoot, runDirectory, accountIds,
+    accountContract,
+    accountContractId: accountContract.contractId ?? "BTC_EUR_PAIRED_PAPER_V1",
+    accountContractVersion: accountContract.version ?? 1,
+    feeBpsPerSide: accountContract.feeBpsPerSide,
+    slippageBpsPerSide: accountContract.slippageBpsPerSide,
     sourceSha256: config.sourceSha256,
     researchSourceSha256, configSha256: config.configSha256,
     maxCycles: config.maxCycles, maxRequests: config.maxRequests,
@@ -248,7 +275,7 @@ function parseArgs(argv) {
   const values = {};
   for (let index = 0; index < rest.length; index++) {
     const key = rest[index];
-    assert(["--data-root", "--run-id", "--archive", "--manifest",
+    assert(["--data-root",     "--run-id", "--archive", "--manifest", "--account-contract",
       "--retrieval-window-ms"].includes(key),
       `UNKNOWN_ARGUMENT:${key}`);
     assert(!Object.hasOwn(values, key), `DUPLICATE_ARGUMENT:${key}`);
@@ -258,7 +285,7 @@ function parseArgs(argv) {
   }
   const allowed = command === "package" ?
     ["--data-root", "--run-id", "--archive", "--manifest", "--retrieval-window-ms"] :
-    ["--data-root", "--run-id"];
+    ["--data-root", "--run-id", ...(command === "run" ? ["--account-contract"] : [])];
   assert(Object.keys(values).every(key => allowed.includes(key)),
     "ARGUMENT_NOT_VALID_FOR_COMMAND");
   if (command === "disabled") {
@@ -266,6 +293,9 @@ function parseArgs(argv) {
   } else {
     assert(values["--data-root"], "DATA_ROOT_REQUIRED");
     if (command !== "package") assert(values["--run-id"], "RUN_ID_REQUIRED");
+    if (command === "run") {
+      assert(values["--account-contract"], "ACCOUNT_CONTRACT_SELECTION_REQUIRED");
+    }
     if (command === "package") {
       assert(values["--run-id"] && values["--archive"] && values["--manifest"],
         "PACKAGE_ARGUMENTS_REQUIRED");
@@ -287,7 +317,10 @@ export async function main(argv = process.argv.slice(2), {
   output = process.stdout, signalSource = process
 } = {}) {
   const { command, values } = parseArgs(argv);
-  const { "--data-root": dataRoot, "--run-id": runId } = values;
+  const {
+    "--data-root": dataRoot, "--run-id": runId,
+    "--account-contract": accountContractId
+  } = values;
   let result;
   let retrievalWindowMs = 0;
   if (command === "disabled") {
@@ -298,7 +331,9 @@ export async function main(argv = process.argv.slice(2), {
       liveTrading: false, executionImpact: false, autoPromotion: false
     };
   } else if (command === "run") {
-    result = await runSpotPaperPairedHost({ dataRoot, runId }, { signalSource });
+    result = await runSpotPaperPairedHost({
+      dataRoot, runId, accountContractId
+    }, { signalSource });
   } else if (command === "status" || command === "report" || command === "export") {
     result = await inspectSpotPaperPairedRun({ dataRoot, runId }, {
       includeReport: command !== "status",

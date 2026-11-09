@@ -136,6 +136,26 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
       !finiteDuration(input.timing[key]) : !nullableInteger(input.timing[key])) return null;
     timing[key] = input.timing[key];
   }
+  const horizonTimingKeys = [
+    'quoteAgeAtValuationMs', 'terminalQuoteAgeMs',
+    'quoteFreshAtShutdown', 'commonHorizonAvailable', 'commonHorizonReason'
+  ];
+  const hasHorizonTiming = horizonTimingKeys.some(key =>
+    Object.hasOwn(input.timing, key));
+  if (hasHorizonTiming) {
+    if (!horizonTimingKeys.every(key => Object.hasOwn(input.timing, key)) ||
+        !nullableInteger(input.timing.quoteAgeAtValuationMs) ||
+        input.timing.quoteAgeAtValuationMs !== null &&
+          input.timing.quoteAgeAtValuationMs < 0 ||
+        !nullableInteger(input.timing.terminalQuoteAgeMs) ||
+        input.timing.terminalQuoteAgeMs !== null &&
+          input.timing.terminalQuoteAgeMs < 0 ||
+        typeof input.timing.quoteFreshAtShutdown !== 'boolean' ||
+        typeof input.timing.commonHorizonAvailable !== 'boolean' ||
+        input.timing.commonHorizonReason !== null &&
+          !REASON_CODE.test(input.timing.commonHorizonReason)) return null;
+    for (const key of horizonTimingKeys) timing[key] = input.timing[key];
+  }
   if (timing.requestedDurationMs !== 28_800_000 ||
       timing.requestedCycles !== 480 ||
       timing.observedCoverageMs !== null && timing.observedCoverageMs < 0 ||
@@ -153,9 +173,38 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
     input.timing.stopReason)) return null;
   const timingResult = {...timing, stopReason: input.timing.stopReason};
 
-  if (input.assumptions.feeBpsPerSide !== 50 ||
-      input.assumptions.slippageBpsPerSide !== 10 ||
-      input.assumptions.ratesVerified !== false) return null;
+  const assumptions = input.assumptions;
+  const legacyFees = assumptions.feeBpsPerSide === 50 &&
+    !Object.hasOwn(assumptions, 'accountContractId') &&
+    !Object.hasOwn(assumptions, 'accountContractVersion');
+  const nextRunFees = assumptions.feeBpsPerSide === 20 &&
+    assumptions.accountContractId === 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2' &&
+    assumptions.accountContractVersion === 2 &&
+    assumptions.feeBasis === 'EEA_SPOT_ONLY_TAKER_ASSUMPTION' &&
+    assumptions.feeSource ===
+      'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea' &&
+    assumptions.feeAsOf === '2026-11-09' &&
+    assumptions.accountTier === 'UNKNOWN' &&
+    assumptions.accountingEngine === 'PAIRED_FEE_SCENARIO_LEDGER_V1';
+  if ((!legacyFees && !nextRunFees) ||
+      assumptions.slippageBpsPerSide !== 10 ||
+      assumptions.ratesVerified !== false) return null;
+  const assumptionsResult = legacyFees ? {
+    feeBpsPerSide: assumptions.feeBpsPerSide,
+    slippageBpsPerSide: assumptions.slippageBpsPerSide,
+    ratesVerified: assumptions.ratesVerified
+  } : {
+    feeBpsPerSide: assumptions.feeBpsPerSide,
+    slippageBpsPerSide: assumptions.slippageBpsPerSide,
+    ratesVerified: assumptions.ratesVerified,
+    accountContractId: assumptions.accountContractId,
+    accountContractVersion: assumptions.accountContractVersion,
+    feeBasis: assumptions.feeBasis,
+    feeSource: assumptions.feeSource,
+    feeAsOf: assumptions.feeAsOf,
+    accountTier: assumptions.accountTier,
+    accountingEngine: assumptions.accountingEngine
+  };
   const arms = {};
   for (const role of SPOT_PAPER_PAIRED_ROLES) {
     arms[role] = safeArm(input.arms[role], role,
@@ -192,11 +241,7 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
     independentAuthentication: 'NOT_ESTABLISHED',
     identity,
     timing: timingResult,
-    assumptions: {
-      feeBpsPerSide: 50,
-      slippageBpsPerSide: 10,
-      ratesVerified: false
-    },
+    assumptions: assumptionsResult,
     arms,
     deltas,
     decision: 'NO_WINNER_OR_PROMOTION'
