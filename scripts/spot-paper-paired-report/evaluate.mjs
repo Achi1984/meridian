@@ -324,21 +324,54 @@ function validateTerminalJournal(journal, report, expected) {
       event.ohlc.receivedAt <= event.decisionAt &&
       event.decisionAt <= event.ticker.requestStartedAt &&
       event.ticker.receivedAt <= event.effectAt &&
+      event.effectAt - event.ticker.receivedAt <= MAX_QUOTE_AGE_MS &&
       event.id === `shared:${index + 1}:${event.ticker.sha256}` &&
       eventRoles(event.decisions) && eventRoles(event.fills) &&
       eventRoles(event.riskStates) && eventRoles(event.valuations) &&
       event.decisionAt === Math.max(...event.decisions.map(item => item.decidedAt)) &&
       event.decisions.every(item => isInteger(item.decidedAt) &&
+        Object.hasOwn(item, 'decision') &&
+        (item.skippedReason === null || typeof item.skippedReason === 'string') &&
+        (item.metadata === null || isRecord(item.metadata)) &&
         event.ohlc.receivedAt <= item.decidedAt &&
         item.decidedAt <= event.ticker.requestStartedAt &&
         item.decidedAt <= event.effectAt) &&
-      event.fills.every(item => Array.isArray(item.fills));
+      event.fills.every(item => Array.isArray(item.fills)) &&
+      event.riskStates.every(item => isRecord(item.state) &&
+        (item.stopReason === null || typeof item.stopReason === 'string') &&
+        (item.stoppedAt === null || isInteger(item.stoppedAt)));
     if (valid) priorEffectAt = event.effectAt;
     return valid;
   });
   const reportArmsReconcile = report.arms.every(arm =>
     Array.isArray(arm.decisions) && arm.decisions.length === observations.length &&
     Array.isArray(arm.riskStates) && arm.riskStates.length === observations.length);
+  const normalizeDecision = decision => Object.fromEntries(
+    Object.entries(decision ?? {}).filter(([key, value]) =>
+      key !== 'state' && key !== 'role' && value !== null && value !== undefined));
+  const decisionsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, roleIndex) =>
+    stableJson(report.arms[roleIndex].decisions.map(normalizeDecision)) ===
+    stableJson(observations.map(event => normalizeDecision(
+      event.decisions.find(item => item.role === role)))));
+  const fillsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, roleIndex) => {
+    const journalFills = observations.flatMap(event => {
+      const group = event.fills.find(item => item.role === role);
+      return group.fills.map(fill => ({...fill, executionAt: event.effectAt}));
+    });
+    return stableJson(report.arms[roleIndex].fills) === stableJson(journalFills);
+  });
+  const riskStatesReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, roleIndex) => {
+    const journalRiskStates = observations.map(event => {
+      const item = event.riskStates.find(value => value.role === role);
+      return {
+        ...item.state,
+        ...(item.stopReason !== null ? {stopReason: item.stopReason} : {}),
+        ...(item.stoppedAt !== null ? {stoppedAt: item.stoppedAt} : {})
+      };
+    });
+    return stableJson(report.arms[roleIndex].riskStates) ===
+      stableJson(journalRiskStates);
+  });
   const fillCountsReconcile = SPOT_PAPER_PAIRED_ROLES.every((role, index) =>
     report.arms[index].fills.length === observations.reduce((sum, event) => {
       const group = Array.isArray(event.fills) ?
@@ -378,7 +411,8 @@ function validateTerminalJournal(journal, report, expected) {
       observations.length === 0 &&
         (report.commonHorizon.effectAt !== null ||
           report.commonHorizon.quoteReceivedAt !== null) ||
-      !reportArmsReconcile || !fillCountsReconcile ||
+      !reportArmsReconcile || !decisionsReconcile || !fillsReconcile ||
+      !riskStatesReconcile || !fillCountsReconcile ||
       !identityMatches(report, payload, expected)) {
     return {error: 'JOURNAL_REPORT_MISMATCH'};
   }

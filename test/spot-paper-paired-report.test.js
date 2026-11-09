@@ -43,7 +43,9 @@ function arm(role, {fills = [], equity = 100_000, fees = 0, slippage = 0,
     tradingStatus: stoppedAt === null ? 'ACTIVE' : 'STOPPED',
     stoppedAt,
     stopReason,
-    decisions: Array.from({length: 480}, () => ({})),
+    decisions: Array.from({length: 480}, (_, index) => ({
+      decision: null, decidedAt: 1_000 + (index + 1) * 60_000 - 2
+    })),
     riskStates: Array.from({length: 480}, () => ({})),
     fills,
     valuation: {
@@ -68,8 +70,8 @@ function fixture() {
   const reportArms = [
     arm('baseline', {
       fills: [
-        {side: 'BUY', grossCents: 10_000, feeCents: 50},
-        {side: 'SELL', grossCents: 10_000, feeCents: 50}
+        {side: 'BUY', grossCents: 10_000, feeCents: 50, executionAt: 61_000},
+        {side: 'SELL', grossCents: 10_000, feeCents: 50, executionAt: 61_000}
       ],
       equity: 99_900, fees: 100, slippage: 20, turnover: 20_000,
       drawdown: 200, stoppedAt: 28_750_000, stopReason: 'SESSION_LOSS_LIMIT'
@@ -175,13 +177,17 @@ function fixture() {
       },
       decisions: models.map(model => ({
         role: model.role,
-        decidedAt: report.startedAt + (index + 1) * 60_000 - 2
+        decidedAt: report.startedAt + (index + 1) * 60_000 - 2,
+        decision: null, skippedReason: null, metadata: null
       })),
       fills: models.map((model, roleIndex) => ({
         role: model.role,
-        fills: index === 0 ? structuredClone(reportArms[roleIndex].fills) : []
+        fills: index === 0 ? structuredClone(reportArms[roleIndex].fills.map(
+          ({executionAt, ...fill}) => fill)) : []
       })),
-      riskStates: models.map(model => ({role: model.role})),
+      riskStates: models.map(model => ({
+        role: model.role, state: {}, stopReason: null, stoppedAt: null, skipped: false
+      })),
       valuations: models.map(model => ({role: model.role}))
     })),
     {id: 'paired-terminal', type: 'terminal', at: report.endedAt,
@@ -269,7 +275,10 @@ test('accepts a historically fresh common horizon with a stale terminal quote', 
   const horizon = input.report.endedAt - 32_712;
   const observation = input.journal.events.at(-2);
   observation.decisionAt = horizon - 2;
-  observation.decisions.forEach(item => { item.decidedAt = horizon - 2; });
+  observation.decisions.forEach((item, index) => {
+    item.decidedAt = horizon - 2;
+    input.report.arms[index].decisions.at(-1).decidedAt = horizon - 2;
+  });
   observation.effectAt = horizon;
   observation.observedAt = horizon;
   observation.ohlc.receivedAt = horizon - 3;
@@ -302,6 +311,45 @@ test('rejects shared observations whose common decision time is not the latest a
   input.journal.events[1].decisions[0].decidedAt++;
   assert.equal(evaluatePairedPaperEvidence(input).reasonCode,
     'JOURNAL_REPORT_MISMATCH');
+});
+
+test('rejects stale intermediate quotes and report/journal content mismatches', () => {
+  const stale = fixture();
+  for (let index = 1; index < stale.journal.events.length - 1; index++) {
+    const event = stale.journal.events[index];
+    event.effectAt += 10_001;
+    event.observedAt = event.effectAt;
+    if (index > 1) {
+      event.ticker.requestStartedAt += 10_001;
+      event.ticker.receivedAt += 10_001;
+    }
+  }
+  stale.report.startedAt += 10_001;
+  stale.report.endedAt += 10_001;
+  stale.report.commonHorizon.effectAt += 10_001;
+  stale.report.commonHorizon.quoteReceivedAt += 10_001;
+  stale.report.comparison.commonHorizonAt += 10_001;
+  for (const arm of Object.values(stale.report.comparison.arms)) {
+    arm.valuationAt += 10_001;
+  }
+  stale.journal.manifest.startedAt = stale.report.startedAt;
+  stale.journal.createdAt = stale.report.startedAt;
+  stale.journal.events[0].at = stale.report.startedAt;
+  stale.journal.events.at(-1).at = stale.report.endedAt;
+  stale.journal.events.at(-1).report = structuredClone(stale.report);
+  assert.equal(evaluatePairedPaperEvidence(stale).reasonCode,
+    'JOURNAL_REPORT_MISMATCH');
+
+  for (const mutate of [
+    input => { input.journal.events[1].decisions[0].decision = {direction: 'ENTRY'}; },
+    input => { input.journal.events[1].fills[0].fills[0].grossCents++; },
+    input => { input.journal.events[1].riskStates[0].state.lossLimitReached = true; }
+  ]) {
+    const input = fixture();
+    mutate(input);
+    assert.equal(evaluatePairedPaperEvidence(input).reasonCode,
+      'JOURNAL_REPORT_MISMATCH');
+  }
 });
 
 test('accepts combined host exports and keeps lock-only snapshots unknown', () => {
