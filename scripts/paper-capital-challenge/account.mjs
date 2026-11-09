@@ -174,21 +174,32 @@ export function replayUsdAccount(journal) {
   });
 }
 
-export function appendUsdAccountEvent(journal, input) {
+export function appendUsdAccountEventWithReplay(journal, input) {
   const previous = replayUsdAccount(journal);
   const event = normalizeEvent(input, previous.binding);
   const duplicate = previous.entries.find(entry => entry.event.id === event.id);
   if (duplicate) {
     if (canonical(duplicate.event) !== canonical(event)) throw new Error("CONTRADICTORY_DUPLICATE_EVENT");
-    return freezeDeep({
-      schemaVersion: JOURNAL_SCHEMA, binding: { ...previous.binding },
-      events: previous.entries.map(entry => entry.event)
-    });
+    return {
+      journal: freezeDeep({
+        schemaVersion: JOURNAL_SCHEMA, binding: { ...previous.binding },
+        events: previous.entries.map(entry => entry.event)
+      }),
+      replay: previous,
+      duplicate: true
+    };
   }
   const next = { schemaVersion: JOURNAL_SCHEMA, binding: { ...previous.binding },
     events: [...previous.entries.map(entry => entry.event), event] };
-  replayUsdAccount(next);
-  return freezeDeep(next);
+  return {
+    journal: freezeDeep(next),
+    replay: replayUsdAccount(next),
+    duplicate: false
+  };
+}
+
+export function appendUsdAccountEvent(journal, input) {
+  return appendUsdAccountEventWithReplay(journal, input).journal;
 }
 
 export function createUsdPersistencePayload(journal) {

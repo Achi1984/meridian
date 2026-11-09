@@ -184,6 +184,25 @@ test("exact duplicate delivery is idempotent and contradictory or unordered even
     /OBSERVATION_OUT_OF_ORDER/);
 });
 
+test("duplicate replay of a deserialized paused state returns a recursively frozen state", () => {
+  let state = createChallengeState(IDENTITY);
+  const initial = observation("initial", 100_000, BASE + 1_000);
+  const loss = observation("loss", 90_000, BASE + 2_000);
+  state = advanceChallengeState(state, initial);
+  state = advanceChallengeState(state, loss);
+  const restored = JSON.parse(JSON.stringify(state));
+  const retried = advanceChallengeState(restored, loss);
+
+  assert.deepEqual(retried, state);
+  assert.equal(retried.paused, true);
+  assert.equal(retried.pauseObservationId, "loss");
+  assert.equal(retried.highWaterEquityCents, 100_000);
+  assert.ok(Object.isFrozen(retried));
+  assert.ok(Object.isFrozen(retried.observations));
+  assert.ok(Object.isFrozen(retried.observations[0]));
+  assert.ok(Object.isFrozen(retried.observations[1].valuation));
+});
+
 test("EUR, unsafe numbers, inconsistent equity, and forged resume snapshots are rejected", () => {
   const state = createChallengeState(IDENTITY);
   assert.throws(() => advanceChallengeState(state,
