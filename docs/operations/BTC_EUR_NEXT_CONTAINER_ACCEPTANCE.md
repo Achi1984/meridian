@@ -2,54 +2,64 @@
 
 ## Result and pinned source
 
-Container acceptance passed locally against the latest reviewed #1319 candidate
-available for this run, source commit
-`756089261b82d69451ae00215a85edcf8c7744d3`. This includes the trend activity
-count reconciliation correction. The build used an isolated detached worktree;
-no #1319 implementation files, host settings, or existing stopped-run evidence
-were modified. These checks do not start a feed, launch a host, or establish
-deployment readiness.
+Container acceptance passed locally against the updated #1319 candidate source
+commit `4097aa704c12749b72e568768a67ea6babfa5816`. The build context was a Git
+archive of that exact commit; source-side identity was computed from the same
+archive. Dirty and untracked checkout files cannot enter the image or expected
+identity. No #1319 implementation files, host settings, or existing stopped-run
+evidence were modified. These checks do not start a feed, launch a host, or
+establish deployment readiness.
 
 | Build identity | Value |
 | --- | --- |
-| Candidate source commit | `756089261b82d69451ae00215a85edcf8c7744d3` |
+| Candidate source commit | `4097aa704c12749b72e568768a67ea6babfa5816` |
+| Exact Git archive SHA-256 | `82e839cf5f7f88ea476a3502209952b50baee1576e22b9d072bc4e814e264faa` |
 | Dockerfile SHA-256 | `4c279e7463c682a09c8d3a99fe5a739c82efd4d9fa2c060cd49813418b4f3f0c` |
-| Base image | `node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293` |
-| Local tag | `meridian-spot-paper-paired-acceptance:756089261b82` |
-| Local image ID | `sha256:244f46781691323326be3d2fab3fb2e24d52bc5dc84d96b5fc3d2883fb226230` |
+| Dockerfile base reference | `node:20-alpine` (mutable tag) |
+| Resolved base image digest | Unknown; not captured in local image metadata |
+| Local tag | `meridian-spot-paper-paired-acceptance:4097aa704c12` |
+| Local image ID | `sha256:9bfde1a6b169b8c4e6427fb46fe6c1c53507feac96b6b0d08bee09f326256d69` |
 | Registry digest | None; image was not pushed |
 | Accepted three-source research digest | `dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25` |
 
-The local image ID is not a remotely deployed immutable image reference. Before
-any launch, build from the exact final reviewed source SHA, complete this
-acceptance on that image, and obtain an approved registry
-`repository@sha256:...` digest. Rebuild and revalidate if any packaged source
-changes.
+The base-image digest is deliberately reported as unknown: this Dockerfile uses
+a mutable tag and the local build did not retain provenance sufficient to bind
+the resolved base digest. Resolve and pin the base or capture authoritative
+build provenance for the final deployment build. The local image ID is not a
+remotely deployed immutable image reference. Before any launch, build from the
+exact final reviewed source SHA, complete this acceptance on that image, and
+obtain an approved registry `repository@sha256:...` digest. Rebuild and
+revalidate if any packaged source changes.
 
 ## Commands and observed results
 
-The reproducible entrypoint requires a checkout of the specific source commit.
-It builds that checkout's `Dockerfile.spot-paper-paired` and runs every
-container command with `--network none`. It requires an empty temporary
-evidence directory and removes that fixture when complete:
+The reproducible entrypoint requires a Git repository containing the requested
+commit. It creates a clean `git archive` build context from that commit (not the
+mutable worktree), computes source-side identity from the archive, and runs all
+container commands by inspected image ID with `--network none`. It requires an
+empty temporary evidence directory and removes the fixture when complete:
 
 ```sh
 node scripts/spot-paper-paired-acceptance/acceptance.mjs \
-  --source-dir /tmp/meridian-1319-candidate \
-  --source-sha 756089261b82d69451ae00215a85edcf8c7744d3
+  --source-dir /tmp/meridian-1319-final \
+  --source-sha 4097aa704c12749b72e568768a67ea6babfa5816
 ```
 
 Observed on that commit:
 
-- The default image command returned `DISABLED` / `NO_RUN_REQUESTED`; the
+- The exact-source archive hash was
+  `82e839cf5f7f88ea476a3502209952b50baee1576e22b9d072bc4e814e264faa`; the
+  inspected local image ID was
+  `sha256:9bfde1a6b169b8c4e6427fb46fe6c1c53507feac96b6b0d08bee09f326256d69`.
+  The default image command returned `DISABLED` / `NO_RUN_REQUESTED`; the
   identity-only command selected account contract
   `BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2` and model pair
   `BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1`.
 - Source-side and in-container expected identities matched exactly:
   - host source SHA-256:
-    `254ed820673074202041a4c4876f7d61eb3f9cd6d5f4af7765a69e1483cfff0a`
+    `68924929a3f2079697dc291ea7e79619cd1bbe87839462fd4694ffabc31b9232`
   - config SHA-256:
-    `b3b33cc2e5cf77d2f98e547fc606e59ccb1bb508ee4508db5b5b79b459d78681`
+    `cd7c1ca3dde11eeb4cbc8f4790355d04a5bb7a117712de8f96e52a9ac7d237ff`
   - research source SHA-256:
     `dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25`
 - All 15 required host, paired-runner, report/evaluator, and research modules
@@ -72,11 +82,11 @@ node --test test/spot-paper-paired-host.test.js \
   test/spot-paper-paired-report.test.js
 ```
 
-All 56 focused tests passed, including the verified trend-activity exit-count
-reconciliation regression. These are synthetic/offline tests. The committed
-acceptance entrypoint performs the image build, container CLI checks, import
-checks, identity comparison, and rejection checks above. No full repository
-suite was repeated.
+The final #1319 focused source suites passed **56/56**, including the verified
+trend-activity exit-count reconciliation regression. The added archive
+regression passed **1/1**, proving dirty tracked and untracked checkout files
+are excluded from the build context. These tests are synthetic/offline. No full
+repository suite was repeated.
 
 ## Northflank handoff — do not launch from this record
 

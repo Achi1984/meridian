@@ -5,6 +5,7 @@ import { spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
+import { archiveGitSource } from "./source-archive.mjs";
 
 const ACCOUNT_CONTRACT = "BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2";
 const MODEL_PAIR = "BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1";
@@ -85,37 +86,40 @@ async function main(argv) {
 
   const sourceDir = resolve(options["--source-dir"]);
   const sourceSha = options["--source-sha"];
-  const checkedOutSha = execute("git", ["rev-parse", "HEAD"], {cwd: sourceDir}).stdout.trim();
-  assert.equal(checkedOutSha, sourceSha, "Source checkout does not match the requested pin");
   assert.match(sourceSha, /^[a-f0-9]{40}$/, "A full source commit SHA is required");
 
-  const dockerfilePath = join(sourceDir, "Dockerfile.spot-paper-paired");
-  const dockerfile = await readFile(dockerfilePath);
-  const imageTag = `meridian-spot-paper-paired-acceptance:${sourceSha.slice(0, 12)}`;
-  execute("docker", [
-    "build",
-    "--label", `org.opencontainers.image.revision=${sourceSha}`,
-    "--file", dockerfilePath,
-    "--tag", imageTag,
-    sourceDir
-  ]);
-  const image = parseJson(execute("docker", [
-    "image", "inspect", "--format", "{{json .}}", imageTag
-  ]).stdout, "Docker image inspection");
-  assert.equal(image.Config.Labels["org.opencontainers.image.revision"], sourceSha);
-  assert.equal(image.Config.User, "node");
-
   const tempRoot = await mkdtemp(join(tmpdir(), "spot-paper-paired-acceptance-"));
-  const dataRoot = join(tempRoot, "evidence-root");
   try {
+    const {contextPath, archiveSha256} = await archiveGitSource(
+      sourceDir, sourceSha, join(tempRoot, "source")
+    );
+    const dockerfilePath = join(contextPath, "Dockerfile.spot-paper-paired");
+    const dockerfile = await readFile(dockerfilePath);
+    const imageTag = `meridian-spot-paper-paired-acceptance:${sourceSha.slice(0, 12)}`;
+    execute("docker", [
+      "build",
+      "--pull",
+      "--label", `org.opencontainers.image.revision=${sourceSha}`,
+      "--file", dockerfilePath,
+      "--tag", imageTag,
+      contextPath
+    ]);
+    const image = parseJson(execute("docker", [
+      "image", "inspect", "--format", "{{json .}}", imageTag
+    ]).stdout, "Docker image inspection");
+    assert.equal(image.Config.Labels["org.opencontainers.image.revision"], sourceSha);
+    assert.equal(image.Config.User, "node");
+    const imageId = image.Id;
+
+    const dataRoot = join(tempRoot, "evidence-root");
     await mkdir(dataRoot);
     await chmod(dataRoot, 0o777);
     const runId = `accept-${sourceSha.slice(0, 12)}`;
     const sourceIdentity = parseJson(execute("node", [
       "scripts/spot-paper-paired/host.mjs", ...identityArgs(dataRoot, runId)
-    ], {cwd: sourceDir}).stdout, "Source identity command");
+    ], {cwd: contextPath}).stdout, "Source identity command");
 
-    const defaultRun = dockerRun(imageTag, dataRoot);
+    const defaultRun = dockerRun(imageId, dataRoot);
     const disabled = parseJson(defaultRun.stdout, "Default container command");
     assert.equal(disabled.status, "DISABLED");
     assert.equal(disabled.reason, "NO_RUN_REQUESTED");
@@ -123,7 +127,7 @@ async function main(argv) {
     assert.equal(disabled.executionImpact, false);
     assert.equal(disabled.autoPromotion, false);
 
-    const containerIdentityRun = dockerRun(imageTag, dataRoot, identityArgs(
+    const containerIdentityRun = dockerRun(imageId, dataRoot, identityArgs(
       "/evidence-root", runId
     ));
     assert.equal(containerIdentityRun.status, 0, containerIdentityRun.stderr);
@@ -153,7 +157,7 @@ async function main(argv) {
     `;
     const imports = execute("docker", [
       "run", "--rm", "--network", "none", "--entrypoint", "node",
-      imageTag, "--input-type=module", "-e", importProgram
+      imageId, "--input-type=module", "-e", importProgram
     ]);
     const importResult = parseJson(imports.stdout, "Packaged module import check");
     assert.deepEqual(importResult.importedModules, REQUIRED_MODULES);
@@ -194,7 +198,7 @@ async function main(argv) {
       }
     ];
     for (const selection of invalidSelections) {
-      const result = dockerRun(imageTag, dataRoot, selection.args);
+      const result = dockerRun(imageId, dataRoot, selection.args);
       assertCommandRejected(result, selection.error, selection.label);
     }
     assert.deepEqual(await readdir(dataRoot), [], "Rejected selections created evidence");
@@ -204,7 +208,7 @@ async function main(argv) {
     await mkdir(existingPath);
     const sentinel = join(existingPath, "preserve.txt");
     await writeFile(sentinel, "existing acceptance fixture\n");
-    const existingResult = dockerRun(imageTag, dataRoot, identityArgs(
+    const existingResult = dockerRun(imageId, dataRoot, identityArgs(
       "/evidence-root", existingRunId
     ));
     assertCommandRejected(existingResult, "EVIDENCE_PATH_ALREADY_EXISTS",
@@ -212,18 +216,18 @@ async function main(argv) {
     assert.equal(await readFile(sentinel, "utf8"), "existing acceptance fixture\n");
     assert.deepEqual(await readdir(existingPath), ["preserve.txt"]);
 
-    const imageId = image.Id;
-    const baseImageDigest =
-      "sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293";
     const repoDigests = image.RepoDigests ?? [];
     process.stdout.write(`${JSON.stringify({
       sourceSha,
       sourceDir,
+      sourceArchiveSha256: archiveSha256,
+      buildContext: "git archive of requested commit",
       imageTag,
       imageId,
       repoDigests,
       dockerfileSha256: createHash("sha256").update(dockerfile).digest("hex"),
-      baseImageDigest,
+      baseImageDigest: null,
+      baseImageDigestStatus: "UNKNOWN_NOT_CAPTURED_IN_LOCAL_IMAGE_METADATA",
       disabledStatus: disabled.status,
       disabledReason: disabled.reason,
       identity: containerIdentity,
