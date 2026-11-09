@@ -47,6 +47,7 @@ test('real M11 Paper workspace authenticates manual reads and renders missing st
   assert.ok(chrome, 'Chrome is required for actual M11 entrypoint screenshots');
   const hosted = await startV11StaticServer();
   const evidence = process.env.V11_PAPER_BOT_WORKSPACE_EVIDENCE_DIR ||
+    process.env.V11_A2_EVIDENCE_DIR ||
     join(tmpdir(), 'meridian-paper-bot-workspace-evidence');
   mkdirSync(evidence, {recursive: true});
   try {
