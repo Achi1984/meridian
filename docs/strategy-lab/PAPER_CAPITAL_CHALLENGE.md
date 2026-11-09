@@ -82,17 +82,54 @@ is rejected before append. Exact duplicate observations remain idempotent at
 the bound, while a contradictory reuse of an ID is rejected. No history is
 truncated and no high-water mark or pause may be reset to work around this
 bound. At the limit, new observations must stop and remain fail-closed. A
-future, separately reviewed durable journal
-must preserve the complete history and carry forward verified campaign
-identity, high-water mark, and pause before any safe continuation can be
-designed; that continuation is not implemented here. Persisting and recovering
-the ledger durably is not implemented here. The replay guard cannot prevent an
-operator from deliberately starting a new empty state; durable campaign
-identity, append-only journal wiring, and restart admission are required before
-any operational use. The pause is based on sampled observations, not a
+future, separately reviewed continuation beyond 256 observations must preserve
+the complete history and carry forward verified campaign identity, high-water
+mark, and pause; that continuation is not implemented here. The pause is based
+on sampled observations, not a
 guaranteed maximum-loss bound: gaps, adverse price moves, fees, and liquidation
 costs can produce larger losses before the next accepted valuation. Such
 overshoots must remain visible and must not be reset or hidden.
+
+## Offline observation-history persistence
+
+`scripts/paper-capital-challenge/history-store.mjs` provides an offline local
+filesystem store for the complete replayable observation history. Call
+`ChallengeHistoryStore.createNew(directory)` only for a new campaign directory;
+it atomically claims the new leaf and fails if the directory already exists.
+Its parent must already exist as a trusted, fully resolved, non-symlink
+directory; the API does not provide hostile-host path confinement. Restart
+uses the distinct
+`ChallengeHistoryStore.reopenExisting(directory, {expectedTip})` operation. It
+requires an existing history and an exact expected tip, and never initializes
+missing history or accepts a caller-supplied state snapshot. The returned state
+is derived by replaying the full ordered observations through the existing
+guard. Campaign, currency, policy, canonical bytes, sequence, predecessor
+chain, journal bound, and digest are validated on read.
+
+The create and append operations return a restart tip containing schema,
+campaign, currency, policy version, revision, and SHA-256 digest of the complete
+checkpoint bytes. On restart, that tip must come from an independently retained
+trusted channel and must not be regenerated from the local history being
+checked. A digest stored only beside the history cannot detect coordinated
+replacement or rollback. The API checks the provided tip but cannot establish
+its provenance; this is not hostile-host rollback protection or a production
+trust mechanism.
+
+The store reuses the reviewed checkpoint transaction pattern: bounded reads and
+writes, an exclusive single-writer claim, pending marker, synced temporary
+file, atomic rename, directory sync, and exact readback before acknowledging a
+commit. Clean close releases the writer claim. Claims left by crashes are never
+stolen automatically. A failed or ambiguous commit blocks further mutation
+and does not clear the claim; `inspectChallengeHistory(directory)` and
+`reconcileChallengeHistory(directory)` are read-only, and unresolved state
+requires separately reviewed recovery. Full history is retained; there is no
+truncation, reset, or automatic pause clearing. The storage bound is 512 KiB in
+addition to the existing 256-observation limit.
+
+This persistence layer stores guard observations, not a trading ledger, quote
+evidence, or position/cash records, and it is not connected to a strategy or
+execution path. It does not establish 24-hour readiness, production durability,
+or campaign trust.
 
 ## Offline optimization protocol
 
@@ -132,9 +169,11 @@ without admitted historical data, no historical claim is justified.
   is connected to this policy. Future quote admission must prove native USD
   denomination for BTC/USD and reject EUR, USDT, and USDC; a pair label alone
   is not proof.
-- **Ledger and durable journal:** no separate USD cash/position ledger,
-  append-only campaign journal, durable recovery, restart identity admission,
-  or operator review workflow is wired.
+- **Ledger and operational admission:** no separate USD cash/position ledger,
+  USD feed, adapter wiring, restart operator workflow, or production trust
+  source for independently retaining the expected tip exists. The local store
+  persists guard observations only; its read-only recovery and host filesystem
+  durability are not production recovery guarantees.
 - **Validation data:** there is no admitted USD observation dataset or
   preregistered baseline/cash-control run.
 - **Execution evidence:** fills, liquidity, fees, slippage, gaps, and latency
