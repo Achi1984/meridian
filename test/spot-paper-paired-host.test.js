@@ -5,12 +5,15 @@ import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  inspectSpotPaperPairedRun, main, runSpotPaperPairedHost,
+  composeSpotPaperPairedHost, inspectSpotPaperPairedRun, main, runSpotPaperPairedHost,
   runSpotPaperPairedWithSignals, SPOT_PAPER_PAIRED_HOST_DEFAULTS
 } from "../scripts/spot-paper-paired/host.mjs";
 import { createRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256 } from
   "../scripts/spot-paper-paired/forward.mjs";
+import {
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT
+} from "../scripts/spot-paper-paired/forward.mjs";
 
 async function rootFixture(t) {
   const dataRoot = await mkdtemp(join(tmpdir(), "paired-host-"));
@@ -37,25 +40,22 @@ async function completedJournal(dataRoot, runId) {
   });
 }
 
-test("paired host defaults are the frozen adapter bounds and integration stays blocked", async t => {
+test("paired host defaults are frozen and its disabled command makes no run request", async t => {
   assert.equal(SPOT_PAPER_PAIRED_HOST_DEFAULTS.maxCycles, 480);
   assert.equal(SPOT_PAPER_PAIRED_HOST_DEFAULTS.maxRequests, 960);
   assert.equal(SPOT_PAPER_PAIRED_HOST_DEFAULTS.maxDurationMs, 8 * 60 * 60 * 1000);
-  assert.equal(SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256, null);
+  assert.match(SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256, /^[a-f0-9]{64}$/);
   const dataRoot = await rootFixture(t);
   const output = { value: "", write(text) { this.value += text; } };
   const result = await main(["disabled"], { output });
   assert.equal(result.status, "DISABLED");
-  assert.match(output.value, /RESEARCH_INTEGRATION_NOT_ACCEPTED/);
-  await assert.rejects(runSpotPaperPairedHost({
-    dataRoot, runId: "paired-host-blocked"
-  }), /RESEARCH_INTEGRATION_NOT_ACCEPTED/);
+  assert.match(output.value, /NO_RUN_REQUESTED/);
   const missing = await inspectSpotPaperPairedRun({
-    dataRoot, runId: "paired-host-blocked"
+    dataRoot, runId: "paired-host-disabled"
   });
   assert.equal(missing.status, "NOT_FOUND");
   const missingExport = await main([
-    "export", "--data-root", dataRoot, "--run-id", "paired-host-blocked"
+    "export", "--data-root", dataRoot, "--run-id", "paired-host-disabled"
   ], { output });
   assert.equal(missingExport.status, "NOT_FOUND");
   assert.equal(missingExport.verifiedTerminal, false);
@@ -69,6 +69,28 @@ test("host composition rejects an existing evidence path before integration or f
   await assert.rejects(runSpotPaperPairedHost({
     dataRoot, runId: "already-used"
   }), /EVIDENCE_PATH_ALREADY_EXISTS/);
+});
+
+test("host composition requires explicit versioned 20-bps next-run contract selection", async t => {
+  const dataRoot = await rootFixture(t);
+  const runId = "paired-host-next-fee-contract";
+  await assert.rejects(composeSpotPaperPairedHost({dataRoot, runId}),
+    /ACCOUNT_CONTRACT_SELECTION_REQUIRED/);
+  const composition = await composeSpotPaperPairedHost({
+    dataRoot, runId,
+    accountContractId: SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId
+  });
+  assert.equal(composition.accountContractId,
+    "BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2");
+  assert.equal(composition.accountContractVersion, 2);
+  assert.equal(composition.feeBpsPerSide, 20);
+  assert.equal(composition.slippageBpsPerSide, 10);
+
+  const output = { value: "", write(text) { this.value += text; } };
+  await assert.rejects(main([
+    "run", "--data-root", dataRoot, "--run-id", "unselected-contract"
+  ], { output }), /ACCOUNT_CONTRACT_SELECTION_REQUIRED/);
+  assert.equal(output.value, "");
 });
 
 test("read-only status/report/export and package commands reuse paired journal helpers", async t => {

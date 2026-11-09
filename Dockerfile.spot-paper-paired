@@ -1,0 +1,20 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+COPY --chown=node:node scripts/spot-paper-paired/ ./scripts/spot-paper-paired/
+COPY --chown=node:node scripts/spot-paper-pilot/core.mjs ./scripts/spot-paper-pilot/core.mjs
+COPY --chown=node:node scripts/spot-paper-pilot/journal.mjs ./scripts/spot-paper-pilot/journal.mjs
+COPY --chown=node:node scripts/spot-paper-pilot/provider.mjs ./scripts/spot-paper-pilot/provider.mjs
+COPY --chown=node:node scripts/spot-paper-pilot/package-host-evidence.mjs ./scripts/spot-paper-pilot/package-host-evidence.mjs
+COPY --chown=node:node scripts/spot-paper-research/comparison.mjs ./scripts/spot-paper-research/comparison.mjs
+COPY --chown=node:node scripts/spot-paper-research/entry-confirmation.mjs ./scripts/spot-paper-research/entry-confirmation.mjs
+
+RUN mkdir -p /evidence-root /tmp/spot-paper-paired-package && \
+    chown node:node /evidence-root /tmp/spot-paper-paired-package
+
+ENV NODE_ENV=production
+USER node
+
+ENTRYPOINT ["node", "scripts/spot-paper-paired/host.mjs"]
+CMD ["disabled"]

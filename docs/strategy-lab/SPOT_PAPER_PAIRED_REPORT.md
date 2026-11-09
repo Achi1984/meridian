@@ -130,8 +130,11 @@ mark makes that arm's common-horizon equity and deltas unavailable. No
 statistical significance, alpha, ranking, or winner is inferred from one run.
 Unfavourable and zero-fill results are retained.
 
-The report declares 50 bp fees and 10 bp slippage per side as assumptions;
-`ratesVerified` must remain false. Booked fees and modeled slippage are shown
+Historical V1 reports declare 50 bp fees and 10 bp slippage per side. The
+explicit V2 next-run contract declares a 20 bp EEA spot-only taker assumption
+and 10 bp slippage per side, with its version, source, and unknown account tier
+included in report assumptions and the config digest. For both contracts,
+`ratesVerified` remains false. Booked fees and modeled slippage are shown
 separately from net equity. The evaluator does not add a hypothetical exit
 cost to net PnL.
 
