@@ -137,9 +137,9 @@ test("entry, exit, durable prefix replay, restart-tip admission, and continuatio
     expectedTip: firstTip
   });
   let resumedDecisionCalls = 0;
-  const exit = await runSyntheticUsdLivesFeedSample({
-    feed: fixtureFeed(observation(2)),
+  const exit = await runSyntheticUsdLivesObservation({
     store,
+    observation: observation(2),
     decide() {
       resumedDecisionCalls++;
       return decision("SELL", "0.009");
@@ -171,6 +171,45 @@ test("entry, exit, durable prefix replay, restart-tip admission, and continuatio
   assert.deepEqual(store.tip, finalTip);
   assert.equal(retainedTips.length, 2);
   await store.close();
+});
+
+test("reopened account blocks feed acquisition until campaign-wide budgets are reviewed", async t => {
+  for (const withCommittedEvent of [false, true]) {
+    let store = await newStore(t);
+    const directory = storeDirectory(store);
+    let expectedTip = store.tip;
+    if (withCommittedEvent) {
+      const first = await runSyntheticUsdLivesObservation({
+        store,
+        observation: observation(1),
+        decide: () => decision("HOLD"),
+        retainRestartTip() {}
+      });
+      expectedTip = structuredClone(first.tip);
+    }
+    await store.close();
+
+    store = await UsdAccountJournalStore.reopenExisting(directory, {
+      binding: BINDING,
+      expectedTip
+    });
+    assert.equal(store.createdNew, false);
+    let feedCalls = 0;
+    await assert.rejects(runSyntheticUsdLivesFeedSample({
+      feed: {
+        async fetchObservation() {
+          feedCalls++;
+          return observation(2);
+        }
+      },
+      store,
+      decide: () => decision("HOLD"),
+      retainRestartTip() {}
+    }), /USD_CAMPAIGN_FEED_BUDGET_REVIEW_REQUIRED/);
+    assert.equal(feedCalls, 0);
+    assert.equal(store.replay.entries.length, withCommittedEvent ? 1 : 0);
+    await store.close();
+  }
 });
 
 test("zero-trade and stale or wrong-currency observations fail closed", async t => {
@@ -215,11 +254,12 @@ test("zero-trade and stale or wrong-currency observations fail closed", async t 
     retainRestartTip() {}
   }), /STALE_OR_FUTURE_QUOTE/);
 
-  const wrongCurrency = observation(4);
+  const wrongCurrencyStore = await newStore(t);
+  const wrongCurrency = observation(1);
   wrongCurrency.quote.marketPair = "BTC/EUR";
   wrongCurrency.quote.quoteCurrency = "EUR";
   await assert.rejects(runSyntheticUsdLivesObservation({
-    store,
+    store: wrongCurrencyStore,
     observation: wrongCurrency,
     decide() {
       decisions++;
@@ -228,7 +268,8 @@ test("zero-trade and stale or wrong-currency observations fail closed", async t 
     retainRestartTip() {}
   }), /NATIVE_USD_INSTRUMENT_REQUIRED/);
   assert.equal(decisions, 0);
-  assert.equal(store.replay.entries.length, 1);
+  assert.equal(wrongCurrencyStore.replay.entries.length, 0);
+  await wrongCurrencyStore.close();
   await store.close();
 });
 
@@ -286,6 +327,13 @@ test("journal exhaustion stops before decision or append", async () => {
     }
   }), /ACCOUNT_JOURNAL_LIMIT_REACHED/);
 
+  const feedStore = {
+    ...store,
+    replay: {entries},
+    append() {
+      throw new Error("APPEND_MUST_NOT_RUN");
+    }
+  };
   let feedCalls = 0;
   await assert.rejects(runSyntheticUsdLivesFeedSample({
     feed: {
@@ -294,7 +342,7 @@ test("journal exhaustion stops before decision or append", async () => {
         return observation(300);
       }
     },
-    store,
+    store: feedStore,
     decide: () => decision("HOLD"),
     retainRestartTip() {}
   }), /ACCOUNT_JOURNAL_LIMIT_REACHED/);
@@ -329,6 +377,100 @@ test("feed exhaustion stops without decision, append, retry, or tip handoff", as
   assert.equal(store.replay.entries.length, 0);
   await store.close();
 });
+
+test("feed adapter replacement cannot renew instance-scoped campaign budgets", async t => {
+  const store = await newStore(t);
+  const originalFeed = fixtureFeed(observation(1), observation(2));
+  let replacementFeedCalls = 0;
+  await runSyntheticUsdLivesFeedSample({
+    feed: originalFeed,
+    store,
+    decide: () => decision("HOLD"),
+    retainRestartTip() {}
+  });
+  let decisions = 0;
+  let tipCalls = 0;
+  await assert.rejects(runSyntheticUsdLivesFeedSample({
+    feed: {
+      async fetchObservation() {
+        replacementFeedCalls++;
+        return observation(2);
+      }
+    },
+    store,
+    decide() {
+      decisions++;
+      return decision("HOLD");
+    },
+    retainRestartTip() {
+      tipCalls++;
+    }
+  }), /USD_CAMPAIGN_FEED_INSTANCE_CHANGED/);
+  assert.equal(replacementFeedCalls, 0);
+  assert.equal(decisions, 0);
+  assert.equal(tipCalls, 0);
+  assert.equal(store.replay.entries.length, 1);
+  await store.close();
+});
+
+for (const failedEntryPoint of ["observation", "feed"]) {
+  test(`tip-retention failure latches the store session after ${failedEntryPoint} entry`, async t => {
+    const store = await newStore(t);
+    const append = store.append.bind(store);
+    let appendCalls = 0;
+    store.append = async event => {
+      appendCalls++;
+      return append(event);
+    };
+    let feedCalls = 0;
+    let decisionCalls = 0;
+    let tipCalls = 0;
+    const feed = {
+      async fetchObservation() {
+        feedCalls++;
+        return observation(1);
+      }
+    };
+    const decide = () => {
+      decisionCalls++;
+      return decision("HOLD");
+    };
+    const retainRestartTip = async () => {
+      tipCalls++;
+      throw new Error("tip retention outcome unknown");
+    };
+
+    const initialCall = failedEntryPoint === "feed"
+      ? runSyntheticUsdLivesFeedSample({feed, store, decide, retainRestartTip})
+      : runSyntheticUsdLivesObservation({
+        store, observation: observation(1), decide, retainRestartTip
+      });
+    await assert.rejects(initialCall, /tip retention outcome unknown/);
+    assert.equal(store.replay.entries.length, 1);
+    assert.equal(store.replay.entries[0].event.id, "synthetic-observation-1");
+    assert.equal(appendCalls, 1);
+
+    await assert.rejects(runSyntheticUsdLivesObservation({
+      store,
+      observation: observation(2),
+      decide,
+      retainRestartTip
+    }), /USD_COMPOSITION_SESSION_FAILED/);
+    await assert.rejects(runSyntheticUsdLivesFeedSample({
+      feed,
+      store,
+      decide,
+      retainRestartTip
+    }), /USD_COMPOSITION_SESSION_FAILED/);
+
+    assert.equal(store.replay.entries.length, 1);
+    assert.equal(feedCalls, failedEntryPoint === "feed" ? 1 : 0);
+    assert.equal(decisionCalls, 1);
+    assert.equal(appendCalls, 1);
+    assert.equal(tipCalls, 1);
+    await store.close();
+  });
+}
 
 test("ambiguous writer interruption remains unknown and receives no retry", async t => {
   let injectFailure = false;

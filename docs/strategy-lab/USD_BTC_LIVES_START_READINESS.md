@@ -21,7 +21,11 @@ durable USD account journal and its replayed guard. The supplied
 prove that a caller stores it independently or securely. Any feed, decision,
 durable-append, or tip-handoff failure stops the caller. An ambiguous commit
 remains UNKNOWN and must not be retried or reopened without separately reviewed
-recovery.
+recovery. If a tip handoff rejects or has an unknown outcome after a journal
+commit, the composition latches that store object as failed. Rewrapping the same
+store cannot clear the latch; neither entry point will fetch, decide, append, or
+retry tip retention again. The committed event remains in the journal. Recovery
+requires a separately reviewed process/store recovery path.
 
 The `runSyntheticUsdLivesFeedSample` and
 `runSyntheticUsdLivesObservation` functions are fixture acceptance surfaces,
@@ -35,6 +39,10 @@ its public Kraken ticker timestamp is local receipt time and its
 `OFFLINE_CALLER_ASSERTION` evidence is neither authenticated nor independently
 verified.
 
+Within one store session, the wrapper also pins the first feed object and
+rejects replacement; it cannot establish that an arbitrary callback reuses
+its transport's internal counters.
+
 The strategy identity is deliberately `null` and `UNAPPROVED`. The documented
 SMA(5/20) baseline in `SPOT_PAPER_NEXT_EXPERIMENT_PROPOSAL.md` is conditional on
 independently validated BTC/USD adapter/profile/ledger integration and is not
@@ -43,6 +51,20 @@ signal, or claim a causal strategy. A future strategy review must freeze the
 exact BTC/USD input, closed-bar/warm-up and cutoff rules, decision-to-fill
 timing, and identity before use; it must prevent lookahead. Until then, only
 explicitly synthetic decisions are accepted by the offline harness.
+
+## Missing candle and strategy interface
+
+The existing Kraken adapter does not provide candles to a decision function.
+`scripts/usd-paper-feed/kraken-public.mjs` validates OHLC rows and returns only
+the latest closed-minute timestamp from that response; its emitted observation
+contains the ticker bid/ask quote, not the candle open/high/low/close values.
+`runUsdOfflineStream` consequently receives quote observations and persisted
+account history, not a candle series. A candle-based SMA(5/20) strategy cannot
+be integrated through this interface today. Do not synthesize candle closes
+from bid/ask, substitute ticker sampling for bars, or claim the existing EUR
+rule was preserved. The SMA reference remains unapproved and conditional; the
+real feed-to-frozen-strategy composition is unfinished and blocks every
+production path. Synthetic callbacks validate plumbing only.
 
 ## Preserved account and campaign limits
 
@@ -60,12 +82,23 @@ explicitly synthetic decisions are accepted by the offline harness.
   256 events, 512 KiB canonical checkpoint bytes, and 24 hours from the first
   event. At one observation per minute, 256 events cover only about 4 hours 16
   minutes, not 24-hour readiness.
-- The feed separately allows at most 256 observations, 512 HTTP requests,
-  128 KiB per response, 32 MiB aggregate response bytes, a 5-second request
-  timeout, a 10-second quote age, and one sample per minute. Its byte, request,
-  time, or event budget may stop the campaign earlier than the journal bound.
-  An adapter failure or exhausted budget is terminal; recreating the adapter
-  cannot extend a campaign. Stop on any failed admission, append, or handoff.
+- The feed adapter instance separately allows at most 256 observations, 512
+  HTTP requests, 128 KiB per response, 32 MiB aggregate response bytes, a
+  5-second request timeout, a 10-second quote age, and one sample per minute.
+  Its byte, request, time, or event budget may stop the campaign earlier than
+  the journal bound.
+  The adapter keeps request and raw-response byte counters only in that instance;
+  those counters are not persisted in the account journal. A newly constructed
+  adapter resets its counters. That reset is not renewed campaign allowance:
+  no campaign-wide request/byte accounting exists here, so after a process
+  restart do not acquire another sample until separately reviewed durable
+  campaign-wide accounting is implemented. Within a process, the composition
+  pins one feed object per store session and rejects replacement; the account
+  store exposes whether a handle came from `createNew` or `reopenExisting`, so
+  feed acquisition is also blocked through reopened handles, even if the journal
+  has no events. An adapter failure or exhausted budget is terminal; recreating
+  the adapter cannot extend a campaign. Stop on any failed admission, append,
+  or handoff.
 - The runner/account/store/guard remain the existing USD implementation; this
   composition creates no parallel ledger or guard and does not alter EUR-owned
   reports or files.
@@ -140,6 +173,15 @@ synthetic PASS does not satisfy any of them.
 - [ ] Review a bounded continuation/stop plan that preserves complete history.
   The current 256-event minute-sampling ceiling is about 4 hours 16 minutes;
   there is no 24-hour readiness or reset/adapter-recreation escape.
+- [ ] Implement and independently review a durable campaign-wide request and
+  raw-response-byte budget that survives restart. Current Kraken counters are
+  adapter-instance scoped, and current account checkpoints do not retain them;
+  the composition fail-closes feed acquisition through any reopened account
+  handle until this is resolved.
+- [ ] Provide the actual closed-candle values required by the approved causal
+  strategy, bind the exact strategy/version to those inputs, and test that
+  adapter-to-decision contract. Current adapter exports no candle values to the
+  runner, so synthetic callback tests do not satisfy this blocker.
 - [ ] Complete explicit owner authorization, host admission, and separate
   operational/cost review before any future start. No such authorization is
   implied here.
