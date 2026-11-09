@@ -1,0 +1,230 @@
+ISOLATED USD PAPER ACCOUNT AND VALUATION INTEGRATION V1
+
+Status: pure hypothetical accounting/replay only. Production stays disabled.
+This is not a deployed second bot, a strategy simulator, an authenticated USD
+feed, an order authorization adapter, or evidence of observed profits/fills.
+No deployment, network acquisition, live test, EUR relabeling, or change to
+the persistence/guard/policy (#1297), EUR fee/horizon/host (#1309), or trend
+research (#1311) files is part of this implementation.
+
+Modules (repository root: /home/runner/work/meridian/meridian):
+  scripts/paper-capital-challenge/account-contract.mjs
+  scripts/paper-capital-challenge/valuation.mjs
+  scripts/paper-capital-challenge/account.mjs
+
+The account composes with the real existing advanceChallengeState and
+getExposureGate, not a second drawdown implementation. Existing ledger and
+trade-plan arithmetic were inspected: their exact decimal primitives are
+private; markPaperPosition uses Number arithmetic, and the EUR core binds
+its own pair/cost semantics. Those are not safe public USD accounting helpers.
+The new small BigInt layer does only fixed-point accounting, not signals,
+candles, trend filters, strategy selection, fee-scenario research, or hosting.
+
+IDENTITY AND MODELED COST CONTRACT
+
+The immutable binding has exactly campaignId, currency, strategyVersion,
+costVersion. campaignId must equal the existing policy campaign, currency
+must be USD, and strategyVersion must be a nonempty bounded safe identifier.
+Every event repeats that binding. A journal cannot switch campaign, currency,
+strategy or cost version partway through. A strategy migration requires a
+separately reviewed continuation design preserving the complete account and
+guard history; creating a new journal must not be used to reset a campaign.
+
+USD_MODELED_COSTS.version = BTC_USD_TAKER20_ADVERSE10_V1:
+  20bps taker fee EACH side
+  10bps adverse slippage EACH side
+  ASSUMED_COUNTERFACTUAL; venue/account applicability NOT_VERIFIED
+
+These are assumptions, not a verified USD venue fee schedule or actual
+liquidity. The provisional maximum single entry remains USD100.00 gross
+modeled notional (10000 cents); its entry fee is additional, so maximum cash
+debit is 10020 cents. This is not an optimized sizing recommendation.
+The account starts from native USD100000 cents and zero BTC. It is long-only,
+one open inventory lot at a time; subsequent buys while holding are skipped.
+Partial sells are supported. No leverage, borrowing, top-ups, resets, maker
+fills, forced churn or pause override exists. Even a paused exit must have a
+valid fresh native-USD quote, positive quantity no greater than held BTC,
+and enough cash to cover any cent-rounded fee exceeding tiny sale proceeds.
+
+EXACT ARITHMETIC AND EVERY COST ONCE
+
+All money outputs are safe integer USD cents, never EUR or stablecoin units.
+BTC quantities and USD/BTC prices enter as plain decimal STRINGS with at
+most 8 fractional digits, no exponent/sign/NaN/coercion; their scaled integers
+must be <= Number.MAX_SAFE_INTEGER. BTC is stored as decimal integer-string
+satoshis. Prices use 1e8 USD units. BigInt intermediates preserve the exact
+adverse price as a rational; no intermediate price rounding or floats.
+
+Buy price = ask * 10010/10000.
+Sell price = bid * 9990/10000.
+Gross USD cents = quantitySatoshis * priceScaled * adverseMultiplier
+                  / (100000000000000 * 10000).
+Buy debit notional rounds UP to cents; sell proceeds/marks round DOWN.
+Each fee rounds UP to the next whole cent from 20bps of the EXACT adverse
+notional, not from its already-rounded cent value. Zero inventory has zero
+exit fee; a positive sub-cent trade can still have a one-cent fee.
+
+Entry cash subtracts buy notional AND entry fee. Exit cash adds sell notional
+AND subtracts exit fee. At every event:
+  netEquityCents = cashCents
+                + inventoryAtAdverseBidCents
+                - unbookedAccruedFeesCents
+                - modeledExitCostsCents.
+Inventory is marked at bid minus slippage. modeledExitCostsCents contains
+only the as-yet-unbooked modeled taker liquidation fee on remaining inventory.
+Spread is already captured by ask/bid, slippage by the adverse price. Neither
+is subtracted again. Booked entry/sale fees are not accrued fees. The report's
+modeledSlippageCents is a rounded diagnostic, NEVER a second cash deduction.
+After a partial sale, only the remaining BTC has a liquidation fee reserve.
+After a complete sale, the reserve is zero.
+
+ACCRUE_FEE explicitly records an ADDITIONAL hypothetical USD fee, not a
+repeat of modeled trade fees. It increases only unbookedAccruedFeesCents.
+SETTLE_FEES subtracts that liability from cash and zeros it, preserving
+equity on an unchanged quote. Accruals may expose negative net equity;
+losses and drawdown overshoot are never clamped or hidden. Settlement cannot
+make cash negative. These caller assertions are not verified venue invoices.
+
+QUOTE EVIDENCE AND BRIDGE
+
+Every event requires a quote with EXACT keys:
+  schemaVersion: NATIVE_BTC_USD_QUOTE_V1
+  id: bounded safe identifier
+  marketPair: BTC/USD
+  baseCurrency: BTC
+  quoteCurrency: USD
+  sourceId: bounded safe identifier
+  nativeInstrument: BTC/USD (normalized native instrument assertion)
+  evidenceKind: SYNTHETIC_FIXTURE or OFFLINE_CALLER_ASSERTION
+  bid, ask: positive decimal strings
+  quotedAtMs, receivedAtMs: nonnegative safe integer epoch milliseconds
+  maxAgeMs: positive integer <= policy.maxValuationAgeMs (10000)
+
+bid <= ask, quotedAtMs <= receivedAtMs <= event.observedAtMs, and quote age
+<= maxAgeMs are required. EUR/USDT/USDC, future/stale/malformed/crossed/
+nonpositive evidence is rejected, including for exits. Across unique events
+both quote timestamps are nondecreasing. Within a source, reusing a quote ID
+with different evidence is contradictory. Equal quote timestamps are allowed
+within freshness; new account event/guard observation timestamps are strict.
+
+Offline caller evidence IS NOT authenticated live acquisition. Relabeling an
+EUR feed as this schema cannot prove native USD applicability. A future
+trusted acquisition adapter must bind the actual venue-native instrument,
+source payload and acquisition timestamps independently; it cannot claim
+authentication just by supplying this record. This implementation deliberately
+does not accept an AUTHENTICATED_LIVE label.
+
+createUsdObservation({binding, account, quote, id, observedAtMs}) is a pure
+bridge returning EXACTLY the observation schema accepted by existing guard,
+without adding cost/evidence fields to that strict schema. A standalone caller
+balance is hypothetical, not authoritative state. Authoritative hypothetical
+account derivation uses replayUsdAccount, never a supplied account snapshot.
+Full quote/cost/fill bindings remain in the associated account transactions.
+
+APPEND-ONLY EVENT INPUT AND REPLAY
+
+createUsdAccountJournal(binding) creates the empty pure input contract:
+  {schemaVersion: USD_PAPER_ACCOUNT_EVENTS_V1, binding, events: []}
+
+Each event has EXACT keys:
+  id, campaignId, currency, strategyVersion, costVersion, observedAtMs,
+  action, quote, quantityBtc, feeCents, reason
+
+action is BUY, SELL, HOLD, SKIP_ENTRY, ACCRUE_FEE or SETTLE_FEES.
+BUY/SELL quantityBtc is a positive decimal string; other actions use null.
+Only ACCRUE_FEE has positive safe integer feeCents; all others use zero.
+Only SKIP_ENTRY has a bounded safe identifier reason; all others use null.
+HOLD is a valuation observation, not a fill. SKIP_ENTRY records a strategy
+decision supplied by the caller; it does not invent a trading signal.
+
+appendUsdAccountEvent(journal, event) validates complete prior evidence and
+returns a new frozen journal. Existing inputs remain unchanged/unfrozen.
+Exact repeated event IDs are idempotent (even old retries); contradictory
+duplicates are rejected, including quantity, quote, action and binding.
+replayUsdAccount(journal) derives balances, modeled fills, observations,
+guard state and activity deterministically from the ordered evidence.
+No caller-supplied state, balance snapshot, peak or pause field is admitted.
+All supplied raw journal lengths are bounded to 256, including retry entries;
+append normalizes exact retries without consuming additional observation slots.
+It does not truncate observations or roll history forward beyond that limit.
+
+A hypothetical BUY is skipped for DRAWDOWN_PAUSED, OPEN_INVENTORY,
+MAX_ENTRY_EXCEEDED, or INSUFFICIENT_UNENCUMBERED_CASH. These reasons are
+reported. Invalid evidence throws rather than silently replacing a price.
+Every accepted unique event produces one post-accounting observation through
+advanceChallengeState. New buys are flat-only; prior booked/accrued flat
+losses have already been observed. Holds retain open losses; sells are only
+risk-reducing. A fee/entry loss can latch the pause on its own event; pause
+does not undo that recorded hypothetical event or automatically flatten it.
+
+The returned authorization always has executionAuthorized=false and
+liveAcquisitionAuthenticated=false. productionExposureGate is the REAL
+getExposureGate result: POLICY_DISABLED while unpaused, DRAWDOWN_PAUSED
+when paused. Hypothetical fills do not bypass that gate for authorization.
+Nothing in these modules dispatches an order or admits a production bot.
+
+PERSISTENCE HANDOFF TO #1297 (NO HISTORY-STORE FILE CHANGES)
+
+createUsdPersistencePayload(journal) returns USD_PAPER_ACCOUNT_PERSISTENCE_V1:
+  binding, costs, transactions: [{event, fill, skipReason, observation}],
+  guardObservations, account, guardState,
+  accountTransactionDurability: NOT_IMPLEMENTED,
+  executionAuthorized: false.
+
+Modeled fills include event/quote/source IDs, time, complete binding, exact
+price rational, side, quantitySatoshis, notionalCents, feeCents, slippageCents,
+ASSUMED_COUNTERFACTUAL provenance and MODELED_TAKER liquidity. Observations
+bind via event.id; no independently supplied fill/valuation claim is trusted.
+Derived payloads are diagnostic outputs, not restart admission credentials.
+To verify one, replay its original events and compare all derived output.
+
+#1297 is integrated from main, and its postchecks are complete. The available
+guard-history interface for future account/host wiring is:
+  for each NEW derived observation in order:
+    result = await historyStore.append(observation)
+    independently retain result.tip
+  resume only via reopenExisting(directory, {expectedTip: externallyRetainedTip})
+  compare persisted observations to replayed account observations before use.
+
+The history store is present on this branch; this interface description is
+not implemented account/host wiring. Guard-history persistence is NOT
+full account-transaction durability: saving observations alone loses BTC/fill/
+cost evidence. A later reviewed account store must atomically persist the
+complete event with its derived fill and valuation, coordinate the guard tip,
+handle ambiguous writes without retry trading, reject rollback/fork/reset/
+contradictory history, and reconcile only read-only against an independently
+retained expected tip. Do not resume from a partial account journal, start a
+new campaign after a crash, or use this in-memory append API as a durable log.
+
+ACTIVITY AND LAUNCH BLOCKERS
+
+Activity reports completed flat-to-open-to-flat round trips, exposure duration
+through the last observation (including an unclosed position), open start time,
+skipped-entry reasons, booked modeled fees, additional accrued fees, modeled
+slippage diagnostic, gross turnover, current reserved exit fees, maximum
+high-water drawdown, net equity and net PnL INCLUDING open losses/exit reserve.
+activityCriterionMet requires at least one completed round trip. It is only a
+minimal activity criterion, not strategy approval or profitability evidence.
+profitableCandidateEstablished is always false. Cash-only and held-but-never-
+closed candidates do not pass that criterion. No forced trades, churn to pass
+it, or pause override should be introduced by a future strategy integration.
+
+Launch blockers remain: independently retained external restart tip and
+complete account-transaction durability;
+reviewed continuation beyond 256 observations; authenticated native live
+BTC/USD feed/venue applicability; verified USD account cost schedule; host
+wiring and explicit owner authorization/admission; an approved active strategy
+and sufficient counterfactual activity evidence without bypassing drawdown.
+All production policy gates remain disabled pending those separate reviews.
+
+FOCUSED OFFLINE VALIDATION
+
+From /home/runner/work/meridian/meridian:
+  node --test test/paper-capital-challenge-account.test.js \
+              test/paper-capital-challenge-guard.test.js
+
+Tests are explicitly synthetic, exercise actual modeled BUY/HOLD/SELL account
+changes, fractional-cent rounding, accrued/exit cost double-count prevention,
+open high-water loss/pause/partial exit, input immutability, deterministic
+JSON replay, duplicate/chronological/currency admission, and the real guard.
+Hosted CI owns the broader regression. No new live tests or acquisition occur.
