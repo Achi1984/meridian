@@ -17,28 +17,42 @@ response-receipt time, not an asserted exchange timestamp. The account schema
 only accepts `OFFLINE_CALLER_ASSERTION`, which is not provider authentication
 or independent quote verification.
 
-Example composition with the #1317 runner and store; the caller supplies its
-own deterministic, stateless decision function:
+Illustrative host scheduling handoff with the #1317 runner and store. The host
+must schedule one sample per minute and persist each observation immediately;
+it must stop on any adapter/runner error. This is not a deployment recipe or
+evidence of a live request:
 
 ```js
 const feed = createKrakenUsdPublicFeed();
-const observations = [];
-for (let index = 0; index < count; index++) {
-  observations.push(await feed.fetchObservation());
+for (;;) {
+  const scheduledAt = Date.now();
+  const observation = await feed.fetchObservation();
+  const result = await runUsdOfflineStream({
+    store, observations: [observation], decide
+  });
+  await retainRestartTipIndependently(result.tip);
+  await sleep(Math.max(0, 60_000 - (Date.now() - scheduledAt)));
 }
-const result = await runUsdOfflineStream({ store, observations, decide });
 ```
 
 The adapter admits only closed one-minute bars, preserves ticker decimal
 strings, rejects wrong pair keys, stale/future timing, and malformed responses,
-and bounds each response to 64 KiB, total received bytes to 512 KiB, requests to
-512, observations to 256, each request to at most 5 seconds, and sampling to
-one observation per minute. Its maximum elapsed span is 24 hours, matching the
-account/store ceiling; 256 observations at the minimum interval cover only
-about 4 hours 16 minutes. These ceilings do not establish 24-hour minute-feed
-readiness. Counters are per adapter instance; recreating it is not permission to
-extend a campaign or reset account/store limits. No continuation beyond those
-limits is implemented.
+and bounds each response to 128 KiB, cumulative raw HTTP response bytes to
+32 MiB per adapter instance, requests to 512, observations to 256, each request
+to at most 5 seconds, and sampling to one observation per minute. The
+deterministic 720-row OHLC fixture is 82,854 JSON bytes: it fits the individual
+response limit, while 256 such OHLC responses would total 21,210,624 bytes
+before ticker bodies. That fixture is synthetic and does not establish typical
+provider history size or availability.
+
+Feed transport budgets are distinct from persisted account limits. The
+unchanged account/store remains bounded to 256 events, 512 KiB of canonical
+checkpoint bytes, and a 24-hour maximum span. The adapter's 32 MiB raw-response
+budget does not enlarge the journal byte bound. The 256-event cap sampled once
+per minute covers only about 4 hours 16 minutes, not 24-hour minute-feed
+readiness. Both components fail closed at their own limits; recreating an
+adapter is not permission to extend a campaign, reset a store, or continue
+past either bound.
 
 Tests use clearly synthetic provider-shaped responses only. No live request,
 authentication, private endpoint, order method, deployment, or market-data

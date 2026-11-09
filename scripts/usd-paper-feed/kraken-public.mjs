@@ -10,8 +10,8 @@ const SOURCE_ID = "kraken-public-btc-usd";
 const QUOTE_MAX_AGE_MS = POLICY.maxValuationAgeMs;
 const MAX_EVENTS = POLICY.maxJournalObservations;
 const MAX_REQUESTS = MAX_EVENTS * 2;
-const MAX_RESPONSE_BYTES = 64 * 1024;
-const MAX_TOTAL_BYTES = 512 * 1024;
+const MAX_RESPONSE_BYTES = 128 * 1024;
+const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
 const MAX_SPAN_MS = 24 * 60 * 60 * 1000;
 const MAX_CLOSED_MINUTE_AGE_MS = 120_000;
 const MIN_SAMPLE_INTERVAL_MS = 60_000;
@@ -183,11 +183,16 @@ export function createKrakenUsdPublicFeed({
 
   const counters = { requests: 0, bytes: 0, events: 0 };
   let firstObservedAtMs = null;
-  let previousObservedAtMs = null;
+  let lastAttemptAtMs = null;
   let previousQuoteAtMs = null;
+  let inFlight = false;
+  let terminalError = null;
 
   async function get(endpoint, params, runtime = {}) {
     if (counters.requests >= MAX_REQUESTS) throw new Error("REQUEST_BUDGET_EXHAUSTED");
+    if (counters.bytes + MAX_RESPONSE_BYTES > MAX_TOTAL_BYTES) {
+      throw new Error("RUN_BYTE_BUDGET_EXHAUSTED");
+    }
     const clock = runtime.monotonicNow ?? monotonicNow;
     const startedMono = clock();
     if (!Number.isFinite(startedMono) || startedMono < 0) throw new Error("INVALID_MONOTONIC_CLOCK");
@@ -303,58 +308,82 @@ export function createKrakenUsdPublicFeed({
   }
 
   async function fetchObservation(runtime = {}) {
-    if (counters.events >= MAX_EVENTS) throw new Error("EVENT_LIMIT_REACHED");
-    const startedAt = safeTime(now(), "CLOCK");
-    if (previousObservedAtMs !== null) {
-      if (startedAt < previousObservedAtMs) throw new Error("CLOCK_MOVED_BACKWARDS");
-      if (startedAt - previousObservedAtMs < MIN_SAMPLE_INTERVAL_MS) {
-        throw new Error("SAMPLE_INTERVAL_TOO_SHORT");
+    if (inFlight) throw new Error("SAMPLE_ALREADY_IN_FLIGHT");
+    inFlight = true;
+    let attemptStarted = false;
+    try {
+      if (terminalError) throw new Error("FEED_TERMINAL_FAILURE", { cause: terminalError });
+      const startedAt = safeTime(now(), "CLOCK");
+      if (lastAttemptAtMs !== null) {
+        if (startedAt < lastAttemptAtMs) throw new Error("CLOCK_MOVED_BACKWARDS");
+        if (startedAt - lastAttemptAtMs < MIN_SAMPLE_INTERVAL_MS) {
+          throw new Error("SAMPLE_INTERVAL_TOO_SHORT");
+        }
       }
-    }
+      if (counters.events >= MAX_EVENTS) throw new Error("EVENT_LIMIT_REACHED");
+      if (MAX_REQUESTS - counters.requests < 2) throw new Error("REQUEST_BUDGET_EXHAUSTED");
+      if (counters.bytes + 2 * MAX_RESPONSE_BYTES > MAX_TOTAL_BYTES) {
+        throw new Error("RUN_BYTE_BUDGET_EXHAUSTED");
+      }
+      if (firstObservedAtMs !== null && startedAt - firstObservedAtMs > MAX_SPAN_MS) {
+        throw new Error("OBSERVATION_WINDOW_LIMIT_REACHED");
+      }
 
-    const ticker = await get("Ticker", { pair: KRAKEN_PAIR }, runtime);
-    const ohlc = await get("OHLC", { pair: KRAKEN_PAIR, interval: "1" }, runtime);
-    const observedAtMs = safeTime(now(), "OBSERVATION_TIME");
-    if (observedAtMs < ticker.receivedAt || observedAtMs < ohlc.receivedAt) {
-      throw new Error("CLOCK_MOVED_BACKWARDS");
+      lastAttemptAtMs = startedAt;
+      attemptStarted = true;
+      const ticker = await get("Ticker", { pair: KRAKEN_PAIR }, runtime);
+      const ohlc = await get("OHLC", { pair: KRAKEN_PAIR, interval: "1" }, runtime);
+      const observedAtMs = safeTime(now(), "OBSERVATION_TIME");
+      if (observedAtMs < ticker.receivedAt || observedAtMs < ohlc.receivedAt) {
+        throw new Error("CLOCK_MOVED_BACKWARDS");
+      }
+      if (firstObservedAtMs !== null && observedAtMs - firstObservedAtMs > MAX_SPAN_MS) {
+        throw new Error("OBSERVATION_WINDOW_LIMIT_REACHED");
+      }
+      const latestClosedMinuteAtMs = parseClosedMinute(ohlc.data, ohlc.receivedAt);
+      const prices = parseTicker(ticker.data);
+      if (previousQuoteAtMs !== null && ticker.receivedAt < previousQuoteAtMs) {
+        throw new Error("QUOTE_OUT_OF_ORDER");
+      }
+      const quote = {
+        schemaVersion: "NATIVE_BTC_USD_QUOTE_V1",
+        id: `kraken-usd-${ticker.receivedAt}-${ticker.sha256.slice(0, 16)}`,
+        marketPair: PAIR,
+        baseCurrency: "BTC",
+        quoteCurrency: "USD",
+        sourceId: SOURCE_ID,
+        nativeInstrument: PAIR,
+        evidenceKind: "OFFLINE_CALLER_ASSERTION",
+        bid: prices.bid,
+        ask: prices.ask,
+        quotedAtMs: ticker.receivedAt,
+        receivedAtMs: ticker.receivedAt,
+        maxAgeMs: QUOTE_MAX_AGE_MS
+      };
+      validateUsdQuote(quote, observedAtMs);
+      if (observedAtMs - latestClosedMinuteAtMs - 60_000 > MAX_CLOSED_MINUTE_AGE_MS) {
+        throw new Error("STALE_CLOSED_MINUTE");
+      }
+      const observation = Object.freeze({
+        id: quote.id,
+        observedAtMs,
+        quote: Object.freeze(quote)
+      });
+      if (firstObservedAtMs === null) firstObservedAtMs = observedAtMs;
+      previousQuoteAtMs = ticker.receivedAt;
+      counters.events++;
+      return observation;
+    } catch (error) {
+      const exhausted = ["EVENT_LIMIT_REACHED", "REQUEST_BUDGET_EXHAUSTED",
+        "RUN_BYTE_BUDGET_EXHAUSTED", "OBSERVATION_WINDOW_LIMIT_REACHED"]
+        .includes(error.message);
+      if (attemptStarted || exhausted) {
+        terminalError = error;
+      }
+      throw error;
+    } finally {
+      inFlight = false;
     }
-    if (firstObservedAtMs !== null && observedAtMs - firstObservedAtMs > MAX_SPAN_MS) {
-      throw new Error("OBSERVATION_WINDOW_LIMIT_REACHED");
-    }
-    const latestClosedMinuteAtMs = parseClosedMinute(ohlc.data, ohlc.receivedAt);
-    const prices = parseTicker(ticker.data);
-    if (previousQuoteAtMs !== null && ticker.receivedAt < previousQuoteAtMs) {
-      throw new Error("QUOTE_OUT_OF_ORDER");
-    }
-    const quote = {
-      schemaVersion: "NATIVE_BTC_USD_QUOTE_V1",
-      id: `kraken-usd-${ticker.receivedAt}-${ticker.sha256.slice(0, 16)}`,
-      marketPair: PAIR,
-      baseCurrency: "BTC",
-      quoteCurrency: "USD",
-      sourceId: SOURCE_ID,
-      nativeInstrument: PAIR,
-      evidenceKind: "OFFLINE_CALLER_ASSERTION",
-      bid: prices.bid,
-      ask: prices.ask,
-      quotedAtMs: ticker.receivedAt,
-      receivedAtMs: ticker.receivedAt,
-      maxAgeMs: QUOTE_MAX_AGE_MS
-    };
-    validateUsdQuote(quote, observedAtMs);
-    if (observedAtMs - latestClosedMinuteAtMs - 60_000 > MAX_CLOSED_MINUTE_AGE_MS) {
-      throw new Error("STALE_CLOSED_MINUTE");
-    }
-    const observation = Object.freeze({
-      id: quote.id,
-      observedAtMs,
-      quote: Object.freeze(quote)
-    });
-    if (firstObservedAtMs === null) firstObservedAtMs = observedAtMs;
-    previousObservedAtMs = observedAtMs;
-    previousQuoteAtMs = ticker.receivedAt;
-    counters.events++;
-    return observation;
   }
 
   return Object.freeze({

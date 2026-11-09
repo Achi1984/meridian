@@ -50,14 +50,23 @@ function ohlcAt(timestampMs) {
   return { error: [], result: { XXBTZUSD: rows, last: minute } };
 }
 
+function longOhlcAt(timestampMs) {
+  const lastClosedMinute = Math.floor((timestampMs - 60_000) / 60_000) * 60;
+  const firstMinute = lastClosedMinute - 719 * 60;
+  const rows = Array.from({ length: 720 }, (_, index) =>
+    [firstMinute + index * 60, "42000.12345678", "44000.12345678",
+      "41000.12345678", "43000.12345678", "43000.12345678", "1.23456789", 123]);
+  return { error: [], result: { XXBTZUSD: rows, last: lastClosedMinute } };
+}
+
 function jsonResponse(value) {
   return new Response(JSON.stringify(value), {
     headers: { "content-type": "application/json" }
   });
 }
 
-function paddedResponse(value) {
-  return new Response(`${JSON.stringify(value)}${" ".repeat(60_000)}`, {
+function paddedResponse(value, padding = 120_000) {
+  return new Response(`${JSON.stringify(value)}${" ".repeat(padding)}`, {
     headers: { "content-type": "application/json" }
   });
 }
@@ -145,6 +154,22 @@ test("valid provider-shaped quote replays through the actual USD account and val
   assert.equal(replay.entries[0].observation.valuation.currency, "USD");
   assert.equal(replay.entries[0].observation.netEquityCents, POLICY.initialCapitalCents);
   assert.equal(replay.authorization.executionAuthorized, false);
+});
+
+test("720-row synthetic history fixture fits the bounded response size and admits a quote", async () => {
+  const history = longOhlcAt(RECEIVED_AT);
+  const rawBytes = Buffer.byteLength(JSON.stringify(history));
+  assert.equal(rawBytes, 82_854);
+  assert.ok(rawBytes < USD_PAPER_FEED_LIMITS.maxResponseBytes);
+  const provider = createKrakenUsdPublicFeed({
+    now: () => RECEIVED_AT,
+    monotonicNow: () => 1,
+    fetchImpl: async url => url.pathname.endsWith("/Ticker") ?
+      jsonResponse(ticker()) : jsonResponse(history)
+  });
+  const sample = await provider.fetchObservation();
+  assert.equal(sample.quote.marketPair, "BTC/USD");
+  assert.equal(provider.counters().bytes, rawBytes + Buffer.byteLength(JSON.stringify(ticker())));
 });
 
 test("wrong provider pair identities are rejected for ticker and OHLC", async () => {
@@ -246,60 +271,144 @@ test("requests time out and parent abort is propagated", async () => {
   await assert.rejects(pending, /REQUEST_ABORTED/);
 });
 
-test("request count, event count, bytes and span stay within the USD lane limits", async () => {
-  assert.equal(USD_PAPER_FEED_LIMITS.maxEvents, 256);
-  assert.equal(USD_PAPER_FEED_LIMITS.maxRequests, 512);
-  assert.equal(USD_PAPER_FEED_LIMITS.maxBytes, 512 * 1024);
-  assert.equal(USD_PAPER_FEED_LIMITS.maxSpanMs, 24 * 60 * 60 * 1000);
-  const limited = createKrakenUsdPublicFeed({
+test("single-flight guard rejects concurrent calls, including a transport that ignores abort", async () => {
+  let fetches = 0;
+  let started;
+  const requestStarted = new Promise(resolve => { started = resolve; });
+  const provider = createKrakenUsdPublicFeed({
     now: () => RECEIVED_AT,
     monotonicNow: () => 1,
-    fetchImpl: async () => { throw new Error("FIXTURE_TRANSPORT_ERROR"); },
-    requestTimeoutMs: 1_000
+    requestTimeoutMs: 10,
+    fetchImpl: async () => {
+      fetches++;
+      started();
+      return new Promise(() => {});
+    }
   });
-  for (let request = 0; request < USD_PAPER_FEED_LIMITS.maxRequests; request++) {
-    await assert.rejects(limited.fetchObservation(), /FIXTURE_TRANSPORT_ERROR/);
-  }
-  await assert.rejects(limited.fetchObservation(), /REQUEST_BUDGET_EXHAUSTED/);
-  assert.equal(limited.counters().requests, USD_PAPER_FEED_LIMITS.maxRequests);
-  assert.ok(limited.counters().bytes <= USD_PAPER_FEED_LIMITS.maxBytes);
+  const first = provider.fetchObservation();
+  await requestStarted;
+  await assert.rejects(provider.fetchObservation(), /SAMPLE_ALREADY_IN_FLIGHT/);
+  assert.equal(fetches, 1);
+  await assert.rejects(first, /REQUEST_TIMEOUT/);
+  await assert.rejects(provider.fetchObservation(), /FEED_TERMINAL_FAILURE/);
+  assert.equal(fetches, 1);
+});
+
+test("attempt cadence and terminal failures stop rapid repeated transport attempts", async () => {
+  let now = RECEIVED_AT;
+  let fetches = 0;
+  const failed = createKrakenUsdPublicFeed({
+    now: () => now,
+    monotonicNow: () => 1,
+    fetchImpl: async () => {
+      fetches++;
+      throw new Error("FIXTURE_TRANSPORT_ERROR");
+    }
+  });
+  await assert.rejects(failed.fetchObservation(), /FIXTURE_TRANSPORT_ERROR/);
+  now += 1;
+  await assert.rejects(failed.fetchObservation(), /FEED_TERMINAL_FAILURE/);
+  assert.equal(fetches, 1);
+
+  let goodFetches = 0;
+  const sampled = createKrakenUsdPublicFeed({
+    now: () => now,
+    monotonicNow: () => 1,
+    fetchImpl: async url => {
+      goodFetches++;
+      return url.pathname.endsWith("/Ticker") ? jsonResponse(ticker()) :
+        jsonResponse(ohlcAt(now));
+    }
+  });
+  await sampled.fetchObservation();
+  await assert.rejects(sampled.fetchObservation(), /SAMPLE_INTERVAL_TOO_SHORT/);
+  assert.equal(goodFetches, 2);
+});
+
+test("event, span and response-byte ceilings are preflighted or latched before another request", async () => {
+  assert.equal(USD_PAPER_FEED_LIMITS.maxEvents, 256);
+  assert.equal(USD_PAPER_FEED_LIMITS.maxRequests, 512);
+  assert.equal(USD_PAPER_FEED_LIMITS.maxBytes, 32 * 1024 * 1024);
+  assert.equal(USD_PAPER_FEED_LIMITS.maxSpanMs, 24 * 60 * 60 * 1000);
 
   let current = RECEIVED_AT;
+  let eventFetches = 0;
   const bounded = createKrakenUsdPublicFeed({
     now: () => current,
     monotonicNow: () => 1,
-    fetchImpl: async url => url.pathname.endsWith("/Ticker") ?
-      jsonResponse(ticker()) : jsonResponse(ohlcAt(current))
+    fetchImpl: async url => {
+      eventFetches++;
+      return url.pathname.endsWith("/Ticker") ?
+        jsonResponse(ticker()) : jsonResponse(ohlcAt(current));
+    }
   });
   for (let event = 0; event < USD_PAPER_FEED_LIMITS.maxEvents; event++) {
     await bounded.fetchObservation();
     current += USD_PAPER_FEED_LIMITS.minSampleIntervalMs;
   }
   await assert.rejects(bounded.fetchObservation(), /EVENT_LIMIT_REACHED/);
+  await assert.rejects(bounded.fetchObservation(), /FEED_TERMINAL_FAILURE/);
+  assert.equal(eventFetches, USD_PAPER_FEED_LIMITS.maxRequests);
   assert.equal(bounded.counters().events, USD_PAPER_FEED_LIMITS.maxEvents);
   assert.equal(bounded.counters().requests, USD_PAPER_FEED_LIMITS.maxRequests);
 
   current = RECEIVED_AT;
+  let spanFetches = 0;
   const spanBounded = createKrakenUsdPublicFeed({
     now: () => current,
     monotonicNow: () => 1,
-    fetchImpl: async url => url.pathname.endsWith("/Ticker") ?
-      jsonResponse(ticker()) : jsonResponse(ohlcAt(current))
+    fetchImpl: async url => {
+      spanFetches++;
+      return url.pathname.endsWith("/Ticker") ?
+        jsonResponse(ticker()) : jsonResponse(ohlcAt(current));
+    }
   });
   await spanBounded.fetchObservation();
+  const spanFetchesBeforeExpiry = spanFetches;
   current += USD_PAPER_FEED_LIMITS.maxSpanMs + 1;
   await assert.rejects(spanBounded.fetchObservation(), /OBSERVATION_WINDOW_LIMIT_REACHED/);
+  await assert.rejects(spanBounded.fetchObservation(), /FEED_TERMINAL_FAILURE/);
+  assert.equal(spanFetches, spanFetchesBeforeExpiry);
 
   current = RECEIVED_AT;
+  let oversizedFetches = 0;
   const byteBounded = createKrakenUsdPublicFeed({
     now: () => current,
     monotonicNow: () => 1,
-    fetchImpl: async url => url.pathname.endsWith("/Ticker") ?
-      paddedResponse(ticker()) : paddedResponse(ohlcAt(current))
+    fetchImpl: async url => {
+      oversizedFetches++;
+      return url.pathname.endsWith("/Ticker") ?
+        jsonResponse(ticker()) : paddedResponse(ohlcAt(current), 140_000);
+    }
   });
-  for (let event = 0; event < 4; event++) {
-    await byteBounded.fetchObservation();
-    current += USD_PAPER_FEED_LIMITS.minSampleIntervalMs;
+  await assert.rejects(byteBounded.fetchObservation(), /RESPONSE_BYTE_LIMIT/);
+  await assert.rejects(byteBounded.fetchObservation(), /FEED_TERMINAL_FAILURE/);
+  assert.equal(oversizedFetches, 2);
+  assert.equal(byteBounded.counters().requests, 2);
+
+  current = RECEIVED_AT;
+  let cumulativeFetches = 0;
+  const cumulativeBounded = createKrakenUsdPublicFeed({
+    now: () => current,
+    monotonicNow: () => 1,
+    fetchImpl: async url => {
+      cumulativeFetches++;
+      return url.pathname.endsWith("/Ticker") ?
+        paddedResponse(ticker()) : paddedResponse(ohlcAt(current));
+    }
+  });
+  for (;;) {
+    try {
+      await cumulativeBounded.fetchObservation();
+      current += USD_PAPER_FEED_LIMITS.minSampleIntervalMs;
+    } catch (error) {
+      assert.match(error.message, /RUN_BYTE_BUDGET_EXHAUSTED/);
+      break;
+    }
   }
-  await assert.rejects(byteBounded.fetchObservation(), /RUN_BYTE_LIMIT/);
+  const fetchesAtExhaustion = cumulativeFetches;
+  await assert.rejects(cumulativeBounded.fetchObservation(), /FEED_TERMINAL_FAILURE/);
+  assert.equal(cumulativeFetches, fetchesAtExhaustion);
+  assert.ok(cumulativeBounded.counters().bytes + 2 * USD_PAPER_FEED_LIMITS.maxResponseBytes >
+    USD_PAPER_FEED_LIMITS.maxBytes);
 });
