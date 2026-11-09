@@ -1,14 +1,20 @@
-import {createHash} from 'node:crypto';
 import {isValidSpotPaperPairedExpectedIdentity} from './scripts/spot-paper-paired-report/evaluate.mjs';
 import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
 } from './scripts/spot-paper-paired-report/contract.mjs';
+import {
+  canonicalSpotPaperPairedReportJson,
+  SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+  SPOT_PAPER_PAIRED_REPORT_MAX_BYTES,
+  spotPaperPairedReportDigest
+} from './scripts/spot-paper-paired-report/envelope.mjs';
 
 export const SPOT_PAPER_PAIRED_REPORT_PATH = '/api/private/spot-paper-paired-report';
-export const SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA =
-  'SPOT_PAPER_PAIRED_REPORT_ENVELOPE_V1';
-export const SPOT_PAPER_PAIRED_REPORT_MAX_BYTES = 256 * 1024;
+export {
+  SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+  SPOT_PAPER_PAIRED_REPORT_MAX_BYTES
+};
 
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_ACTIVE_REQUESTS = 2;
@@ -16,26 +22,6 @@ const UNSUPPORTED_MODEL_IDS = new Set([
   'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1'
 ]);
 let activeRequests = 0;
-
-function canonicalJson(value) {
-  if (value === null || typeof value === 'boolean' || typeof value === 'string') {
-    return JSON.stringify(value);
-  }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value) || Number.isInteger(value) && !Number.isSafeInteger(value)) {
-      throw new TypeError('invalid_json_number');
-    }
-    return JSON.stringify(Object.is(value, -0) ? 0 : value);
-  }
-  if (Array.isArray(value)) return `[${value.map(canonicalJson).join(',')}]`;
-  if (!value || typeof value !== 'object') throw new TypeError('invalid_json_value');
-  return `{${Object.keys(value).sort()
-    .map(key => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
-}
-
-function digest(value) {
-  return createHash('sha256').update(value).digest('hex');
-}
 
 function exactKeys(value, keys) {
   return !!value && typeof value === 'object' && !Array.isArray(value) &&
@@ -125,9 +111,7 @@ function decodeRow(row, config) {
   let envelope;
   try {
     envelope = typeof row.envelope === 'string' ? JSON.parse(row.envelope) : row.envelope;
-    const canonical = canonicalJson(envelope);
-    if (Buffer.byteLength(canonical, 'utf8') > SPOT_PAPER_PAIRED_REPORT_MAX_BYTES ||
-        digest(Buffer.from(canonical, 'utf8')) !== row.content_sha256) {
+    if (spotPaperPairedReportDigest(envelope) !== row.content_sha256) {
       return response(503, {error: 'spot_paper_paired_report_corrupt'});
     }
   } catch {
@@ -141,7 +125,8 @@ function decodeRow(row, config) {
   const report = projectSpotPaperPairedDashboard(envelope.report);
   if (!report) return response(422, {error: 'spot_paper_paired_report_invalid'});
   if (envelope.runId !== config.expectedRunId ||
-      canonicalJson(report.identity) !== canonicalJson(publicIdentity(config.expectedIdentity))) {
+      canonicalSpotPaperPairedReportJson(report.identity) !==
+        canonicalSpotPaperPairedReportJson(publicIdentity(config.expectedIdentity))) {
     return response(409, {error: 'spot_paper_paired_identity_mismatch'});
   }
   return response(200, {

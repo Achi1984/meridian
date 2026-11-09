@@ -63,18 +63,30 @@ The source pipeline is:
    `node scripts/spot-paper-paired-report/cli.mjs "$WORK_DIR/expected-identity.json" "$WORK_DIR/host-export.json" > "$WORK_DIR/paired-dashboard.json"`.
    This invokes `evaluatePairedPaperEvidence` and emits only the sanitized
    dashboard DTO; the host export and journal are not browser inputs.
-3. The sanitized DTO is the only supported value for a paired report row in
-   `meridian_spot_paper_paired_reports`. After the operator-reviewed migration
-   is applied, the authenticated GET reads the row through the existing
-   bounded private-report store and revalidates its digest and configured
-   identity before returning it.
+3. Validate the sanitized DTO and its identity using the bounded ingestion
+   command. It defaults to a no-write dry run and can be run without database
+   credentials:
+   `node scripts/spot-paper-paired-report/ingest.mjs "$WORK_DIR/expected-identity.json" "$WORK_DIR/paired-dashboard.json"`.
+   Only after an explicit operator decision, the reviewed database migration,
+   and expected server identity configuration are in place, the operator may
+   opt in to one immutable insert:
+   `node scripts/spot-paper-paired-report/ingest.mjs "$WORK_DIR/expected-identity.json" "$WORK_DIR/paired-dashboard.json" --write`.
+   The command uses `DATABASE_URL` and the existing
+   `MERIDIAN_PAPER_REPORT_DATABASE_CA` TLS configuration from the environment;
+   it does not accept credentials as arguments or print database errors that
+   could contain them. Identical run/digest rows are idempotent, different
+   content for an existing run is rejected, and an uncertain write outcome is
+   reported without an automatic retry. The authenticated GET then reads the
+   row through the existing bounded private-report store and revalidates its
+   digest and configured identity before returning it.
 
 The route is read-only: it adds no upload endpoint, token, automatic publisher,
-or production publication. Provisioning is not complete in this change: no
-production expected-identity configuration, paired database row, or approved
-sanitized-DTO ingestion procedure is supplied. Therefore the production UI
-must continue to say “not provisioned” or “not published”; it may not infer
-that a historic run does not exist. The route requires an applied
+or production publication. The ingestion command is operator-invoked code
+preparation only; this change does not connect to a database, apply migrations,
+or publish a report. Provisioning is not complete: no production
+expected-identity configuration or paired database row is supplied. Therefore
+the production UI must continue to say “not provisioned” or “not published”;
+it may not infer that a historic run does not exist. The route requires an applied
 `migrations/20261109_meridian_spot_paper_paired_reports.sql` migration and
 server-side `MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED=true`,
 `MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED=true`, and
