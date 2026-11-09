@@ -331,6 +331,54 @@ test("pre-publication failure keeps the old checkpoint and requires explicit reo
   await reopened.session.close();
 });
 
+test("checkpoint abort cleanup preserves NOT_COMMITTED and UNKNOWN claim semantics", async t => {
+  const cleanDirectory = await tempDirectory(t);
+  let injectCleanFailure = false;
+  const cleanStore = await CheckpointStore.open(cleanDirectory, {
+    onPhase(phase) {
+      if (injectCleanFailure && phase === "after-pending") {
+        throw new Error("injected boundary failure before temp creation");
+      }
+    }
+  });
+  injectCleanFailure = true;
+  const candidateBytes = canonicalCheckpointBytes({
+    sequence: 0,
+    records: [{predecessorHash: null}]
+  });
+  const notCommitted = await cleanStore.commitCheckpoint({
+    expectedSequence: -1,
+    expectedHash: null,
+    candidateBytes
+  });
+  assert.equal(notCommitted.status, "NOT_COMMITTED");
+  assert.equal((await cleanStore.readCheckpoint()).status, "ABSENT");
+  assert.equal((await cleanStore.reconcilePending()).status, "ABSENT");
+  await assert.rejects(CheckpointStore.open(cleanDirectory), {code: "CHECKPOINT_BUSY"});
+  await cleanStore.close();
+
+  const uncertainDirectory = await tempDirectory(t);
+  let injectUncertainFailure = false;
+  const uncertainStore = await CheckpointStore.open(uncertainDirectory, {
+    onPhase(phase) {
+      if (injectUncertainFailure && phase === "after-rename") {
+        throw new Error("injected post-rename boundary failure");
+      }
+    }
+  });
+  injectUncertainFailure = true;
+  const unknown = await uncertainStore.commitCheckpoint({
+    expectedSequence: -1,
+    expectedHash: null,
+    candidateBytes
+  });
+  assert.equal(unknown.status, "UNKNOWN");
+  assert.equal((await uncertainStore.readCheckpoint()).status, "UNKNOWN");
+  assert.equal((await uncertainStore.reconcilePending()).status, "UNKNOWN");
+  await assert.rejects(CheckpointStore.open(uncertainDirectory), {code: "CHECKPOINT_BUSY"});
+  await uncertainStore.close();
+});
+
 test("checkpoint rejects corrupt and oversized bytes", async t => {
   const corruptDirectory = await tempDirectory(t);
   const created = await openSession(corruptDirectory);
