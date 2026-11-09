@@ -290,7 +290,9 @@ function cleanDecision(result) {
 }
 
 export function replaySpotPaperFeeScenarioObservations(observations, {
-  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide
+  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide,
+  strategyAdapters,
+  modelIds
 } = {}) {
   assert(SPOT_PAPER_PAIRED_FEE_RATES_BPS.includes(feeBpsPerSide),
     "UNSUPPORTED_FEE_SCENARIO");
@@ -306,10 +308,40 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
   assert(Buffer.byteLength(serialized, "utf8") <= MAX_EVIDENCE_BYTES,
     "EVIDENCE_BYTE_LIMIT");
 
+  const defaultAdapters = {
+    baseline: {
+      modelId: SPOT_PAPER_PILOT_VERSION,
+      createState: createStrategyState,
+      advance: (state, candles) => advanceStrategy(state, candles),
+      recordSell: state => state
+    },
+    challenger: {
+      modelId: SPOT_PAPER_PAIRED.challengerModel,
+      createState: createEntryConfirmationState,
+      advance: advanceEntryConfirmation,
+      recordSell: recordEntryConfirmationSell
+    }
+  };
+  const adapters = strategyAdapters ?? defaultAdapters;
+  const selectedModelIds = modelIds ?? {
+    baseline: defaultAdapters.baseline.modelId,
+    challenger: defaultAdapters.challenger.modelId,
+    cash: SPOT_PAPER_PAIRED.controlModel
+  };
+  const customStrategies = strategyAdapters !== undefined || modelIds !== undefined;
+  assert(["baseline", "challenger"].every(role =>
+    typeof adapters[role]?.modelId === "string" &&
+    adapters[role].modelId === selectedModelIds[role] &&
+    typeof adapters[role].createState === "function" &&
+    typeof adapters[role].advance === "function" &&
+    typeof adapters[role].recordSell === "function") &&
+    selectedModelIds.cash === SPOT_PAPER_PAIRED.controlModel,
+  "INVALID_REPLAY_STRATEGY_BINDING");
+
   const states = [
-    { strategy: createStrategyState(), ledger: createScenarioLedger(),
+    { strategy: adapters.baseline.createState(), ledger: createScenarioLedger(),
       valuationLedger: createScenarioLedger(), stopped: false },
-    { strategy: createEntryConfirmationState(), ledger: createScenarioLedger(),
+    { strategy: adapters.challenger.createState(), ledger: createScenarioLedger(),
       valuationLedger: createScenarioLedger(), stopped: false },
     { cashCents: CASH_CENTS, fills: [] }
   ];
@@ -396,27 +428,28 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
           state: null, decision: null, decidedAt: armDecisionAt,
           metadata: { control: "NO_TRADE" }
         };
-      } else if (role === "baseline") {
-        const advanced = advanceStrategy(before.strategy, parsed.candles);
-        decision = {
-          state: { ...before, strategy: advanced.state },
-          decision: advanced.signals.at(-1) ?? null,
-          decidedAt: armDecisionAt,
-          metadata: { newCandleCount: advanced.newCandleCount,
-            missedDecisionWindow: Boolean(advanced.missedDecisionWindow) }
-        };
       } else {
-        const advanced = advanceEntryConfirmation(before.strategy, parsed.candles, {
+        const advanced = adapters[role].advance(before.strategy, parsed.candles, {
           decisionAt: armDecisionAt,
           held: Boolean(before.ledger.position)
         });
+        const metadata = {
+          newCandleCount: advanced.newCandleCount,
+          missedDecisionWindow: Boolean(advanced.missedDecisionWindow),
+          ...(role === "challenger" && !customStrategies ?
+            {discarded: advanced.discarded ?? null} : {}),
+          ...(customStrategies && advanced.discarded ?
+            {discarded: advanced.discarded} : {}),
+          ...(customStrategies && advanced.blockedEntryReason ?
+            {blockedEntryReason: advanced.blockedEntryReason} : {}),
+          ...(customStrategies && advanced.trendFilter ?
+            {trendFilter: advanced.trendFilter} : {})
+        };
         decision = {
           state: { ...before, strategy: advanced.state },
           decision: advanced.signals.at(-1) ?? null,
           decidedAt: armDecisionAt,
-          metadata: { newCandleCount: advanced.newCandleCount,
-            missedDecisionWindow: Boolean(advanced.missedDecisionWindow),
-            discarded: advanced.discarded ?? null }
+          metadata
         };
       }
       assert(isRecord(decision) && Object.hasOwn(decision, "decision"),
@@ -432,7 +465,7 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
           signal: decision.decision, quote, nowMs: observation.effectAt,
           feeBpsPerSide
         });
-        const candidateFills = role === "challenger" ?
+        const candidateFills = role === "challenger" || customStrategies ?
           result.fills.map(fill => {
             const strategyReason = fill.side === "BUY" ?
               decision.decision?.strategyReason :
@@ -441,17 +474,17 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
                 decision.decision?.strategyReason;
             return {
               ...fill, ledgerReason: fill.reason,
-              strategyId: SPOT_PAPER_PAIRED.challengerModel,
+              strategyId: selectedModelIds[role],
               ...(strategyReason ? { reason: strategyReason, strategyReason } : {})
             };
           }) : result.fills;
-        if (role === "challenger" && candidateFills.length) {
+        if ((role === "challenger" || customStrategies) && candidateFills.length) {
           result.ledger.fills.splice(result.ledger.fills.length - candidateFills.length,
             candidateFills.length, ...candidateFills);
         }
-        const strategy = role === "challenger" &&
+        const strategy = (role === "challenger" || customStrategies) &&
           candidateFills.some(fill => fill.side === "SELL") ?
-          recordEntryConfirmationSell(decision.state.strategy, observation.effectAt) :
+          adapters[role].recordSell(decision.state.strategy, observation.effectAt) :
           decision.state.strategy;
         effect = {
           state: { ...before, strategy, ledger: result.ledger,
@@ -531,9 +564,7 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
     commonHorizonAt: observations.at(-1).effectAt,
     arms: roles.map((role, index) => ({
       role,
-      modelId: role === "baseline" ? SPOT_PAPER_PILOT_VERSION :
-        role === "challenger" ? SPOT_PAPER_PAIRED.challengerModel :
-          SPOT_PAPER_PAIRED.controlModel,
+      modelId: selectedModelIds[role],
       tradingStatus: states[index].stopped ? "STOPPED" : "ACTIVE",
       stopReason: states[index].stopReason ?? null,
       stoppedAt: states[index].stoppedAt ?? null,
@@ -556,10 +587,12 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
 }
 
 export function compareSpotPaperFeeScenarioObservations(observations, {
-  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide
+  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide,
+  strategyAdapters,
+  modelIds
 } = {}) {
   const replay = replaySpotPaperFeeScenarioObservations(observations, {
-    feeBpsPerSide
+    feeBpsPerSide, strategyAdapters, modelIds
   });
   return {
     schemaVersion: "SPOT_PAPER_SMA_COMPARISON_V1",

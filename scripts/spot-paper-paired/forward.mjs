@@ -35,6 +35,10 @@ export const SPOT_PAPER_PAIRED_PINNED_INTEGRATION =
 export const SPOT_PAPER_RESEARCH_COMPARISON_ID = "SPOT_PAPER_SMA_COMPARISON_V1";
 export const SPOT_PAPER_PAIRED_SOURCE_ID = "KRAKEN_PUBLIC_SPOT_XBTEUR";
 export const SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID = "SYNTHETIC_TEST_ONLY";
+export const SPOT_PAPER_PAIRED_TREND_MODEL =
+  "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1";
+export const SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR =
+  "BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1";
 export const SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256 =
   "4c60b1ccccbd495d93006a6838593423c27caac8104a0239fa23fd97a716f82d";
 export const SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT = Object.freeze({
@@ -212,11 +216,30 @@ function validateBindings(config, testOnly) {
   assert(providerCounters?.requests === 0 && providerCounters?.bytes === 0,
     "PROVIDER_ALREADY_USED");
   assert(Array.isArray(config.arms) && config.arms.length === 3, "THREE_ARMS_REQUIRED");
-  const expected = [
+  const nextRun = config.modelPair?.id === SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR;
+  assert(!config.modelPair || nextRun, "UNKNOWN_MODEL_PAIR");
+  if (nextRun) {
+    assert(config.accountContract.contractId ===
+      SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId &&
+      config.accountContract.feeBpsPerSide === 20 &&
+      config.accountContract.slippageBpsPerSide === 10,
+    "NEXT_RUN_ACCOUNT_CONTRACT_REQUIRED");
+  }
+  const expected = nextRun ? [
+    ["baseline", SPOT_PAPER_PAIRED.challengerModel],
+    ["challenger", SPOT_PAPER_PAIRED_TREND_MODEL],
+    ["cash", SPOT_PAPER_PAIRED.controlModel]
+  ] : [
     ["baseline", SPOT_PAPER_PAIRED.baselineModel],
     ["challenger", SPOT_PAPER_PAIRED.challengerModel],
     ["cash", SPOT_PAPER_PAIRED.controlModel]
   ];
+  if (nextRun) {
+    assert(Array.isArray(config.modelPair.models) &&
+      same(config.modelPair.models, expected.map(([role, modelId]) => ({
+        role, modelId
+      }))), "MODEL_PAIR_IDENTITY_MISMATCH");
+  }
   const accounts = new Set();
   for (let index = 0; index < expected.length; index++) {
     const [role, model] = expected[index];
@@ -227,6 +250,7 @@ function validateBindings(config, testOnly) {
       typeof arm.apply === "function" && typeof arm.summarize === "function" &&
       (config.accountContract.version !== 2 || role === "cash" ||
         arm.feeApply === config.feeScenarioApply) &&
+      (!nextRun || arm.strategyAdapter === config.strategyAdapters?.[role]) &&
       same(arm.accountContract, config.accountContract),
     `INVALID_${role.toUpperCase()}_BINDING`);
     assert(!accounts.has(arm.accountId), "CONFLICTING_ACCOUNTS");
@@ -240,15 +264,29 @@ function validateBindings(config, testOnly) {
     typeof config.comparisonEngine.compare === "function" &&
     comparisonBindingValid,
   "RESEARCH_COMPARISON_ENGINE_REQUIRED");
-  assert(config.challengerExports?.SPOT_PAPER_ENTRY_CONFIRMATION_ID ===
-    SPOT_PAPER_PAIRED.challengerModel &&
-    typeof config.challengerExports.createEntryConfirmationState === "function" &&
-    typeof config.challengerExports.advanceEntryConfirmation === "function" &&
-    typeof config.challengerExports.recordEntryConfirmationSell === "function",
-  "RESEARCH_CHALLENGER_EXPORTS_REQUIRED");
-  assert(config.arms[1].researchExports === config.challengerExports &&
-    config.arms[1].modelId === config.challengerExports.SPOT_PAPER_ENTRY_CONFIRMATION_ID,
-    "CHALLENGER_EXPORTS_NOT_BOUND");
+  if (nextRun) {
+    for (const role of ["baseline", "challenger"]) {
+      const adapter = config.strategyAdapters?.[role];
+      assert(adapter?.modelId === expected.find(item => item[0] === role)?.[1] &&
+        typeof adapter.createState === "function" &&
+        typeof adapter.advance === "function" &&
+        typeof adapter.recordSell === "function" &&
+        config.arms.find(arm => arm.role === role)?.researchExports === adapter.bridge,
+      `${role.toUpperCase()}_STRATEGY_ADAPTER_REQUIRED`);
+    }
+    assert(config.arms[1].modelId === SPOT_PAPER_PAIRED_TREND_MODEL,
+      "TREND_MODEL_ID_MISMATCH");
+  } else {
+    assert(config.challengerExports?.SPOT_PAPER_ENTRY_CONFIRMATION_ID ===
+      SPOT_PAPER_PAIRED.challengerModel &&
+      typeof config.challengerExports.createEntryConfirmationState === "function" &&
+      typeof config.challengerExports.advanceEntryConfirmation === "function" &&
+      typeof config.challengerExports.recordEntryConfirmationSell === "function",
+    "RESEARCH_CHALLENGER_EXPORTS_REQUIRED");
+    assert(config.arms[1].researchExports === config.challengerExports &&
+      config.arms[1].modelId === config.challengerExports.SPOT_PAPER_ENTRY_CONFIRMATION_ID,
+      "CHALLENGER_EXPORTS_NOT_BOUND");
+  }
   assert(config.configSha256 === pairedConfigDigest(config), "CONFIG_IDENTITY_MISMATCH");
 }
 
@@ -343,7 +381,8 @@ export function createBaselineArm(
 export function createChallengerArm(
   researchExports, accountId = "challenger",
   accountContract = SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
-  feeApply = applyPaperObservation
+  feeApply = applyPaperObservation,
+  { role = "challenger", modelId = researchExports?.SPOT_PAPER_ENTRY_CONFIRMATION_ID } = {}
 ) {
   if (researchExports?.SPOT_PAPER_ENTRY_CONFIRMATION_ID !==
       SPOT_PAPER_PAIRED.challengerModel ||
@@ -352,9 +391,15 @@ export function createChallengerArm(
       typeof researchExports.recordEntryConfirmationSell !== "function") {
     throw new Error("RESEARCH_CHALLENGER_EXPORTS_REQUIRED");
   }
+  assert((role === "challenger" &&
+      modelId === researchExports.SPOT_PAPER_ENTRY_CONFIRMATION_ID) ||
+    (role === "baseline" &&
+      modelId === SPOT_PAPER_PAIRED.challengerModel) ||
+    (role === "challenger" && modelId === SPOT_PAPER_PAIRED_TREND_MODEL),
+  "INVALID_STRATEGY_ARM_IDENTITY");
   return {
-    role: "challenger",
-    modelId: researchExports.SPOT_PAPER_ENTRY_CONFIRMATION_ID,
+    role,
+    modelId,
     accountId,
     accountContract,
     feeApply,
@@ -392,7 +437,7 @@ export function createChallengerArm(
           fill.reason === "SAMPLED_2PCT_BID_STOP" ?
             "BASELINE_SAMPLED_2PCT_BID_STOP" : decision?.strategyReason;
         return { ...fill, ledgerReason: fill.reason,
-          strategyId: SPOT_PAPER_PAIRED.challengerModel,
+          strategyId: modelId,
           ...(strategyReason ? { reason: strategyReason, strategyReason } : {}) };
       });
       if (candidateFills.length) {
