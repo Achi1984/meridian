@@ -18,7 +18,7 @@ test("paired image contains only the host runtime graph and stays inert by defau
     "scripts/spot-paper-research/entry-confirmation.mjs",
     "scripts/spot-paper-research/five-minute-trend.mjs"
   ]);
-  assert.match(dockerfile, /^FROM node:20-alpine$/m);
+  assert.match(dockerfile, /^FROM node:20-alpine@sha256:[a-f0-9]{64}$/m);
   assert.match(dockerfile, /^USER node$/m);
   assert.match(dockerfile, /^ENTRYPOINT \["node", "scripts\/spot-paper-paired\/host\.mjs"\]$/m);
   assert.match(dockerfile, /^CMD \["disabled"\]$/m);
