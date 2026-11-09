@@ -102,11 +102,18 @@ spot-specific fee assumptions into this integration.
    timestamped public data for all 12 native USDT perpetuals; frozen closed
    hourly signal bars; executable bid/ask (and preferably depth) for each
    simulated rebalance; funding settlements and current interval/contract
-   metadata; and a declared mark/valuation source. It must model both long and
-   short fills, partial/rejected/stale legs, bid/ask crossing, explicit adverse
-   slippage, funding cash flows, and exposure/margin treatment, with no network
-   order or account-mutation path. A funding-only archive and candle open do not
-   establish executable fills.
+   metadata; and a declared mark/valuation source. Before simulation, its
+   versioned account contract must specify a USDT paper-capital amount and how
+   that amount defines each target's notional; convert target weight to
+   contract quantity using the selected contract multiplier and exchange
+   quantity step; set rounding direction; and define price tick, minimum and
+   maximum quantity/notional handling. Report post-rounding gross/net exposure.
+   If any leg is not valid or the portfolio invariant is not met, fail the
+   rebalance closed rather than silently dropping a name, rescaling weights, or
+   forcing a fill. It must model both long and short fills, partial/rejected/
+   stale legs, bid/ask crossing, explicit adverse slippage, and funding cash
+   flows, with no network order or account-mutation path. A funding-only archive
+   and candle open do not establish executable fills.
 
 3. **Costs — M.** The frozen research engine uses 10 bps baseline and 20 bps
    stress **one-way per unit of turnover**. Those are historical model
@@ -116,7 +123,12 @@ spot-specific fee assumptions into this integration.
    separately and avoid charging spread/slippage twice. Do not copy the BTC/EUR
    20-bps spot fee or BTC/USD challenge assumptions as perpetual fees.
 
-4. **Durable account and deterministic replay — L.** Persist versioned campaign,
+4. **Durable account and deterministic replay — L.** Specify the selected
+   initial/maintenance-margin and leverage-tier assumptions, the mark-price
+   basis and liquidation trigger/price model, and how simulated liquidation
+   events and fees affect equity; source/version these assumptions and keep
+   account-tier uncertainty explicit. The V2 gross-weight constraint does not
+   itself define capital, margin, or liquidation behavior. Persist versioned campaign,
    strategy/config and source identities; ordered rebalance decisions; target
    weights; quote/mark and funding receipts; each simulated fill; cash and
    per-contract positions; fee/slippage/funding accruals; equity/margin
@@ -126,7 +138,10 @@ spot-specific fee assumptions into this integration.
    the complete journal and verify an expected tip retained independently of
    the journal, with atomic write/readback and an explicit recovery operator
    path. Existing spot/guard stores are design references only, not an account
-   implementation.
+   implementation. Focused integration tests must pin weight-to-notional/
+   quantity conversion, both-side step rounding, minimum-order rejection,
+   post-rounding exposure checks, margin/liquidation boundaries, funding and
+   fee booking exactly once, and crash/restart replay of those events.
 
 5. **Paper host/report and review — M/L.** Add only after the above contracts:
    isolated identity and disabled-by-default host wiring; append-only dated
