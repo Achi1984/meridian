@@ -386,8 +386,25 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
               stoppedAt: before.stoppedAt ?? null } }
         };
       }
+      const observedDecision = observation.decisions?.[index];
       let decision;
-      if (role === "cash") {
+      if (observedDecision && Object.hasOwn(observedDecision, "decision")) {
+        assert(observedDecision.role === role &&
+          observedDecision.decidedAt === armDecisionAt &&
+          Object.hasOwn(observedDecision, "decision") &&
+          (observedDecision.metadata === null ||
+            isRecord(observedDecision.metadata)),
+        "INVALID_RECORDED_DECISION");
+        decision = {
+          state: before,
+          decision: observedDecision.decision,
+          decidedAt: observedDecision.decidedAt,
+          ...(typeof observedDecision.skippedReason === "string" ?
+            { skippedReason: observedDecision.skippedReason } : {}),
+          ...(isRecord(observedDecision.metadata) ?
+            { metadata: observedDecision.metadata } : {})
+        };
+      } else if (role === "cash") {
         decision = {
           state: null, decision: null, decidedAt: armDecisionAt,
           metadata: { control: "NO_TRADE" }

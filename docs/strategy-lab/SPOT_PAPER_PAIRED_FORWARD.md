@@ -282,9 +282,12 @@ The replay refuses synthetic, incomplete, unverified, identity-mismatched, or
 changed evidence. It rechecks the read-only journal and each referenced response
 byte count and SHA-256, then rebuilds all three accounts, strategy decisions,
 position sizes, risk stops, fees, and terminal marks from the saved Kraken
-observations. The 50-bps replay must reconcile to the original report's
-decisions, fills, risk states, and accounting before alternative scenarios are
-returned. The original report is included unchanged; the output also preserves
+observations. The verified per-observation strategy decisions are held fixed as
+immutable inputs; account sizing, fee affordability, fills, and risk outcomes
+are recalculated for each fee scenario rather than treating fee savings as a
+refund. The 50-bps replay must reconcile to the original report's decisions,
+fills, risk states, and accounting before alternative scenarios are returned.
+The original report is included unchanged; the output also preserves
 its identity hashes and reports canonical report/export hashes plus the verified
 journal payload checksum. This tool performs no network, host, or evidence-file
 write and does not change the original report.
