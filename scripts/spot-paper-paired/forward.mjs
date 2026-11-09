@@ -46,7 +46,50 @@ export const SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT = Object.freeze({
   maxSessionLossCents: SPOT_PAPER_PAIRED.maxSessionLossCents
 });
 
+export const SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT = Object.freeze({
+  contractId: "BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2",
+  version: 2,
+  ...SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
+  feeBpsPerSide: 20,
+  feeBasis: "EEA_SPOT_ONLY_TAKER_ASSUMPTION",
+  feeSource: "https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea",
+  feeAsOf: "2026-11-09",
+  accountTier: "UNKNOWN",
+  accountingEngine: "PAIRED_FEE_SCENARIO_LEDGER_V1"
+});
+export const SPOT_PAPER_PAIRED_ACCOUNT_CONTRACTS = Object.freeze({
+  BTC_EUR_PAIRED_PAPER_V1: SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
+  [SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId]:
+    SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT
+});
+
+export function resolveSpotPaperPairedAccountContract(contractId) {
+  if (!Object.hasOwn(SPOT_PAPER_PAIRED_ACCOUNT_CONTRACTS, contractId)) {
+    throw new Error("UNKNOWN_ACCOUNT_CONTRACT");
+  }
+  const contract = SPOT_PAPER_PAIRED_ACCOUNT_CONTRACTS[contractId];
+  return contract;
+}
+
+function accountAssumptions(accountContract) {
+  return {
+    feeBpsPerSide: accountContract.feeBpsPerSide,
+    slippageBpsPerSide: accountContract.slippageBpsPerSide,
+    ratesVerified: false,
+    ...(accountContract.version ? {
+      accountContractId: accountContract.contractId,
+      accountContractVersion: accountContract.version,
+      feeBasis: accountContract.feeBasis,
+      feeSource: accountContract.feeSource,
+      feeAsOf: accountContract.feeAsOf,
+      accountTier: accountContract.accountTier,
+      accountingEngine: accountContract.accountingEngine
+    } : {})
+  };
+}
+
 export function pairedConfigDigest(config) {
+  const accountContract = config.accountContract ?? SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT;
   const identity = {
     pair: SPOT_PAPER_PAIRED.pair,
     feedSourceId: config.provider.sourceId,
@@ -54,7 +97,7 @@ export function pairedConfigDigest(config) {
     arms: config.arms.map(({ role, modelId, accountId }) => ({
       role, modelId, accountId
     })),
-    accountContract: SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
+    accountContract,
     comparisonEngineId: config.comparisonEngine.id,
     limits: {
       maxCycles: config.maxCycles ?? SPOT_PAPER_PAIRED.maxCycles,
@@ -66,8 +109,8 @@ export function pairedConfigDigest(config) {
       pollIntervalMs: config.pollIntervalMs ?? SPOT_PAPER_PAIRED.pollIntervalMs
     },
     assumptions: {
-      feeBpsPerSide: SPOT_PAPER_PAIRED.feeBpsPerSide,
-      slippageBpsPerSide: SPOT_PAPER_PAIRED.slippageBpsPerSide
+      feeBpsPerSide: accountContract.feeBpsPerSide,
+      slippageBpsPerSide: accountContract.slippageBpsPerSide
     }
   };
   return sha256(Buffer.from(JSON.stringify(identity), "utf8"));
@@ -110,6 +153,10 @@ function validateJson(value, code) {
 
 function validateConfig(config) {
   assert(isRecord(config), "CONFIG_REQUIRED");
+  config.accountContract = config.accountContract ??
+    SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT;
+  assert(Object.values(SPOT_PAPER_PAIRED_ACCOUNT_CONTRACTS).some(contract =>
+    same(contract, config.accountContract)), "INVALID_ACCOUNT_CONTRACT");
   assert(typeof config.runId === "string" &&
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(config.runId), "INVALID_RUN_ID");
   assert(typeof config.dataRoot === "string" && config.dataRoot.trim(), "DATA_ROOT_REQUIRED");
@@ -178,15 +225,20 @@ function validateBindings(config, testOnly) {
       typeof arm.accountId === "string" && arm.accountId.length > 0 &&
       typeof arm.initialize === "function" && typeof arm.decide === "function" &&
       typeof arm.apply === "function" && typeof arm.summarize === "function" &&
-      same(arm.accountContract, SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT),
+      (config.accountContract.version !== 2 ||
+        arm.feeApply === config.feeScenarioApply) &&
+      same(arm.accountContract, config.accountContract),
     `INVALID_${role.toUpperCase()}_BINDING`);
     assert(!accounts.has(arm.accountId), "CONFLICTING_ACCOUNTS");
     accounts.add(arm.accountId);
   }
+  const comparisonBindingValid = config.accountContract.version === 2 ?
+    config.comparisonEngine?.compare === config.feeScenarioCompare :
+    config.comparisonEngine?.compare ===
+      config.comparisonExports?.compareSpotPaperStrategies;
   assert(config.comparisonEngine?.id === SPOT_PAPER_RESEARCH_COMPARISON_ID &&
     typeof config.comparisonEngine.compare === "function" &&
-    config.comparisonEngine.compare ===
-      config.comparisonExports?.compareSpotPaperStrategies,
+    comparisonBindingValid,
   "RESEARCH_COMPARISON_ENGINE_REQUIRED");
   assert(config.challengerExports?.SPOT_PAPER_ENTRY_CONFIRMATION_ID ===
     SPOT_PAPER_PAIRED.challengerModel &&
@@ -221,12 +273,14 @@ function summarizeLedger(state, valuationAvailable, terminalAt) {
   };
 }
 
-function markLedgerWithoutTrading(ledger, quote, at) {
+function markLedgerWithoutTrading(
+  ledger, quote, at, feeBpsPerSide, feeApply = applyPaperObservation
+) {
   if (!ledger.position) return clone(ledger);
   const valuationInput = clone(ledger);
   valuationInput.position.stopPriceNano = "0";
-  const result = applyPaperObservation(valuationInput, {
-    quote, nowMs: at, stopped: true
+  const result = feeApply(valuationInput, {
+    quote, nowMs: at, stopped: true, feeBpsPerSide
   });
   assert(result.fills.length === 0 && result.ledger.position?.quantitySat ===
     ledger.position.quantitySat &&
@@ -235,12 +289,17 @@ function markLedgerWithoutTrading(ledger, quote, at) {
   return result.ledger;
 }
 
-export function createBaselineArm(accountId = "baseline") {
+export function createBaselineArm(
+  accountId = "baseline",
+  accountContract = SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
+  feeApply = applyPaperObservation
+) {
   return {
     role: "baseline",
     modelId: SPOT_PAPER_PAIRED.baselineModel,
     accountId,
-    accountContract: SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
+    accountContract,
+    feeApply,
     initialize: () => ({ strategy: createStrategyState(), ledger: createLedger(),
       valuationLedger: createLedger(), stopped: false }),
     decide({ state, candles, at }) {
@@ -262,8 +321,9 @@ export function createBaselineArm(accountId = "baseline") {
             stoppedAt: state.stoppedAt ?? null }
         };
       }
-      const result = applyPaperObservation(state.ledger, {
-        signal: decision, quote, nowMs: at, stopped: stopped || state.stopped
+      const result = feeApply(state.ledger, {
+        signal: decision, quote, nowMs: at, stopped: stopped || state.stopped,
+        feeBpsPerSide: accountContract.feeBpsPerSide
       });
       return {
         state: { ...state, ledger: result.ledger,
@@ -280,7 +340,11 @@ export function createBaselineArm(accountId = "baseline") {
   };
 }
 
-export function createChallengerArm(researchExports, accountId = "challenger") {
+export function createChallengerArm(
+  researchExports, accountId = "challenger",
+  accountContract = SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
+  feeApply = applyPaperObservation
+) {
   if (researchExports?.SPOT_PAPER_ENTRY_CONFIRMATION_ID !==
       SPOT_PAPER_PAIRED.challengerModel ||
       typeof researchExports.createEntryConfirmationState !== "function" ||
@@ -292,7 +356,8 @@ export function createChallengerArm(researchExports, accountId = "challenger") {
     role: "challenger",
     modelId: researchExports.SPOT_PAPER_ENTRY_CONFIRMATION_ID,
     accountId,
-    accountContract: SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
+    accountContract,
+    feeApply,
     researchExports,
     initialize: () => ({ strategy: researchExports.createEntryConfirmationState(),
       ledger: createLedger(), valuationLedger: createLedger(), stopped: false }),
@@ -318,8 +383,9 @@ export function createChallengerArm(researchExports, accountId = "challenger") {
             stoppedAt: state.stoppedAt ?? null }
         };
       }
-      const result = applyPaperObservation(state.ledger, {
-        signal: decision, quote, nowMs: at, stopped: stopped || state.stopped
+      const result = feeApply(state.ledger, {
+        signal: decision, quote, nowMs: at, stopped: stopped || state.stopped,
+        feeBpsPerSide: accountContract.feeBpsPerSide
       });
       const candidateFills = result.fills.map(fill => {
         const strategyReason = fill.side === "BUY" ? decision?.strategyReason :
@@ -333,7 +399,7 @@ export function createChallengerArm(researchExports, accountId = "challenger") {
         result.ledger.fills.splice(result.ledger.fills.length - candidateFills.length,
           candidateFills.length, ...candidateFills);
       }
-      let strategy = state.strategy;
+      let strategy = decision?.state?.strategy ?? state.strategy;
       if (candidateFills.some(fill => fill.side === "SELL")) {
         strategy = researchExports.recordEntryConfirmationSell(strategy, at);
       }
@@ -352,12 +418,15 @@ export function createChallengerArm(researchExports, accountId = "challenger") {
   };
 }
 
-export function createCashControlArm(accountId = "cash-control") {
+export function createCashControlArm(
+  accountId = "cash-control",
+  accountContract = SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT
+) {
   return {
     role: "cash",
     modelId: SPOT_PAPER_PAIRED.controlModel,
     accountId,
-    accountContract: SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT,
+    accountContract,
     initialize: () => ({ cashCents: SPOT_PAPER_PAIRED.initialCashCents, fills: [] }),
     decide({ at }) {
       return { state: null, decision: null, decidedAt: at, metadata: { control: "NO_TRADE" } };
@@ -574,7 +643,7 @@ async function runPairedForward(input, testOnly) {
   const states = config.arms.map(arm => clone(arm.initialize({
     initialCashCents: SPOT_PAPER_PAIRED.initialCashCents,
     maxEntryCents: SPOT_PAPER_PAIRED.maxEntryCents,
-    feeBpsPerSide: SPOT_PAPER_PAIRED.feeBpsPerSide,
+    feeBpsPerSide: config.accountContract.feeBpsPerSide,
     slippageBpsPerSide: SPOT_PAPER_PAIRED.slippageBpsPerSide,
     stopLossBps: SPOT_PAPER_PAIRED.stopLossBps,
     maxSessionLossCents: SPOT_PAPER_PAIRED.maxSessionLossCents
@@ -600,9 +669,7 @@ async function runPairedForward(input, testOnly) {
       SPOT_PAPER_PAIRED_PINNED_INTEGRATION,
     models: config.arms.map(({ role, modelId, accountId }) => ({ role, modelId, accountId })),
     comparisonEngineId: config.comparisonEngine.id,
-    assumptions: { feeBpsPerSide: SPOT_PAPER_PAIRED.feeBpsPerSide,
-      slippageBpsPerSide: SPOT_PAPER_PAIRED.slippageBpsPerSide,
-      ratesVerified: false },
+    assumptions: accountAssumptions(config.accountContract),
     limits: {
       maxCycles: config.maxCycles, maxRequests: config.maxRequests,
       maxBytes: config.maxBytes, maxResponseBytes: config.maxResponseBytes,
@@ -801,7 +868,9 @@ async function runPairedForward(input, testOnly) {
         const nextStates = effects.map((effect, index) => {
           const state = clone(effect.state);
           state.valuationLedger = states[index].stopped ?
-            markLedgerWithoutTrading(states[index].ledger, effectQuote, effectAt) :
+            markLedgerWithoutTrading(states[index].ledger, effectQuote, effectAt,
+              config.accountContract.feeBpsPerSide,
+              config.feeScenarioApply ?? applyPaperObservation) :
             clone(state.ledger ?? state.valuationLedger);
           if (states[index].stopped || effect.stopReason) {
             state.stopped = true;
@@ -1075,22 +1144,39 @@ export async function runSpotPaperPaired(input) {
     import("../spot-paper-research/comparison.mjs"),
     import("../spot-paper-research/entry-confirmation.mjs")
   ]);
+  const accountContract = input.accountContract ??
+    SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT;
+  assert(Object.values(SPOT_PAPER_PAIRED_ACCOUNT_CONTRACTS).some(contract =>
+    same(contract, accountContract)), "INVALID_ACCOUNT_CONTRACT");
   const accountIds = input.accountIds;
   assert(isRecord(accountIds), "ACCOUNT_IDS_REQUIRED");
+  let compare = comparisonExports.compareSpotPaperStrategies;
+  let feeScenarioApply;
+  if (accountContract.contractId ===
+      SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId) {
+    const feeScenario = await import("./fee-scenario.mjs");
+    feeScenarioApply = feeScenario.applySpotPaperPairedFeeObservation;
+    compare = observations => feeScenario.compareSpotPaperFeeScenarioObservations(
+      observations, {feeBpsPerSide: accountContract.feeBpsPerSide});
+  }
   const comparisonEngine = {
     id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
-    compare: comparisonExports.compareSpotPaperStrategies
+    compare
   };
   const { createSpotPaperPairedKrakenProvider } = await import("./feed.mjs");
   const provider = createSpotPaperPairedKrakenProvider({ signal: input.signal });
   const arms = [
-    createBaselineArm(accountIds.baseline),
-    createChallengerArm(challengerExports, accountIds.challenger),
-    createCashControlArm(accountIds.cash)
+    createBaselineArm(accountIds.baseline, accountContract, feeScenarioApply),
+    createChallengerArm(challengerExports, accountIds.challenger, accountContract,
+      feeScenarioApply),
+    createCashControlArm(accountIds.cash, accountContract)
   ];
   const config = {
-    ...input, provider, testOnly: false, researchSourceSha256,
-    challengerExports, comparisonExports, comparisonEngine, arms
+    ...input, accountContract, provider, testOnly: false, researchSourceSha256,
+    challengerExports, comparisonExports, comparisonEngine, arms,
+    ...(accountContract.version === 2 ? {
+      feeScenarioCompare: compare, feeScenarioApply
+    } : {})
   };
   if (config.configSha256 !== pairedConfigDigest(config)) {
     throw new Error("CONFIG_IDENTITY_MISMATCH");

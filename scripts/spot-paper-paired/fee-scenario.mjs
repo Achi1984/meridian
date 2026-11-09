@@ -228,6 +228,10 @@ function applyScenarioObservation(previous, {
   return { ledger, fills, stopReason, lossLimitReached };
 }
 
+export function applySpotPaperPairedFeeObservation(previous, options) {
+  return applyScenarioObservation(previous, options);
+}
+
 function markLedgerWithoutTrading(ledger, quote, at, feeBpsPerSide) {
   if (!ledger.position) return structuredClone(ledger);
   const input = structuredClone(ledger);
@@ -366,8 +370,6 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
       observation.ticker.receivedAt <= observation.effectAt,
     "MISSING_CAUSAL_QUOTE");
 
-    const parsed = parseKrakenOhlc(observation.ohlc, observation.effectAt);
-    assert(parsed.candles.length <= 720, "CANDLE_SNAPSHOT_LIMIT");
     const quote = parseKrakenTicker(observation.ticker, observation.effectAt);
     const effectResults = roles.map((role, index) => {
       const armDecisionAt = decisionTimes[index];
@@ -382,29 +384,14 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
           },
           effect: { state: before, fills: [], stopReason: before.stopReason ?? null,
             riskState: { stopped: true, reason: before.stopReason ?? null,
-              stopReason: before.stopReason ?? null,
-              stoppedAt: before.stoppedAt ?? null } }
+                stopReason: before.stopReason ?? null,
+                stoppedAt: before.stoppedAt ?? null } }
         };
       }
-      const observedDecision = observation.decisions?.[index];
+      const parsed = parseKrakenOhlc(observation.ohlc, armDecisionAt);
+      assert(parsed.candles.length <= 720, "CANDLE_SNAPSHOT_LIMIT");
       let decision;
-      if (observedDecision && Object.hasOwn(observedDecision, "decision")) {
-        assert(observedDecision.role === role &&
-          observedDecision.decidedAt === armDecisionAt &&
-          Object.hasOwn(observedDecision, "decision") &&
-          (observedDecision.metadata === null ||
-            isRecord(observedDecision.metadata)),
-        "INVALID_RECORDED_DECISION");
-        decision = {
-          state: before,
-          decision: observedDecision.decision,
-          decidedAt: observedDecision.decidedAt,
-          ...(typeof observedDecision.skippedReason === "string" ?
-            { skippedReason: observedDecision.skippedReason } : {}),
-          ...(isRecord(observedDecision.metadata) ?
-            { metadata: observedDecision.metadata } : {})
-        };
-      } else if (role === "cash") {
+      if (role === "cash") {
         decision = {
           state: null, decision: null, decidedAt: armDecisionAt,
           metadata: { control: "NO_TRADE" }
@@ -464,7 +451,7 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
         }
         const strategy = role === "challenger" &&
           candidateFills.some(fill => fill.side === "SELL") ?
-          recordEntryConfirmationSell(before.strategy, observation.effectAt) :
+          recordEntryConfirmationSell(decision.state.strategy, observation.effectAt) :
           decision.state.strategy;
         effect = {
           state: { ...before, strategy, ledger: result.ledger,
@@ -555,7 +542,53 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
       valuation: {
         ...finalSummaries[index],
         openPositions: finalSummaries[index].openPositions
-      }
+      },
+      finalCashCents: index === 2 ? states[index].cashCents :
+        states[index].ledger.cashCents,
+      terminalPosition: index === 2 ? null :
+        states[index].valuationLedger?.position ??
+          states[index].ledger.position ?? null,
+      lastMark: index === 2 ? null :
+        states[index].valuationLedger?.lastMark ??
+          states[index].ledger.lastMark ?? null
+    }))
+  };
+}
+
+export function compareSpotPaperFeeScenarioObservations(observations, {
+  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide
+} = {}) {
+  const replay = replaySpotPaperFeeScenarioObservations(observations, {
+    feeBpsPerSide
+  });
+  return {
+    schemaVersion: "SPOT_PAPER_SMA_COMPARISON_V1",
+    status: "COMPARISON_AVAILABLE",
+    commonHorizonAt: replay.commonHorizonAt,
+    arms: Object.fromEntries(replay.arms.map(arm => {
+      const position = arm.terminalPosition;
+      return [arm.role, {
+        strategyId: arm.role === "cash" ? "CASH_NO_TRADE" : arm.modelId,
+        valuationAt: replay.commonHorizonAt,
+        valuationStatus: arm.valuation.unresolvedObservations === 0 ?
+          "MARKED_AT_COMMON_HORIZON" : "UNKNOWN_COMMON_HORIZON_MARK",
+        positionStatus: position ? "OPEN_UNRESOLVED_AT_HORIZON" : "FLAT",
+        unresolvedTerminalInventory: position ? {
+          quantitySat: position.quantitySat,
+          entrySignalId: position.entrySignalId,
+          lastMark: arm.lastMark
+        } : null,
+        initialCashCents: CASH_CENTS,
+        finalCashCents: arm.finalCashCents,
+        finalNetEquityCents: arm.valuation.netEquityCents,
+        feesCents: arm.valuation.feesCents,
+        grossTurnoverCents: arm.valuation.turnoverCents,
+        fills: arm.fills,
+        fillCount: arm.fills.length,
+        stopped: arm.tradingStatus === "STOPPED",
+        stopReason: arm.stopReason,
+        tradingStoppedAt: arm.stoppedAt
+      }];
     }))
   };
 }
@@ -701,6 +734,7 @@ export async function replayVerifiedSpotPaperFeeScenarios({
     "OBSERVATION_COUNT_LIMIT");
 
   const runDirectory = join(dataRoot, expectedIdentity.runId);
+  const originalReport = structuredClone(hostExport.report);
   const marketObservations = [];
   let responseBytes = 0;
   let priorEffectAt = originalReport.startedAt;
@@ -732,7 +766,6 @@ export async function replayVerifiedSpotPaperFeeScenarios({
     quoteAgeAtEffectMs <= SPOT_PAPER_PAIRED.maxQuoteAgeMs,
   "NO_VALID_HISTORICAL_COMMON_HORIZON");
 
-  const originalReport = structuredClone(hostExport.report);
   const scenarios = SPOT_PAPER_PAIRED_FEE_RATES_BPS.map(feeBpsPerSide =>
     replaySpotPaperFeeScenarioObservations(marketObservations, { feeBpsPerSide }));
   assertOriginalReplayMatches(originalReport, scenarios[0]);

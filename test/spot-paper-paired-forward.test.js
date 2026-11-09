@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { existsSync } from "node:fs";
-import { mkdtemp, mkdir, readFile, rm, stat } from "node:fs/promises";
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
@@ -12,9 +12,13 @@ import {
   SPOT_PAPER_PAIRED, SPOT_PAPER_PAIRED_SOURCE_ID,
   SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256,
   SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
-  SPOT_PAPER_PAIRED_INTEGRATION, SPOT_PAPER_RESEARCH_COMPARISON_ID
+  SPOT_PAPER_PAIRED_INTEGRATION, SPOT_PAPER_RESEARCH_COMPARISON_ID,
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
+  SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT
 } from "../scripts/spot-paper-paired/forward.mjs";
 import {
+  applySpotPaperPairedFeeObservation,
+  compareSpotPaperFeeScenarioObservations,
   replaySpotPaperFeeScenarioObservations,
   replayVerifiedSpotPaperFeeScenarios
 } from "../scripts/spot-paper-paired/fee-scenario.mjs";
@@ -23,6 +27,8 @@ import { readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { createSpotPaperPairedKrakenProvider } from
   "../scripts/spot-paper-paired/feed.mjs";
 import { main as pairedHostMain } from "../scripts/spot-paper-paired/host.mjs";
+import { evaluatePairedPaperEvidence } from
+  "../scripts/spot-paper-paired-report/evaluate.mjs";
 
 const MINUTE = 60_000;
 const BASE = Date.UTC(2025, 0, 1);
@@ -468,6 +474,84 @@ test("deadline during normal poll sleep preserves historical horizon but reports
     arm.decisions[0].decidedAt), staggered[0].decisions.map(item => item.decidedAt));
 });
 
+test("versioned 20-bps contract drives paper fills and shared comparison", async t => {
+  const setup = await fixture(t, {maxCycles: 2});
+  const [comparison, confirmation] = await Promise.all([
+    import("../scripts/spot-paper-research/comparison.mjs"),
+    import("../scripts/spot-paper-research/entry-confirmation.mjs")
+  ]);
+  const accountContract = SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT;
+  const compare = observations => compareSpotPaperFeeScenarioObservations(
+    observations, {feeBpsPerSide: accountContract.feeBpsPerSide});
+  const feeProbe = createBaselineArm("fee-probe", accountContract,
+    applySpotPaperPairedFeeObservation);
+  const feeProbeState = feeProbe.initialize();
+  const feeProbeResult = feeProbe.apply({
+    state: feeProbeState,
+    decision: {id: "fee-probe-entry", direction: "ENTRY", candleAt: 1},
+    quote: {bidNano: "30000000000000", askNano: "30001000000000",
+      spreadBps: 1, receivedAt: 1},
+    at: 1
+  });
+  assert.equal(feeProbeResult.fills[0].feeCents,
+    Math.round(feeProbeResult.fills[0].grossCents * 20 / 10_000));
+  setup.config.accountContract = accountContract;
+  setup.config.arms = [
+    createBaselineArm("baseline-next-v2", accountContract,
+      applySpotPaperPairedFeeObservation),
+    createChallengerArm(confirmation, "challenger-next-v2", accountContract,
+      applySpotPaperPairedFeeObservation),
+    createCashControlArm("cash-next-v2", accountContract)
+  ];
+  setup.config.challengerExports = confirmation;
+  setup.config.feeScenarioApply = applySpotPaperPairedFeeObservation;
+  setup.config.comparisonExports = {
+    ...comparison, compareSpotPaperStrategies: compare
+  };
+  setup.config.feeScenarioCompare = compare;
+  setup.config.comparisonEngine = {
+    id: SPOT_PAPER_RESEARCH_COMPARISON_ID, compare
+  };
+  setup.config.configSha256 = pairedConfigDigest(setup.config);
+  setup.config.accountContract = SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT;
+  setup.config.arms.forEach(arm => {
+    arm.accountContract = SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT;
+  });
+  await assert.rejects(runSpotPaperPairedSynthetic(setup.config),
+    /CONFIG_IDENTITY_MISMATCH/);
+  assert.deepEqual(setup.order, []);
+  setup.config.accountContract = accountContract;
+  setup.config.arms.forEach(arm => { arm.accountContract = accountContract; });
+
+  const report = await runSpotPaperPairedSynthetic(setup.config);
+  assert.equal(report.assumptions.feeBpsPerSide, 20);
+  assert.equal(report.assumptions.accountContractId,
+    "BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2");
+  assert.equal(report.assumptions.accountContractVersion, 2);
+  assert.equal(report.assumptions.feeBasis,
+    "EEA_SPOT_ONLY_TAKER_ASSUMPTION");
+  assert.equal(report.assumptions.accountTier, "UNKNOWN");
+  assert.equal(report.assumptions.slippageBpsPerSide, 10);
+  assert.equal(report.comparison.status, "COMPARISON_AVAILABLE");
+  assert.equal(report.comparison.arms.baseline.feesCents,
+    report.arms[0].valuation.feesCents);
+  const output = {write() {}};
+  const hostExport = await pairedHostMain([
+    "export", "--data-root", setup.dataRoot, "--run-id", report.runId
+  ], {output});
+  const expectedIdentity = {
+    schemaVersion: "SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1",
+    runId: report.runId, pair: report.pair,
+    sourceSha256: report.sourceSha256, configSha256: report.configSha256,
+    researchSourceSha256: report.researchSourceSha256,
+    feedSourceId: report.feedSourceId,
+    comparisonEngineId: report.comparisonEngineId, models: report.models
+  };
+  assert.equal(evaluatePairedPaperEvidence({
+    expectedIdentity, report: hostExport
+  }).evidenceStatus, "VERIFIED_COMPLETE");
+});
+
 test("offline fee replay rejects synthetic and unverified host evidence", async t => {
   const setup = await fixture(t, { maxCycles: 1 });
   const report = await runSpotPaperPairedSynthetic(setup.config);
@@ -505,6 +589,83 @@ test("offline fee replay rejects synthetic and unverified host evidence", async 
   await assert.rejects(replayVerifiedSpotPaperFeeScenarios({
     expectedIdentity, hostExport: unverified, dataRoot: setup.dataRoot
   }), /VERIFIED_HOST_EXPORT_REQUIRED/);
+});
+
+test("verified fee replay reopens persisted response bytes through the public API", async t => {
+  const setup = await fixture(t, {maxCycles: 2});
+  const [comparison, confirmation] = await Promise.all([
+    import("../scripts/spot-paper-research/comparison.mjs"),
+    import("../scripts/spot-paper-research/entry-confirmation.mjs")
+  ]);
+  const [comparisonBytes, entryConfirmationBytes] = await Promise.all([
+    readFile(new URL("../scripts/spot-paper-research/comparison.mjs", import.meta.url)),
+    readFile(new URL("../scripts/spot-paper-research/entry-confirmation.mjs", import.meta.url))
+  ]);
+  setup.config.researchSourceSha256 = pairedResearchSourceDigest({
+    comparisonBytes, entryConfirmationBytes
+  });
+  setup.config.arms = [
+    createBaselineArm("baseline-disk-test"),
+    createChallengerArm(confirmation, "challenger-disk-test"),
+    createCashControlArm("cash-disk-test")
+  ];
+  setup.config.challengerExports = confirmation;
+  setup.config.comparisonExports = comparison;
+  setup.config.comparisonEngine = {
+    id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
+    compare: comparison.compareSpotPaperStrategies
+  };
+  setup.config.configSha256 = pairedConfigDigest(setup.config);
+
+  const report = await runSpotPaperPairedSynthetic(setup.config);
+  const output = {write() {}};
+  const hostExport = await pairedHostMain([
+    "export", "--data-root", setup.dataRoot, "--run-id", report.runId
+  ], {output});
+  const runDirectory = join(setup.dataRoot, report.runId);
+  const journalPath = join(runDirectory, "journal.json");
+  const envelope = JSON.parse(await readFile(journalPath, "utf8"));
+  const config = {...setup.config, provider: {
+    ...setup.config.provider, sourceId: SPOT_PAPER_PAIRED_SOURCE_ID
+  }};
+  const configSha256 = pairedConfigDigest(config);
+  const reportForReplay = structuredClone(hostExport.report);
+  reportForReplay.feedSourceId = SPOT_PAPER_PAIRED_SOURCE_ID;
+  reportForReplay.testOnly = false;
+  reportForReplay.researchSourceSha256 = setup.config.researchSourceSha256;
+  reportForReplay.configSha256 = configSha256;
+  const payload = envelope.payload;
+  payload.manifest.feedSourceId = SPOT_PAPER_PAIRED_SOURCE_ID;
+  payload.manifest.configSha256 = configSha256;
+  payload.manifest.researchSourceSha256 = setup.config.researchSourceSha256;
+  payload.events.at(-1).report = reportForReplay;
+  envelope.sha256 = sha256(Buffer.from(JSON.stringify(payload), "utf8"));
+  await writeFile(journalPath, JSON.stringify(envelope));
+  hostExport.report = reportForReplay;
+  hostExport.journal = {
+    ...hostExport.journal,
+    manifest: payload.manifest,
+    events: payload.events
+  };
+  const expectedIdentity = {
+    schemaVersion: "SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1",
+    runId: reportForReplay.runId, pair: reportForReplay.pair,
+    sourceSha256: reportForReplay.sourceSha256,
+    configSha256, researchSourceSha256: setup.config.researchSourceSha256,
+    feedSourceId: SPOT_PAPER_PAIRED_SOURCE_ID,
+    comparisonEngineId: reportForReplay.comparisonEngineId,
+    models: reportForReplay.models
+  };
+  const result = await replayVerifiedSpotPaperFeeScenarios({
+    expectedIdentity, hostExport, dataRoot: setup.dataRoot
+  });
+  assert.equal(result.evidenceStatus, "VERIFIED_COMPLETE");
+  assert.equal(result.replayAgreement,
+    "ORIGINAL_50BPS_DECISIONS_FILLS_RISK_AND_ACCOUNTING_MATCHED");
+  assert.equal(result.scenarios.length, 3);
+  assert.equal(result.originalReport.configSha256, configSha256);
+  assert.ok(hostExport.journal.events.some(event =>
+    event.type === "shared_observation" && event.ticker.bytes > 0));
 });
 
 test("operator interruption is not full-duration completion", async t => {
@@ -803,6 +964,20 @@ test("actual #1299 exports integrate multi-cycle buys, exits, cooldown, stopped 
       assert.equal(replay.valuation.slippageCents, arm.valuation.slippageCents);
       assert.equal(replay.valuation.netEquityCents, arm.valuation.netEquityCents);
     }
+    const feeTwentyReplay = replaySpotPaperFeeScenarioObservations(
+      feeReplayInputs, {feeBpsPerSide: 20});
+    const baselineFifty = feeReplay.arms.find(arm => arm.role === "baseline");
+    const baselineTwenty = feeTwentyReplay.arms.find(arm => arm.role === "baseline");
+    const challengerFifty = feeReplay.arms.find(arm => arm.role === "challenger");
+    const challengerTwenty = feeTwentyReplay.arms.find(arm => arm.role === "challenger");
+    assert.notEqual(baselineTwenty.stoppedAt, baselineFifty.stoppedAt);
+    assert.equal(challengerFifty.tradingStatus, "STOPPED");
+    assert.equal(challengerTwenty.tradingStatus, "ACTIVE");
+    assert.ok(challengerTwenty.decisions.some((decision, index) =>
+      index > challengerFifty.decisions.findIndex(item =>
+        item.skippedReason === "ARM_STOPPED") &&
+      decision.metadata?.discarded === "COOLDOWN_ACTIVE"));
+    assert.notDeepEqual(challengerTwenty.decisions, challengerFifty.decisions);
     assert.ok(report.arms.some(arm => arm.tradingStatus === "STOPPED" &&
       arm.valuation.openPositions.length > 0),
     `STOPPED_OPEN_INVENTORY_NOT_EXERCISED:${JSON.stringify(report.arms.map(arm => ({

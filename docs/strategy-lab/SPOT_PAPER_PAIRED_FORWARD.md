@@ -26,9 +26,18 @@ BTC/EUR observations:
 
 The per-arm account contract is EUR 1,000 initial cash, at most EUR 100 entry,
 no leverage or short positions, existing sampled 2% stop, and EUR 20 loss
-limit. The common modeled costs remain 50 bp fee and 10 bp adverse slippage per
-side. These cost values are assumptions, not verified Kraken rates. The adapter
-does not tune, validate, or change them.
+limit. Historical V1 evidence uses the original 50 bp fee and 10 bp adverse slippage per
+side. The explicitly selected V2 next-run PAPER account contract uses a 20 bp
+per-side EEA spot-only taker assumption and retains 10 bp adverse slippage per
+side. The user-specific fee tier remains unknown; this setting is not a
+verified account rate and does not alter historical evidence.
+
+V2 is selected by contract ID, not by an implicit fee default:
+`BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2`. Its version, fee assumption, source, and
+account-tier status are included in the config digest and report assumptions.
+The host `run` command requires an explicit `--account-contract` argument; no
+run is authorized or started by documenting this selection. V1/50-bp reports
+remain valid under the existing report and replay paths.
 
 The hard run limits are eight hours, 480 cycles, 960 total public requests
 across the entire run (including warmup), 64 MiB total response bytes, 256 KiB
@@ -197,7 +206,7 @@ The minimal host composition and concrete local commands are now in
 
 ```sh
 node scripts/spot-paper-paired/host.mjs disabled
-node scripts/spot-paper-paired/host.mjs run --data-root /evidence-root --run-id <new-unique-run-id>
+node scripts/spot-paper-paired/host.mjs run --data-root /evidence-root --run-id <new-unique-run-id> --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2
 node scripts/spot-paper-paired/host.mjs status --data-root /evidence-root --run-id <run-id>
 node scripts/spot-paper-paired/host.mjs report --data-root /evidence-root --run-id <run-id>
 node scripts/spot-paper-paired/host.mjs export --data-root /evidence-root --run-id <run-id>
@@ -280,13 +289,16 @@ node scripts/spot-paper-paired/fee-scenario.mjs \
 
 The replay refuses synthetic, incomplete, unverified, identity-mismatched, or
 changed evidence. It rechecks the read-only journal and each referenced response
-byte count and SHA-256, then rebuilds all three accounts, strategy decisions,
-position sizes, risk stops, fees, and terminal marks from the saved Kraken
-observations. The verified per-observation strategy decisions are held fixed as
-immutable inputs; account sizing, fee affordability, fills, and risk outcomes
-are recalculated for each fee scenario rather than treating fee savings as a
-refund. The 50-bps replay must reconcile to the original report's decisions,
-fills, risk states, and accounting before alternative scenarios are returned.
+byte count and SHA-256, then rebuilds all three accounts, strategy decisions, position sizes, risk
+stops, fees, and terminal marks from the saved Kraken observations. Only the
+immutable market responses and causal decision/effect timestamps are inputs;
+each fee scenario independently advances the strategy from its own fee-specific
+holdings, stops, and cooldown state. This is necessary because changed
+affordability and risk outcomes can change later decisions. The 50-bp replay
+must exactly reconcile to the original report's decisions, fills, risk states,
+and accounting before alternative scenarios are returned. The 20-bp and 10-bp
+counterfactuals may therefore have different stops, cooldowns, decisions, and
+fills; they are not fee refunds over fixed fills.
 The original report is included unchanged; the output also preserves
 its identity hashes and reports canonical report/export hashes plus the verified
 journal payload checksum. This tool performs no network, host, or evidence-file

@@ -173,9 +173,21 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
     input.timing.stopReason)) return null;
   const timingResult = {...timing, stopReason: input.timing.stopReason};
 
-  if (input.assumptions.feeBpsPerSide !== 50 ||
-      input.assumptions.slippageBpsPerSide !== 10 ||
-      input.assumptions.ratesVerified !== false) return null;
+  const assumptions = input.assumptions;
+  const legacyFees = assumptions.feeBpsPerSide === 50 &&
+    !Object.hasOwn(assumptions, 'accountContractId') &&
+    !Object.hasOwn(assumptions, 'accountContractVersion');
+  const nextRunFees = assumptions.feeBpsPerSide === 20 &&
+    assumptions.accountContractId === 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2' &&
+    assumptions.accountContractVersion === 2 &&
+    assumptions.feeBasis === 'EEA_SPOT_ONLY_TAKER_ASSUMPTION' &&
+    assumptions.feeSource ===
+      'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea' &&
+    assumptions.feeAsOf === '2026-11-09' &&
+    assumptions.accountTier === 'UNKNOWN';
+  if ((!legacyFees && !nextRunFees) ||
+      assumptions.slippageBpsPerSide !== 10 ||
+      assumptions.ratesVerified !== false) return null;
   const arms = {};
   for (const role of SPOT_PAPER_PAIRED_ROLES) {
     arms[role] = safeArm(input.arms[role], role,
@@ -212,11 +224,7 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
     independentAuthentication: 'NOT_ESTABLISHED',
     identity,
     timing: timingResult,
-    assumptions: {
-      feeBpsPerSide: 50,
-      slippageBpsPerSide: 10,
-      ratesVerified: false
-    },
+    assumptions: structuredClone(assumptions),
     arms,
     deltas,
     decision: 'NO_WINNER_OR_PROMOTION'

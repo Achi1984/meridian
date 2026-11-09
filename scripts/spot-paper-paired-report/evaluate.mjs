@@ -103,6 +103,23 @@ function exactModels(actual, expected) {
       model.accountId === expected.models[index].accountId);
 }
 
+function validFeeAssumptions(assumptions) {
+  if (!isRecord(assumptions) || assumptions.slippageBpsPerSide !== 10 ||
+      assumptions.ratesVerified !== false) return false;
+  if (assumptions.feeBpsPerSide === 50) {
+    return !Object.hasOwn(assumptions, 'accountContractId') &&
+      !Object.hasOwn(assumptions, 'accountContractVersion');
+  }
+  return assumptions.feeBpsPerSide === 20 &&
+    assumptions.accountContractId === 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2' &&
+    assumptions.accountContractVersion === 2 &&
+    assumptions.feeBasis === 'EEA_SPOT_ONLY_TAKER_ASSUMPTION' &&
+    assumptions.feeSource ===
+      'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea' &&
+    assumptions.feeAsOf === '2026-11-09' &&
+    assumptions.accountTier === 'UNKNOWN';
+}
+
 function getJournalPayload(journal) {
   if (!isRecord(journal)) return null;
   if (isRecord(journal.payload)) {
@@ -146,9 +163,8 @@ function identityMatches(report, payload, expected) {
     manifest.feedSourceId === expected.feedSourceId &&
     manifest.comparisonEngineId === expected.comparisonEngineId &&
     exactModels(manifest.models, expected) &&
-    manifest.assumptions?.feeBpsPerSide === 50 &&
-    manifest.assumptions?.slippageBpsPerSide === 10 &&
-    manifest.assumptions?.ratesVerified === false &&
+    stableJson(manifest.assumptions) === stableJson(report.assumptions) &&
+    validFeeAssumptions(manifest.assumptions) &&
     isRecord(limits) &&
     isInteger(limits.maxCycles) && limits.maxCycles > 0 &&
       limits.maxCycles <= MAX_CYCLES && report.cycles <= limits.maxCycles &&
@@ -197,10 +213,7 @@ function reportIsValid(report, expected) {
       report.autoPromotion !== false ||
       typeof report.testOnly !== 'boolean' ||
       report.testOnly !== (report.feedSourceId === 'SYNTHETIC_TEST_ONLY') ||
-      !isRecord(report.assumptions) ||
-      report.assumptions.feeBpsPerSide !== 50 ||
-      report.assumptions.slippageBpsPerSide !== 10 ||
-      report.assumptions.ratesVerified !== false ||
+      !validFeeAssumptions(report.assumptions) ||
       !isRecord(report.commonHorizon) ||
       typeof report.commonHorizon.available !== 'boolean' ||
       !Array.isArray(report.arms) || report.arms.length !== 3) {
