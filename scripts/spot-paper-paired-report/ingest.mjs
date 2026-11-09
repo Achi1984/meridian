@@ -92,6 +92,9 @@ export function prepareSpotPaperPairedReport(expectedIdentity, dashboard) {
       report.evidenceStatus === 'CORRUPT_UNKNOWN') {
     fail('PAIRED_DASHBOARD_INVALID');
   }
+  if (report.evidenceStatus !== 'VERIFIED_COMPLETE') {
+    fail('PAIRED_EVIDENCE_NOT_FINALIZABLE');
+  }
   if (canonicalSpotPaperPairedReportJson(report.identity) !==
       canonicalSpotPaperPairedReportJson(publicIdentity(expectedIdentity))) {
     fail('PAIRED_IDENTITY_MISMATCH');

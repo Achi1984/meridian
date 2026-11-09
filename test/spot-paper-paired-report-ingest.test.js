@@ -21,17 +21,18 @@ import {
 } from '../scripts/spot-paper-paired-report/ingest.mjs';
 import {SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
   spotPaperPairedReportDigest} from '../scripts/spot-paper-paired-report/envelope.mjs';
-import {
-  syntheticExpectedPairedIdentity,
-  syntheticPairedDashboard
-} from './helpers/spot-paper-paired-dashboard-fixture.mjs';
 import {syntheticPairedEvaluatorFixture} from
   './helpers/spot-paper-paired-evaluator-fixture.mjs';
 import {createSpotPaperPairedReportConnector} from
   '../v11/spot-paper-paired-report-connector.js';
 
-const expectedIdentity = syntheticExpectedPairedIdentity();
-const dashboard = () => syntheticPairedDashboard(expectedIdentity);
+function verifiedFixture() {
+  const evidence = syntheticPairedEvaluatorFixture();
+  return {
+    expectedIdentity: evidence.expectedIdentity,
+    dashboard: evaluatePairedPaperEvidence(evidence)
+  };
+}
 
 function memoryStore() {
   const rows = new Map();
@@ -77,17 +78,19 @@ function memoryStore() {
 }
 
 test('paired ingestion validates and builds the exact authenticated-read envelope', async () => {
-  const prepared = prepareSpotPaperPairedReport(expectedIdentity, dashboard());
-  assert.equal(prepared.runId, expectedIdentity.runId);
-  assert.equal(prepared.configHash, expectedIdentity.configSha256);
+  const fixture = verifiedFixture();
+  const prepared = prepareSpotPaperPairedReport(
+    fixture.expectedIdentity, fixture.dashboard
+  );
+  assert.equal(prepared.runId, fixture.expectedIdentity.runId);
+  assert.equal(prepared.configHash, fixture.expectedIdentity.configSha256);
   assert.deepEqual(Object.keys(prepared.envelope).sort(), ['report', 'runId', 'schema']);
   assert.equal(prepared.envelope.schema, SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA);
   assert.equal(prepared.digest, spotPaperPairedReportDigest(prepared.envelope));
 
   let storeCalls = 0;
   const dryRun = await ingestSpotPaperPairedReport({
-    expectedIdentity,
-    dashboard: dashboard(),
+    ...fixture,
     getStore() { storeCalls++; }
   });
   assert.equal(dryRun.status, 'DRY_RUN');
@@ -95,10 +98,10 @@ test('paired ingestion validates and builds the exact authenticated-read envelop
 });
 
 test('paired insertion is immutable, idempotent for identical data, and rejects conflicts', async () => {
+  const fixture = verifiedFixture();
   const store = memoryStore();
   const input = {
-    expectedIdentity,
-    dashboard: dashboard(),
+    ...fixture,
     write: true,
     getStore: () => store
   };
@@ -109,7 +112,7 @@ test('paired insertion is immutable, idempotent for identical data, and rejects 
     MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED: 'true',
     MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED: 'true',
     MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON:
-      JSON.stringify(expectedIdentity)
+      JSON.stringify(fixture.expectedIdentity)
   });
   const readResult = await handleSpotPaperPairedReportGatewayRequest({
     method: 'GET',
@@ -121,9 +124,9 @@ test('paired insertion is immutable, idempotent for identical data, and rejects 
     getStore: () => store
   });
   assert.equal(readResult.status, 200);
-  assert.deepEqual(readResult.body.report, dashboard());
+  assert.deepEqual(readResult.body.report, fixture.dashboard);
 
-  const changed = dashboard();
+  const changed = structuredClone(fixture.dashboard);
   changed.arms.baseline.cashCents += 1;
   assert.equal((await ingestSpotPaperPairedReport({
     ...input,
@@ -132,6 +135,7 @@ test('paired insertion is immutable, idempotent for identical data, and rejects 
 });
 
 test('invalid DTO and independently supplied identity fail before database access', async () => {
+  const fixture = verifiedFixture();
   let storeCalls = 0;
   const options = {
     write: true,
@@ -139,25 +143,44 @@ test('invalid DTO and independently supplied identity fail before database acces
   };
   await assert.rejects(ingestSpotPaperPairedReport({
     ...options,
-    expectedIdentity,
-    dashboard: {...dashboard(), evidenceStatus: 'UNRECOGNIZED'}
+    ...fixture,
+    dashboard: {...fixture.dashboard, evidenceStatus: 'UNRECOGNIZED'}
   }), error => error.code === 'PAIRED_DASHBOARD_INVALID');
 
-  const wrongIdentity = structuredClone(expectedIdentity);
+  const wrongIdentity = structuredClone(fixture.expectedIdentity);
   wrongIdentity.runId = 'different-run';
   await assert.rejects(ingestSpotPaperPairedReport({
     ...options,
     expectedIdentity: wrongIdentity,
-    dashboard: dashboard()
+    dashboard: fixture.dashboard
   }), error => error.code === 'PAIRED_IDENTITY_MISMATCH');
   assert.equal(storeCalls, 0);
 });
 
+test('only verified complete evidence can pass ingestion validation', async () => {
+  const fixture = verifiedFixture();
+  let storeCalls = 0;
+  for (const evidenceStatus of [
+    'INTERRUPTED', 'RUNNING_SNAPSHOT', 'CORRUPT_UNKNOWN'
+  ]) {
+    for (const write of [false, true]) {
+      await assert.rejects(ingestSpotPaperPairedReport({
+        expectedIdentity: fixture.expectedIdentity,
+        dashboard: {...fixture.dashboard, evidenceStatus},
+        write,
+        getStore() { storeCalls++; return memoryStore(); }
+      }), error => error.code === (evidenceStatus === 'CORRUPT_UNKNOWN' ?
+        'PAIRED_DASHBOARD_INVALID' : 'PAIRED_EVIDENCE_NOT_FINALIZABLE'));
+    }
+  }
+  assert.equal(storeCalls, 0);
+});
+
 test('unknown database write outcome is returned without an implicit retry', async () => {
+  const fixture = verifiedFixture();
   let calls = 0;
   const result = await ingestSpotPaperPairedReport({
-    expectedIdentity,
-    dashboard: dashboard(),
+    ...fixture,
     write: true,
     getStore: () => ({
       async insertImmutable() {
@@ -228,12 +251,13 @@ test('legacy and canonical trend evaluator DTOs survive ingestion, gateway GET, 
 });
 
 test('operator CLI defaults to dry-run and bounds input files before database access', async () => {
+  const fixture = verifiedFixture();
   const dir = await mkdtemp(join(tmpdir(), 'paired-report-ingest-'));
   try {
     const identityPath = join(dir, 'identity.json');
     const dashboardPath = join(dir, 'dashboard.json');
-    await writeFile(identityPath, JSON.stringify(expectedIdentity));
-    await writeFile(dashboardPath, JSON.stringify(dashboard()));
+    await writeFile(identityPath, JSON.stringify(fixture.expectedIdentity));
+    await writeFile(dashboardPath, JSON.stringify(fixture.dashboard));
     let output = '';
     let storeCalls = 0;
     const exitCode = await main([identityPath, dashboardPath], {
