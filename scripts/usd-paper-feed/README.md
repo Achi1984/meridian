@@ -36,7 +36,9 @@ and bounds each response to 64 KiB, total received bytes to 512 KiB, requests to
 one observation per minute. Its maximum elapsed span is 24 hours, matching the
 account/store ceiling; 256 observations at the minimum interval cover only
 about 4 hours 16 minutes. These ceilings do not establish 24-hour minute-feed
-readiness. No continuation beyond the account/store limits is implemented.
+readiness. Counters are per adapter instance; recreating it is not permission to
+extend a campaign or reset account/store limits. No continuation beyond those
+limits is implemented.
 
 Tests use clearly synthetic provider-shaped responses only. No live request,
 authentication, private endpoint, order method, deployment, or market-data

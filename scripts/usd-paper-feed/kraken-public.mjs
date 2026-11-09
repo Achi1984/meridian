@@ -1,13 +1,14 @@
 import { createHash } from "node:crypto";
 import { validateUsdQuote } from "../paper-capital-challenge/account-contract.mjs";
+import { PAPER_CAPITAL_CHALLENGE_POLICY as POLICY } from "../paper-capital-challenge/policy.mjs";
 
 const API_ORIGIN = "https://api.kraken.com";
 const PAIR = "BTC/USD";
 const KRAKEN_PAIR = "XBTUSD";
 const RESULT_PAIR = "XXBTZUSD";
 const SOURCE_ID = "kraken-public-btc-usd";
-const QUOTE_MAX_AGE_MS = 10_000;
-const MAX_EVENTS = 256;
+const QUOTE_MAX_AGE_MS = POLICY.maxValuationAgeMs;
+const MAX_EVENTS = POLICY.maxJournalObservations;
 const MAX_REQUESTS = MAX_EVENTS * 2;
 const MAX_RESPONSE_BYTES = 64 * 1024;
 const MAX_TOTAL_BYTES = 512 * 1024;
