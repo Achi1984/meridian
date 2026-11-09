@@ -144,7 +144,15 @@ function describeReason(bot) {
   return 'Kein aktueller Hinweis gemeldet.';
 }
 
-function renderTradeDetails(document, parent, bot) {
+function summaryStatus(bot) {
+  const state = STATE_LABELS[bot.state] || STATE_LABELS.UNKNOWN;
+  if (bot.state === 'PREPARED' || bot.state === 'UNKNOWN') return state;
+  if (bot.freshness.status === 'STALE') return 'Daten veraltet';
+  if (bot.freshness.status !== 'FRESH') return 'Status unbekannt';
+  return `${state} · Aktuell`;
+}
+
+function renderTradeDetails(document, parent, bot, disclosures) {
   const details = document.createElement('details');
   details.setAttribute('style', 'margin-top:10px;min-width:0');
   node(document, details, 'summary', `Handelsdetails (${bot.trades.length})`);
@@ -168,57 +176,110 @@ function renderTradeDetails(document, parent, bot) {
     details.append(list);
   }
   parent.append(details);
+  disclosures.push(details);
 }
 
-function renderBot(document, parent, bot) {
+function renderBot(document, parent, bot, disclosures) {
   const card = document.createElement('details');
+  card.className = 'spot-paper-bot-card';
   card.setAttribute('style',
     'border:1px solid currentColor;border-radius:12px;padding:12px;min-width:0;overflow-wrap:anywhere');
   const summary = document.createElement('summary');
-  summary.setAttribute('style', 'cursor:pointer;display:flex;flex-wrap:wrap;gap:8px;align-items:center');
+  summary.setAttribute('style',
+    'cursor:pointer;display:flex;flex-wrap:wrap;gap:8px;align-items:center;min-width:0;padding:4px 0;letter-spacing:0');
   node(document, summary, 'strong', bot.label);
-  node(document, summary, 'span', STATE_LABELS[bot.state] || STATE_LABELS.UNKNOWN,
-    `spot-paper-bot-status${bot.state === 'PAUSED' || bot.state === 'UNKNOWN' ?
-      ' tone-muted' : ''}`);
+  if (bot.strategy !== bot.label) node(document, summary, 'small', bot.strategy);
+  const status = node(document, summary, 'span', summaryStatus(bot),
+    'spot-paper-bot-status tone-muted');
+  status.setAttribute('style',
+    'display:inline-flex;align-items:center;max-width:100%;padding:2px 7px;border:1px solid currentColor;border-radius:999px;font-size:11px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;transform:none;transition:none');
+  const summaryPnl = bot.metrics.netPnl;
+  const summaryValue = document.createElement('strong');
+  summaryValue.setAttribute('style', 'font-size:13px;overflow-wrap:anywhere');
+  summaryValue.textContent = `Netto-PnL ${summaryPnl?.available ?
+    amount(summaryPnl, true) : 'Unbekannt'}`;
+  summaryValue.className = amountTone(summaryPnl, true);
+  summary.append(summaryValue);
+  node(document, summary, 'small', `Quelle: ${bot.freshness.at ?
+    timestamp({available: true, value: bot.freshness.at}) : 'Zeitpunkt nicht gemeldet.'}`);
   card.append(summary);
+  disclosures.push(card);
+
   const content = document.createElement('div');
   content.setAttribute('style', 'display:grid;gap:8px;min-width:0;padding-top:12px');
-  field(document, content, 'Strategie', bot.strategy);
-  field(document, content, 'Version', bot.version.available ?
-    bot.version.value : unknownText(bot.version));
+  const capital = document.createElement('section');
+  capital.setAttribute('aria-label', `${bot.label} Kapital und Ergebnis`);
+  node(document, capital, 'h4', 'Kapital & Ergebnis');
+  const capitalMetrics = document.createElement('div');
+  capitalMetrics.setAttribute('style',
+    'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:8px;min-width:0');
+  for (const key of ['capital', 'equity', 'netPnl', 'realizedPnl', 'unrealizedPnl']) {
+    const label = METRIC_LABELS.find(([metric]) => metric === key)[1];
+    const value = bot.metrics[key];
+    const signed = key === 'netPnl' || key === 'realizedPnl' || key === 'unrealizedPnl';
+    field(document, capitalMetrics, label, amount(value, signed),
+      key === 'equity' && value?.available && value.value < 0 ?
+        'tone-danger' : amountTone(value, signed));
+  }
+  field(document, capitalMetrics, 'Netto-PnL %', percent(bot.netPnlPercent),
+    signedPercentTone(bot.netPnlPercent));
+  capital.append(capitalMetrics);
+  content.append(capital);
+
   if (bot.instrument) {
-    field(document, content, 'Instrument', bot.instrument);
-    field(document, content, 'Modelleinheit', bot.nativeUnit);
-  } else {
-    field(document, content, 'Markt', bot.market.available ?
-      bot.market.value : unknownText(bot.market));
-    field(document, content, 'Währung', bot.currency.available ?
-      bot.currency.value : unknownText(bot.currency));
+    const instrument = document.createElement('section');
+    instrument.setAttribute('aria-label', `${bot.label} Instrument`);
+    field(document, instrument, 'Instrument', bot.instrument);
+    field(document, instrument, 'Modelleinheit', bot.nativeUnit);
+    content.append(instrument);
   }
 
-  const metrics = document.createElement('div');
-  metrics.setAttribute('style',
+  const costs = document.createElement('section');
+  costs.setAttribute('aria-label', `${bot.label} Kosten und Handel`);
+  node(document, costs, 'h4', 'Kosten & Handel');
+  const costMetrics = document.createElement('div');
+  costMetrics.setAttribute('style',
     'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,145px),1fr));gap:8px;min-width:0');
-  for (const [key, label] of METRIC_LABELS) {
+  for (const key of ['fees', 'slippage', 'funding']) {
+    const label = METRIC_LABELS.find(([metric]) => metric === key)[1];
     const value = bot.metrics[key];
-    const pnlMetric = key === 'netPnl' || key === 'realizedPnl' ||
-      key === 'unrealizedPnl' || key === 'funding';
-    field(document, metrics, label, amount(value, pnlMetric),
-    key === 'equity' && value?.available && value.value < 0 ?
-      'tone-danger' : amountTone(value, pnlMetric));
+    const signed = key === 'funding';
+    field(document, costMetrics, label, amount(value, signed), amountTone(value, signed));
   }
-  field(document, metrics, 'Netto-PnL %', percent(bot.netPnlPercent),
-    signedPercentTone(bot.netPnlPercent));
-  field(document, metrics, 'Abgeschlossene Handelsrunden', bot.roundTrips.available ?
+  field(document, costMetrics, 'Abgeschlossene Handelsrunden', bot.roundTrips.available ?
     String(bot.roundTrips.value) : unknownText(bot.roundTrips));
-  field(document, metrics, 'Zeit investiert', time(bot.timeInvestedMs));
-  field(document, metrics, 'Letzter Trade', timestamp(bot.lastTradeAt));
-  content.append(metrics);
-  field(document, content, 'Datenfrische',
+  field(document, costMetrics, 'Zeit investiert', time(bot.timeInvestedMs));
+  field(document, costMetrics, 'Letzter Trade', timestamp(bot.lastTradeAt));
+  costs.append(costMetrics);
+  renderTradeDetails(document, costs, bot, disclosures);
+  content.append(costs);
+
+  const details = document.createElement('section');
+  details.setAttribute('aria-label', `${bot.label} Statusdetails`);
+  node(document, details, 'h4', 'Status & Details');
+  field(document, details, 'Strategie', bot.strategy);
+  field(document, details, 'Version', bot.version.available ?
+    bot.version.value : unknownText(bot.version));
+  if (bot.instrument) {
+    field(document, details, 'Markt', unknownText(bot.market));
+    field(document, details, 'Währung', unknownText(bot.currency));
+  } else {
+    field(document, details, 'Markt', bot.market.available ?
+      bot.market.value : unknownText(bot.market));
+    field(document, details, 'Währung', bot.currency.available ?
+      bot.currency.value : unknownText(bot.currency));
+  }
+  const reportedState = STATE_LABELS[bot.state] || STATE_LABELS.UNKNOWN;
+  field(document, details, 'Gemeldeter Laufstatus',
+    bot.state === 'PREPARED' || bot.state === 'UNKNOWN' ? reportedState :
+      `${reportedState} · ${bot.freshness.status === 'STALE' ? 'Daten veraltet' :
+        bot.freshness.status === 'FRESH' ? 'Aktuell' : 'Datenfrische unbekannt'}`);
+  field(document, details, 'Datenfrische',
     `${FRESHNESS_LABELS[bot.freshness.status] || FRESHNESS_LABELS.UNKNOWN} · ${reasonText(bot.freshness.reason)}` +
     (bot.freshness.at ? ` · ${timestamp({available: true, value: bot.freshness.at})}` : ''));
-  field(document, content, bot.state === 'PAUSED' ? 'Pause-Grund' : 'Handels-/Statusgrund',
+  field(document, details, bot.state === 'PAUSED' ? 'Pause-Grund' : 'Handels-/Statusgrund',
     describeReason(bot));
+  content.append(details);
 
   if (bot.id === 'btc-usd-lives') {
     const risk = document.createElement('section');
@@ -233,7 +294,6 @@ function renderBot(document, parent, bot) {
       'Risikowerte aus geprüften Daten.' : unknownText(bot.risk.drawdown));
     content.append(risk);
   }
-  renderTradeDetails(document, content, bot);
   card.append(content);
   parent.append(card);
 }
@@ -300,7 +360,22 @@ export function renderSpotPaperBotOverview(root, adapters, document = root?.owne
   const cards = document.createElement('div');
   cards.setAttribute('style',
     'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;min-width:0');
-  for (const bot of model.bots) renderBot(document, cards, bot);
+  cards.id = `${heading.id}-cards`;
+  const disclosures = [];
+  for (const bot of model.bots) renderBot(document, cards, bot, disclosures);
+  const controls = document.createElement('div');
+  controls.setAttribute('style', 'display:flex;flex-wrap:wrap;gap:8px;min-width:0');
+  for (const [label, open] of [['Alle Details öffnen', true], ['Alle Details schließen', false]]) {
+    const button = node(document, controls, 'button', label);
+    button.setAttribute('type', 'button');
+    button.setAttribute('aria-controls', cards.id);
+    button.setAttribute('style',
+      'min-height:44px;min-width:44px;max-width:100%;padding:8px 12px;border:1px solid currentColor;border-radius:8px;background:transparent;color:inherit;font:inherit;cursor:pointer;overflow-wrap:anywhere');
+    button.addEventListener('click', () => {
+      for (const disclosure of disclosures) disclosure.open = open;
+    });
+  }
+  root.append(controls);
   root.append(cards);
   renderCurve(document, root, model.curve, model.bots);
   return model;
