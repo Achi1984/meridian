@@ -4,10 +4,8 @@ import { createHash } from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { chmod, mkdir, mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
-import { dirname, join, resolve } from "node:path";
-import { fileURLToPath } from "node:url";
+import { join, resolve } from "node:path";
 
-const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const ACCOUNT_CONTRACT = "BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2";
 const MODEL_PAIR = "BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1";
 const RESEARCH_SOURCE_SHA256 =
