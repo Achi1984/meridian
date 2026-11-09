@@ -184,10 +184,27 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
     assumptions.feeSource ===
       'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea' &&
     assumptions.feeAsOf === '2026-11-09' &&
-    assumptions.accountTier === 'UNKNOWN';
+    assumptions.accountTier === 'UNKNOWN' &&
+    assumptions.accountingEngine === 'PAIRED_FEE_SCENARIO_LEDGER_V1';
   if ((!legacyFees && !nextRunFees) ||
       assumptions.slippageBpsPerSide !== 10 ||
       assumptions.ratesVerified !== false) return null;
+  const assumptionsResult = legacyFees ? {
+    feeBpsPerSide: assumptions.feeBpsPerSide,
+    slippageBpsPerSide: assumptions.slippageBpsPerSide,
+    ratesVerified: assumptions.ratesVerified
+  } : {
+    feeBpsPerSide: assumptions.feeBpsPerSide,
+    slippageBpsPerSide: assumptions.slippageBpsPerSide,
+    ratesVerified: assumptions.ratesVerified,
+    accountContractId: assumptions.accountContractId,
+    accountContractVersion: assumptions.accountContractVersion,
+    feeBasis: assumptions.feeBasis,
+    feeSource: assumptions.feeSource,
+    feeAsOf: assumptions.feeAsOf,
+    accountTier: assumptions.accountTier,
+    accountingEngine: assumptions.accountingEngine
+  };
   const arms = {};
   for (const role of SPOT_PAPER_PAIRED_ROLES) {
     arms[role] = safeArm(input.arms[role], role,
@@ -224,7 +241,7 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
     independentAuthentication: 'NOT_ESTABLISHED',
     identity,
     timing: timingResult,
-    assumptions: structuredClone(assumptions),
+    assumptions: assumptionsResult,
     arms,
     deltas,
     decision: 'NO_WINNER_OR_PROMOTION'

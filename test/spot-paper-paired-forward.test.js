@@ -77,6 +77,8 @@ async function fixture(t, options = {}) {
   let challengerApplyCount = 0;
   let sleepCount = 0;
   let replayObservations = null;
+  const challengerStatesSeen = [];
+  const challengerSellStates = [];
   const provider = {
     sourceId: SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
     async fetchOhlc() {
@@ -125,17 +127,29 @@ async function fixture(t, options = {}) {
     advanceEntryConfirmation(state, candles, { nowMs }) {
       challengerDecisions++;
       order.push("decide:challenger");
+      if (options.preserveChallengeState) challengerStatesSeen.push(structuredClone(state));
+      const advancedState = options.preserveChallengeState ?
+        {...state, advancedCycle: challengerDecisions} :
+        options.mutateChallengeState ? {...state, challengerOnly: true} : state;
       return {
-        state: options.mutateChallengeState ? { ...state, challengerOnly: true } : state,
+        state: advancedState,
         signals: options.enterOnCycleOne && challengerDecisions === 1 ? [{
           id: "synthetic-entry", direction: "ENTRY", candleAt: candles.at(-1).timestamp,
           closeNano: candles.at(-1).closeNano, strategyReason: "SYNTHETIC_TEST_ENTRY"
+        }] : options.exitOnCycleTwo && challengerDecisions === 2 ? [{
+          id: "synthetic-exit", direction: "EXIT", candleAt: candles.at(-1).timestamp,
+          closeNano: candles.at(-1).closeNano, strategyReason: "SYNTHETIC_TEST_EXIT"
         }] : [],
         newCandleCount: 1, nowMs
       };
     },
     recordEntryConfirmationSell(state, executedAt) {
-      return { ...state, pending: null, cooldownUntil: executedAt + 600_000 };
+      const updated = { ...state, pending: null, cooldownUntil: executedAt + 600_000 };
+      if (options.preserveChallengeState) {
+        challengerSellStates.push({before: structuredClone(state),
+          after: structuredClone(updated)});
+      }
+      return updated;
     }
   };
   const challengerArm = createChallengerArm(challenge, "challenger-eur");
@@ -222,6 +236,7 @@ async function fixture(t, options = {}) {
   return { config, order, provider, get wall() { return wall; },
     get mono() { return mono; },
     get challengerApplyCount() { return challengerApplyCount; },
+    challengerStatesSeen, challengerSellStates,
     get replayObservations() { return replayObservations; },
     dataRoot };
 }
@@ -354,6 +369,23 @@ test("candidate quote-triggered stop fills remain causal after strategy annotati
   assert.equal(challenger.fills[1].reason, "BASELINE_SAMPLED_2PCT_BID_STOP");
   assert.ok(challenger.valuation.feesCents > 0);
   assert.ok(challenger.valuation.slippageCents > 0);
+});
+
+test("runner preserves challenger decision advancement through sell cooldown", async t => {
+  const setup = await fixture(t, {
+    maxCycles: 3, maxRequests: 6, enterOnCycleOne: true,
+    exitOnCycleTwo: true, preserveChallengeState: true
+  });
+  const report = await runSpotPaperPairedSynthetic(setup.config);
+
+  assert.equal(report.cycles, 3);
+  assert.equal(setup.challengerSellStates.length, 1);
+  assert.equal(setup.challengerSellStates[0].before.advancedCycle, 2);
+  assert.equal(setup.challengerStatesSeen[2].advancedCycle, 2);
+  assert.equal(setup.challengerStatesSeen[2].cooldownUntil,
+    setup.challengerSellStates[0].after.cooldownUntil);
+  assert.ok(report.arms.find(arm => arm.role === "challenger").fills.some(fill =>
+    fill.side === "SELL" && fill.reason === "SYNTHETIC_TEST_EXIT"));
 });
 
 test("stopped account gets mark-only common-horizon valuation while stale replay is withheld", async t => {

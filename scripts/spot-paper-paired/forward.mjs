@@ -399,7 +399,7 @@ export function createChallengerArm(
         result.ledger.fills.splice(result.ledger.fills.length - candidateFills.length,
           candidateFills.length, ...candidateFills);
       }
-      let strategy = decision?.state?.strategy ?? state.strategy;
+      let strategy = state.strategy;
       if (candidateFills.some(fill => fill.side === "SELL")) {
         strategy = researchExports.recordEntryConfirmationSell(strategy, at);
       }

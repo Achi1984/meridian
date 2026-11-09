@@ -12,6 +12,7 @@ import {
   SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES
 } from '../scripts/spot-paper-paired-report/evaluate.mjs';
 import {
+  projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA
 } from '../scripts/spot-paper-paired-report/contract.mjs';
 
@@ -310,6 +311,48 @@ test('accepts a historically fresh common horizon with a stale terminal quote', 
   assert.equal(output.timing.terminalQuoteAgeMs, 32_712);
   assert.equal(output.timing.quoteFreshAtShutdown, false);
   assert.equal(output.timing.commonHorizonAvailable, true);
+});
+
+test('dashboard projection allowlists legacy and V2 fee assumptions', () => {
+  const legacy = evaluatePairedPaperEvidence(fixture());
+  legacy.assumptions.privateMetadata = {nested: {secret: 'not-for-browser'}};
+  legacy.assumptions.unrecognized = 'drop';
+  const safeLegacy = projectSpotPaperPairedDashboard(legacy);
+  assert.deepEqual(safeLegacy.assumptions, {
+    feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false
+  });
+
+  const v2 = structuredClone(legacy);
+  v2.assumptions = {
+    feeBpsPerSide: 20,
+    slippageBpsPerSide: 10,
+    ratesVerified: false,
+    accountContractId: 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2',
+    accountContractVersion: 2,
+    feeBasis: 'EEA_SPOT_ONLY_TAKER_ASSUMPTION',
+    feeSource: 'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea',
+    feeAsOf: '2026-11-09',
+    accountTier: 'UNKNOWN',
+    accountingEngine: 'PAIRED_FEE_SCENARIO_LEDGER_V1',
+    privateMetadata: {nested: {secret: 'not-for-browser'}}
+  };
+  const safeV2 = projectSpotPaperPairedDashboard(v2);
+  assert.deepEqual(safeV2.assumptions, {
+    feeBpsPerSide: 20,
+    slippageBpsPerSide: 10,
+    ratesVerified: false,
+    accountContractId: 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2',
+    accountContractVersion: 2,
+    feeBasis: 'EEA_SPOT_ONLY_TAKER_ASSUMPTION',
+    feeSource: 'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea',
+    feeAsOf: '2026-11-09',
+    accountTier: 'UNKNOWN',
+    accountingEngine: 'PAIRED_FEE_SCENARIO_LEDGER_V1'
+  });
+  assert.equal(projectSpotPaperPairedDashboard({
+    ...v2,
+    assumptions: {...v2.assumptions, accountingEngine: 'UNRECOGNIZED'}
+  }), null);
 });
 
 test('rejects shared observations whose common decision time is not the latest arm decision', () => {
