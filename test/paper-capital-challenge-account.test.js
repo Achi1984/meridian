@@ -282,6 +282,24 @@ test("ordered events, contradictory duplicate IDs, immutable bindings and unsafe
   assert.throws(() => validateUsdQuote(accessor, BASE), /INVALID_QUOTE/);
 });
 
+test("quote identity preserves colon-containing source/ID tuples without aliases", () => {
+  const firstQuote = quote(0, "10000", "10000", { sourceId: "a:b", id: "c" });
+  const secondQuote = quote(1, "10001", "10001", { sourceId: "a", id: "b:c" });
+  const events = [
+    event(0, "HOLD", { quote: firstQuote }),
+    event(1, "HOLD", { quote: secondQuote })
+  ];
+  const result = replay(events);
+  assert.equal(result.entries.length, 2);
+  assert.deepEqual(result.entries.map(entry => [entry.event.quote.sourceId, entry.event.quote.id]),
+    [["a:b", "c"], ["a", "b:c"]]);
+  for (const existing of [firstQuote, secondQuote]) {
+    assert.throws(() => replay([...events, event(2, "HOLD", {
+      quote: { ...existing, bid: "9999" }
+    })]), /CONTRADICTORY_DUPLICATE_QUOTE/);
+  }
+});
+
 test("pure valuation validates account and leaves caller input unchanged", () => {
   const args = {
     binding: BINDING, account: { cashCents: 90972, inventorySatoshis: "900000",

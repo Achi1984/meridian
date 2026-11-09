@@ -71,7 +71,7 @@ export function replayUsdAccount(journal) {
       if (canonical(duplicate) !== canonical(event)) throw new Error("CONTRADICTORY_DUPLICATE_EVENT");
       continue;
     }
-    const quoteKey = `${event.quote.sourceId}:${event.quote.id}`;
+    const quoteKey = JSON.stringify([event.quote.sourceId, event.quote.id]);
     const oldQuote = quoteIds.get(quoteKey);
     if (oldQuote && canonical(oldQuote) !== canonical(event.quote)) {
       throw new Error("CONTRADICTORY_DUPLICATE_QUOTE");

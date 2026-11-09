@@ -178,15 +178,16 @@ bind via event.id; no independently supplied fill/valuation claim is trusted.
 Derived payloads are diagnostic outputs, not restart admission credentials.
 To verify one, replay its original events and compare all derived output.
 
-The intended guard-history interface, once #1297 is integrated, is:
+#1297 is integrated from main, and its postchecks are complete. The available
+guard-history interface for future account/host wiring is:
   for each NEW derived observation in order:
     result = await historyStore.append(observation)
     independently retain result.tip
   resume only via reopenExisting(directory, {expectedTip: externallyRetainedTip})
   compare persisted observations to replayed account observations before use.
 
-This interface description is not implemented host wiring and does not claim
-the history store is present on this branch. Guard-history persistence is NOT
+The history store is present on this branch; this interface description is
+not implemented account/host wiring. Guard-history persistence is NOT
 full account-transaction durability: saving observations alone loses BTC/fill/
 cost evidence. A later reviewed account store must atomically persist the
 complete event with its derived fill and valuation, coordinate the guard tip,
@@ -208,8 +209,8 @@ profitableCandidateEstablished is always false. Cash-only and held-but-never-
 closed candidates do not pass that criterion. No forced trades, churn to pass
 it, or pause override should be introduced by a future strategy integration.
 
-Launch blockers remain: #1297 persistence review/integration; independently
-retained external restart tip and complete account-transaction durability;
+Launch blockers remain: independently retained external restart tip and
+complete account-transaction durability;
 reviewed continuation beyond 256 observations; authenticated native live
 BTC/USD feed/venue applicability; verified USD account cost schedule; host
 wiring and explicit owner authorization/admission; an approved active strategy
