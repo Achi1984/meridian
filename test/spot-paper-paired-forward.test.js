@@ -531,6 +531,8 @@ test("versioned 20-bps contract drives paper fills and shared comparison", async
   assert.equal(report.assumptions.feeBasis,
     "EEA_SPOT_ONLY_TAKER_ASSUMPTION");
   assert.equal(report.assumptions.accountTier, "UNKNOWN");
+  assert.equal(report.assumptions.accountingEngine,
+    "PAIRED_FEE_SCENARIO_LEDGER_V1");
   assert.equal(report.assumptions.slippageBpsPerSide, 10);
   assert.equal(report.comparison.status, "COMPARISON_AVAILABLE");
   assert.equal(report.comparison.arms.baseline.feesCents,

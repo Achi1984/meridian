@@ -225,7 +225,7 @@ function validateBindings(config, testOnly) {
       typeof arm.accountId === "string" && arm.accountId.length > 0 &&
       typeof arm.initialize === "function" && typeof arm.decide === "function" &&
       typeof arm.apply === "function" && typeof arm.summarize === "function" &&
-      (config.accountContract.version !== 2 ||
+      (config.accountContract.version !== 2 || role === "cash" ||
         arm.feeApply === config.feeScenarioApply) &&
       same(arm.accountContract, config.accountContract),
     `INVALID_${role.toUpperCase()}_BINDING`);

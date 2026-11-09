@@ -117,7 +117,8 @@ function validFeeAssumptions(assumptions) {
     assumptions.feeSource ===
       'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea' &&
     assumptions.feeAsOf === '2026-11-09' &&
-    assumptions.accountTier === 'UNKNOWN';
+    assumptions.accountTier === 'UNKNOWN' &&
+    assumptions.accountingEngine === 'PAIRED_FEE_SCENARIO_LEDGER_V1';
 }
 
 function getJournalPayload(journal) {
