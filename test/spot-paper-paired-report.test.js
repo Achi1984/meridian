@@ -416,6 +416,62 @@ test('historical V1 report identity cannot be relabeled as the next-run model pa
   assert.equal(result.reasonCode, 'IDENTITY_MISMATCH');
 });
 
+test('trend activity round trips reconcile to verified challenger sell fills', () => {
+  const input = fixture();
+  const nextRunModels = [
+    'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1',
+    'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1',
+    'CASH_CONTROL_V1'
+  ];
+  input.expectedIdentity.modelPairId =
+    'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1';
+  input.expectedIdentity.models = input.expectedIdentity.models.map((model, index) => ({
+    ...model, modelId: nextRunModels[index]
+  }));
+  input.report.modelPairId = input.expectedIdentity.modelPairId;
+  input.report.models = structuredClone(input.expectedIdentity.models);
+  input.report.arms.forEach((arm, index) => {
+    arm.modelId = nextRunModels[index];
+    input.report.comparison.arms[arm.role].strategyId = nextRunModels[index];
+  });
+  input.report.assumptions = {
+    feeBpsPerSide: 20,
+    slippageBpsPerSide: 10,
+    ratesVerified: false,
+    accountContractId: 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2',
+    accountContractVersion: 2,
+    feeBasis: 'EEA_SPOT_ONLY_TAKER_ASSUMPTION',
+    feeSource: 'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea',
+    feeAsOf: '2026-11-09',
+    accountTier: 'UNKNOWN',
+    accountingEngine: 'PAIRED_FEE_SCENARIO_LEDGER_V1'
+  };
+  input.report.trendActivityDiagnostic = {
+    schemaVersion: 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1',
+    status: 'PARTIAL_COVERAGE',
+    completedRoundTripCount: 0,
+    requiredCompletedRoundTrips: 5,
+    observedCoverageMs: Math.floor(input.report.elapsedMs),
+    requiredCoverageMs: 86_400_000,
+    completeWindow: false,
+    forcedTrades: false,
+    deadlineExtensionAllowed: false,
+    profitability: 'NOT_ASSESSED'
+  };
+  input.journal.manifest.modelPairId = input.expectedIdentity.modelPairId;
+  input.journal.manifest.models = structuredClone(input.expectedIdentity.models);
+  input.journal.manifest.assumptions = structuredClone(input.report.assumptions);
+  input.journal.events.at(-1).report = structuredClone(input.report);
+  assert.equal(evaluatePairedPaperEvidence(input).evidenceStatus,
+    'VERIFIED_COMPLETE');
+
+  input.report.trendActivityDiagnostic.completedRoundTripCount = 1;
+  input.journal.events.at(-1).report = structuredClone(input.report);
+  const tampered = evaluatePairedPaperEvidence(input);
+  assert.equal(tampered.evidenceStatus, 'CORRUPT_UNKNOWN');
+  assert.equal(tampered.reasonCode, 'INVALID_TREND_ACTIVITY_DIAGNOSTIC');
+});
+
 test('rejects shared observations whose common decision time is not the latest arm decision', () => {
   const input = fixture();
   input.journal.events[1].decisions[0].decidedAt++;

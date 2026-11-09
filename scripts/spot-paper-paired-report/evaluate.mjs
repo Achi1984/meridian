@@ -134,6 +134,13 @@ function validFeeAssumptions(assumptions) {
 }
 
 function validTrendActivityDiagnostic(diagnostic, report) {
+  const challengerFills = report.arms?.find(arm =>
+    arm?.role === 'challenger')?.fills;
+  if (!Array.isArray(challengerFills) ||
+      challengerFills.some(fill => !isRecord(fill) ||
+        !['BUY', 'SELL'].includes(fill.side))) return false;
+  const completedRoundTripCount =
+    challengerFills.filter(fill => fill.side === 'SELL').length;
   return exactKeys(diagnostic, [
     'schemaVersion', 'status', 'completedRoundTripCount',
     'requiredCompletedRoundTrips', 'observedCoverageMs', 'requiredCoverageMs',
@@ -142,7 +149,7 @@ function validTrendActivityDiagnostic(diagnostic, report) {
     diagnostic.schemaVersion === 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1' &&
     diagnostic.status === 'PARTIAL_COVERAGE' &&
     isInteger(diagnostic.completedRoundTripCount) &&
-    diagnostic.completedRoundTripCount >= 0 &&
+    diagnostic.completedRoundTripCount === completedRoundTripCount &&
     diagnostic.requiredCompletedRoundTrips === 5 &&
     diagnostic.observedCoverageMs === Math.floor(report.elapsedMs) &&
     diagnostic.requiredCoverageMs === 86_400_000 &&
