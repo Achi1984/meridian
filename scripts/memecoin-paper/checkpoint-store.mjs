@@ -288,7 +288,9 @@ export class CheckpointStore {
 
   async #abortBeforePublication(tempPath) {
     let clearSucceeded = true;
-    await rm(tempPath, {force: true}).catch(() => { clearSucceeded = false; });
+    if (tempPath) {
+      await rm(tempPath, {force: true}).catch(() => { clearSucceeded = false; });
+    }
     await this.#clearPending().catch(() => { clearSucceeded = false; });
     return clearSucceeded;
   }
