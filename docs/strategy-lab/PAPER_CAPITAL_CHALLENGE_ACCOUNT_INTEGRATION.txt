@@ -7,7 +7,7 @@ No deployment, network acquisition, live test, EUR relabeling, or change to
 the persistence/guard/policy (#1297), EUR fee/horizon/host (#1309), or trend
 research (#1311) files is part of this implementation.
 
-Modules (repository root: /home/runner/work/meridian/meridian):
+Modules (relative to repository root):
   scripts/paper-capital-challenge/account-contract.mjs
   scripts/paper-capital-challenge/valuation.mjs
   scripts/paper-capital-challenge/account.mjs
@@ -232,11 +232,21 @@ took 5,870 ms in the focused local run. These figures are bounded synthetic
 test evidence, not a host capacity or latency guarantee.
 
 scripts/paper-capital-challenge/offline-runner.mjs consumes prevalidated
-caller-supplied native USD quotes and one injected causal decision per quote.
-It persists each action through the account journal and reports activity,
+caller-supplied native USD quotes and an injected causal decision function.
+The function receives the current observation plus immutable persisted
+transaction history. It must be stateless/deterministic from those inputs or
+reconstruct its state from that history; arbitrary closure or process-local
+strategy state is not persisted. A decision not yet durably appended may be
+requested again after a crash, so callback behavior must be repeatable.
+Exact persisted input prefixes are verified against the original quote and
+timestamp, then skipped without calling the decision function again; only
+unseen suffix observations invoke it and count toward resource limits.
+The runner persists each action through the account journal and reports activity,
 rejected entries, last modeled trade, booked/additional costs, net equity,
-and remaining drawdown allowance. The real guard blocks buys after pause;
-valid risk-reducing sells remain admissible. It has no provider, host,
+remaining arithmetic drawdown allowance, and the actual entry-gate result
+separately. A positive allowance after a mark recovery does not unlatch a pause
+or enable entries. The real guard blocks buys after pause; valid risk-reducing
+sells remain admissible. It has no provider, host,
 network, order dispatch, or live authentication. A future host still needs
 an independently qualified native BTC/USD feed and an independently retained
 latest tip, supplied back to reopenExisting after restart.
@@ -263,7 +273,7 @@ without bypassing drawdown. All production policy gates remain disabled.
 
 FOCUSED OFFLINE VALIDATION
 
-From /home/runner/work/meridian/meridian:
+From the repository root:
   node --test test/paper-capital-challenge-account.test.js \
               test/paper-capital-challenge-guard.test.js \
               test/paper-capital-challenge-history-store.test.js \

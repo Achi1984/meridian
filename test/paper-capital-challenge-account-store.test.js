@@ -264,14 +264,14 @@ test("offline fixture replay matches uninterrupted and restart-split executions"
     observation(4, "5000"),
     observation(5, "5000")
   ];
-  const decide = ({observation: current}) => ({
-    "event-0": decision("BUY", "0.009"),
-    "event-1": decision("HOLD"),
-    "event-2": decision("HOLD"),
-    "event-3": decision("BUY", "0.009"),
-    "event-4": decision("SELL", "0.004"),
-    "event-5": decision("SELL", "0.005")
-  })[current.id];
+  const decide = ({history}) => ({
+    0: decision("BUY", "0.009"),
+    1: decision("HOLD"),
+    2: decision("HOLD"),
+    3: decision("BUY", "0.009"),
+    4: decision("SELL", "0.004"),
+    5: decision("SELL", "0.005")
+  })[history.length];
 
   const uninterrupted = await runUsdOfflineStream({
     store: fullStore, observations: fixture, decide
@@ -283,9 +283,26 @@ test("offline fixture replay matches uninterrupted and restart-split executions"
   const resumedStore = await UsdAccountJournalStore.reopenExisting(splitDirectory, {
     binding: BINDING, expectedTip: firstHalf.tip
   });
+  let suffixDecisions = 0;
+  const contradictoryPrefix = structuredClone(fixture);
+  contradictoryPrefix[1].quote.bid = "20001";
+  contradictoryPrefix[1].quote.ask = "20001";
+  await assert.rejects(runUsdOfflineStream({
+    store: resumedStore,
+    observations: contradictoryPrefix,
+    decide() {
+      suffixDecisions += 1;
+      return decision("HOLD");
+    }
+  }), /CONTRADICTORY_DUPLICATE_EVENT/);
+  assert.equal(suffixDecisions, 0);
   const secondHalf = await runUsdOfflineStream({
-    store: resumedStore, observations: fixture.slice(3), decide
+    store: resumedStore, observations: fixture, decide(context) {
+      suffixDecisions += 1;
+      return decide(context);
+    }
   });
+  assert.equal(suffixDecisions, 3);
 
   assert.deepEqual(secondHalf.replay, uninterrupted.replay);
   assert.deepEqual(secondHalf.report, uninterrupted.report);
@@ -295,8 +312,48 @@ test("offline fixture replay matches uninterrupted and restart-split executions"
   assert.equal(secondHalf.report.netEquityCents, secondHalf.replay.activity.netEquityCents);
   assert.equal(secondHalf.report.remainingDrawdownAllowanceCents, 0);
   assert.equal(secondHalf.report.paused, true);
-  await fullStore.close();
+  const retainedTip = secondHalf.tip;
+  const retainedCash = secondHalf.replay.account.cashCents;
+  const retainedInventory = secondHalf.replay.account.inventorySatoshis;
   await resumedStore.close();
+  const retried = await runChild(splitDirectory, "runner-retry", retainedTip, fixture);
+  assert.equal(retried.code, 0, retried.stderr);
+  const retriedResult = JSON.parse(retried.stdout);
+  assert.deepEqual(retriedResult.tip, retainedTip);
+  assert.deepEqual(retriedResult.replay, JSON.parse(JSON.stringify(secondHalf.replay)));
+  assert.deepEqual(retriedResult.report, JSON.parse(JSON.stringify(secondHalf.report)));
+  assert.equal(retriedResult.replay.account.cashCents, retainedCash);
+  assert.equal(retriedResult.replay.account.inventorySatoshis, retainedInventory);
+  await fullStore.close();
+});
+
+test("latched pause remains an entry denial after mark recovery restores allowance", async t => {
+  const root = await tempDirectory(t);
+  const store = await UsdAccountJournalStore.createNew(path.join(root, "recovery"), {
+    binding: BINDING
+  });
+  const observations = [
+    observation(0),
+    observation(1, "20000"),
+    observation(2, "5000"),
+    observation(3, "20000")
+  ];
+  const actions = [
+    decision("BUY", "0.009"),
+    decision("HOLD"),
+    decision("HOLD"),
+    decision("HOLD")
+  ];
+  const result = await runUsdOfflineStream({
+    store, observations, decide: ({history}) => actions[history.length]
+  });
+
+  assert.equal(result.report.paused, true);
+  assert.equal(result.report.remainingDrawdownAllowanceCents, POLICY.maxDrawdownCents);
+  assert.deepEqual(result.report.entryAdmission, {
+    allowed: false, reason: "DRAWDOWN_PAUSED"
+  });
+  await store.close();
 });
 
 test("24-hour full-window storage and replay stay within declared resource limits", {
@@ -335,15 +392,22 @@ test("24-hour full-window storage and replay stay within declared resource limit
   assert.ok(committedBytes < 64 * 1024 * 1024);
   assert.ok(elapsedMs < 120_000);
   let decisions = 0;
-  await assert.rejects(runUsdOfflineStream({
+  const persistedPrefix = store.replay.entries.map(entry => ({
+    id: entry.event.id,
+    observedAtMs: entry.event.observedAtMs,
+    quote: entry.event.quote
+  }));
+  const retriedPrefix = await runUsdOfflineStream({
     store,
-    observations: [observation(MAX_USD_ACCOUNT_JOURNAL_EVENTS)],
+    observations: persistedPrefix,
     decide() {
       decisions += 1;
-      return decision("HOLD");
+      throw new Error("persisted retry must not call strategy");
     }
-  }), /ACCOUNT_JOURNAL_LIMIT_REACHED/);
+  });
   assert.equal(decisions, 0);
+  assert.deepEqual(retriedPrefix.tip, tip);
+  assert.equal(retriedPrefix.replay.entries.length, MAX_USD_ACCOUNT_JOURNAL_EVENTS);
   await assert.rejects(store.append(event(MAX_USD_ACCOUNT_JOURNAL_EVENTS, "HOLD", {
     observedAtMs: BASE + MAX_USD_ACCOUNT_WINDOW_MS
   })), /ACCOUNT_JOURNAL_LIMIT_REACHED/);

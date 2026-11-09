@@ -234,7 +234,7 @@ export function advanceChallengeState(previousState, inputObservation) {
     if (stableJson(duplicate) !== stableJson(observation)) {
       throw new Error("CONTRADICTORY_DUPLICATE_OBSERVATION");
     }
-    return previous;
+    return freezeState(previous);
   }
   validateJournalLength(previous.observations, { requireCapacity: true });
   return freezeState(advanceValidated(previous, observation, { duplicateChecked: true }));
