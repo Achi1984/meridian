@@ -21,6 +21,12 @@ const MAX_REQUESTS = 960;
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_QUOTE_AGE_MS = 10_000;
 const MAX_RESPONSE_BYTES = 256 * 1024;
+const NEXT_RUN_MODEL_PAIR = 'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1';
+const NEXT_RUN_MODELS = [
+  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1',
+  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1',
+  'CASH_CONTROL_V1'
+];
 const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -62,10 +68,12 @@ function fail(reasonCode) {
 }
 
 function validExpectedIdentity(expected) {
-  if (!exactKeys(expected, [
-        'schemaVersion', 'runId', 'pair', 'sourceSha256', 'configSha256',
-        'researchSourceSha256', 'feedSourceId', 'comparisonEngineId', 'models'
-      ]) ||
+  const keys = [
+    'schemaVersion', 'runId', 'pair', 'sourceSha256', 'configSha256',
+    'researchSourceSha256', 'feedSourceId', 'comparisonEngineId', 'models',
+    ...(expected?.modelPairId === undefined ? [] : ['modelPairId'])
+  ];
+  if (!exactKeys(expected, keys) ||
       expected.schemaVersion !== SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA ||
       !RUN_ID.test(expected.runId ?? '') || expected.pair !== 'BTC/EUR' ||
       !HASH.test(expected.sourceSha256 ?? '') ||
@@ -75,13 +83,16 @@ function validExpectedIdentity(expected) {
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(expected.feedSourceId) ||
       typeof expected.comparisonEngineId !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(expected.comparisonEngineId) ||
+      expected.modelPairId !== undefined &&
+        expected.modelPairId !== NEXT_RUN_MODEL_PAIR ||
       !Array.isArray(expected.models) || expected.models.length !== 3) return false;
   return expected.models.every((model, index) =>
     exactKeys(model, ['role', 'modelId', 'accountId']) &&
     model.role === SPOT_PAPER_PAIRED_ROLES[index] &&
     MODEL_ID.test(model.modelId ?? '') &&
     typeof model.accountId === 'string' &&
-    /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(model.accountId));
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(model.accountId) &&
+    (!expected.modelPairId || model.modelId === NEXT_RUN_MODELS[index]));
 }
 
 function expectedPublicIdentity(expected) {
@@ -91,6 +102,7 @@ function expectedPublicIdentity(expected) {
     sourceSha256: expected.sourceSha256,
     configSha256: expected.configSha256,
     researchSourceSha256: expected.researchSourceSha256,
+    ...(expected.modelPairId ? {modelPairId: expected.modelPairId} : {}),
     models: expected.models.map(({role, modelId}) => ({role, modelId}))
   };
 }
@@ -119,6 +131,32 @@ function validFeeAssumptions(assumptions) {
     assumptions.feeAsOf === '2026-11-09' &&
     assumptions.accountTier === 'UNKNOWN' &&
     assumptions.accountingEngine === 'PAIRED_FEE_SCENARIO_LEDGER_V1';
+}
+
+function validTrendActivityDiagnostic(diagnostic, report) {
+  const challengerFills = report.arms?.find(arm =>
+    arm?.role === 'challenger')?.fills;
+  if (!Array.isArray(challengerFills) ||
+      challengerFills.some(fill => !isRecord(fill) ||
+        !['BUY', 'SELL'].includes(fill.side))) return false;
+  const completedRoundTripCount =
+    challengerFills.filter(fill => fill.side === 'SELL').length;
+  return exactKeys(diagnostic, [
+    'schemaVersion', 'status', 'completedRoundTripCount',
+    'requiredCompletedRoundTrips', 'observedCoverageMs', 'requiredCoverageMs',
+    'completeWindow', 'forcedTrades', 'deadlineExtensionAllowed', 'profitability'
+  ]) &&
+    diagnostic.schemaVersion === 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1' &&
+    diagnostic.status === 'PARTIAL_COVERAGE' &&
+    isInteger(diagnostic.completedRoundTripCount) &&
+    diagnostic.completedRoundTripCount === completedRoundTripCount &&
+    diagnostic.requiredCompletedRoundTrips === 5 &&
+    diagnostic.observedCoverageMs === Math.floor(report.elapsedMs) &&
+    diagnostic.requiredCoverageMs === 86_400_000 &&
+    diagnostic.completeWindow === false &&
+    diagnostic.forcedTrades === false &&
+    diagnostic.deadlineExtensionAllowed === false &&
+    diagnostic.profitability === 'NOT_ASSESSED';
 }
 
 function getJournalPayload(journal) {
@@ -154,6 +192,7 @@ function identityMatches(report, payload, expected) {
     report.researchSourceSha256 === expected.researchSourceSha256 &&
     report.feedSourceId === expected.feedSourceId &&
     report.comparisonEngineId === expected.comparisonEngineId &&
+    (report.modelPairId ?? undefined) === (expected.modelPairId ?? undefined) &&
     exactModels(report.models, expected) &&
     manifest?.schemaVersion === 'SPOT_PAPER_PAIRED_MANIFEST_V1' &&
     manifest.runId === expected.runId && manifest.mode === 'paper' &&
@@ -163,6 +202,7 @@ function identityMatches(report, payload, expected) {
     manifest.researchSourceSha256 === expected.researchSourceSha256 &&
     manifest.feedSourceId === expected.feedSourceId &&
     manifest.comparisonEngineId === expected.comparisonEngineId &&
+    (manifest.modelPairId ?? undefined) === (expected.modelPairId ?? undefined) &&
     exactModels(manifest.models, expected) &&
     stableJson(manifest.assumptions) === stableJson(report.assumptions) &&
     validFeeAssumptions(manifest.assumptions) &&
@@ -220,12 +260,18 @@ function reportIsValid(report, expected) {
       !Array.isArray(report.arms) || report.arms.length !== 3) {
     return 'INVALID_REPORT_FIELDS';
   }
+  if (expected.modelPairId ?
+      !validTrendActivityDiagnostic(report.trendActivityDiagnostic, report) :
+      report.trendActivityDiagnostic !== undefined) {
+    return 'INVALID_TREND_ACTIVITY_DIAGNOSTIC';
+  }
   if (report.runId !== expected.runId || report.pair !== expected.pair ||
       report.sourceSha256 !== expected.sourceSha256 ||
       report.configSha256 !== expected.configSha256 ||
       report.researchSourceSha256 !== expected.researchSourceSha256 ||
       report.feedSourceId !== expected.feedSourceId ||
       report.comparisonEngineId !== expected.comparisonEngineId ||
+      (report.modelPairId ?? undefined) !== (expected.modelPairId ?? undefined) ||
       !exactModels(report.models, expected)) {
     return 'IDENTITY_MISMATCH';
   }
@@ -741,7 +787,11 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
       completedCycles: safeNumber(reportValid ? report._completedCycles : null),
       stopReason: report?.stopReason ?? 'UNKNOWN'
     },
-    assumptions: {feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false},
+    assumptions: report?.assumptions ??
+      {feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false},
+    ...(expected.modelPairId ? {
+      trendActivityDiagnostic: report?.trendActivityDiagnostic
+    } : {}),
     arms,
     deltas
   };
