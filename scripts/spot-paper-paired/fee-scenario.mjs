@@ -10,7 +10,10 @@ import {
 } from "../spot-paper-pilot/core.mjs";
 import {
   pairedResearchSourceDigest, SPOT_PAPER_PAIRED,
-  SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256
+  SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256,
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+  SPOT_PAPER_PAIRED_TREND_MODEL
 } from "./forward.mjs";
 import {
   evaluatePairedPaperEvidence, SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES
@@ -20,7 +23,7 @@ import {
 } from "../spot-paper-paired-report/contract.mjs";
 import {
   advanceEntryConfirmation, createEntryConfirmationState,
-  recordEntryConfirmationSell
+  recordEntryConfirmationSell, SPOT_PAPER_ENTRY_CONFIRMATION_ID
 } from "../spot-paper-research/entry-confirmation.mjs";
 
 export const SPOT_PAPER_PAIRED_FEE_SCENARIO_SCHEMA =
@@ -290,7 +293,9 @@ function cleanDecision(result) {
 }
 
 export function replaySpotPaperFeeScenarioObservations(observations, {
-  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide
+  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide,
+  strategyAdapters,
+  modelIds
 } = {}) {
   assert(SPOT_PAPER_PAIRED_FEE_RATES_BPS.includes(feeBpsPerSide),
     "UNSUPPORTED_FEE_SCENARIO");
@@ -306,10 +311,40 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
   assert(Buffer.byteLength(serialized, "utf8") <= MAX_EVIDENCE_BYTES,
     "EVIDENCE_BYTE_LIMIT");
 
+  const defaultAdapters = {
+    baseline: {
+      modelId: SPOT_PAPER_PILOT_VERSION,
+      createState: createStrategyState,
+      advance: (state, candles) => advanceStrategy(state, candles),
+      recordSell: state => state
+    },
+    challenger: {
+      modelId: SPOT_PAPER_PAIRED.challengerModel,
+      createState: createEntryConfirmationState,
+      advance: advanceEntryConfirmation,
+      recordSell: recordEntryConfirmationSell
+    }
+  };
+  const adapters = strategyAdapters ?? defaultAdapters;
+  const selectedModelIds = modelIds ?? {
+    baseline: defaultAdapters.baseline.modelId,
+    challenger: defaultAdapters.challenger.modelId,
+    cash: SPOT_PAPER_PAIRED.controlModel
+  };
+  const customStrategies = strategyAdapters !== undefined || modelIds !== undefined;
+  assert(["baseline", "challenger"].every(role =>
+    typeof adapters[role]?.modelId === "string" &&
+    adapters[role].modelId === selectedModelIds[role] &&
+    typeof adapters[role].createState === "function" &&
+    typeof adapters[role].advance === "function" &&
+    typeof adapters[role].recordSell === "function") &&
+    selectedModelIds.cash === SPOT_PAPER_PAIRED.controlModel,
+  "INVALID_REPLAY_STRATEGY_BINDING");
+
   const states = [
-    { strategy: createStrategyState(), ledger: createScenarioLedger(),
+    { strategy: adapters.baseline.createState(), ledger: createScenarioLedger(),
       valuationLedger: createScenarioLedger(), stopped: false },
-    { strategy: createEntryConfirmationState(), ledger: createScenarioLedger(),
+    { strategy: adapters.challenger.createState(), ledger: createScenarioLedger(),
       valuationLedger: createScenarioLedger(), stopped: false },
     { cashCents: CASH_CENTS, fills: [] }
   ];
@@ -396,27 +431,27 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
           state: null, decision: null, decidedAt: armDecisionAt,
           metadata: { control: "NO_TRADE" }
         };
-      } else if (role === "baseline") {
-        const advanced = advanceStrategy(before.strategy, parsed.candles);
-        decision = {
-          state: { ...before, strategy: advanced.state },
-          decision: advanced.signals.at(-1) ?? null,
-          decidedAt: armDecisionAt,
-          metadata: { newCandleCount: advanced.newCandleCount,
-            missedDecisionWindow: Boolean(advanced.missedDecisionWindow) }
-        };
       } else {
-        const advanced = advanceEntryConfirmation(before.strategy, parsed.candles, {
+        const advanced = adapters[role].advance(before.strategy, parsed.candles, {
           decisionAt: armDecisionAt,
           held: Boolean(before.ledger.position)
         });
+        const metadata = {
+          newCandleCount: advanced.newCandleCount,
+          missedDecisionWindow: Boolean(advanced.missedDecisionWindow),
+          ...(!customStrategies && role === "challenger" ?
+            {discarded: advanced.discarded ?? null} : {}),
+          ...(customStrategies ? {discarded: advanced.discarded ?? null} : {}),
+          ...(customStrategies && advanced.blockedEntryReason ?
+            {blockedEntryReason: advanced.blockedEntryReason} : {}),
+          ...(customStrategies && advanced.trendFilter ?
+            {trendFilter: advanced.trendFilter} : {})
+        };
         decision = {
           state: { ...before, strategy: advanced.state },
           decision: advanced.signals.at(-1) ?? null,
           decidedAt: armDecisionAt,
-          metadata: { newCandleCount: advanced.newCandleCount,
-            missedDecisionWindow: Boolean(advanced.missedDecisionWindow),
-            discarded: advanced.discarded ?? null }
+          metadata
         };
       }
       assert(isRecord(decision) && Object.hasOwn(decision, "decision"),
@@ -432,7 +467,7 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
           signal: decision.decision, quote, nowMs: observation.effectAt,
           feeBpsPerSide
         });
-        const candidateFills = role === "challenger" ?
+        const candidateFills = role === "challenger" || customStrategies ?
           result.fills.map(fill => {
             const strategyReason = fill.side === "BUY" ?
               decision.decision?.strategyReason :
@@ -441,17 +476,17 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
                 decision.decision?.strategyReason;
             return {
               ...fill, ledgerReason: fill.reason,
-              strategyId: SPOT_PAPER_PAIRED.challengerModel,
+              strategyId: selectedModelIds[role],
               ...(strategyReason ? { reason: strategyReason, strategyReason } : {})
             };
           }) : result.fills;
-        if (role === "challenger" && candidateFills.length) {
+        if ((role === "challenger" || customStrategies) && candidateFills.length) {
           result.ledger.fills.splice(result.ledger.fills.length - candidateFills.length,
             candidateFills.length, ...candidateFills);
         }
-        const strategy = role === "challenger" &&
+        const strategy = (role === "challenger" || customStrategies) &&
           candidateFills.some(fill => fill.side === "SELL") ?
-          recordEntryConfirmationSell(decision.state.strategy, observation.effectAt) :
+          adapters[role].recordSell(decision.state.strategy, observation.effectAt) :
           decision.state.strategy;
         effect = {
           state: { ...before, strategy, ledger: result.ledger,
@@ -531,9 +566,7 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
     commonHorizonAt: observations.at(-1).effectAt,
     arms: roles.map((role, index) => ({
       role,
-      modelId: role === "baseline" ? SPOT_PAPER_PILOT_VERSION :
-        role === "challenger" ? SPOT_PAPER_PAIRED.challengerModel :
-          SPOT_PAPER_PAIRED.controlModel,
+      modelId: selectedModelIds[role],
       tradingStatus: states[index].stopped ? "STOPPED" : "ACTIVE",
       stopReason: states[index].stopReason ?? null,
       stoppedAt: states[index].stoppedAt ?? null,
@@ -556,10 +589,12 @@ export function replaySpotPaperFeeScenarioObservations(observations, {
 }
 
 export function compareSpotPaperFeeScenarioObservations(observations, {
-  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide
+  feeBpsPerSide = SPOT_PAPER_PAIRED.feeBpsPerSide,
+  strategyAdapters,
+  modelIds
 } = {}) {
   const replay = replaySpotPaperFeeScenarioObservations(observations, {
-    feeBpsPerSide
+    feeBpsPerSide, strategyAdapters, modelIds
   });
   return {
     schemaVersion: "SPOT_PAPER_SMA_COMPARISON_V1",
@@ -631,7 +666,7 @@ async function readEvidenceResponse(runDirectory, reference) {
   }
 }
 
-function assertOriginalReplayMatches(report, baselineReplay) {
+function assertOriginalReplayMatches(report, baselineReplay, reason) {
   assert(report.arms.length === 3, "INVALID_ORIGINAL_REPORT");
   for (let index = 0; index < roles.length; index++) {
     const original = report.arms[index];
@@ -649,7 +684,7 @@ function assertOriginalReplayMatches(report, baselineReplay) {
       same(valuation.openPositions, replay.valuation.openPositions) &&
       (valuation.netEquityCents === null ||
         valuation.netEquityCents === replay.valuation.netEquityCents),
-    "ORIGINAL_50BPS_REPLAY_MISMATCH");
+    reason);
   }
 }
 
@@ -691,16 +726,76 @@ export async function replayVerifiedSpotPaperFeeScenarios({
     "HOST_EVIDENCE_NOT_VERIFIED_COMPLETE");
   assert(hostExport.report?.feedSourceId === "KRAKEN_PUBLIC_SPOT_XBTEUR" &&
     hostExport.report.testOnly === false, "LIVE_KRAKEN_EVIDENCE_REQUIRED");
-  const [comparisonBytes, entryConfirmationBytes] = await Promise.all([
+  const nextRun = expectedIdentity.modelPairId ===
+    SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR;
+  const versionedV2 = hostExport.report.assumptions?.accountContractVersion === 2;
+  const researchBytes = await Promise.all([
     readFile(new URL("../spot-paper-research/comparison.mjs", import.meta.url)),
-    readFile(new URL("../spot-paper-research/entry-confirmation.mjs", import.meta.url))
+    readFile(new URL("../spot-paper-research/entry-confirmation.mjs", import.meta.url)),
+    ...(nextRun ? [
+      readFile(new URL("../spot-paper-research/five-minute-trend.mjs", import.meta.url))
+    ] : [])
   ]);
-  const researchSourceSha256 = pairedResearchSourceDigest({
-    comparisonBytes, entryConfirmationBytes
-  });
-  assert(researchSourceSha256 === SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256 &&
+  let researchSourceSha256;
+  if (nextRun) {
+    const {nextRunResearchSourceDigest} =
+      await import("./next-run-composition.mjs");
+    researchSourceSha256 = nextRunResearchSourceDigest({
+      comparisonBytes: researchBytes[0], entryConfirmationBytes: researchBytes[1],
+      fiveMinuteTrendBytes: researchBytes[2]
+    });
+  } else {
+    researchSourceSha256 = pairedResearchSourceDigest({
+      comparisonBytes: researchBytes[0], entryConfirmationBytes: researchBytes[1]
+    });
+  }
+  const expectedResearchSource = nextRun ?
+    SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256 :
+    SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256;
+  assert(researchSourceSha256 === expectedResearchSource &&
     researchSourceSha256 === hostExport.report.researchSourceSha256,
   "RESEARCH_SOURCE_IDENTITY_MISMATCH");
+  let strategyAdapters;
+  let modelIds;
+  let scenarioRates = versionedV2 ?
+    [20, 50, 10] : SPOT_PAPER_PAIRED_FEE_RATES_BPS;
+  if (nextRun) {
+    const trendExports =
+      await import("../spot-paper-research/five-minute-trend.mjs");
+    const expectedModels = [
+      {role: "baseline", modelId: SPOT_PAPER_ENTRY_CONFIRMATION_ID},
+      {role: "challenger", modelId: trendExports.SPOT_PAPER_5M_TREND_FILTER_ID},
+      {role: "cash", modelId: SPOT_PAPER_PAIRED.controlModel}
+    ];
+    assert(same(expectedIdentity.models.map(({role, modelId}) =>
+      ({role, modelId})), expectedModels) &&
+      trendExports.SPOT_PAPER_5M_TREND_FILTER_ID ===
+        SPOT_PAPER_PAIRED_TREND_MODEL,
+    "NEXT_RUN_MODEL_PAIR_MISMATCH");
+    strategyAdapters = {
+      baseline: {
+        modelId: SPOT_PAPER_ENTRY_CONFIRMATION_ID,
+        createState: createEntryConfirmationState,
+        advance: advanceEntryConfirmation,
+        recordSell: recordEntryConfirmationSell
+      },
+      challenger: {
+        modelId: trendExports.SPOT_PAPER_5M_TREND_FILTER_ID,
+        createState: trendExports.createFiveMinuteTrendState,
+        advance: trendExports.advanceFiveMinuteTrendEntry,
+        recordSell: trendExports.recordFiveMinuteTrendSell
+      }
+    };
+    modelIds = {
+      baseline: SPOT_PAPER_ENTRY_CONFIRMATION_ID,
+      challenger: trendExports.SPOT_PAPER_5M_TREND_FILTER_ID,
+      cash: SPOT_PAPER_PAIRED.controlModel
+    };
+    scenarioRates = [20, 50, 10];
+  } else {
+    assert(expectedIdentity.modelPairId === undefined,
+      "UNKNOWN_MODEL_PAIR");
+  }
 
   const context = {
     deadlineAt: performance.now() + 60_000,
@@ -766,12 +861,18 @@ export async function replayVerifiedSpotPaperFeeScenarios({
     quoteAgeAtEffectMs <= SPOT_PAPER_PAIRED.maxQuoteAgeMs,
   "NO_VALID_HISTORICAL_COMMON_HORIZON");
 
-  const scenarios = SPOT_PAPER_PAIRED_FEE_RATES_BPS.map(feeBpsPerSide =>
-    replaySpotPaperFeeScenarioObservations(marketObservations, { feeBpsPerSide }));
-  assertOriginalReplayMatches(originalReport, scenarios[0]);
+  const scenarios = scenarioRates.map(feeBpsPerSide =>
+    replaySpotPaperFeeScenarioObservations(marketObservations, {
+      feeBpsPerSide, strategyAdapters, modelIds
+    }));
+  assertOriginalReplayMatches(originalReport, scenarios[0],
+    nextRun || versionedV2 ? "ORIGINAL_20BPS_REPLAY_MISMATCH" :
+      "ORIGINAL_50BPS_REPLAY_MISMATCH");
   const scenarioDescriptions = {
-    50: "ORIGINAL_PAIRED_RUN_ASSUMPTION",
-    20: "COUNTERFACTUAL_REGULAR_EEA_SPOT_TAKER",
+    50: nextRun || versionedV2 ? "COUNTERFACTUAL_50BPS_TAKER" :
+      "ORIGINAL_PAIRED_RUN_ASSUMPTION",
+    20: nextRun || versionedV2 ? "ORIGINAL_PAIRED_RUN_ASSUMPTION" :
+      "COUNTERFACTUAL_REGULAR_EEA_SPOT_TAKER",
     10: "COUNTERFACTUAL_X_PERPS_ACCOUNT_SPOT_TAKER"
   };
   scenarios.forEach(scenario => {
@@ -832,7 +933,9 @@ export async function replayVerifiedSpotPaperFeeScenarios({
       }
     },
     originalReport,
-    replayAgreement: "ORIGINAL_50BPS_DECISIONS_FILLS_RISK_AND_ACCOUNTING_MATCHED",
+    replayAgreement: nextRun || versionedV2 ?
+      "ORIGINAL_20BPS_STRATEGIES_DECISIONS_FILLS_RISK_AND_ACCOUNTING_MATCHED" :
+      "ORIGINAL_50BPS_DECISIONS_FILLS_RISK_AND_ACCOUNTING_MATCHED",
     scenarios
   };
 }

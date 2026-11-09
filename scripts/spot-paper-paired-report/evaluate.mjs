@@ -90,7 +90,8 @@ export function isValidSpotPaperPairedExpectedIdentity(expected) {
     /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(model.accountId) &&
     (expected.modelPairId ||
       model.modelId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[1]) &&
-    (!expected.modelPairId || model.modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[index]));
+    (!expected.modelPairId ||
+      model.modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[index]));
 }
 
 function expectedPublicIdentity(expected) {

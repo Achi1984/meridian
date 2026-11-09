@@ -232,9 +232,8 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
   const timingResult = {...timing, stopReason: input.timing.stopReason};
   if (trendActivityDiagnostic &&
       (timing.actualElapsedMs === null ||
-       trendActivityDiagnostic.observedCoverageMs !== Math.floor(timing.actualElapsedMs))) {
-    return null;
-  }
+       trendActivityDiagnostic.observedCoverageMs !==
+         Math.floor(timing.actualElapsedMs))) return null;
 
   const assumptions = input.assumptions;
   const legacyFees = assumptions.feeBpsPerSide === 50 &&

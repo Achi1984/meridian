@@ -14,6 +14,8 @@ import {
   SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
   SPOT_PAPER_PAIRED_INTEGRATION, SPOT_PAPER_RESEARCH_COMPARISON_ID,
   SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
   SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT
 } from "../scripts/spot-paper-paired/forward.mjs";
 import {
@@ -300,6 +302,30 @@ test("live runner rejects missing or mismatched research identity before feed ac
   assert.deepEqual(setup.order, []);
 });
 
+test("next-run live entrypoint rejects a wrong source pin and injected provider before feed access", async t => {
+  const setup = await fixture(t);
+  const input = {
+    runId: "next-run-live-gate",
+    dataRoot: setup.dataRoot,
+    modelPairId: SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+    accountContract: SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
+    researchSourceSha256: "0".repeat(64),
+    accountIds: {
+      baseline: "next-baseline",
+      challenger: "next-challenger",
+      cash: "next-cash"
+    }
+  };
+  await assert.rejects(runSpotPaperPairedLive(input),
+    /NEXT_RUN_IDENTITY_REQUIRED/);
+  await assert.rejects(runSpotPaperPairedLive({
+    ...input,
+    researchSourceSha256: SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256,
+    provider: setup.config.provider
+  }), /PROVIDER_INJECTION_FORBIDDEN/);
+  assert.deepEqual(setup.order, []);
+});
+
 test("a stale pre-signal or future quote stops the shared run without accepting an observation", async t => {
   for (const options of [{ predatingTicker: true }, { staleTickerAt: 1 }, { futureTicker: true }]) {
     const setup = await fixture(t, options);
@@ -513,8 +539,12 @@ test("versioned 20-bps contract drives paper fills and shared comparison", async
     import("../scripts/spot-paper-research/entry-confirmation.mjs")
   ]);
   const accountContract = SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT;
-  const compare = observations => compareSpotPaperFeeScenarioObservations(
-    observations, {feeBpsPerSide: accountContract.feeBpsPerSide});
+  let feeReplayObservations;
+  const compare = observations => {
+    feeReplayObservations = structuredClone(observations);
+    return compareSpotPaperFeeScenarioObservations(
+      observations, {feeBpsPerSide: accountContract.feeBpsPerSide});
+  };
   const feeProbe = createBaselineArm("fee-probe", accountContract,
     applySpotPaperPairedFeeObservation);
   const feeProbeState = feeProbe.initialize();
@@ -581,8 +611,31 @@ test("versioned 20-bps contract drives paper fills and shared comparison", async
     feedSourceId: report.feedSourceId,
     comparisonEngineId: report.comparisonEngineId, models: report.models
   };
+  const replay = replaySpotPaperFeeScenarioObservations(
+    feeReplayObservations, {feeBpsPerSide: 20});
+  for (const [index, replayArm] of replay.arms.entries()) {
+    const reportArm = report.arms[index];
+    assert.deepEqual(replayArm.decisions, reportArm.decisions);
+    assert.deepEqual(replayArm.fills, reportArm.fills);
+    assert.equal(replayArm.valuation.feesCents, reportArm.valuation.feesCents);
+    assert.equal(replayArm.valuation.netEquityCents,
+      reportArm.valuation.netEquityCents);
+  }
   assert.equal(evaluatePairedPaperEvidence({
     expectedIdentity, report: hostExport
+  }).evidenceStatus, "VERIFIED_COMPLETE");
+  assert.notEqual(evaluatePairedPaperEvidence({
+    expectedIdentity,
+    report: {
+      ...hostExport,
+      report: {
+        ...hostExport.report,
+        assumptions: {
+          ...hostExport.report.assumptions,
+          accountContractId: "BTC_EUR_PAIRED_PAPER_V1"
+        }
+      }
+    }
   }).evidenceStatus, "VERIFIED_COMPLETE");
 });
 
@@ -625,7 +678,7 @@ test("offline fee replay rejects synthetic and unverified host evidence", async 
   }), /VERIFIED_HOST_EXPORT_REQUIRED/);
 });
 
-test("verified fee replay reopens persisted response bytes through the public API", async t => {
+async function verifiedFeeReplayFixture(t, versionedV2 = false) {
   const setup = await fixture(t, {maxCycles: 2});
   const [comparison, confirmation] = await Promise.all([
     import("../scripts/spot-paper-research/comparison.mjs"),
@@ -638,16 +691,35 @@ test("verified fee replay reopens persisted response bytes through the public AP
   setup.config.researchSourceSha256 = pairedResearchSourceDigest({
     comparisonBytes, entryConfirmationBytes
   });
-  setup.config.arms = [
-    createBaselineArm("baseline-disk-test"),
-    createChallengerArm(confirmation, "challenger-disk-test"),
-    createCashControlArm("cash-disk-test")
-  ];
+  let feeScenarioCompare;
+  if (versionedV2) {
+    const accountContract = SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT;
+    feeScenarioCompare = observations =>
+      compareSpotPaperFeeScenarioObservations(observations, {
+        feeBpsPerSide: accountContract.feeBpsPerSide
+      });
+    setup.config.accountContract = accountContract;
+    setup.config.arms = [
+      createBaselineArm("baseline-disk-test", accountContract,
+        applySpotPaperPairedFeeObservation),
+      createChallengerArm(confirmation, "challenger-disk-test", accountContract,
+        applySpotPaperPairedFeeObservation),
+      createCashControlArm("cash-disk-test", accountContract)
+    ];
+    setup.config.feeScenarioApply = applySpotPaperPairedFeeObservation;
+    setup.config.feeScenarioCompare = feeScenarioCompare;
+  } else {
+    setup.config.arms = [
+      createBaselineArm("baseline-disk-test"),
+      createChallengerArm(confirmation, "challenger-disk-test"),
+      createCashControlArm("cash-disk-test")
+    ];
+  }
   setup.config.challengerExports = confirmation;
   setup.config.comparisonExports = comparison;
   setup.config.comparisonEngine = {
     id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
-    compare: comparison.compareSpotPaperStrategies
+    compare: feeScenarioCompare ?? comparison.compareSpotPaperStrategies
   };
   setup.config.configSha256 = pairedConfigDigest(setup.config);
 
@@ -693,11 +765,25 @@ test("verified fee replay reopens persisted response bytes through the public AP
   const result = await replayVerifiedSpotPaperFeeScenarios({
     expectedIdentity, hostExport, dataRoot: setup.dataRoot
   });
-  assert.equal(result.evidenceStatus, "VERIFIED_COMPLETE");
-  assert.equal(result.replayAgreement,
+  return {result, hostExport, reportForReplay, configSha256};
+}
+
+test("verified fee replay labels original V1 and legacy V2 fee assumptions", async t => {
+  const {result: v1} = await verifiedFeeReplayFixture(t);
+  assert.equal(v1.evidenceStatus, "VERIFIED_COMPLETE");
+  assert.equal(v1.replayAgreement,
     "ORIGINAL_50BPS_DECISIONS_FILLS_RISK_AND_ACCOUNTING_MATCHED");
-  assert.equal(result.scenarios.length, 3);
-  assert.equal(result.originalReport.configSha256, configSha256);
+  assert.equal(v1.scenarios.length, 3);
+
+  const {result: v2, hostExport, configSha256} =
+    await verifiedFeeReplayFixture(t, true);
+  assert.equal(v2.evidenceStatus, "VERIFIED_COMPLETE");
+  assert.equal(v2.replayAgreement,
+    "ORIGINAL_20BPS_STRATEGIES_DECISIONS_FILLS_RISK_AND_ACCOUNTING_MATCHED");
+  assert.equal(v2.scenarios[0].feeBpsPerSide, 20);
+  assert.equal(v2.scenarios[0].scenario, "ORIGINAL_PAIRED_RUN_ASSUMPTION");
+  assert.equal(v2.scenarios[1].feeBpsPerSide, 50);
+  assert.equal(v2.originalReport.configSha256, configSha256);
   assert.ok(hostExport.journal.events.some(event =>
     event.type === "shared_observation" && event.ticker.bytes > 0));
 });
