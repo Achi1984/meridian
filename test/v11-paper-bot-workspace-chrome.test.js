@@ -241,28 +241,27 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           }
           assert.equal(failure, null, failure?.message);
           assert.equal(pairedReads, 1, 'one manual paired refresh creates exactly one GET');
-          let pairedText = '';
+          let pairedSnapshot = null;
           const expectedFirstState = width === 320 ? 'unprovisioned' :
             width === 390 ? 'empty' : 'running_snapshot';
           for (let attempt = 0; attempt < 150; attempt++) {
-            pairedText = await evaluate(`document.querySelector('#paired-paper-report-root').textContent`);
-            const state = await evaluate(
-              `document.querySelector('#paired-paper-report-root').dataset.state`);
-            if (state === expectedFirstState) break;
+            pairedSnapshot = await evaluate(`(()=>{
+              const root=document.querySelector('#paired-paper-report-root');
+              return {state:root.dataset.state,text:root.textContent};
+            })()`);
+            if (pairedSnapshot.state === expectedFirstState) break;
             await new Promise(resolve => setTimeout(resolve, 10));
           }
-          assert.equal(await evaluate(
-            `document.querySelector('#paired-paper-report-root').dataset.state`),
-          expectedFirstState);
+          assert.equal(pairedSnapshot?.state, expectedFirstState);
           if (width === 320) {
-            assert.match(pairedText, /Transport nicht provisioniert/);
-            assert.doesNotMatch(pairedText, /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
+            assert.match(pairedSnapshot.text, /Transport nicht provisioniert/);
+            assert.doesNotMatch(pairedSnapshot.text, /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
           } else if (width === 390) {
-            assert.match(pairedText, /Kein gepaarter Bericht veröffentlicht/);
-            assert.doesNotMatch(pairedText, /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
+            assert.match(pairedSnapshot.text, /Kein gepaarter Bericht veröffentlicht/);
+            assert.doesNotMatch(pairedSnapshot.text, /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
           } else {
-            assert.match(pairedText, /CONFIRM2_COOLDOWN10/);
-            assert.doesNotMatch(pairedText, /5M-SMA20-Trend/);
+            assert.match(pairedSnapshot.text, /CONFIRM2_COOLDOWN10/);
+            assert.doesNotMatch(pairedSnapshot.text, /5M-SMA20-Trend/);
           }
           const image = await call('Page.captureScreenshot', {format: 'png'});
           writeFileSync(join(evidence, `paper-bot-workspace-${width}-${pairedResponseMode}.png`),
