@@ -140,7 +140,12 @@ test('real M11 Paper workspace authenticates manual reads and renders missing st
           }
           assert.equal(failure, null, failure?.message);
           assert.equal(reads, 1, 'one manual refresh creates exactly one authenticated GET');
-          const unavailable = await evaluate(`document.querySelector('#paper-bot-overview-section').textContent`);
+          let unavailable = '';
+          for (let attempt = 0; attempt < 150; attempt++) {
+           unavailable = await evaluate(`document.querySelector('#paper-bot-overview-section').textContent`);
+           if (unavailable.includes('Kein authentifizierter Bericht verfügbar')) break;
+           await new Promise(resolve => setTimeout(resolve, 10));
+          }
           assert.match(unavailable, /Kein authentifizierter Bericht verfügbar/);
           assert.match(unavailable, /In Vorbereitung/);
           assert.doesNotMatch(unavailable, /0,00 €|0 fills/i);
