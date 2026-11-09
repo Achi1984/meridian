@@ -39,11 +39,9 @@ The model, controller, tests, and browser preview all use the shared
 payload accepted by that real projector, including the canonical statuses,
 reasons, run timings, arm metrics, and signed/unavailable deltas. No
 production demo or fallback report is provided.
-The contract currently resides in the separate #1304 candidate; this panel
-must be composed with that package (or run after it reaches the base branch).
-The integration test imports the actual owner export directly and intentionally
-fails to load when that dependency is absent; it does not skip or recreate the
-contract.
+The actual shared contract from #1304 is present on the base branch. The
+integration test imports the owner's export directly and intentionally fails
+to load if that dependency is absent; it does not skip or recreate the contract.
 
 ## Display and evidence boundaries
 
