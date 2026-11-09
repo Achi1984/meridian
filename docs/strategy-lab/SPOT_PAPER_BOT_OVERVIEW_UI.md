@@ -48,7 +48,8 @@ with `{value, basis: 'INITIAL_CAPITAL'}`. The projector also supplies
 `ageMs`, `reason`), and the applicable `pauseReason` or `noTradeReason`.
 Trade details are an optional bounded `trades` array of timestamp, side,
 quantity, currency-tagged price and amount, and an optional reason. All strings
-are inserted as text, not markup.
+are inserted as text, not markup. Trade quantity is labelled with the base
+asset from the validated market identity.
 
 Only `EUR` and `USD` are currently accepted. BTC/EUR and BTC/USD identity and
 currency must match their respective overview cards. A mismatch fails closed

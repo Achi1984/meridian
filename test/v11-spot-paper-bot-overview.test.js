@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
-import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
+import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
@@ -105,9 +105,16 @@ class Element {
 }
 
 function harness() {
-  const document = {createElement: tag => new Element(document, tag)};
+  const document = {createElement: tag => {
+    if (typeof tag !== 'string' || !/^[a-z][a-z0-9-]*$/i.test(tag)) {
+      throw new Error('Invalid element name');
+    }
+    return new Element(document, tag);
+  }};
   return {root: new Element(document, 'section'), document};
 }
+
+const visit = element => [element, ...element.children.flatMap(visit)];
 
 test('projects explicit sanitized adapters without combining currencies', () => {
   let projectCalls = 0;
@@ -167,6 +174,14 @@ test('missing, rejected, unvalidated, stale, and mixed-currency reports fail clo
   assert.equal(stale.bots[0].metrics.netPnl.reason, 'DATA_STALE');
   assert.equal(stale.bots[0].trades.length, 0);
 
+  const staleLives = presentSpotPaperBotOverview([
+    adapter('btc-usd-lives', sourceReport('btc-usd-lives', {
+      freshness: {status: 'STALE', at: freshAt, ageMs: 99_000, reason: 'SOURCE_STALE'}
+    }))
+  ]);
+  assert.equal(staleLives.bots[1].risk.available, false);
+  assert.equal(staleLives.bots[1].risk.allowance.reason, 'LIVES_RISK_NOT_VALIDATED');
+
   const mixed = presentSpotPaperBotOverview([
     adapter('btc-eur-trend',
       sourceReport('btc-eur-trend', {currency: 'USD', market: 'BTC/USD'}))
@@ -202,6 +217,15 @@ test('only validated USD risk DTOs expose Lives loss allowance; reasons and trad
   ]);
   assert.equal(invalidTrade.bots[0].trades.length, 0);
   assert.equal(invalidTrade.bots[0].tradesReason, 'TRADE_DETAILS_NOT_VALIDATED');
+
+  const noTrade = presentSpotPaperBotOverview([
+    adapter('btc-eur-trend', sourceReport('btc-eur-trend', {
+      roundTrips: 0,
+      lastTradeAt: null,
+      noTradeReason: 'No entry signal yet'
+    }))
+  ]);
+  assert.equal(noTrade.bots[0].reason, 'No entry signal yet');
 });
 
 test('normalized curves require explicit same basis and identical coverage', () => {
@@ -218,6 +242,7 @@ test('normalized curves require explicit same basis and identical coverage', () 
     adapter('btc-eur-trend', sourceReport('btc-eur-trend', {curve: structuredClone(coverage)})),
     adapter('btc-usd-lives', sourceReport('btc-usd-lives', {curve: structuredClone(coverage)})),
     adapter('lowvol-v2', sourceReport('lowvol-v2', {
+      strategy: 'LowVol V2',
       market: 'BTC/EUR',
       currency: 'EUR',
       curve: structuredClone(coverage)
@@ -230,10 +255,15 @@ test('normalized curves require explicit same basis and identical coverage', () 
     'btc-usd-lives': 101,
     'lowvol-v2': 101
   });
+  const {root, document} = harness();
+  mountSpotPaperBotOverview(root, {adapters, document});
+  assert.match(root.textContent, /Basis INITIAL_CAPITAL_INDEX_100/);
+  assert.match(root.textContent, /BTC\/EUR Trend-Kandidat: 101/);
   const mismatched = presentSpotPaperBotOverview([
     adapters[0],
     adapters[1],
     adapter('lowvol-v2', sourceReport('lowvol-v2', {
+      strategy: 'LowVol V2',
       market: 'BTC/EUR',
       currency: 'EUR',
       curve: {...structuredClone(coverage), coverageEnd: '2026-11-09T11:59:00.000Z'}
@@ -241,6 +271,15 @@ test('normalized curves require explicit same basis and identical coverage', () 
   ]);
   assert.equal(mismatched.curve.available, false);
   assert.equal(mismatched.curve.reason, 'CURVE_HORIZONS_NOT_ALIGNED');
+  const reversed = presentSpotPaperBotOverview(adapters.map(item => {
+    const report = sourceReport(item.id, {
+      curve: {...structuredClone(coverage), coverageStart: coverage.coverageEnd},
+      ...(item.id === 'lowvol-v2' ? {strategy: 'LowVol V2'} : {})
+    });
+    return adapter(item.id, report);
+  }));
+  assert.equal(reversed.curve.available, false);
+  assert.equal(reversed.curve.reason, 'CURVE_COVERAGE_INVALID');
 });
 
 test('mount is host-controlled, accessible, collapsible, and renders signed PnL text', () => {
@@ -248,7 +287,10 @@ test('mount is host-controlled, accessible, collapsible, and renders signed PnL 
   const mounted = mountSpotPaperBotOverview(root, {
     adapters: [
       adapter('btc-eur-trend', sourceReport('btc-eur-trend')),
-      adapter('btc-usd-lives', sourceReport('btc-usd-lives'))
+      adapter('btc-usd-lives', sourceReport('btc-usd-lives', {
+        lifecycle: 'PAUSED',
+        pauseReason: '<b>Loss limit reached</b>'
+      }))
     ],
     document
   });
@@ -263,10 +305,29 @@ test('mount is host-controlled, accessible, collapsible, and renders signed PnL 
   assert.match(root.textContent, /88,00\s+\$/);
   assert.match(root.textContent, /Trade-Details \(1\)/);
   assert.match(root.textContent, /LowVol V2 bleibt in Vorbereitung/);
+  assert.match(root.textContent, /<b>Loss limit reached<\/b>/);
+  const nodes = visit(root);
+  assert.equal(nodes.some(item => item.tagName === 'B'), false);
+  assert.equal(nodes.some(item => item.tagName === 'BUTTON'), false);
+  const positivePnl = nodes.find(item => item.textContent === '+25,00 € Gewinn');
+  const negativePnl = nodes.find(item => item.textContent === '−12,00 $ Verlust');
+  assert.equal(positivePnl.className, 'tone-safe');
+  assert.equal(negativePnl.className, 'tone-danger');
   assert.doesNotMatch(root.textContent, /Summe EUR|Gesamtkapital|Rang 1/i);
   assert.equal(mounted.update([]).bots[2].state, 'PREPARED');
   mounted.dispose();
   assert.equal(root.children.length, 0);
+});
+
+test('overview modules do not add network, timers, storage, HTML parsing, or trading controls', () => {
+  const sources = [
+    '../v11/spot-paper-bot-overview-model.js',
+    '../v11/spot-paper-bot-overview-view.js',
+    '../v11/spot-paper-bot-overview-controller.js'
+  ].map(path => readFileSync(new URL(path, import.meta.url), 'utf8')).join('\n');
+  assert.doesNotMatch(sources,
+    /\bfetch\s*\(|\bsetInterval\s*\(|\bsetTimeout\s*\(|localStorage|sessionStorage|indexedDB|\.innerHTML\s*=/);
+  assert.doesNotMatch(sources, /createElement\(['"](?:button|input|select|form)['"]\)/);
 });
 
 test('mobile Chrome renders separate responsive cards without horizontal overflow', {
@@ -304,13 +365,15 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
             {id:'btc-eur-trend',report:${source},project},
             {id:'btc-usd-lives',report:${lives},project}
           ]});
+          for (const disclosure of root.querySelectorAll('details')) disclosure.open=true;
           return {
             width:innerWidth,viewport:document.documentElement.clientWidth,
             documentWidth:document.documentElement.scrollWidth,
             bodyWidth:document.body.scrollWidth,rootWidth:root.clientWidth,
             rootScrollWidth:root.scrollWidth,
             details:root.querySelectorAll('details').length,
-            regions:root.querySelectorAll('[role="region"]').length,
+            hasNamedRegion:root.getAttribute('role')==='region'&&
+              Boolean(root.getAttribute('aria-labelledby')),
             synthetic:root.textContent.includes('SYNTHETIC FIXTURE'),
             currencies:root.textContent.includes('EUR')&&root.textContent.includes('USD'),
             prepared:root.textContent.includes('In Vorbereitung')
@@ -326,7 +389,7 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
         assert.ok(result.bodyWidth <= result.viewport + 1, JSON.stringify(result));
         assert.ok(result.rootScrollWidth <= result.rootWidth + 1, JSON.stringify(result));
         assert.ok(result.details >= 4);
-        assert.equal(result.regions, 1);
+        assert.equal(result.hasNamedRegion, true);
         assert.equal(result.synthetic, true);
         assert.equal(result.currencies, true);
         assert.equal(result.prepared, true);

@@ -15,7 +15,8 @@ export const SPOT_PAPER_BOT_DEFINITIONS = Object.freeze([
     id: 'lowvol-v2',
     label: 'LowVol V2',
     market: null,
-    currency: null
+    currency: null,
+    strategyIdentity: 'LowVol V2'
   })
 ]);
 
@@ -80,7 +81,7 @@ function countMetric(value) {
     {available: true, value, reason: null} : unknown('COUNT_NOT_REPORTED');
 }
 
-function validateTrade(trade, currency) {
+function validateTrade(trade, currency, baseAsset) {
   if (!isRecord(trade)) return null;
   const at = validTimestamp(trade.at);
   const side = trade.side;
@@ -93,6 +94,7 @@ function validateTrade(trade, currency) {
     at,
     side,
     quantity: trade.quantity,
+    quantityUnit: baseAsset,
     amount,
     price,
     reason: safeText(trade.reason)
@@ -188,9 +190,16 @@ function projectBot(definition, adapter) {
   const market = safeText(report.market, 32);
   const currency = typeof report.currency === 'string' && CURRENCY.test(report.currency) ?
     report.currency : null;
-  const marketMatches = definition.market === null || market === definition.market;
-  const currencyMatches = definition.currency === null || currency === definition.currency;
-  const identityValid = marketMatches && currencyMatches && market !== null && currency !== null;
+  const strategy = safeText(report.strategy);
+  const marketParts = /^([A-Z0-9]{2,12})\/(EUR|USD)$/.exec(market || '');
+  const marketMatches = marketParts !== null &&
+    (definition.market === null || market === definition.market);
+  const currencyMatches = currency !== null && marketParts?.[2] === currency &&
+    (definition.currency === null || currency === definition.currency);
+  const strategyMatches = !definition.strategyIdentity ||
+    strategy === definition.strategyIdentity;
+  const identityValid = marketMatches && currencyMatches && strategyMatches &&
+    market !== null && currency !== null;
   const state = STATES.has(report.state) ? report.state : 'UNKNOWN';
   const runtimeEvidence = report.runtimeEvidence === 'VALIDATED';
   const stateValidated = state === 'PREPARED' || state === 'UNKNOWN' || runtimeEvidence;
@@ -242,19 +251,21 @@ function projectBot(definition, adapter) {
       freshnessStatus === 'STALE' ? 'DATA_STALE' : 'LAST_TRADE_NOT_REPORTED');
   const rawTrades = report.trades;
   const tradesValid = metricsFresh && Array.isArray(rawTrades) &&
-    rawTrades.length <= 100 && rawTrades.every(trade => validateTrade(trade, currency));
-  const trades = tradesValid ? rawTrades.map(trade => validateTrade(trade, currency)) : [];
+    rawTrades.length <= 100 &&
+    rawTrades.every(trade => validateTrade(trade, currency, marketParts[1]));
+  const trades = tradesValid ?
+    rawTrades.map(trade => validateTrade(trade, currency, marketParts[1])) : [];
   const noTradeReason = safeText(report.noTradeReason);
   const pauseReason = safeText(report.pauseReason);
   const reason = resultState === 'PAUSED' ? pauseReason :
     (resultState === 'PREPARED' || report.roundTrips === 0 || !report.lastTradeAt ?
       noTradeReason || 'Unbekannt — NO_TRADE_REASON_NOT_REPORTED' : null);
-  const risk = validatedRisk(report.risk, definition.id);
+  const risk = validatedRisk(metricsFresh ? report.risk : null, definition.id);
   return {
     ...definition,
     state: resultState,
     stateReason,
-    strategy: safeText(report.strategy) || definition.label,
+    strategy: strategy || definition.label,
     version: safeText(report.version) ?
       {available: true, value: report.version, reason: null} :
       unknown('VERSION_NOT_REPORTED'),
@@ -297,6 +308,18 @@ function alignedCurve(bots) {
     return unavailable('CURVE_BASIS_OR_COVERAGE_NOT_VALIDATED');
   }
   const first = curves[0];
+  const firstStart = Date.parse(first.coverageStart);
+  const firstEnd = Date.parse(first.coverageEnd);
+  const orderedPoints = first.points.every((point, index) => {
+    const at = validTimestamp(point.at);
+    const value = Date.parse(point.at);
+    return at !== null && value >= firstStart && value <= firstEnd &&
+      Number.isFinite(point.index) && point.index >= 0 &&
+      (index === 0 || value > Date.parse(first.points[index - 1].at));
+  });
+  if (firstStart > firstEnd || !orderedPoints) {
+    return unavailable('CURVE_COVERAGE_INVALID');
+  }
   const sameCoverage = curves.every(curve =>
     curve.coverageStart === first.coverageStart &&
     curve.coverageEnd === first.coverageEnd &&

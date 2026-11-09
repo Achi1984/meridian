@@ -115,7 +115,7 @@ function renderTradeDetails(document, parent, bot) {
         available: true, value: trade.at
       })}`);
       node(document, item, 'p',
-        `${trade.quantity} · Preis ${amount(trade.price)} · Volumen ${amount(trade.amount)}`);
+        `${trade.quantity} ${trade.quantityUnit} · Preis ${amount(trade.price)} · Volumen ${amount(trade.amount)}`);
       if (trade.reason) node(document, item, 'p', `Grund: ${trade.reason}`);
       list.append(item);
     }
@@ -194,7 +194,8 @@ function renderCurve(document, root, curve, bots) {
     node(document, section, 'p',
       `Nicht dargestellt — ${curve.reason}. Kein Cross-Horizon-Ranking.`);
   } else {
-    node(document, section, `Basis ${curve.basis} · Abdeckung ${curve.coverageStart} bis ${curve.coverageEnd}.`);
+    node(document, section, 'p',
+      `Basis ${curve.basis} · Abdeckung ${curve.coverageStart} bis ${curve.coverageEnd}.`);
     const list = document.createElement('ol');
     list.setAttribute('style', 'padding-inline-start:24px');
     for (const point of curve.points) {
@@ -227,12 +228,12 @@ export function renderSpotPaperBotOverview(root, adapters, document = root?.owne
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
-  node(document, root,
+  node(document, root, 'p',
     'BTC/EUR und BTC/USD bleiben getrennte Währungen. Es gibt keine Summen oder Rangfolge über Bot-Läufe und Horizonte hinweg.',
-    'p', 'caption');
-  node(document, root,
+    'caption');
+  node(document, root, 'p',
     'Diese Ansicht liest keine Konten, startet oder stoppt keine Bots und lädt keine Daten selbst.',
-    'p', 'caption');
+    'caption');
   const cards = document.createElement('div');
   cards.setAttribute('style',
     'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;min-width:0');
