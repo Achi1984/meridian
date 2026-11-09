@@ -13,8 +13,10 @@ test("paired image contains only the host runtime graph and stays inert by defau
     "scripts/spot-paper-pilot/journal.mjs",
     "scripts/spot-paper-pilot/provider.mjs",
     "scripts/spot-paper-pilot/package-host-evidence.mjs",
+    "scripts/spot-paper-paired-report/",
     "scripts/spot-paper-research/comparison.mjs",
-    "scripts/spot-paper-research/entry-confirmation.mjs"
+    "scripts/spot-paper-research/entry-confirmation.mjs",
+    "scripts/spot-paper-research/five-minute-trend.mjs"
   ]);
   assert.match(dockerfile, /^FROM node:20-alpine$/m);
   assert.match(dockerfile, /^USER node$/m);
