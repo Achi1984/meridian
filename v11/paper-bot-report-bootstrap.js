@@ -140,7 +140,7 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     pairedStateNode.textContent = pairedMessages[pairedState] || pairedMessages.unavailable;
     overview.update(report ? [sourceAdapter(report)] : []);
     paired.setLoading(pairedReading);
-    paired.render(pairedReport);
+    paired.render(pairedReport, pairedState);
   }
 
   function clearPrivate() {

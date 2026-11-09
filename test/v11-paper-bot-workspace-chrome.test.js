@@ -23,6 +23,11 @@ const chrome = [process.env.CHROME_BIN, '/usr/bin/google-chrome',
 const sizes = [320, 390, 1440];
 const pairedIdentity = syntheticExpectedPairedIdentity();
 const pairedFixture = syntheticPairedDashboard(pairedIdentity);
+const pairedLegacyIdentity = syntheticExpectedPairedIdentity();
+pairedLegacyIdentity.models[1].modelId = 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1';
+const pairedLegacyFixture = syntheticPairedDashboard(pairedLegacyIdentity);
+const pairedTrendFixture = syntheticPairedDashboard(
+  syntheticExpectedPairedIdentity({modelPair: true}));
 
 function runFlaggedBrowserTest(name) {
   const env = {...process.env};
@@ -66,6 +71,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
       const metrics = await withMobileChrome(chrome, width, hosted.url, async call => {
         let reads = 0;
         let pairedReads = 0;
+        let pairedResponseMode = 'legacy';
         let failure = null;
         const off = call.onEvent('Fetch.requestPaused', event => {
           void (async () => {
@@ -104,6 +110,26 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
               });
             } else {
               pairedReads++;
+              const mode = pairedResponseMode;
+              if (mode === 'unprovisioned' || mode === 'not_found') {
+                await call('Fetch.fulfillRequest', {
+                  requestId: event.requestId,
+                  responseCode: mode === 'unprovisioned' ? 503 : 404,
+                  responseHeaders: [
+                    {name: 'Access-Control-Allow-Origin', value: '*'},
+                    {name: 'Content-Type', value: 'application/json; charset=utf-8'},
+                    {name: 'Cache-Control', value: 'no-store'}
+                  ],
+                  body: Buffer.from(JSON.stringify({
+                    error: mode === 'unprovisioned' ?
+                      'spot_paper_paired_transport_not_provisioned' :
+                      'spot_paper_paired_report_not_found'
+                  })).toString('base64')
+                });
+                return;
+              }
+              const report = mode === 'trend' ? pairedTrendFixture :
+                mode === 'legacy' ? pairedLegacyFixture : pairedFixture;
               await call('Fetch.fulfillRequest', {
                 requestId: event.requestId,
                 responseCode: 200,
@@ -115,7 +141,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
                 body: Buffer.from(JSON.stringify({
                   schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
                   runId: pairedIdentity.runId,
-                  report: pairedFixture
+                  report
                 })).toString('base64')
               });
             }
@@ -159,6 +185,15 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           const initial = await evaluate(`({
             text:document.querySelector('#paper-bot-overview-root').textContent,
             paired:document.querySelector('#paired-paper-source-status').textContent,
+            pairedPanel:document.querySelector('#paired-paper-report-root').textContent,
+            pairedPanelState:document.querySelector('#paired-paper-report-root').dataset.state,
+            badges:[...document.querySelectorAll(
+              '#paper-bot-overview-root summary .spot-paper-bot-status')].map(element=>{
+                const style=getComputedStyle(element),bounds=element.getBoundingClientRect();
+                return {text:element.textContent,transform:style.transform,
+                  writingMode:style.writingMode,width:bounds.width,height:bounds.height,
+                  scrollWidth:element.scrollWidth,clientWidth:element.clientWidth};
+              }),
             disabled:document.querySelector('#paper-bot-overview-section button').disabled,
             viewport:document.documentElement.clientWidth,
             documentWidth:document.documentElement.scrollWidth
@@ -167,8 +202,21 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.match(initial.text, /In Vorbereitung/);
           assert.match(initial.text, /Unbekannt/);
           assert.match(initial.paired, /Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt/);
+          assert.equal(initial.pairedPanelState, 'idle');
+          assert.match(initial.pairedPanel, /Noch kein Bericht geladen/);
+          assert.doesNotMatch(initial.pairedPanel, /CORRUPT_UNKNOWN|Report-Projektor/);
+          assert.equal(initial.badges.length, 3);
+          for (const badge of initial.badges) {
+            assert.equal(badge.transform, 'none', JSON.stringify(badge));
+            assert.equal(badge.writingMode, 'horizontal-tb', JSON.stringify(badge));
+            assert.ok(badge.height < 30, JSON.stringify(badge));
+            assert.ok(badge.scrollWidth <= badge.clientWidth + 1, JSON.stringify(badge));
+          }
           assert.ok(initial.documentWidth <= initial.viewport + 1,
             `horizontal overflow: ${JSON.stringify(initial)}`);
+          const idleImage = await call('Page.captureScreenshot', {format: 'png'});
+          writeFileSync(join(evidence, `paper-bot-workspace-${width}-idle.png`),
+            Buffer.from(idleImage.data, 'base64'));
 
           await evaluate(`document.querySelector('#paper-bot-overview-section button').click()`);
           for (let attempt = 0; attempt < 150 && reads === 0; attempt++) {
@@ -185,23 +233,38 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.match(unavailable, /Kein authentifizierter Bericht verfügbar/);
           assert.match(unavailable, /In Vorbereitung/);
           assert.doesNotMatch(unavailable, /0,00 €|0 fills/i);
+          pairedResponseMode = width === 320 ? 'unprovisioned' :
+            width === 390 ? 'not_found' : 'legacy';
           await evaluate(`document.querySelector('#paired-paper-report-section button').click()`);
           for (let attempt = 0; attempt < 150 && pairedReads === 0; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
           assert.equal(failure, null, failure?.message);
           assert.equal(pairedReads, 1, 'one manual paired refresh creates exactly one GET');
-          let pairedText = '';
+          let pairedSnapshot = null;
+          const expectedFirstState = width === 320 ? 'unprovisioned' :
+            width === 390 ? 'empty' : 'running_snapshot';
           for (let attempt = 0; attempt < 150; attempt++) {
-            pairedText = await evaluate(`document.querySelector('#paired-paper-report-root').textContent`);
-            if (pairedText.includes('SYNTHETIC FIXTURE')) break;
+            pairedSnapshot = await evaluate(`(()=>{
+              const root=document.querySelector('#paired-paper-report-root');
+              return {state:root.dataset.state,text:root.textContent};
+            })()`);
+            if (pairedSnapshot.state === expectedFirstState) break;
             await new Promise(resolve => setTimeout(resolve, 10));
           }
-          assert.match(pairedText, /SYNTHETIC FIXTURE/);
-          assert.match(pairedText, /BTC_EUR_RESEARCH_TEST_V1/);
-          assert.match(pairedText, /RUNNING_SNAPSHOT/);
+          assert.equal(pairedSnapshot?.state, expectedFirstState);
+          if (width === 320) {
+            assert.match(pairedSnapshot.text, /Transport nicht provisioniert/);
+            assert.doesNotMatch(pairedSnapshot.text, /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
+          } else if (width === 390) {
+            assert.match(pairedSnapshot.text, /Kein gepaarter Bericht veröffentlicht/);
+            assert.doesNotMatch(pairedSnapshot.text, /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
+          } else {
+            assert.match(pairedSnapshot.text, /CONFIRM2_COOLDOWN10/);
+            assert.doesNotMatch(pairedSnapshot.text, /5M-SMA20-Trend/);
+          }
           const image = await call('Page.captureScreenshot', {format: 'png'});
-          writeFileSync(join(evidence, `paper-bot-workspace-${width}.png`),
+          writeFileSync(join(evidence, `paper-bot-workspace-${width}-${pairedResponseMode}.png`),
             Buffer.from(image.data, 'base64'));
 
           await evaluate(`document.getElementById('app-access-lock').click()`);
@@ -222,11 +285,31 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           }
           assert.equal(failure, null, failure?.message);
           assert.equal(reads, 2, 'the second user-initiated read is handled once');
+          pairedResponseMode = width === 320 ? 'legacy' : 'trend';
           await evaluate(`document.querySelector('#paired-paper-report-section button').click()`);
           for (let attempt = 0; attempt < 150 && pairedReads < 2; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
           assert.equal(pairedReads, 2, 're-unlock requires a second manual paired read');
+          for (let attempt = 0; attempt < 150; attempt++) {
+            const panelText = await evaluate(
+              `document.querySelector('#paired-paper-report-root').textContent`);
+            if (panelText.includes('SYNTHETIC FIXTURE')) break;
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          const pairedAfterRelock = await evaluate(
+            `document.querySelector('#paired-paper-report-root').textContent`);
+          assert.match(pairedAfterRelock, /SYNTHETIC FIXTURE/);
+          if (pairedResponseMode === 'trend') {
+            assert.match(pairedAfterRelock, /5M-SMA20-Trend/);
+            assert.match(pairedAfterRelock, /BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1/);
+          } else {
+            assert.match(pairedAfterRelock, /CONFIRM2_COOLDOWN10/);
+            assert.doesNotMatch(pairedAfterRelock, /5M-SMA20-Trend/);
+          }
+          const validImage = await call('Page.captureScreenshot', {format: 'png'});
+          writeFileSync(join(evidence, `paper-bot-workspace-${width}-${pairedResponseMode}.png`),
+            Buffer.from(validImage.data, 'base64'));
           const finalSize = await evaluate(`({
             width:innerWidth,
             viewport:document.documentElement.clientWidth,

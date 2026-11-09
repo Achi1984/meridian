@@ -178,7 +178,8 @@ function renderBot(document, parent, bot) {
   summary.setAttribute('style', 'cursor:pointer;display:flex;flex-wrap:wrap;gap:8px;align-items:center');
   node(document, summary, 'strong', bot.label);
   node(document, summary, 'span', STATE_LABELS[bot.state] || STATE_LABELS.UNKNOWN,
-    bot.state === 'PAUSED' || bot.state === 'UNKNOWN' ? 'tone-muted' : '');
+    `spot-paper-bot-status${bot.state === 'PAUSED' || bot.state === 'UNKNOWN' ?
+      ' tone-muted' : ''}`);
   card.append(summary);
   const content = document.createElement('div');
   content.setAttribute('style', 'display:grid;gap:8px;min-width:0;padding-top:12px');

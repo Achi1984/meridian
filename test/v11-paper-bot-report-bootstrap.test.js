@@ -184,7 +184,7 @@ test('workspace requires unlock and explicit refresh; lock clears read DTO and u
   assert.equal(calls, 0, 'locked access does not dispatch a report read');
   assert.match(h.overviewRoot.textContent, /Unbekannt/);
   assert.match(h.overviewRoot.textContent, /In Vorbereitung/);
-  assert.match(h.pairedRoot.textContent, /nicht verfügbar/);
+  assert.match(h.pairedRoot.textContent, /Noch kein Bericht geladen/);
 
   h.access.unlock();
   assert.equal(calls, 0, 'unlock alone does not dispatch a report read');
@@ -257,17 +257,21 @@ test('paired DTO is read through the real workspace mount and remains visibly sy
 test('paired transport, missing publication, identity and schema failures remain distinct', async () => {
   const cases = [
     {status: 503, body: {error: 'spot_paper_paired_transport_not_provisioned'},
-      expected: /Transport ist nicht provisioniert/},
+      expected: /Transport ist nicht provisioniert/,
+      panelExpected: /Transport nicht provisioniert/, panelState: 'unprovisioned'},
     {status: 404, body: {error: 'spot_paper_paired_report_not_found'},
-      expected: /Kein gepaarter Bericht veröffentlicht/},
+      expected: /Kein gepaarter Bericht veröffentlicht/,
+      panelExpected: /Kein gepaarter Bericht veröffentlicht/, panelState: 'empty'},
     {status: 409, body: {error: 'spot_paper_paired_identity_mismatch'},
-      expected: /Identität stimmt nicht/},
+      expected: /Identität stimmt nicht/, panelState: 'unavailable'},
     {status: 422, body: {error: 'spot_paper_paired_schema_unsupported'},
-      expected: /Schema wird nicht unterstützt/},
+      expected: /Schema wird nicht unterstützt/, panelState: 'unavailable'},
     {status: 422, body: {error: 'spot_paper_paired_identity_unsupported'},
-      expected: /Trend-Identität ist bis zum kanonischen #1319-Vertrag nicht unterstützt/},
+      expected: /Trend-Identität ist bis zum kanonischen #1319-Vertrag nicht unterstützt/,
+      panelState: 'unavailable'},
     {status: 422, body: {error: 'spot_paper_paired_report_invalid'},
-      expected: /gepaarte Bericht konnte nicht validiert werden/}
+      expected: /gepaarte Bericht konnte nicht validiert werden/,
+      panelState: 'unavailable'}
   ];
   for (const item of cases) {
     const h = harness({fetchImpl: async url => {
@@ -281,7 +285,11 @@ test('paired transport, missing publication, identity and schema failures remain
     h.access.unlock();
     await h.workspace.refreshPaired();
     assert.match(h.pairedRoot.parentNode.textContent, item.expected);
-    assert.match(h.pairedRoot.textContent, /gemeinsamer Report-Projektor oder DTO nicht verfügbar/);
+    assert.equal(h.pairedRoot.attrs['data-state'], item.panelState);
+    assert.doesNotMatch(h.pairedRoot.textContent,
+      /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
+    assert.match(h.pairedRoot.textContent, /Kennzahlen und Identität bleiben/);
+    if (item.panelExpected) assert.match(h.pairedRoot.textContent, item.panelExpected);
     h.workspace.dispose();
   }
 
@@ -312,7 +320,7 @@ test('missing paired source and unavailable bot report remain explicit, with no 
   assert.match(h.overviewRoot.parentNode.textContent, /Kein authentifizierter Bericht verfügbar/);
   assert.match(h.overviewRoot.textContent, /Unbekannt/);
   assert.match(h.overviewRoot.textContent, /In Vorbereitung/);
-  assert.match(h.pairedRoot.textContent, /gemeinsamer Report-Projektor oder DTO nicht verfügbar/);
+  assert.match(h.pairedRoot.textContent, /Noch kein Bericht geladen/);
   assert.match(h.pairedRoot.parentNode.textContent, /Kein gepaarter Bericht abgerufen/);
   h.workspace.setActive(false);
   h.workspace.setActive(true);

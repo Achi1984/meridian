@@ -820,6 +820,9 @@ function restoreB2(source){
   const ledgerManualCss='    .ledger-manual{margin-top:24px;overflow-wrap:anywhere}\n    .ledger-manual label{display:block;margin:12px 0}\n    .ledger-manual input,.ledger-manual textarea{display:block;box-sizing:border-box;width:100%;max-width:100%;padding:10px;color:inherit;background:#111e2d;border:1px solid #54799a;border-radius:8px}\n    .ledger-manual button{max-width:100%;white-space:normal}\n    .ledger-manual li{margin:8px 0}\n';
   assert.equal(source.split(ledgerManualCss).length-1,1,'one exact FIX11 manual Ledger CSS addition');
   source=source.replace(ledgerManualCss,'');
+  const spotPaperStatusCss='    #paper-bot-overview-root summary .spot-paper-bot-status{display:inline-flex;align-items:center;max-width:100%;font-size:11px;line-height:1.4;white-space:nowrap;transform:none;transition:none}\n    #paper-bot-overview-root details[open] summary .spot-paper-bot-status{transform:none}\n';
+  assert.equal(source.split(spotPaperStatusCss).length-1,1,'one exact scoped M11 Paper status CSS addition');
+  source=source.replace(spotPaperStatusCss,'');
   source=restoreBotOverviewCss(source);
   const ledgerReviewCss="    .ledger-review{margin-top:24px;border-top:1px solid #334155;padding-top:16px;overflow-wrap:anywhere}\n    .ledger-review button{max-width:100%;text-align:left}\n    .ledger-review li{margin-bottom:8px;overflow-wrap:anywhere}\n";
   assert.equal(source.split(ledgerReviewCss).length-1,1,'one exact FIX3 Ledger review CSS addition');

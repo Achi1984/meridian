@@ -1,5 +1,6 @@
 import {
   projectSpotPaperPairedDashboard,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODELS,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
 } from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX14';
 
@@ -23,6 +24,38 @@ const COUNT_FIELDS = Object.freeze([
   ['fillCount', 'Fills'],
   ['unresolvedObservations', 'Ungeklärte Beobachtungen']
 ]);
+const EMPTY_STATES = Object.freeze({
+  idle: {
+    state: 'idle',
+    status: 'NOT_REQUESTED',
+    statusLabel: 'Noch kein Bericht geladen; Kennzahlen bleiben unbekannt.'
+  },
+  ready: {
+    state: 'idle',
+    status: 'NOT_REQUESTED',
+    statusLabel: 'Noch kein Bericht geladen; Kennzahlen bleiben unbekannt.'
+  },
+  locked: {
+    state: 'idle',
+    status: 'NOT_REQUESTED',
+    statusLabel: 'Noch kein Bericht geladen; Kennzahlen bleiben unbekannt.'
+  },
+  loading: {
+    state: 'loading',
+    status: 'LOADING',
+    statusLabel: 'Bericht wird geladen …'
+  },
+  transport_unavailable: {
+    state: 'unprovisioned',
+    status: 'TRANSPORT_UNAVAILABLE',
+    statusLabel: 'Transport nicht provisioniert; Kennzahlen bleiben unbekannt.'
+  },
+  not_found: {
+    state: 'empty',
+    status: 'NO_PUBLISHED_REPORT',
+    statusLabel: 'Kein gepaarter Bericht veröffentlicht; Kennzahlen bleiben unbekannt.'
+  }
+});
 
 const isRecord = value => value !== null && typeof value === 'object' &&
   !Array.isArray(value);
@@ -124,7 +157,27 @@ const INVENTORY_LABELS = Object.freeze({
   OPEN: 'Offene Position',
   UNKNOWN: 'Unbekannt — Bestandsstatus fehlt'
 });
-export function presentSpotPaperPairedReport(input) {
+function unavailableReport(state) {
+  const unavailable = EMPTY_STATES[state] || {
+    state: 'unavailable',
+    status: 'UNAVAILABLE',
+    statusLabel: 'Bericht nicht verfügbar; Kennzahlen bleiben unbekannt.'
+  };
+  return {available: false, ...unavailable};
+}
+
+function challengerLabel(modelId) {
+  if (modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[1]) {
+    return 'CONFIRM2_COOLDOWN10 · 5M-SMA20-Trend';
+  }
+  if (modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[0]) {
+    return 'CONFIRM2_COOLDOWN10';
+  }
+  return 'Challenger';
+}
+
+export function presentSpotPaperPairedReport(input, {state = 'idle'} = {}) {
+  if (input === null || input === undefined) return unavailableReport(state);
   let dto;
   try {
     dto = projectSpotPaperPairedDashboard(input);
@@ -132,7 +185,12 @@ export function presentSpotPaperPairedReport(input) {
     dto = null;
   }
   if (!isRecord(dto) || dto.schemaVersion !== SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA) {
-    return {available: false, state: 'error', status: 'CORRUPT_UNKNOWN'};
+    return {
+      available: false,
+      state: 'error',
+      status: 'CORRUPT_UNKNOWN',
+      statusLabel: STATUS_LABELS.CORRUPT_UNKNOWN
+    };
   }
   const identity = dto.identity;
   const arms = Object.fromEntries(ARM_DEFINITIONS.map(({id}) =>
@@ -159,9 +217,12 @@ export function presentSpotPaperPairedReport(input) {
       pair: identity.pair,
       sourceSha256: identity.sourceSha256,
       configSha256: identity.configSha256,
-      researchSourceSha256: identity.researchSourceSha256
+      researchSourceSha256: identity.researchSourceSha256,
+      modelPairId: identity.modelPairId ?? null
     },
     models: identity.models,
+    challengerLabel: challengerLabel(arms.challenger.modelId),
+    trendActivityDiagnostic: dto.trendActivityDiagnostic ?? null,
     timing: {
       requestedDurationMs: dto.timing.requestedDurationMs,
       observedCoverageMs: dto.timing.observedCoverageMs,
