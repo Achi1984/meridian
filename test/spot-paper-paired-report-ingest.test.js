@@ -179,6 +179,15 @@ test('legacy and canonical trend evaluator DTOs survive ingestion, gateway GET, 
     assert.equal(dto.evidenceStatus, 'VERIFIED_COMPLETE');
     assert.equal(dto.identity.modelPairId ?? null,
       evidence.expectedIdentity.modelPairId ?? null);
+    if (modelPair) {
+      const countMismatch = structuredClone(evidence);
+      countMismatch.report.trendActivityDiagnostic.completedRoundTripCount = 1;
+      countMismatch.journal.events.at(-1).report =
+        structuredClone(countMismatch.report);
+      const rejected = evaluatePairedPaperEvidence(countMismatch);
+      assert.equal(rejected.evidenceStatus, 'CORRUPT_UNKNOWN');
+      assert.equal(rejected.reasonCode, 'INVALID_TREND_ACTIVITY_DIAGNOSTIC');
+    }
 
     const store = memoryStore();
     const write = await ingestSpotPaperPairedReport({

@@ -194,21 +194,6 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
       !finiteDuration(input.timing[key]) : !nullableInteger(input.timing[key])) return null;
     timing[key] = input.timing[key];
   }
-  if (timing.requestedDurationMs !== 28_800_000 ||
-      timing.requestedCycles !== 480 ||
-      timing.observedCoverageMs !== null && timing.observedCoverageMs < 0 ||
-      timing.actualElapsedMs !== null &&
-        (timing.actualElapsedMs < 0 ||
-          timing.actualElapsedMs > 28_805_000) ||
-      timing.attemptedCycles !== null &&
-        (timing.attemptedCycles < 0 || timing.attemptedCycles > 480) ||
-      timing.completedCycles !== null &&
-        (timing.completedCycles < 0 || timing.completedCycles > 480 ||
-          timing.attemptedCycles !== null &&
-            timing.completedCycles > timing.attemptedCycles)) return null;
-  if (!['CYCLE_LIMIT', 'DURATION_LIMIT', 'OPERATOR_STOP',
-    'REQUEST_LIMIT', 'SHARED_FEED_FAILURE', 'UNKNOWN'].includes(
-    input.timing.stopReason)) return null;
   const horizonTimingKeys = [
     'quoteAgeAtValuationMs', 'terminalQuoteAgeMs',
     'quoteFreshAtShutdown', 'commonHorizonAvailable', 'commonHorizonReason'
@@ -229,6 +214,21 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
           !REASON_CODE.test(input.timing.commonHorizonReason)) return null;
     for (const key of horizonTimingKeys) timing[key] = input.timing[key];
   }
+  if (timing.requestedDurationMs !== 28_800_000 ||
+      timing.requestedCycles !== 480 ||
+      timing.observedCoverageMs !== null && timing.observedCoverageMs < 0 ||
+      timing.actualElapsedMs !== null &&
+        (timing.actualElapsedMs < 0 ||
+          timing.actualElapsedMs > 28_805_000) ||
+      timing.attemptedCycles !== null &&
+        (timing.attemptedCycles < 0 || timing.attemptedCycles > 480) ||
+      timing.completedCycles !== null &&
+        (timing.completedCycles < 0 || timing.completedCycles > 480 ||
+          timing.attemptedCycles !== null &&
+            timing.completedCycles > timing.attemptedCycles)) return null;
+  if (!['CYCLE_LIMIT', 'DURATION_LIMIT', 'OPERATOR_STOP',
+    'REQUEST_LIMIT', 'SHARED_FEED_FAILURE', 'UNKNOWN'].includes(
+    input.timing.stopReason)) return null;
   const timingResult = {...timing, stopReason: input.timing.stopReason};
   if (trendActivityDiagnostic &&
       (timing.actualElapsedMs === null ||
@@ -274,6 +274,10 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
       identity.models.find(model => model.role === role).modelId);
     if (!arms[role]) return null;
   }
+  if (trendActivityDiagnostic &&
+      arms.challenger.fillCount !== null &&
+      trendActivityDiagnostic.completedRoundTripCount >
+        arms.challenger.fillCount) return null;
   const deltas = {
     status: input.deltas.status,
     reason: input.deltas.status === 'UNAVAILABLE' ?

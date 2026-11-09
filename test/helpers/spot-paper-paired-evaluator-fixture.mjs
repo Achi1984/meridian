@@ -204,11 +204,15 @@ export function syntheticPairedEvaluatorFixture({modelPair = false} = {}) {
         observedAt,
         ohlc: {
           path: `responses/${'a'.repeat(64)}.json`,
-          sha256: 'a'.repeat(64), bytes: 100
+          sha256: 'a'.repeat(64), bytes: 100,
+          requestStartedAt: observedAt - 10_000,
+          receivedAt: observedAt - 100
         },
         ticker: {
           path: `responses/${'b'.repeat(64)}.json`,
-          sha256: 'b'.repeat(64), bytes: 100
+          sha256: 'b'.repeat(64), bytes: 100,
+          requestStartedAt: observedAt - 1,
+          receivedAt: observedAt
         },
         decisions: models.map(model => ({
           role: model.role, decidedAt: observedAt - 2,
