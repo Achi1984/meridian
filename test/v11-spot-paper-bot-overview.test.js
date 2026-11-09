@@ -1,8 +1,10 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
+import {spawnSync} from 'node:child_process';
 import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
+import {fileURLToPath} from 'node:url';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {presentSpotPaperBotOverview} from '../v11/spot-paper-bot-overview-model.js';
@@ -333,6 +335,20 @@ test('overview modules do not add network, timers, storage, HTML parsing, or tra
 test('mobile Chrome renders separate responsive cards without horizontal overflow', {
   timeout: 180_000
 }, async () => {
+  if (typeof WebSocket !== 'function') {
+    const name = 'mobile Chrome renders separate responsive cards without horizontal overflow';
+    const env = {...process.env};
+    delete env.NODE_TEST_CONTEXT;
+    const child = spawnSync(process.execPath, ['--experimental-websocket', '--test',
+      `--test-name-pattern=^${name}$`, fileURLToPath(import.meta.url)], {
+      env, encoding: 'utf8', timeout: 170_000
+    });
+    assert.equal(child.status, 0,
+      `${String(child.stdout).slice(-2500)}${String(child.stderr).slice(-1000)}`);
+    assert.match(child.stdout, /V11_SPOT_PAPER_BOT_OVERVIEW_SIZE .*"width":320/);
+    assert.match(child.stdout, /V11_SPOT_PAPER_BOT_OVERVIEW_SIZE .*"width":390/);
+    return;
+  }
   const chrome = [process.env.CHROME_BIN, '/usr/bin/google-chrome',
     '/usr/bin/chromium'].find(path => path && existsSync(path));
   assert.ok(chrome, 'Chrome is required for paper bot overview mobile evidence');
@@ -399,6 +415,7 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
         return result;
       });
       assert.equal(metrics.width, width);
+      console.log('V11_SPOT_PAPER_BOT_OVERVIEW_SIZE ' + JSON.stringify(metrics));
     }
   } finally {
     await hosted.close();
