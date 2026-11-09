@@ -1,8 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import {mkdtemp, rm} from "node:fs/promises";
+import {mkdtemp, readFile, rm, writeFile} from "node:fs/promises";
 import {tmpdir} from "node:os";
 import {join} from "node:path";
+import {fileURLToPath} from "node:url";
+import {spawnSync} from "node:child_process";
 import {
   advanceFiveMinuteTrendEntry, createFiveMinuteTrendState,
   recordFiveMinuteTrendSell, SPOT_PAPER_5M_TREND_FILTER_ID,
@@ -17,6 +19,8 @@ import {
 } from "../scripts/spot-paper-paired/next-run-composition.mjs";
 import {
   pairedConfigDigest, runSpotPaperPairedSynthetic,
+  SPOT_PAPER_PAIRED_INTEGRATION,
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256,
   SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
   SPOT_PAPER_PAIRED_TREND_MODEL
 } from "../scripts/spot-paper-paired/forward.mjs";
@@ -25,9 +29,16 @@ import {SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID} from
 import {sha256} from "../scripts/spot-paper-pilot/core.mjs";
 import {readRunJournal} from "../scripts/spot-paper-pilot/journal.mjs";
 import {evaluatePairedPaperEvidence} from "../scripts/spot-paper-paired-report/evaluate.mjs";
+import {main as pairedHostMain} from "../scripts/spot-paper-paired/host.mjs";
+import {main as pairedIngestMain} from
+  "../scripts/spot-paper-paired-report/ingest.mjs";
 
 const MINUTE = 60_000;
 const BASE = Date.UTC(2025, 0, 1);
+const REPO_ROOT = fileURLToPath(new URL("../", import.meta.url));
+const EVALUATOR_CLI = fileURLToPath(new URL(
+  "../scripts/spot-paper-paired-report/cli.mjs", import.meta.url
+));
 const row = (timestamp, value) => {
   const close = `${value}.00000000`;
   return [timestamp / 1000, close, close, close, close, close, "1.00000000", 1];
@@ -94,11 +105,24 @@ async function setup(t, {allowTrendEntries = false, stopOnCycleFour = false,
     },
     counters: () => ({...counters})
   };
+  const researchSourceSha256 = nextRunResearchSourceDigest({
+    comparisonBytes: await readFile(new URL(
+      "../scripts/spot-paper-research/comparison.mjs", import.meta.url
+    )),
+    entryConfirmationBytes: await readFile(new URL(
+      "../scripts/spot-paper-research/entry-confirmation.mjs", import.meta.url
+    )),
+    fiveMinuteTrendBytes: await readFile(new URL(
+      "../scripts/spot-paper-research/five-minute-trend.mjs", import.meta.url
+    ))
+  });
+  assert.equal(researchSourceSha256,
+    SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256);
   const config = createSpotPaperPairedNextRunConfig({
     runId: "next-run-synthetic",
     dataRoot,
     sourceSha256: "a".repeat(64),
-    researchSourceSha256: "b".repeat(64),
+    researchSourceSha256,
     provider,
     confirmationExports: {
       SPOT_PAPER_ENTRY_CONFIRMATION_ID,
@@ -274,6 +298,99 @@ test("the selected composition completes only within the existing 480-cycle boun
   assert.equal(report.trendActivityDiagnostic.status, "PARTIAL_COVERAGE");
   assert.equal(report.trendActivityDiagnostic.requiredCoverageMs, 24 * 60 * MINUTE);
   assert.ok(report.trendActivityDiagnostic.observedCoverageMs < 8 * 60 * MINUTE);
+});
+
+test("actual 480-cycle next-run producer exports through evaluation to no-write ingestion", async t => {
+  const {config} = await setup(t, {allowTrendEntries: true, maxCycles: 480});
+  const report = await runSpotPaperPairedSynthetic(config);
+  const expectedIdentity = {
+    schemaVersion: "SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1",
+    runId: config.runId,
+    pair: "BTC/EUR",
+    sourceSha256: config.sourceSha256,
+    configSha256: config.configSha256,
+    researchSourceSha256: config.researchSourceSha256,
+    feedSourceId: config.provider.sourceId,
+    comparisonEngineId: config.comparisonEngine.id,
+    modelPairId: config.modelPair.id,
+    models: report.models
+  };
+  const identityPath = join(config.dataRoot, "synthetic-expected-identity.json");
+  const exportPath = join(config.dataRoot, "synthetic-host-export.json");
+  const dashboardPath = join(config.dataRoot, "synthetic-paired-dashboard.json");
+  await writeFile(identityPath, JSON.stringify(expectedIdentity));
+
+  const hostOutput = {value: "", write(value) { this.value += value; }};
+  const hostExport = await pairedHostMain([
+    "export", "--data-root", config.dataRoot, "--run-id", config.runId
+  ], {output: hostOutput});
+  assert.equal(hostExport.status, "TERMINAL_JOURNAL_VERIFIED");
+  assert.equal(hostExport.verifiedTerminal, true);
+  assert.equal(hostExport.reconciliationStatus, "READ_ONLY_VERIFIED");
+  assert.equal(hostExport.journal.events.filter(event =>
+    event.type === "shared_observation").length, 480);
+  assert.deepEqual(JSON.parse(hostOutput.value), hostExport);
+  await writeFile(exportPath, hostOutput.value);
+
+  const evaluated = spawnSync(process.execPath, [
+    EVALUATOR_CLI, identityPath, exportPath
+  ], {cwd: REPO_ROOT, encoding: "utf8", timeout: 60_000});
+  assert.equal(evaluated.status, 0, evaluated.stderr || evaluated.stdout);
+  const dashboard = JSON.parse(evaluated.stdout);
+  assert.equal(dashboard.evidenceStatus, "VERIFIED_COMPLETE");
+  assert.equal(dashboard.syntheticFixture, true);
+  assert.equal(dashboard.identity.runId, config.runId);
+  assert.equal(dashboard.identity.modelPairId, config.modelPair.id);
+  assert.equal(config.provider.sourceId, "SYNTHETIC_TEST_ONLY");
+  assert.equal(hostExport.report.testOnly, true);
+  assert.equal(hostExport.report.integrationStatus, SPOT_PAPER_PAIRED_INTEGRATION);
+  assert.equal(hostExport.report.feedSourceId, "SYNTHETIC_TEST_ONLY");
+  assert.deepEqual(dashboard.identity.models.map(model => model.modelId),
+    config.modelPair.models.map(model => model.modelId));
+  assert.equal(dashboard.timing.completedCycles, 480);
+  assert.equal(dashboard.timing.attemptedCycles, 480);
+  assert.equal(report.outcome, "COMPLETED_BOUNDED");
+  assert.equal(report.testOnly, true);
+  assert.equal(dashboard.assumptions.feeBpsPerSide, 20);
+  assert.equal(dashboard.assumptions.slippageBpsPerSide, 10);
+  assert.equal(dashboard.decision, "NO_WINNER_OR_PROMOTION");
+
+  for (const role of ["baseline", "challenger", "cash"]) {
+    const producedArm = report.arms.find(arm => arm.role === role);
+    const projectedArm = dashboard.arms[role];
+    assert.equal(projectedArm.fillCount, producedArm.fills.length);
+    assert.equal(projectedArm.bookedFeesCents, producedArm.valuation.feesCents);
+    assert.equal(projectedArm.modeledSlippageCents,
+      producedArm.valuation.slippageCents);
+    assert.equal(projectedArm.turnoverCents, producedArm.valuation.turnoverCents);
+    assert.equal(projectedArm.sampledDrawdownCents,
+      producedArm.valuation.sampledDrawdownCents);
+    assert.equal(projectedArm.unresolvedObservations,
+      producedArm.valuation.unresolvedObservations);
+    assert.equal(projectedArm.netPnlCents,
+      producedArm.valuation.netEquityCents -
+        producedArm.valuation.startingCapitalCents);
+    assert.equal(producedArm.fills.reduce((sum, fill) => sum + fill.feeCents, 0),
+      producedArm.valuation.feesCents);
+  }
+  assert.equal(dashboard.arms.baseline.fillCount, report.arms[0].fills.length);
+  assert.equal(dashboard.trendActivityDiagnostic.status, "PARTIAL_COVERAGE");
+  assert.equal(dashboard.trendActivityDiagnostic.completedRoundTripCount,
+    report.trendActivityDiagnostic.completedRoundTripCount);
+  await writeFile(dashboardPath, evaluated.stdout);
+
+  let storeCalls = 0;
+  let ingestOutput = "";
+  const ingestExitCode = await pairedIngestMain([
+    identityPath, dashboardPath
+  ], {
+    stdout: {write(value) { ingestOutput += value; }},
+    stderr: {write(value) { assert.fail(value); }},
+    getStore() { storeCalls++; }
+  });
+  assert.equal(ingestExitCode, 0);
+  assert.equal(JSON.parse(ingestOutput).status, "DRY_RUN");
+  assert.equal(storeCalls, 0);
 });
 
 test("interruptions and missing or stale feed data remain fail-closed in the composed runner", async t => {
