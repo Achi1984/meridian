@@ -8,6 +8,16 @@
 `NATIVE_BTC_USD_QUOTE_V1` schema and is admitted by the unchanged account and
 valuation modules.
 
+The additive `fetchCausalSample({decide})` API is versioned separately. It
+fetches OHLC first, passes bounded native BTC/USD closed-candle evidence to the
+decision callback, and requests Ticker only after that callback returns. Its
+result carries the candle response digest, exact decimal candle values and
+timestamps, OHLC receipt time, decision time, ticker request/receipt times, and
+the unchanged strict account observation. It uses the same adapter instance,
+single-flight guard, sample cadence, request deadlines, and request/byte/event
+budgets as `fetchObservation()`; it does not reserve a fresh allowance or alter
+the legacy method's output/order.
+
 The existing spot-pilot provider hard-codes `XBTEUR`; its ticker and OHLC
 parsers accept only EUR pair keys. Reusing them would request or admit EUR data,
 so this lane keeps the USD request and strict `XXBTZUSD` response-key parsers
@@ -17,13 +27,14 @@ response-receipt time, not an asserted exchange timestamp. The account schema
 only accepts `OFFLINE_CALLER_ASSERTION`, which is not provider authentication
 or independent quote verification.
 
-Illustrative host scheduling handoff with the #1317 runner and store. The host
-must first create a new store or reopen it with an independently retained tip.
-For every continuation, #1317 requires the exact persisted observation prefix
-before the new suffix; a singleton-only call is not a valid incremental
-continuation. Persist/retain each returned tip independently and stop on any
-adapter/runner error. This is not a deployment recipe or evidence of a live
-request:
+Illustrative data handoff with the #1317 runner and a newly created store. A
+reopened account is not permission to acquire another feed sample: the current
+composition blocks that until campaign-wide budgets survive verified restart.
+For every permitted continuation, #1317 requires the exact persisted
+observation prefix before the new suffix; a singleton-only call is not a valid
+incremental continuation. Persist/retain each returned tip independently and
+stop on any adapter/runner error. This is not a deployment recipe or evidence
+of a live request:
 
 ```js
 const feed = createKrakenUsdPublicFeed();
@@ -44,10 +55,10 @@ for (;;) {
 }
 ```
 
-The adapter admits only closed one-minute bars, preserves ticker decimal
-strings, rejects wrong pair keys, stale/future timing, and malformed responses,
-and bounds each response to 128 KiB, cumulative raw HTTP response bytes to
-32 MiB per adapter instance, requests to 512, observations to 256, each request
+The adapter admits only closed one-minute bars, preserves exact candle and
+ticker decimal strings, rejects wrong pair keys, stale/future timing, and
+malformed responses, and bounds each response to 128 KiB, cumulative raw HTTP
+response bytes to 32 MiB per adapter instance, requests to 512, observations to 256, each request
 to at most 5 seconds, and sampling to one observation per minute. The admitted
 quote age is `PAPER_CAPITAL_CHALLENGE_POLICY.maxValuationAgeMs` (10,000 ms);
 the adapter reads this policy value rather than maintaining a second age
@@ -66,6 +77,26 @@ adapter is not permission to extend a campaign, reset a store, or continue
 past either bound. The runner receives the full persisted observation prefix
 plus only the newly acquired suffix; the store replays the prior prefix without
 calling the decision function again.
+
+`scripts/usd-paper-composition/sma-candidate.mjs` provides an explicitly
+`PROPOSED_UNAPPROVED` SMA(5/20) candidate using only the spot-pilot core's
+`createStrategyState()` and `advanceStrategy()` signal semantics. The USD
+composition evaluates the signal before Ticker acquisition, then uses the
+later ticker only for USD account execution sizing/valuation. Entry sizing
+requires an explicit caller-supplied USD-cent notional, capped at the existing
+USD 100 limit and current cash after modeled costs; no sizing default is
+introduced. The existing USD 1,000 capital, USD 100 high-water pause and
+20-bp/10-bp modeled costs remain unchanged. The production host remains
+disabled, and the candidate adds no stop, spread policy, or forced trade.
+
+Strategy evidence is emitted as a separate digest-bound record through a
+caller-provided retention callback; it is not part of the account journal and
+callback success does not prove durable independent retention. Neither strategy
+state/evidence nor campaign-wide adapter request/byte counters survive a
+verified restart today. Reopened account stores therefore remain prohibited
+from acquiring another feed sample. Missing or tampered strategy evidence
+cannot authorize resume, and even verified evidence does not remove this
+campaign-budget gate.
 
 Tests use clearly synthetic provider-shaped responses only. No live request,
 authentication, private endpoint, order method, deployment, or market-data

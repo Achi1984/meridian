@@ -4,9 +4,12 @@ import {
   MAX_USD_ACCOUNT_JOURNAL_EVENTS,
   MAX_USD_ACCOUNT_WINDOW_MS
 } from "../paper-capital-challenge/account-store.mjs";
-import {USD_MODELED_COSTS} from "../paper-capital-challenge/account-contract.mjs";
+import {
+  decimalAtoms, modeledExecution, NOTIONAL_DIVISOR, USD_MODELED_COSTS
+} from "../paper-capital-challenge/account-contract.mjs";
 import {PAPER_CAPITAL_CHALLENGE_POLICY as POLICY} from
   "../paper-capital-challenge/policy.mjs";
+import {USD_SMA_CANDIDATE} from "./sma-candidate.mjs";
 
 const STORE_SESSIONS = new WeakMap();
 
@@ -27,8 +30,141 @@ export const USD_BTC_LIVES_HOST_CONFIGURATION = Object.freeze({
   strategyIdentity: null
 });
 
+export const USD_BTC_SMA_CANDIDATE_CONFIGURATION = Object.freeze({
+  schemaVersion: "USD_BTC_SMA_CANDIDATE_COMPOSITION_V1",
+  enabled: false,
+  executionEnabled: false,
+  strategyStatus: USD_SMA_CANDIDATE.status,
+  strategyVersion: USD_SMA_CANDIDATE.strategyVersion,
+  sourceVersion: USD_SMA_CANDIDATE.sourceVersion,
+  warmupClosedCandles: USD_SMA_CANDIDATE.warmupClosedCandles,
+  maxEntryNotionalCents: USD_MODELED_COSTS.maxEntryCents,
+  requiresExplicitEntryNotional: true
+});
+
 export function startUsdLivesHost() {
   throw new Error("USD_LIVES_HOST_DISABLED");
+}
+
+export async function runProposedUsdSmaCandidateSample({
+  feed,
+  store,
+  candidate,
+  candidateNotionalCents,
+  retainStrategyEvidence,
+  retainRestartTip
+} = {}) {
+  if (!feed || typeof feed.fetchCausalSample !== "function" ||
+      !store || typeof store.append !== "function" ||
+      !candidate || typeof candidate.decide !== "function" ||
+      typeof candidate.recordSample !== "function" ||
+      !Number.isSafeInteger(candidateNotionalCents) || candidateNotionalCents < 1 ||
+      candidateNotionalCents > USD_MODELED_COSTS.maxEntryCents ||
+      typeof retainStrategyEvidence !== "function" ||
+      typeof retainRestartTip !== "function") {
+    throw new TypeError("proposed USD SMA composition requires a causal feed, candidate, explicit notional, and evidence/tip sinks");
+  }
+  return withStoreSession(store, async session => {
+    if (!Array.isArray(store.replay?.entries)) {
+      throw new TypeError("proposed USD SMA composition requires a replayable account store");
+    }
+    if (store.replay.entries.length >= MAX_USD_ACCOUNT_JOURNAL_EVENTS) {
+      throw new Error("ACCOUNT_JOURNAL_LIMIT_REACHED");
+    }
+    if (session.feedBudgetRequiresReview) {
+      throw new Error("USD_CAMPAIGN_FEED_BUDGET_REVIEW_REQUIRED");
+    }
+    if (session.feedInstance && session.feedInstance !== feed) {
+      throw new Error("USD_CAMPAIGN_FEED_INSTANCE_CHANGED");
+    }
+    if (session.strategyInstance && session.strategyInstance !== candidate) {
+      throw new Error("USD_CAMPAIGN_STRATEGY_INSTANCE_CHANGED");
+    }
+    session.feedInstance ??= feed;
+    session.strategyInstance ??= candidate;
+    const sample = await feed.fetchCausalSample({
+      decide: candleEvidence => candidate.decide(candleEvidence)
+    });
+    const strategyEvidence = candidate.recordSample(sample);
+    await retainStrategyEvidence(structuredClone(strategyEvidence));
+    const prefix = store.replay.entries.map(({event}) => ({
+      id: event.id,
+      observedAtMs: event.observedAtMs,
+      quote: event.quote
+    }));
+    const result = await runUsdOfflineStream({
+      store,
+      observations: [...prefix, sample.observation],
+      decide: context => decisionForCandidateSample(
+        sample.decision, context, candidateNotionalCents)
+    });
+    await retainRestartTip(structuredClone(result.tip));
+    return Object.freeze({
+      ...result,
+      sample,
+      strategyEvidence,
+      acceptance: Object.freeze({
+        kind: "PROPOSED_UNAPPROVED_CANDIDATE",
+        hostEnabled: USD_BTC_SMA_CANDIDATE_CONFIGURATION.enabled,
+        strategyStatus: USD_BTC_SMA_CANDIDATE_CONFIGURATION.strategyStatus,
+        productionReadiness: "NOT_ASSESSED"
+      })
+    });
+  });
+}
+
+function decisionForCandidateSample(candidateDecision, context, candidateNotionalCents) {
+  if (candidateDecision.action === "EXIT") {
+    const inventory = BigInt(context.account.inventorySatoshis);
+    return inventory > 0n ? {
+      action: "SELL",
+      quantityBtc: formatBtc(inventory),
+      reason: null
+    } : {action: "HOLD", quantityBtc: null, reason: null};
+  }
+  if (candidateDecision.action !== "ENTRY" ||
+      context.account.inventorySatoshis !== "0") {
+    return {action: "HOLD", quantityBtc: null, reason: null};
+  }
+  const quantity = quantityForCandidateNotional(
+    candidateNotionalCents,
+    context.account.cashCents,
+    context.account.unbookedAccruedFeesCents,
+    context.observation.quote.ask
+  );
+  if (quantity === 0n) {
+    return {
+      action: "SKIP_ENTRY",
+      quantityBtc: null,
+      reason: "CANDIDATE_NOTIONAL_UNEXECUTABLE"
+    };
+  }
+  return {action: "BUY", quantityBtc: formatBtc(quantity), reason: null};
+}
+
+function quantityForCandidateNotional(notionalLimitCents, cashCents, accruedFeesCents, ask) {
+  const price = decimalAtoms(ask, "ASK");
+  const cashLimit = BigInt(cashCents) - BigInt(accruedFeesCents);
+  const limit = BigInt(notionalLimitCents);
+  if (cashLimit <= 0n) return 0n;
+  let low = 0n;
+  const maximumQuantity = BigInt(Number.MAX_SAFE_INTEGER);
+  let high = limit * NOTIONAL_DIVISOR / price;
+  if (high > maximumQuantity) high = maximumQuantity;
+  while (low < high) {
+    const middle = (low + high + 1n) / 2n;
+    const execution = modeledExecution(middle, {ask}, "BUY");
+    const debit = BigInt(execution.notionalCents) + BigInt(execution.feeCents);
+    if (BigInt(execution.notionalCents) <= limit && debit <= cashLimit) low = middle;
+    else high = middle - 1n;
+  }
+  return low;
+}
+
+function formatBtc(satoshis) {
+  const whole = satoshis / 100_000_000n;
+  const fraction = (satoshis % 100_000_000n).toString().padStart(8, "0").replace(/0+$/, "");
+  return fraction ? `${whole}.${fraction}` : String(whole);
 }
 
 export async function runSyntheticUsdLivesFeedSample({
@@ -98,6 +234,7 @@ function getStoreSession(store) {
       failed: false,
       failure: null,
       feedInstance: null,
+      strategyInstance: null,
       feedBudgetRequiresReview: store.createdNew !== true ||
         (store.replay?.entries?.length ?? 0) > 0
     };
