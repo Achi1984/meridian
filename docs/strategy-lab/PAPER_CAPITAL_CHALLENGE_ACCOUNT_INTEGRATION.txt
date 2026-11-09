@@ -179,22 +179,67 @@ Derived payloads are diagnostic outputs, not restart admission credentials.
 To verify one, replay its original events and compare all derived output.
 
 #1297 is integrated from main, and its postchecks are complete. The available
-guard-history interface for future account/host wiring is:
+guard-history interface for observation-only history is:
   for each NEW derived observation in order:
     result = await historyStore.append(observation)
     independently retain result.tip
   resume only via reopenExisting(directory, {expectedTip: externallyRetainedTip})
   compare persisted observations to replayed account observations before use.
 
-The history store is present on this branch; this interface description is
-not implemented account/host wiring. Guard-history persistence is NOT
-full account-transaction durability: saving observations alone loses BTC/fill/
-cost evidence. A later reviewed account store must atomically persist the
-complete event with its derived fill and valuation, coordinate the guard tip,
-handle ambiguous writes without retry trading, reject rollback/fork/reset/
-contradictory history, and reconcile only read-only against an independently
-retained expected tip. Do not resume from a partial account journal, start a
-new campaign after a crash, or use this in-memory append API as a durable log.
+The observation-only history store is not used by the USD account journal.
+It cannot provide full account-transaction durability by itself: saving
+observations alone loses BTC/fill/cost evidence. The in-memory append API
+remains a pure replay helper and is not itself a durable log.
+
+VERSIONED FULL-ACCOUNT JOURNAL V2 AND OFFLINE RUNNER
+
+scripts/paper-capital-challenge/account-store.mjs composes the existing
+account replay/valuation/guard with the existing CheckpointStore transaction
+primitive. Its sole durable checkpoint contains the immutable campaign,
+strategy, cost and native BTC/USD binding plus each complete admitted
+transaction (input event/quote/action, derived modeled fill or skip reason,
+and guard valuation observation). Sequence and SHA-256 predecessor digest
+cover every record. Cash, BTC, booked and accrued costs, high-water equity
+and latched pause are reconstructed by replaying the complete event list;
+serialized derived values are checked against replay and are never trusted
+as restart snapshots. There is no separate guard journal.
+
+The versioned contract is USD_PAPER_ACCOUNT_JOURNAL_V2 /
+USD_PAPER_ACCOUNT_TIP_V2. createNew is create-only; reopenExisting requires
+the exact independently retained expectedTip and matching binding. The
+checkpoint lock enforces one writer. Exact duplicate IDs return the existing
+tip; conflicting IDs fail. Any unacknowledged commit blocks that writer.
+A crash with a pending marker remains UNKNOWN/locked, whether the checkpoint
+rename happened or not. Inspection does not clear a marker or stale lock.
+Never retry a trade after an ambiguous commit or reopen without the external
+tip. There is no reset, top-up, compaction, or truncation path.
+
+Predeclared offline resource bound: at most 256 complete events, at most
+24 hours from the first admitted event, and at most 512 KiB for the complete
+canonical checkpoint. The 256-event bound is inherited from the unchanged
+V1 account/guard replay contract; V2 does not silently increase or alter its
+replay semantics. The full-window test writes and reopens all 256 events,
+asserts the byte and cumulative-publication limits, and verifies the event
+bound. When the 256th event or 24-hour horizon is reached, the next unique
+event is rejected and the process must stop. This is not a guarantee that a
+24-hour feed at a higher cadence fits: no safe continuation/retention beyond
+these exact limits is implemented or claimed.
+
+The measured full-window fixture spans 86,062,500 ms. Its final canonical
+checkpoint is 331,375 bytes (512 KiB allowed), cumulative published checkpoint
+bytes are 42,648,244 (64 MiB allowed), and 256 append/replay/fsync operations
+took 5,870 ms in the focused local run. These figures are bounded synthetic
+test evidence, not a host capacity or latency guarantee.
+
+scripts/paper-capital-challenge/offline-runner.mjs consumes prevalidated
+caller-supplied native USD quotes and one injected causal decision per quote.
+It persists each action through the account journal and reports activity,
+rejected entries, last modeled trade, booked/additional costs, net equity,
+and remaining drawdown allowance. The real guard blocks buys after pause;
+valid risk-reducing sells remain admissible. It has no provider, host,
+network, order dispatch, or live authentication. A future host still needs
+an independently qualified native BTC/USD feed and an independently retained
+latest tip, supplied back to reopenExisting after restart.
 
 ACTIVITY AND LAUNCH BLOCKERS
 
@@ -209,22 +254,23 @@ profitableCandidateEstablished is always false. Cash-only and held-but-never-
 closed candidates do not pass that criterion. No forced trades, churn to pass
 it, or pause override should be introduced by a future strategy integration.
 
-Launch blockers remain: independently retained external restart tip and
-complete account-transaction durability;
-reviewed continuation beyond 256 observations; authenticated native live
-BTC/USD feed/venue applicability; verified USD account cost schedule; host
-wiring and explicit owner authorization/admission; an approved active strategy
-and sufficient counterfactual activity evidence without bypassing drawdown.
-All production policy gates remain disabled pending those separate reviews.
+Launch blockers remain: independently retained external restart tip;
+reviewed continuation beyond the 256-event/24-hour/512-KiB bounds;
+authenticated native live BTC/USD feed/venue applicability; verified USD
+account cost schedule; host wiring and explicit owner authorization/admission;
+an approved active strategy and sufficient counterfactual activity evidence
+without bypassing drawdown. All production policy gates remain disabled.
 
 FOCUSED OFFLINE VALIDATION
 
 From /home/runner/work/meridian/meridian:
   node --test test/paper-capital-challenge-account.test.js \
-              test/paper-capital-challenge-guard.test.js
+              test/paper-capital-challenge-guard.test.js \
+              test/paper-capital-challenge-history-store.test.js \
+              test/paper-capital-challenge-account-store.test.js
 
-Tests are explicitly synthetic, exercise actual modeled BUY/HOLD/SELL account
-changes, fractional-cent rounding, accrued/exit cost double-count prevention,
-open high-water loss/pause/partial exit, input immutability, deterministic
-JSON replay, duplicate/chronological/currency admission, and the real guard.
-Hosted CI owns the broader regression. No new live tests or acquisition occur.
+Tests are explicitly synthetic. The account-store suite includes real
+filesystem/process restarts, before/after-publication crashes, idempotency,
+stale tips, corruption, full-window storage/replay bounds, and runner
+equivalence. Account/guard suites exercise modeled fills and the real guard.
+Hosted CI owns the broader regression. No live acquisition or orders occur.
