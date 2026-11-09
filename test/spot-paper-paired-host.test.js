@@ -5,12 +5,15 @@ import { mkdtemp, mkdir, readFile, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
-  inspectSpotPaperPairedRun, main, runSpotPaperPairedHost,
+  composeSpotPaperPairedHost, inspectSpotPaperPairedRun, main, runSpotPaperPairedHost,
   runSpotPaperPairedWithSignals, SPOT_PAPER_PAIRED_HOST_DEFAULTS
 } from "../scripts/spot-paper-paired/host.mjs";
 import { createRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256 } from
   "../scripts/spot-paper-paired/forward.mjs";
+import {
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT
+} from "../scripts/spot-paper-paired/forward.mjs";
 
 async function rootFixture(t) {
   const dataRoot = await mkdtemp(join(tmpdir(), "paired-host-"));
@@ -66,6 +69,28 @@ test("host composition rejects an existing evidence path before integration or f
   await assert.rejects(runSpotPaperPairedHost({
     dataRoot, runId: "already-used"
   }), /EVIDENCE_PATH_ALREADY_EXISTS/);
+});
+
+test("host composition requires explicit versioned 20-bps next-run contract selection", async t => {
+  const dataRoot = await rootFixture(t);
+  const runId = "paired-host-next-fee-contract";
+  await assert.rejects(composeSpotPaperPairedHost({dataRoot, runId}),
+    /ACCOUNT_CONTRACT_SELECTION_REQUIRED/);
+  const composition = await composeSpotPaperPairedHost({
+    dataRoot, runId,
+    accountContractId: SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT.contractId
+  });
+  assert.equal(composition.accountContractId,
+    "BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2");
+  assert.equal(composition.accountContractVersion, 2);
+  assert.equal(composition.feeBpsPerSide, 20);
+  assert.equal(composition.slippageBpsPerSide, 10);
+
+  const output = { value: "", write(text) { this.value += text; } };
+  await assert.rejects(main([
+    "run", "--data-root", dataRoot, "--run-id", "unselected-contract"
+  ], { output }), /ACCOUNT_CONTRACT_SELECTION_REQUIRED/);
+  assert.equal(output.value, "");
 });
 
 test("read-only status/report/export and package commands reuse paired journal helpers", async t => {
