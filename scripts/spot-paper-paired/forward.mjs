@@ -925,10 +925,18 @@ async function runPairedForward(input, testOnly) {
       Number.isFinite(monotonicEndedAt) && monotonicEndedAt >= monotonicStart,
     "CLOCK_ERROR");
     const elapsedMs = monotonicEndedAt - monotonicStart;
-    const commonHorizonAvailable = Boolean(lastQuote &&
-      endedAt >= lastQuote.receivedAt &&
-      endedAt - lastQuote.receivedAt <= SPOT_PAPER_PAIRED.maxQuoteAgeMs);
-    const sharedHorizonAt = replayObservations.at(-1)?.effectAt ?? null;
+    const lastObservation = replayObservations.at(-1) ?? null;
+    const sharedHorizonAt = lastObservation?.effectAt ?? null;
+    const quoteAgeAtEffectMs = lastQuote && sharedHorizonAt !== null ?
+      sharedHorizonAt - lastQuote.receivedAt : null;
+    const terminalQuoteAgeMs = lastQuote ? endedAt - lastQuote.receivedAt : null;
+    const commonHorizonAvailable = Boolean(lastQuote && lastObservation &&
+      lastObservation.ticker.receivedAt === lastQuote.receivedAt &&
+      quoteAgeAtEffectMs !== null && quoteAgeAtEffectMs >= 0 &&
+      quoteAgeAtEffectMs <= SPOT_PAPER_PAIRED.maxQuoteAgeMs);
+    const quoteFreshAtShutdown = terminalQuoteAgeMs !== null &&
+      terminalQuoteAgeMs >= 0 &&
+      terminalQuoteAgeMs <= SPOT_PAPER_PAIRED.maxQuoteAgeMs;
     const summaries = config.arms.map((arm, index) => ({ ...arm.summarize({
       state: states[index].valuationLedger ?
         { ...states[index], ledger: states[index].valuationLedger } : states[index],
@@ -999,7 +1007,9 @@ async function runPairedForward(input, testOnly) {
         "CONFIGURED_DURATION_REACHED" : "PARTIAL",
       cycles: cycle, requests: counters.requests, deliveredBytes: counters.bytes,
       commonHorizon: { available: commonHorizonAvailable,
-        quoteReceivedAt: lastQuote?.receivedAt ?? null, effectAt: sharedHorizonAt },
+        reason: commonHorizonAvailable ? null : "NO_VALID_COMMON_OBSERVATION",
+        quoteReceivedAt: lastQuote?.receivedAt ?? null, effectAt: sharedHorizonAt,
+        quoteAgeAtEffectMs, terminalQuoteAgeMs, quoteFreshAtShutdown },
       assumptions: manifest.assumptions,
       arms: config.arms.map((arm, index) => ({
         role: arm.role, modelId: arm.modelId, accountId: arm.accountId,

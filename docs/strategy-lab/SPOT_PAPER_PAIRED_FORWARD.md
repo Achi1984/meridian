@@ -112,8 +112,13 @@ available only when that position has a valid mark at the shared horizon;
 otherwise remaining marked equity and the comparison result are unknown, not
 compared against a stale mark.
 Terminal summaries and the replay use the final shared observation's `effectAt`
-as their stated horizon; the report separately records whether that quote was
-still fresh when terminal persistence began.
+as their stated horizon. Historical quote freshness is checked at that
+observation's `effectAt`, independently of terminal freshness. The terminal
+report retains `quoteAgeAtEffectMs`, `terminalQuoteAgeMs`, and
+`quoteFreshAtShutdown`; a quote can support a historical valuation without being
+described as current at shutdown. With no valid shared observation, the horizon
+and open-position equity remain unavailable. This reporting distinction does
+not alter the execution-time quote-age checks.
 Reports carry costs, net/marked
 equity, sampled drawdown from starting capital, exposure, turnover, open
 positions, unresolved observations, and the shared-horizon status. The cash
@@ -257,6 +262,49 @@ host export is produced by the read-only, journal-validating helper. The
 evaluator independently checks expected identity, journal reconciliation,
 terminal report/checkpoint, and accounting, and labels its result structural,
 not independently authenticated.
+
+## Offline fee-scenario replay
+
+After retrieving and verifying the stopped host evidence, preserve the original
+run directory and export. Keep the evidence directory read-only and write the
+scenario output outside it:
+
+```sh
+node scripts/spot-paper-paired/host.mjs export \
+  --data-root "$PAIRED_DATA_ROOT" --run-id "$PAIRED_RUN_ID" \
+  > "$STAGE/paired-export.json"
+node scripts/spot-paper-paired/fee-scenario.mjs \
+  "$EXPECTED_IDENTITY_JSON" "$STAGE/paired-export.json" "$PAIRED_DATA_ROOT" \
+  > "$STAGE/fee-scenarios.json"
+```
+
+The replay refuses synthetic, incomplete, unverified, identity-mismatched, or
+changed evidence. It rechecks the read-only journal and each referenced response
+byte count and SHA-256, then rebuilds all three accounts, strategy decisions,
+position sizes, risk stops, fees, and terminal marks from the saved Kraken
+observations. The 50-bps replay must reconcile to the original report's
+decisions, fills, risk states, and accounting before alternative scenarios are
+returned. The original report is included unchanged; the output also preserves
+its identity hashes and reports canonical report/export hashes plus the verified
+journal payload checksum. This tool performs no network, host, or evidence-file
+write and does not change the original report.
+
+The labeled output is
+`COUNTERFACTUAL_KRAKEN_FEED_OKX_FEE_SCENARIO`, not OKX execution evidence. The
+original 50-bps-per-side assumption is replayed alongside a 20-bps-per-side
+regular EEA spot taker scenario and an optional 10-bps-per-side X-Perps-account
+spot taker scenario. The official EEA fee pages were checked 2026-11-09; the
+regular spot schedule is effective 2026-09-25, and the later X-Perps-account
+spot table is used for the optional scenario. Scenario outputs record the
+source URLs and date. User-specific fee tier and X-Perps-account eligibility
+remain `UNKNOWN`. Market-style fills are modeled as taker fills; no maker fills
+are invented, and the existing 10-bps-per-side slippage remains unchanged.
+These counterfactuals are not actual OKX fills or account fees and must not be
+used to configure runtime fees or promote a strategy.
+
+No verified export or actual replay result for the stopped first paired run is
+included in this repository. Evidence retrieval and execution of this offline
+replay remain pending; do not infer or publish a result from log-derived totals.
 
 For Northflank retrieval, use a separately reviewed maintenance Job with the
 evidence volume mounted read-only and the exact `node` host command above; use

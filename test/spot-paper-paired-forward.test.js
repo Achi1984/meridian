@@ -14,6 +14,10 @@ import {
   SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
   SPOT_PAPER_PAIRED_INTEGRATION, SPOT_PAPER_RESEARCH_COMPARISON_ID
 } from "../scripts/spot-paper-paired/forward.mjs";
+import {
+  replaySpotPaperFeeScenarioObservations,
+  replayVerifiedSpotPaperFeeScenarios
+} from "../scripts/spot-paper-paired/fee-scenario.mjs";
 import { sha256 } from "../scripts/spot-paper-pilot/core.mjs";
 import { readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { createSpotPaperPairedKrakenProvider } from
@@ -65,6 +69,7 @@ async function fixture(t, options = {}) {
   const providerCounts = { requests: 0, bytes: 0 };
   const order = [];
   let challengerApplyCount = 0;
+  let sleepCount = 0;
   let replayObservations = null;
   const provider = {
     sourceId: SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
@@ -194,7 +199,10 @@ async function fixture(t, options = {}) {
     now: () => wall,
     monotonicNow: () => mono,
     sleep: async ms => {
-      wall += ms - (options.wallSleepLagMs ?? 0);
+      const wallAdvance = typeof options.wallSleepAdvanceMs === "function" ?
+        options.wallSleepAdvanceMs(ms, sleepCount++) :
+        options.wallSleepAdvanceMs ?? (ms - (options.wallSleepLagMs ?? 0));
+      wall += wallAdvance;
       mono += ms;
     },
     provider,
@@ -278,6 +286,9 @@ test("a stale pre-signal or future quote stops the shared run without accepting 
     assert.equal(report.stopReason, "SHARED_FEED_FAILURE");
     assert.equal(report.cycles, 1);
     assert.equal(report.commonHorizon.available, false);
+    assert.equal(report.commonHorizon.reason, "NO_VALID_COMMON_OBSERVATION");
+    assert.equal(report.commonHorizon.quoteAgeAtEffectMs, null);
+    assert.equal(report.commonHorizon.quoteFreshAtShutdown, false);
     const journal = await readRunJournal({ dataRoot: setup.dataRoot,
       runId: setup.config.runId });
     const failure = journal.events.find(event => event.type === "shared_feed_failure");
@@ -374,31 +385,126 @@ test("sampled drawdown retains losses from the initial-capital high-water mark",
   assert.equal(challenger.valuation.sampledDrawdownCents, 1_000);
 });
 
-test("a delayed common horizon is reported unknown, not as an equivalent final mark", async t => {
-  const setup = await fixture(t, { maxCycles: 1, enterOnCycleOne: true });
-  const originalNow = setup.config.now;
-  let calls = 0;
-  setup.config.now = () => {
-    calls++;
-    const value = originalNow();
-    return calls > 7 ? value + 11_000 : value;
+test("deadline during normal poll sleep preserves historical horizon but reports terminal quote age",
+  async t => {
+  const setup = await fixture(t, {
+    maxCycles: 3, maxRequests: 6, maxDurationMs: 2 * MINUTE,
+    candleCount: 22,
+    wallSleepAdvanceMs: (ms, index) => index === 0 ? ms : 32_712,
+    priceAtIndex: index => index >= 21 ? "31000.00000000" : PRICE
+  });
+  const [comparisonExports, challengerExports] = await Promise.all([
+    import("../scripts/spot-paper-research/comparison.mjs"),
+    import("../scripts/spot-paper-research/entry-confirmation.mjs")
+  ]);
+  const captureObservations =
+    setup.config.comparisonExports.compareSpotPaperStrategies;
+  setup.config.comparisonExports.compareSpotPaperStrategies = observations => {
+    captureObservations(observations);
+    return comparisonExports.compareSpotPaperStrategies(observations);
   };
-  setup.config.arms[1].researchExports.advanceEntryConfirmation =
-    setup.config.challengerExports.advanceEntryConfirmation;
-  setup.config.challengerExports.advanceEntryConfirmation =
-    (state, candles, context) => {
-      return {
-        state, signals: [{
-          id: "synthetic-entry", direction: "ENTRY", candleAt: candles.at(-1).timestamp,
-          closeNano: candles.at(-1).closeNano, strategyReason: "SYNTHETIC_TEST_ENTRY"
-        }], newCandleCount: 1
-      };
-    };
+  setup.config.challengerExports = challengerExports;
+  setup.config.arms[1] = createChallengerArm(challengerExports, "challenger-eur");
+  setup.config.comparisonEngine = {
+    id: SPOT_PAPER_RESEARCH_COMPARISON_ID,
+    compare: setup.config.comparisonExports.compareSpotPaperStrategies
+  };
+  setup.config.configSha256 = pairedConfigDigest(setup.config);
+
   const report = await runSpotPaperPairedSynthetic(setup.config);
-  assert.equal(report.commonHorizon.available, false);
-  assert.equal(report.comparison.status, "UNAVAILABLE");
-  assert.equal(report.arms[1].valuation.netEquityCents, null);
-  assert.equal(report.arms[1].valuation.openPositions.length, 1);
+  assert.equal(report.stopReason, "DURATION_LIMIT");
+  assert.equal(report.cycles, 2);
+  assert.equal(report.requests, 4);
+  assert.equal(setup.order.filter(item => item === "ohlc").length, 2);
+  assert.equal(report.commonHorizon.available, true);
+  assert.equal(report.commonHorizon.quoteAgeAtEffectMs, 0);
+  assert.equal(report.commonHorizon.terminalQuoteAgeMs, 32_712);
+  assert.equal(report.commonHorizon.quoteFreshAtShutdown, false);
+  assert.equal(report.comparison.status, "COMPARISON_AVAILABLE");
+  const baseline = report.arms.find(arm => arm.role === "baseline");
+  assert.equal(baseline.valuation.openPositions.length, 1);
+  assert.ok(Number.isSafeInteger(baseline.valuation.netEquityCents));
+  assert.equal(report.comparison.arms.baseline.finalNetEquityCents,
+    baseline.valuation.netEquityCents);
+
+  const originalAssumption = replaySpotPaperFeeScenarioObservations(
+    setup.replayObservations, { feeBpsPerSide: 50 });
+  originalAssumption.arms.forEach((replay, index) => {
+    const original = report.arms[index];
+    assert.deepEqual(replay.decisions, original.decisions);
+    assert.deepEqual(replay.fills, original.fills);
+    assert.deepEqual(replay.riskStates, original.riskStates);
+    assert.equal(replay.valuation.feesCents, original.valuation.feesCents);
+    assert.equal(replay.valuation.slippageCents, original.valuation.slippageCents);
+    assert.equal(replay.valuation.netEquityCents,
+      original.valuation.netEquityCents);
+  });
+  const regularEeaSpot = replaySpotPaperFeeScenarioObservations(
+    setup.replayObservations, { feeBpsPerSide: 20 });
+  const xPerpsSpot = replaySpotPaperFeeScenarioObservations(
+    setup.replayObservations, { feeBpsPerSide: 10 });
+  assert.equal(originalAssumption.slippageBpsPerSide, 10);
+  assert.equal(regularEeaSpot.slippageBpsPerSide, 10);
+  assert.equal(xPerpsSpot.slippageBpsPerSide, 10);
+  assert.notEqual(originalAssumption.arms[0].fills[0].quantitySat,
+    regularEeaSpot.arms[0].fills[0].quantitySat);
+  assert.ok(regularEeaSpot.arms[0].valuation.feesCents <
+    originalAssumption.arms[0].valuation.feesCents);
+  assert.ok(xPerpsSpot.arms[0].valuation.feesCents <
+    regularEeaSpot.arms[0].valuation.feesCents);
+  const staggered = [structuredClone(setup.replayObservations[0])];
+  const firstDecisionAt = staggered[0].ohlc.receivedAt + 1;
+  staggered[0].decisions = [
+    {role: "baseline", decidedAt: firstDecisionAt},
+    {role: "challenger", decidedAt: firstDecisionAt + 2},
+    {role: "cash", decidedAt: firstDecisionAt + 1}
+  ];
+  staggered[0].decisionAt = firstDecisionAt + 2;
+  staggered[0].ticker.requestStartedAt = firstDecisionAt + 3;
+  staggered[0].ticker.receivedAt = firstDecisionAt + 4;
+  staggered[0].effectAt = firstDecisionAt + 4;
+  const staggeredReplay = replaySpotPaperFeeScenarioObservations(staggered);
+  assert.deepEqual(staggeredReplay.arms.map(arm =>
+    arm.decisions[0].decidedAt), staggered[0].decisions.map(item => item.decidedAt));
+});
+
+test("offline fee replay rejects synthetic and unverified host evidence", async t => {
+  const setup = await fixture(t, { maxCycles: 1 });
+  const report = await runSpotPaperPairedSynthetic(setup.config);
+  const journal = await readRunJournal({
+    dataRoot: setup.dataRoot, runId: setup.config.runId
+  });
+  const expectedIdentity = {
+    schemaVersion: "SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1",
+    runId: report.runId, pair: report.pair,
+    sourceSha256: report.sourceSha256,
+    configSha256: report.configSha256,
+    researchSourceSha256: report.researchSourceSha256,
+    feedSourceId: report.feedSourceId,
+    comparisonEngineId: report.comparisonEngineId,
+    models: report.models
+  };
+  const hostExport = {
+    schemaVersion: "SPOT_PAPER_PAIRED_HOST_EXPORT_V1",
+    runId: report.runId, status: "TERMINAL_JOURNAL_VERIFIED",
+    verifiedTerminal: true, reconciliationStatus: "READ_ONLY_VERIFIED",
+    report,
+    journal: {
+      schemaVersion: journal.schemaVersion, runId: journal.runId,
+      sequence: journal.sequence, checkpoint: journal.checkpoint,
+      manifest: journal.manifest, events: journal.events,
+      reconciliationStatus: journal.reconciliationStatus
+    }
+  };
+  await assert.rejects(replayVerifiedSpotPaperFeeScenarios({
+    expectedIdentity, hostExport, dataRoot: setup.dataRoot
+  }), /LIVE_KRAKEN_EVIDENCE_REQUIRED/);
+
+  const unverified = structuredClone(hostExport);
+  unverified.verifiedTerminal = false;
+  await assert.rejects(replayVerifiedSpotPaperFeeScenarios({
+    expectedIdentity, hostExport: unverified, dataRoot: setup.dataRoot
+  }), /VERIFIED_HOST_EXPORT_REQUIRED/);
 });
 
 test("operator interruption is not full-duration completion", async t => {
@@ -666,6 +772,37 @@ test("actual #1299 exports integrate multi-cycle buys, exits, cooldown, stopped 
         fill.id, fill.side, fill.quantitySat, fill.priceNano, fill.grossCents, fill.feeCents
       ]));
     }
+    const sharedEvents = journal.events.filter(event =>
+      event.type === "shared_observation");
+    const feeReplayInputs = [];
+    for (const event of sharedEvents) {
+      const readAcquisition = async reference => {
+        const raw = await readFile(join(setup.dataRoot, setup.config.runId,
+          reference.path), "utf8");
+        return {
+          raw, data: JSON.parse(raw), sha256: reference.sha256,
+          bytes: reference.bytes, requestStartedAt: reference.requestStartedAt,
+          receivedAt: reference.receivedAt
+        };
+      };
+      feeReplayInputs.push({
+        decisionAt: event.decisionAt, decisions: event.decisions,
+        effectAt: event.effectAt,
+        ohlc: await readAcquisition(event.ohlc),
+        ticker: await readAcquisition(event.ticker)
+      });
+    }
+    const feeReplay = replaySpotPaperFeeScenarioObservations(
+      feeReplayInputs, {feeBpsPerSide: 50});
+    for (const [index, arm] of report.arms.entries()) {
+      const replay = feeReplay.arms[index];
+      assert.deepEqual(replay.decisions, arm.decisions);
+      assert.deepEqual(replay.fills, arm.fills);
+      assert.deepEqual(replay.riskStates, arm.riskStates);
+      assert.equal(replay.valuation.feesCents, arm.valuation.feesCents);
+      assert.equal(replay.valuation.slippageCents, arm.valuation.slippageCents);
+      assert.equal(replay.valuation.netEquityCents, arm.valuation.netEquityCents);
+    }
     assert.ok(report.arms.some(arm => arm.tradingStatus === "STOPPED" &&
       arm.valuation.openPositions.length > 0),
     `STOPPED_OPEN_INVENTORY_NOT_EXERCISED:${JSON.stringify(report.arms.map(arm => ({
@@ -676,4 +813,6 @@ test("actual #1299 exports integrate multi-cycle buys, exits, cooldown, stopped 
           fill.grossCents - fill.feeCents), 0),
       openPositions: arm.valuation.openPositions.length, fills: arm.fills.length
     })))}`);
+    assert.ok(feeReplay.arms.some(arm => arm.tradingStatus === "STOPPED" &&
+      arm.valuation.openPositions.length > 0));
   });

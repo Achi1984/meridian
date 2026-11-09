@@ -136,6 +136,26 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
       !finiteDuration(input.timing[key]) : !nullableInteger(input.timing[key])) return null;
     timing[key] = input.timing[key];
   }
+  const horizonTimingKeys = [
+    'quoteAgeAtValuationMs', 'terminalQuoteAgeMs',
+    'quoteFreshAtShutdown', 'commonHorizonAvailable', 'commonHorizonReason'
+  ];
+  const hasHorizonTiming = horizonTimingKeys.some(key =>
+    Object.hasOwn(input.timing, key));
+  if (hasHorizonTiming) {
+    if (!horizonTimingKeys.every(key => Object.hasOwn(input.timing, key)) ||
+        !nullableInteger(input.timing.quoteAgeAtValuationMs) ||
+        input.timing.quoteAgeAtValuationMs !== null &&
+          input.timing.quoteAgeAtValuationMs < 0 ||
+        !nullableInteger(input.timing.terminalQuoteAgeMs) ||
+        input.timing.terminalQuoteAgeMs !== null &&
+          input.timing.terminalQuoteAgeMs < 0 ||
+        typeof input.timing.quoteFreshAtShutdown !== 'boolean' ||
+        typeof input.timing.commonHorizonAvailable !== 'boolean' ||
+        input.timing.commonHorizonReason !== null &&
+          !REASON_CODE.test(input.timing.commonHorizonReason)) return null;
+    for (const key of horizonTimingKeys) timing[key] = input.timing[key];
+  }
   if (timing.requestedDurationMs !== 28_800_000 ||
       timing.requestedCycles !== 480 ||
       timing.observedCoverageMs !== null && timing.observedCoverageMs < 0 ||

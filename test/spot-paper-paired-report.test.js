@@ -158,12 +158,25 @@ function fixture() {
       id: `shared:${index + 1}:${'b'.repeat(64)}`,
       type: 'shared_observation',
       cycle: index + 1,
-      decisionAt: report.startedAt + (index + 1) * 60_000,
+      decisionAt: report.startedAt + (index + 1) * 60_000 - 2,
       effectAt: report.startedAt + (index + 1) * 60_000,
       observedAt: report.startedAt + (index + 1) * 60_000,
-      ohlc: {path: `responses/${'a'.repeat(64)}.json`, sha256: 'a'.repeat(64), bytes: 100},
-      ticker: {path: `responses/${'b'.repeat(64)}.json`, sha256: 'b'.repeat(64), bytes: 100},
-      decisions: models.map(model => ({role: model.role})),
+      ohlc: {
+        path: `responses/${'a'.repeat(64)}.json`, sha256: 'a'.repeat(64),
+        bytes: 100,
+        requestStartedAt: report.startedAt + (index + 1) * 60_000 - 4,
+        receivedAt: report.startedAt + (index + 1) * 60_000 - 3
+      },
+      ticker: {
+        path: `responses/${'b'.repeat(64)}.json`, sha256: 'b'.repeat(64),
+        bytes: 100,
+        requestStartedAt: report.startedAt + (index + 1) * 60_000 - 1,
+        receivedAt: report.startedAt + (index + 1) * 60_000
+      },
+      decisions: models.map(model => ({
+        role: model.role,
+        decidedAt: report.startedAt + (index + 1) * 60_000 - 2
+      })),
       fills: models.map((model, roleIndex) => ({
         role: model.role,
         fills: index === 0 ? structuredClone(reportArms[roleIndex].fills) : []
@@ -217,6 +230,10 @@ test('projects a compatible synthetic terminal run without winner or cost double
   assert.equal(output.timing.observedCoverageMs, 28_800_000);
   assert.equal(output.timing.runStoppedAt, 28_801_000);
   assert.equal(output.timing.valuationAt, 28_801_000);
+  assert.equal(output.timing.commonHorizonAvailable, true);
+  assert.equal(output.timing.quoteAgeAtValuationMs, 0);
+  assert.equal(output.timing.terminalQuoteAgeMs, 0);
+  assert.equal(output.timing.quoteFreshAtShutdown, true);
   assert.equal(output.arms.baseline.tradingStoppedAt, 28_750_000);
   assert.equal(output.decision, 'NO_WINNER_OR_PROMOTION');
   assert.deepEqual(Object.keys(output), [
@@ -245,6 +262,46 @@ test('preserves fractional performance-clock milliseconds without threshold roun
     assert.equal(output.timing.actualElapsedMs, elapsedMs);
     assert.equal(output.reasonCode, 'TERMINAL_REPORT_RECONCILED');
   }
+});
+
+test('accepts a historically fresh common horizon with a stale terminal quote', () => {
+  const input = fixture();
+  const horizon = input.report.endedAt - 32_712;
+  const observation = input.journal.events.at(-2);
+  observation.decisionAt = horizon - 2;
+  observation.decisions.forEach(item => { item.decidedAt = horizon - 2; });
+  observation.effectAt = horizon;
+  observation.observedAt = horizon;
+  observation.ohlc.receivedAt = horizon - 3;
+  observation.ohlc.requestStartedAt = horizon - 4;
+  observation.ticker.requestStartedAt = horizon - 1;
+  observation.ticker.receivedAt = horizon;
+  input.report.commonHorizon = {
+    available: true, reason: null,
+    quoteReceivedAt: horizon, effectAt: horizon,
+    quoteAgeAtEffectMs: 0, terminalQuoteAgeMs: 32_712,
+    quoteFreshAtShutdown: false
+  };
+  input.report.comparison.commonHorizonAt = horizon;
+  for (const arm of Object.values(input.report.comparison.arms)) {
+    arm.valuationAt = horizon;
+  }
+  input.journal.events.at(-1).report = structuredClone(input.report);
+
+  const output = evaluatePairedPaperEvidence(input);
+  assert.equal(output.evidenceStatus, 'VERIFIED_COMPLETE');
+  assert.equal(output.timing.valuationAt, horizon);
+  assert.equal(output.timing.quoteAgeAtValuationMs, 0);
+  assert.equal(output.timing.terminalQuoteAgeMs, 32_712);
+  assert.equal(output.timing.quoteFreshAtShutdown, false);
+  assert.equal(output.timing.commonHorizonAvailable, true);
+});
+
+test('rejects shared observations whose common decision time is not the latest arm decision', () => {
+  const input = fixture();
+  input.journal.events[1].decisions[0].decidedAt++;
+  assert.equal(evaluatePairedPaperEvidence(input).reasonCode,
+    'JOURNAL_REPORT_MISMATCH');
 });
 
 test('accepts combined host exports and keeps lock-only snapshots unknown', () => {
