@@ -94,10 +94,13 @@ server-side `MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED=true`,
 These settings and data have not been provisioned.
 
 The existing paired DTO is not independent authentication and must retain its
-`STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED` qualification.
-The #1319-specific 5-minute model identity remains unsupported until its
-canonical contract lands. No real paired results are synthesized; test-only
-fixtures are visibly labeled `SYNTHETIC FIXTURE`.
+`STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED` qualification. The
+current reviewed #1319 model-pair contract is accepted only with its canonical
+`modelPairId`, ordered baseline/trend/cash model IDs, fee assumptions, and
+activity diagnostic; a trend model ID without that identity is rejected. This
+contract support does not establish that a run occurred or that a report is
+published. No real paired results are synthesized; test-only fixtures are
+visibly labeled `SYNTHETIC FIXTURE`.
 
 ## Evidence shown
 

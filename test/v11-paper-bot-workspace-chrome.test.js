@@ -35,7 +35,8 @@ function runFlaggedBrowserTest(name) {
 
 function assertNamedTestPassed(output, name) {
   const line = output.split(/\r?\n/).find(item =>
-    new RegExp(`^ok \\\\d+ - ${name.replace(/[.*+?^${}()|[\\]\\\\]/g, '\\\\$&')}(?:\\\\s+#|$)`).test(item));
+    item.startsWith('ok ') &&
+    (item.includes(` - ${name}`) || item.includes(` - ${name} #`)));
   assert.ok(line, `the named M11 browser regression must execute:\n${output}`);
   assert.doesNotMatch(line, /# SKIP(?:\s|$)/);
 }

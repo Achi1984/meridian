@@ -108,10 +108,6 @@ async function readResponse(response, signal) {
   }
   const report = projectSpotPaperPairedDashboard(envelope.report);
   if (!report) return outcome('REJECTED', null, 'PAIRED_REPORT_INVALID');
-  if (report.identity.models.some(model =>
-    model.modelId === 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1')) {
-    return outcome('UNSUPPORTED_IDENTITY', null, 'PAIRED_MODEL_IDENTITY_UNSUPPORTED');
-  }
   if (report.identity.runId !== envelope.runId || report.identity.pair !== 'BTC/EUR') {
     return outcome('IDENTITY_MISMATCH', null, 'PAIRED_REPORT_IDENTITY_MISMATCH');
   }

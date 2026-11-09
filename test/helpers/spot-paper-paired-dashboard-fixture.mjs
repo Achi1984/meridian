@@ -4,7 +4,7 @@ import {
   SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA
 } from '../../scripts/spot-paper-paired-report/contract.mjs';
 
-export function syntheticExpectedPairedIdentity() {
+export function syntheticExpectedPairedIdentity({modelPair = false} = {}) {
   return {
     schemaVersion: SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA,
     runId: 'paired-synthetic-test-only',
@@ -14,7 +14,17 @@ export function syntheticExpectedPairedIdentity() {
     researchSourceSha256: '3'.repeat(64),
     feedSourceId: 'SYNTHETIC_TEST_ONLY',
     comparisonEngineId: 'SYNTHETIC_TEST_ONLY',
-    models: [
+    ...(modelPair ? {
+      modelPairId: 'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1'
+    } : {}),
+    models: modelPair ? [
+      {role: 'baseline', modelId: 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1',
+        accountId: 'baseline-test-account'},
+      {role: 'challenger',
+        modelId: 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1',
+        accountId: 'challenger-test-account'},
+      {role: 'cash', modelId: 'CASH_CONTROL_V1', accountId: 'cash-test-account'}
+    ] : [
       {role: 'baseline', modelId: 'BTC_EUR_SMA5_SMA20_V1',
         accountId: 'baseline-test-account'},
       {role: 'challenger', modelId: 'BTC_EUR_RESEARCH_TEST_V1',
@@ -35,6 +45,7 @@ export function syntheticPairedDashboard(identity = syntheticExpectedPairedIdent
     sourceSha256: identity.sourceSha256,
     configSha256: identity.configSha256,
     researchSourceSha256: identity.researchSourceSha256,
+    ...(identity.modelPairId ? {modelPairId: identity.modelPairId} : {}),
     models: identity.models.map(({role, modelId}) => ({role, modelId}))
   };
   for (const model of identity.models) report.arms[model.role].modelId = model.modelId;

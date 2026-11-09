@@ -85,6 +85,21 @@ test('paired read route is bounded, authenticated, read-only and config-gated', 
   });
   assert.equal(unsupported.status, 422);
   assert.equal(unsupported.body.error, 'spot_paper_paired_identity_unsupported');
+
+  const trendIdentity = syntheticExpectedPairedIdentity({modelPair: true});
+  const trendConfig = spotPaperPairedReportGatewayConfig({
+    ...env(),
+    MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON:
+      JSON.stringify(trendIdentity)
+  });
+  assert.equal(trendConfig.enabled, true);
+  const trendMissing = await handleSpotPaperPairedReportGatewayRequest(request(), {
+    config: trendConfig,
+    authorizedRead: () => true,
+    getStore: () => ({get: async () => null})
+  });
+  assert.equal(trendMissing.status, 404);
+  assert.equal(trendMissing.body.error, 'spot_paper_paired_report_not_found');
 });
 
 test('returns only the identity-bound sanitized canonical paired DTO', async () => {

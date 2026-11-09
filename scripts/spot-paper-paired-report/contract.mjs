@@ -11,6 +11,13 @@ export const SPOT_PAPER_PAIRED_EVIDENCE_STATUSES = Object.freeze([
   'RUNNING_SNAPSHOT',
   'CORRUPT_UNKNOWN'
 ]);
+export const SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR =
+  'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1';
+export const SPOT_PAPER_PAIRED_NEXT_RUN_MODELS = Object.freeze([
+  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1',
+  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1',
+  'CASH_CONTROL_V1'
+]);
 
 const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
@@ -34,6 +41,8 @@ function safeIdentity(identity) {
       identity.pair !== 'BTC/EUR' || !HASH.test(identity.sourceSha256 ?? '') ||
       !HASH.test(identity.configSha256 ?? '') ||
       !HASH.test(identity.researchSourceSha256 ?? '') ||
+      identity.modelPairId !== undefined &&
+        identity.modelPairId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR ||
       !Array.isArray(identity.models) || identity.models.length !== 3) return null;
   const models = identity.models.map((model, index) => {
     if (!isRecord(model) || model.role !== SPOT_PAPER_PAIRED_ROLES[index] ||
@@ -41,13 +50,54 @@ function safeIdentity(identity) {
     return {role: model.role, modelId: model.modelId};
   });
   if (models.some(model => model === null)) return null;
+  const usesTrendModel = models.some(model =>
+    model.modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[1]);
+  if (usesTrendModel && !identity.modelPairId) return null;
+  if (identity.modelPairId &&
+      models.some((model, index) =>
+        model.modelId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[index])) return null;
   return {
     runId: identity.runId,
     pair: 'BTC/EUR',
     sourceSha256: identity.sourceSha256,
     configSha256: identity.configSha256,
     researchSourceSha256: identity.researchSourceSha256,
+    ...(identity.modelPairId ? {modelPairId: identity.modelPairId} : {}),
     models
+  };
+}
+
+function safeTrendActivityDiagnostic(value) {
+  const keys = [
+    'schemaVersion', 'status', 'completedRoundTripCount',
+    'requiredCompletedRoundTrips', 'observedCoverageMs', 'requiredCoverageMs',
+    'completeWindow', 'forcedTrades', 'deadlineExtensionAllowed', 'profitability'
+  ];
+  if (!isRecord(value) ||
+      Object.keys(value).sort().join(',') !== [...keys].sort().join(',') ||
+      value.schemaVersion !== 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1' ||
+      value.status !== 'PARTIAL_COVERAGE' ||
+      !isInteger(value.completedRoundTripCount) ||
+      value.completedRoundTripCount < 0 ||
+      value.requiredCompletedRoundTrips !== 5 ||
+      !isInteger(value.observedCoverageMs) ||
+      value.observedCoverageMs < 0 ||
+      value.observedCoverageMs >= 86_400_000 ||
+      value.requiredCoverageMs !== 86_400_000 ||
+      value.completeWindow !== false || value.forcedTrades !== false ||
+      value.deadlineExtensionAllowed !== false ||
+      value.profitability !== 'NOT_ASSESSED') return null;
+  return {
+    schemaVersion: value.schemaVersion,
+    status: value.status,
+    completedRoundTripCount: value.completedRoundTripCount,
+    requiredCompletedRoundTrips: value.requiredCompletedRoundTrips,
+    observedCoverageMs: value.observedCoverageMs,
+    requiredCoverageMs: value.requiredCoverageMs,
+    completeWindow: value.completeWindow,
+    forcedTrades: value.forcedTrades,
+    deadlineExtensionAllowed: value.deadlineExtensionAllowed,
+    profitability: value.profitability
   };
 }
 
@@ -124,6 +174,14 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
       !isRecord(input.deltas)) return null;
   const identity = safeIdentity(input.identity);
   if (!identity) return null;
+  const hasTrendDiagnostic = Object.hasOwn(input, 'trendActivityDiagnostic');
+  if ((identity.modelPairId &&
+       ['VERIFIED_COMPLETE', 'INTERRUPTED'].includes(input.evidenceStatus) &&
+       !hasTrendDiagnostic) ||
+      (!identity.modelPairId && hasTrendDiagnostic)) return null;
+  const trendActivityDiagnostic = hasTrendDiagnostic ?
+    safeTrendActivityDiagnostic(input.trendActivityDiagnostic) : null;
+  if (hasTrendDiagnostic && !trendActivityDiagnostic) return null;
 
   const timingKeys = [
     'requestedDurationMs', 'observedCoverageMs', 'actualElapsedMs',
@@ -151,11 +209,65 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
   if (!['CYCLE_LIMIT', 'DURATION_LIMIT', 'OPERATOR_STOP',
     'REQUEST_LIMIT', 'SHARED_FEED_FAILURE', 'UNKNOWN'].includes(
     input.timing.stopReason)) return null;
+  const horizonTimingKeys = [
+    'quoteAgeAtValuationMs', 'terminalQuoteAgeMs',
+    'quoteFreshAtShutdown', 'commonHorizonAvailable', 'commonHorizonReason'
+  ];
+  const hasHorizonTiming = horizonTimingKeys.some(key =>
+    Object.hasOwn(input.timing, key));
+  if (hasHorizonTiming) {
+    if (!horizonTimingKeys.every(key => Object.hasOwn(input.timing, key)) ||
+        !nullableInteger(input.timing.quoteAgeAtValuationMs) ||
+        input.timing.quoteAgeAtValuationMs !== null &&
+          input.timing.quoteAgeAtValuationMs < 0 ||
+        !nullableInteger(input.timing.terminalQuoteAgeMs) ||
+        input.timing.terminalQuoteAgeMs !== null &&
+          input.timing.terminalQuoteAgeMs < 0 ||
+        typeof input.timing.quoteFreshAtShutdown !== 'boolean' ||
+        typeof input.timing.commonHorizonAvailable !== 'boolean' ||
+        input.timing.commonHorizonReason !== null &&
+          !REASON_CODE.test(input.timing.commonHorizonReason)) return null;
+    for (const key of horizonTimingKeys) timing[key] = input.timing[key];
+  }
   const timingResult = {...timing, stopReason: input.timing.stopReason};
+  if (trendActivityDiagnostic &&
+      (timing.actualElapsedMs === null ||
+       trendActivityDiagnostic.observedCoverageMs !== Math.floor(timing.actualElapsedMs))) {
+    return null;
+  }
 
-  if (input.assumptions.feeBpsPerSide !== 50 ||
-      input.assumptions.slippageBpsPerSide !== 10 ||
-      input.assumptions.ratesVerified !== false) return null;
+  const assumptions = input.assumptions;
+  const legacyFees = assumptions.feeBpsPerSide === 50 &&
+    !Object.hasOwn(assumptions, 'accountContractId') &&
+    !Object.hasOwn(assumptions, 'accountContractVersion');
+  const nextRunFees = assumptions.feeBpsPerSide === 20 &&
+    assumptions.accountContractId === 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2' &&
+    assumptions.accountContractVersion === 2 &&
+    assumptions.feeBasis === 'EEA_SPOT_ONLY_TAKER_ASSUMPTION' &&
+    assumptions.feeSource ===
+      'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea' &&
+    assumptions.feeAsOf === '2026-11-09' &&
+    assumptions.accountTier === 'UNKNOWN' &&
+    assumptions.accountingEngine === 'PAIRED_FEE_SCENARIO_LEDGER_V1';
+  if ((!legacyFees && !nextRunFees) ||
+      assumptions.slippageBpsPerSide !== 10 ||
+      assumptions.ratesVerified !== false) return null;
+  const assumptionsResult = legacyFees ? {
+    feeBpsPerSide: assumptions.feeBpsPerSide,
+    slippageBpsPerSide: assumptions.slippageBpsPerSide,
+    ratesVerified: assumptions.ratesVerified
+  } : {
+    feeBpsPerSide: assumptions.feeBpsPerSide,
+    slippageBpsPerSide: assumptions.slippageBpsPerSide,
+    ratesVerified: assumptions.ratesVerified,
+    accountContractId: assumptions.accountContractId,
+    accountContractVersion: assumptions.accountContractVersion,
+    feeBasis: assumptions.feeBasis,
+    feeSource: assumptions.feeSource,
+    feeAsOf: assumptions.feeAsOf,
+    accountTier: assumptions.accountTier,
+    accountingEngine: assumptions.accountingEngine
+  };
   const arms = {};
   for (const role of SPOT_PAPER_PAIRED_ROLES) {
     arms[role] = safeArm(input.arms[role], role,
@@ -192,11 +304,8 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
     independentAuthentication: 'NOT_ESTABLISHED',
     identity,
     timing: timingResult,
-    assumptions: {
-      feeBpsPerSide: 50,
-      slippageBpsPerSide: 10,
-      ratesVerified: false
-    },
+    assumptions: assumptionsResult,
+    ...(trendActivityDiagnostic ? {trendActivityDiagnostic} : {}),
     arms,
     deltas,
     decision: 'NO_WINNER_OR_PROMOTION'

@@ -1,5 +1,6 @@
+import {constants} from 'node:fs';
 import {open} from 'node:fs/promises';
-import {resolve} from 'node:path';
+import {isAbsolute, resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
 import {createPrivatePaperReportPoolOptions, attachPrivateReportPoolErrorHandler,
   createPrivateReportStore} from '../../private-report-store.mjs';
@@ -27,8 +28,16 @@ function fail(code) {
 export async function readBoundedJsonFile(path, maxBytes) {
   let file;
   try {
-    file = await open(path, 'r');
-    const stat = await file.stat();
+    if (typeof path !== 'string' || !isAbsolute(path)) fail('INPUT_PATH_INVALID');
+    if (!Number.isInteger(constants.O_NOFOLLOW) ||
+        !Number.isInteger(constants.O_NONBLOCK)) fail('SAFE_FILE_FLAGS_UNAVAILABLE');
+    try {
+      file = await open(path, constants.O_RDONLY | constants.O_NOFOLLOW |
+        constants.O_NONBLOCK);
+    } catch (error) {
+      fail(error?.code === 'ELOOP' ? 'INPUT_SYMLINK_REJECTED' : 'INPUT_OPEN_FAILED');
+    }
+    const stat = await file.stat({bigint: true});
     if (!stat.isFile() || stat.size > maxBytes) fail('INPUT_TOO_LARGE_OR_NOT_FILE');
     const buffer = Buffer.alloc(maxBytes + 1);
     let bytesRead = 0;
@@ -39,9 +48,21 @@ export async function readBoundedJsonFile(path, maxBytes) {
       if (result.bytesRead === 0) break;
       bytesRead += result.bytesRead;
     }
-    if (bytesRead > maxBytes || bytesRead !== stat.size) fail('INPUT_TOO_LARGE_OR_CHANGED');
+    const after = await file.stat({bigint: true});
+    if (bytesRead > maxBytes || BigInt(bytesRead) !== stat.size ||
+        after.dev !== stat.dev || after.ino !== stat.ino || after.size !== stat.size ||
+        after.mtimeNs !== stat.mtimeNs || after.ctimeNs !== stat.ctimeNs) {
+      fail('INPUT_TOO_LARGE_OR_CHANGED');
+    }
+    let text;
     try {
-      return JSON.parse(buffer.toString('utf8', 0, bytesRead));
+      text = new TextDecoder('utf-8', {fatal: true})
+        .decode(buffer.subarray(0, bytesRead));
+    } catch {
+      fail('INPUT_INVALID_UTF8');
+    }
+    try {
+      return JSON.parse(text);
     } catch {
       fail('INPUT_INVALID_JSON');
     }
@@ -57,6 +78,7 @@ function publicIdentity(identity) {
     sourceSha256: identity.sourceSha256,
     configSha256: identity.configSha256,
     researchSourceSha256: identity.researchSourceSha256,
+    ...(identity.modelPairId ? {modelPairId: identity.modelPairId} : {}),
     models: identity.models.map(({role, modelId}) => ({role, modelId}))
   };
 }

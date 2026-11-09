@@ -7,7 +7,9 @@ import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA,
   SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA,
-  SPOT_PAPER_PAIRED_ROLES
+  SPOT_PAPER_PAIRED_ROLES,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODELS
 } from './contract.mjs';
 
 export const SPOT_PAPER_PAIRED_REPORT_SCHEMA = 'SPOT_PAPER_PAIRED_REPORT_V1';
@@ -62,10 +64,12 @@ function fail(reasonCode) {
 }
 
 export function isValidSpotPaperPairedExpectedIdentity(expected) {
-  if (!exactKeys(expected, [
-        'schemaVersion', 'runId', 'pair', 'sourceSha256', 'configSha256',
-        'researchSourceSha256', 'feedSourceId', 'comparisonEngineId', 'models'
-      ]) ||
+  const keys = [
+    'schemaVersion', 'runId', 'pair', 'sourceSha256', 'configSha256',
+    'researchSourceSha256', 'feedSourceId', 'comparisonEngineId', 'models',
+    ...(expected?.modelPairId === undefined ? [] : ['modelPairId'])
+  ];
+  if (!exactKeys(expected, keys) ||
       expected.schemaVersion !== SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_SCHEMA ||
       !RUN_ID.test(expected.runId ?? '') || expected.pair !== 'BTC/EUR' ||
       !HASH.test(expected.sourceSha256 ?? '') ||
@@ -75,13 +79,18 @@ export function isValidSpotPaperPairedExpectedIdentity(expected) {
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(expected.feedSourceId) ||
       typeof expected.comparisonEngineId !== 'string' ||
       !/^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(expected.comparisonEngineId) ||
+      expected.modelPairId !== undefined &&
+        expected.modelPairId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR ||
       !Array.isArray(expected.models) || expected.models.length !== 3) return false;
   return expected.models.every((model, index) =>
     exactKeys(model, ['role', 'modelId', 'accountId']) &&
     model.role === SPOT_PAPER_PAIRED_ROLES[index] &&
     MODEL_ID.test(model.modelId ?? '') &&
     typeof model.accountId === 'string' &&
-    /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(model.accountId));
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(model.accountId) &&
+    (expected.modelPairId ||
+      model.modelId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[1]) &&
+    (!expected.modelPairId || model.modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[index]));
 }
 
 function expectedPublicIdentity(expected) {
@@ -91,6 +100,7 @@ function expectedPublicIdentity(expected) {
     sourceSha256: expected.sourceSha256,
     configSha256: expected.configSha256,
     researchSourceSha256: expected.researchSourceSha256,
+    ...(expected.modelPairId ? {modelPairId: expected.modelPairId} : {}),
     models: expected.models.map(({role, modelId}) => ({role, modelId}))
   };
 }
@@ -101,6 +111,43 @@ function exactModels(actual, expected) {
       model.role === expected.models[index].role &&
       model.modelId === expected.models[index].modelId &&
       model.accountId === expected.models[index].accountId);
+}
+
+function validFeeAssumptions(assumptions) {
+  if (!isRecord(assumptions) || assumptions.slippageBpsPerSide !== 10 ||
+      assumptions.ratesVerified !== false) return false;
+  if (assumptions.feeBpsPerSide === 50) {
+    return !Object.hasOwn(assumptions, 'accountContractId') &&
+      !Object.hasOwn(assumptions, 'accountContractVersion');
+  }
+  return assumptions.feeBpsPerSide === 20 &&
+    assumptions.accountContractId === 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2' &&
+    assumptions.accountContractVersion === 2 &&
+    assumptions.feeBasis === 'EEA_SPOT_ONLY_TAKER_ASSUMPTION' &&
+    assumptions.feeSource ===
+      'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea' &&
+    assumptions.feeAsOf === '2026-11-09' &&
+    assumptions.accountTier === 'UNKNOWN' &&
+    assumptions.accountingEngine === 'PAIRED_FEE_SCENARIO_LEDGER_V1';
+}
+
+function validTrendActivityDiagnostic(diagnostic, report) {
+  return exactKeys(diagnostic, [
+    'schemaVersion', 'status', 'completedRoundTripCount',
+    'requiredCompletedRoundTrips', 'observedCoverageMs', 'requiredCoverageMs',
+    'completeWindow', 'forcedTrades', 'deadlineExtensionAllowed', 'profitability'
+  ]) &&
+    diagnostic.schemaVersion === 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1' &&
+    diagnostic.status === 'PARTIAL_COVERAGE' &&
+    isInteger(diagnostic.completedRoundTripCount) &&
+    diagnostic.completedRoundTripCount >= 0 &&
+    diagnostic.requiredCompletedRoundTrips === 5 &&
+    diagnostic.observedCoverageMs === Math.floor(report.elapsedMs) &&
+    diagnostic.requiredCoverageMs === 86_400_000 &&
+    diagnostic.completeWindow === false &&
+    diagnostic.forcedTrades === false &&
+    diagnostic.deadlineExtensionAllowed === false &&
+    diagnostic.profitability === 'NOT_ASSESSED';
 }
 
 function getJournalPayload(journal) {
@@ -136,6 +183,7 @@ function identityMatches(report, payload, expected) {
     report.researchSourceSha256 === expected.researchSourceSha256 &&
     report.feedSourceId === expected.feedSourceId &&
     report.comparisonEngineId === expected.comparisonEngineId &&
+    (report.modelPairId ?? undefined) === (expected.modelPairId ?? undefined) &&
     exactModels(report.models, expected) &&
     manifest?.schemaVersion === 'SPOT_PAPER_PAIRED_MANIFEST_V1' &&
     manifest.runId === expected.runId && manifest.mode === 'paper' &&
@@ -145,10 +193,9 @@ function identityMatches(report, payload, expected) {
     manifest.researchSourceSha256 === expected.researchSourceSha256 &&
     manifest.feedSourceId === expected.feedSourceId &&
     manifest.comparisonEngineId === expected.comparisonEngineId &&
+    (manifest.modelPairId ?? undefined) === (expected.modelPairId ?? undefined) &&
     exactModels(manifest.models, expected) &&
-    manifest.assumptions?.feeBpsPerSide === 50 &&
-    manifest.assumptions?.slippageBpsPerSide === 10 &&
-    manifest.assumptions?.ratesVerified === false &&
+    validFeeAssumptions(manifest.assumptions) &&
     isRecord(limits) &&
     isInteger(limits.maxCycles) && limits.maxCycles > 0 &&
       limits.maxCycles <= MAX_CYCLES && report.cycles <= limits.maxCycles &&
@@ -197,14 +244,16 @@ function reportIsValid(report, expected) {
       report.autoPromotion !== false ||
       typeof report.testOnly !== 'boolean' ||
       report.testOnly !== (report.feedSourceId === 'SYNTHETIC_TEST_ONLY') ||
-      !isRecord(report.assumptions) ||
-      report.assumptions.feeBpsPerSide !== 50 ||
-      report.assumptions.slippageBpsPerSide !== 10 ||
-      report.assumptions.ratesVerified !== false ||
+      !validFeeAssumptions(report.assumptions) ||
       !isRecord(report.commonHorizon) ||
       typeof report.commonHorizon.available !== 'boolean' ||
       !Array.isArray(report.arms) || report.arms.length !== 3) {
     return 'INVALID_REPORT_FIELDS';
+  }
+  if (expected.modelPairId ?
+      !validTrendActivityDiagnostic(report.trendActivityDiagnostic, report) :
+      report.trendActivityDiagnostic !== undefined) {
+    return 'INVALID_TREND_ACTIVITY_DIAGNOSTIC';
   }
   if (report.runId !== expected.runId || report.pair !== expected.pair ||
       report.sourceSha256 !== expected.sourceSha256 ||
@@ -212,6 +261,7 @@ function reportIsValid(report, expected) {
       report.researchSourceSha256 !== expected.researchSourceSha256 ||
       report.feedSourceId !== expected.feedSourceId ||
       report.comparisonEngineId !== expected.comparisonEngineId ||
+      (report.modelPairId ?? undefined) !== (expected.modelPairId ?? undefined) ||
       !exactModels(report.models, expected)) {
     return 'IDENTITY_MISMATCH';
   }
@@ -227,6 +277,35 @@ function reportIsValid(report, expected) {
   } else if (report.commonHorizon.effectAt !== null &&
       !isInteger(report.commonHorizon.effectAt)) {
     return 'INVALID_COMMON_HORIZON';
+  }
+  const horizon = report.commonHorizon;
+  const horizonMetadata = [
+    'reason', 'quoteAgeAtEffectMs', 'terminalQuoteAgeMs',
+    'quoteFreshAtShutdown'
+  ];
+  const hasHorizonMetadata = horizonMetadata.some(key => Object.hasOwn(horizon, key));
+  if (hasHorizonMetadata) {
+    if (!horizonMetadata.every(key => Object.hasOwn(horizon, key)) ||
+        horizon.available && horizon.reason !== null ||
+        !horizon.available && horizon.reason !== 'NO_VALID_COMMON_OBSERVATION' ||
+        horizon.quoteAgeAtEffectMs !== null &&
+          (!isInteger(horizon.quoteAgeAtEffectMs) || horizon.effectAt === null ||
+            horizon.quoteAgeAtEffectMs !==
+              horizon.effectAt - (horizon.quoteReceivedAt ?? 0)) ||
+        horizon.terminalQuoteAgeMs !== null &&
+          (!isInteger(horizon.terminalQuoteAgeMs) || horizon.quoteReceivedAt === null ||
+            horizon.terminalQuoteAgeMs !== report.endedAt - horizon.quoteReceivedAt) ||
+        typeof horizon.quoteFreshAtShutdown !== 'boolean' ||
+        horizon.quoteFreshAtShutdown !==
+          (horizon.terminalQuoteAgeMs !== null &&
+            horizon.terminalQuoteAgeMs >= 0 &&
+            horizon.terminalQuoteAgeMs <= MAX_QUOTE_AGE_MS) ||
+        horizon.available &&
+          (horizon.quoteAgeAtEffectMs === null ||
+            horizon.quoteAgeAtEffectMs < 0 ||
+            horizon.quoteAgeAtEffectMs > MAX_QUOTE_AGE_MS)) {
+      return 'INVALID_COMMON_HORIZON';
+    }
   }
   for (let index = 0; index < SPOT_PAPER_PAIRED_ROLES.length; index++) {
     const role = SPOT_PAPER_PAIRED_ROLES[index];
@@ -594,6 +673,12 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
   const elapsed = safeDuration(report?.elapsedMs);
   const coverage = isInteger(report?.startedAt) && isInteger(horizon) ?
     horizon - report.startedAt : null;
+  const legacyQuoteAgeAtValuation = isInteger(horizon) &&
+      isInteger(report?.commonHorizon?.quoteReceivedAt) ?
+    horizon - report.commonHorizon.quoteReceivedAt : null;
+  const legacyTerminalQuoteAge = isInteger(report?.endedAt) &&
+      isInteger(report?.commonHorizon?.quoteReceivedAt) ?
+    report.endedAt - report.commonHorizon.quoteReceivedAt : null;
   const dto = {
     schemaVersion: SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA,
     evidenceStatus: status,
@@ -608,12 +693,30 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
       actualElapsedMs: elapsed,
       runStoppedAt: safeNumber(report?.endedAt),
       valuationAt: safeNumber(horizon),
+      quoteAgeAtValuationMs: safeNumber(
+        report?.commonHorizon?.quoteAgeAtEffectMs ?? legacyQuoteAgeAtValuation),
+      terminalQuoteAgeMs: safeNumber(
+        report?.commonHorizon?.terminalQuoteAgeMs ?? legacyTerminalQuoteAge),
+      quoteFreshAtShutdown:
+        typeof report?.commonHorizon?.quoteFreshAtShutdown === 'boolean' ?
+          report.commonHorizon.quoteFreshAtShutdown :
+          legacyTerminalQuoteAge !== null &&
+            legacyTerminalQuoteAge >= 0 &&
+            legacyTerminalQuoteAge <= MAX_QUOTE_AGE_MS,
+      commonHorizonAvailable: report?.commonHorizon?.available === true,
+      commonHorizonReason: report?.commonHorizon?.reason ??
+        (report?.commonHorizon?.available === true ? null :
+          'COMMON_HORIZON_UNAVAILABLE'),
       requestedCycles: MAX_CYCLES,
       attemptedCycles: safeNumber(report?.cycles),
       completedCycles: safeNumber(reportValid ? report._completedCycles : null),
       stopReason: report?.stopReason ?? 'UNKNOWN'
     },
-    assumptions: {feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false},
+    assumptions: report?.assumptions ??
+      {feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false},
+    ...(expected.modelPairId ? {
+      trendActivityDiagnostic: report?.trendActivityDiagnostic
+    } : {}),
     arms,
     deltas
   };

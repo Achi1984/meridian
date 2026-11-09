@@ -1,7 +1,9 @@
 import {isValidSpotPaperPairedExpectedIdentity} from './scripts/spot-paper-paired-report/evaluate.mjs';
 import {
   projectSpotPaperPairedDashboard,
-  SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
+  SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODELS
 } from './scripts/spot-paper-paired-report/contract.mjs';
 import {
   canonicalSpotPaperPairedReportJson,
@@ -18,9 +20,6 @@ export {
 
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_ACTIVE_REQUESTS = 2;
-const UNSUPPORTED_MODEL_IDS = new Set([
-  'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1'
-]);
 let activeRequests = 0;
 
 function exactKeys(value, keys) {
@@ -35,6 +34,7 @@ function publicIdentity(identity) {
     sourceSha256: identity.sourceSha256,
     configSha256: identity.configSha256,
     researchSourceSha256: identity.researchSourceSha256,
+    ...(identity.modelPairId ? {modelPairId: identity.modelPairId} : {}),
     models: identity.models.map(({role, modelId}) => ({role, modelId}))
   };
 }
@@ -46,19 +46,26 @@ function response(status, body) {
 export function spotPaperPairedReportGatewayConfig(env = process.env) {
   const rawExpected = String(env.MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON ?? '');
   let expectedIdentity = null;
+  let unsupportedIdentity = false;
   if (Buffer.byteLength(rawExpected) <= 16 * 1024) {
     try {
       const parsed = JSON.parse(rawExpected);
+      unsupportedIdentity =
+        parsed?.modelPairId !== undefined &&
+          parsed.modelPairId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR ||
+        parsed?.modelPairId === undefined &&
+          parsed?.models?.some?.(model =>
+            model.modelId === SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[1]) === true;
       if (isValidSpotPaperPairedExpectedIdentity(parsed)) expectedIdentity = parsed;
     } catch {}
   }
+  const featureEnabled =
+    env.MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED === 'true' &&
+    env.MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED === 'true';
   return Object.freeze({
-    enabled: env.MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED === 'true' &&
-      env.MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED === 'true' &&
-      expectedIdentity !== null,
+    enabled: featureEnabled && expectedIdentity !== null,
     expectedIdentity,
-    unsupportedIdentity: expectedIdentity?.models.some(model =>
-      UNSUPPORTED_MODEL_IDS.has(model.modelId)) ?? false,
+    unsupportedIdentity: featureEnabled && unsupportedIdentity,
     expectedRunId: expectedIdentity?.runId ?? null,
     expectedConfigHash: expectedIdentity?.configSha256 ?? null
   });
@@ -140,11 +147,11 @@ async function read(req, {config, getStore, authorizedRead, signal}) {
   if (typeof authorizedRead !== 'function' || !authorizedRead(req)) {
     return response(401, {error: 'read_token_required'});
   }
+  if (config?.unsupportedIdentity === true) {
+    return response(422, {error: 'spot_paper_paired_identity_unsupported'});
+  }
   if (!configured(config)) {
     return response(503, {error: 'spot_paper_paired_transport_not_provisioned'});
-  }
-  if (config.unsupportedIdentity) {
-    return response(422, {error: 'spot_paper_paired_identity_unsupported'});
   }
   if (req.method !== 'GET') return response(405, {error: 'method_not_allowed'});
   if (queryPresent(req)) {

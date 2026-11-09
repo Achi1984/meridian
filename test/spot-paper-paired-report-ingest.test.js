@@ -1,7 +1,9 @@
 import assert from 'node:assert/strict';
-import {mkdtemp, rm, writeFile} from 'node:fs/promises';
+import {execFileSync, spawnSync} from 'node:child_process';
+import {mkdtemp, rm, symlink, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {fileURLToPath, pathToFileURL} from 'node:url';
 import {test} from 'node:test';
 import {createPrivateReportStore} from '../private-report-store.mjs';
 import {
@@ -9,6 +11,8 @@ import {
   SPOT_PAPER_PAIRED_REPORT_PATH,
   spotPaperPairedReportGatewayConfig
 } from '../spot-paper-paired-report-gateway.mjs';
+import {evaluatePairedPaperEvidence} from
+  '../scripts/spot-paper-paired-report/evaluate.mjs';
 import {
   ingestSpotPaperPairedReport,
   main,
@@ -21,6 +25,10 @@ import {
   syntheticExpectedPairedIdentity,
   syntheticPairedDashboard
 } from './helpers/spot-paper-paired-dashboard-fixture.mjs';
+import {syntheticPairedEvaluatorFixture} from
+  './helpers/spot-paper-paired-evaluator-fixture.mjs';
+import {createSpotPaperPairedReportConnector} from
+  '../v11/spot-paper-paired-report-connector.js';
 
 const expectedIdentity = syntheticExpectedPairedIdentity();
 const dashboard = () => syntheticPairedDashboard(expectedIdentity);
@@ -164,6 +172,52 @@ test('unknown database write outcome is returned without an implicit retry', asy
   assert.equal(calls, 1);
 });
 
+test('legacy and canonical trend evaluator DTOs survive ingestion, gateway GET, and connector', async () => {
+  for (const modelPair of [false, true]) {
+    const evidence = syntheticPairedEvaluatorFixture({modelPair});
+    const dto = evaluatePairedPaperEvidence(evidence);
+    assert.equal(dto.evidenceStatus, 'VERIFIED_COMPLETE');
+    assert.equal(dto.identity.modelPairId ?? null,
+      evidence.expectedIdentity.modelPairId ?? null);
+
+    const store = memoryStore();
+    const write = await ingestSpotPaperPairedReport({
+      expectedIdentity: evidence.expectedIdentity,
+      dashboard: dto,
+      write: true,
+      getStore: () => store
+    });
+    assert.equal(write.status, 'INSERTED');
+
+    const config = spotPaperPairedReportGatewayConfig({
+      MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED: 'true',
+      MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED: 'true',
+      MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON:
+        JSON.stringify(evidence.expectedIdentity)
+    });
+    const gateway = await handleSpotPaperPairedReportGatewayRequest({
+      method: 'GET',
+      url: SPOT_PAPER_PAIRED_REPORT_PATH,
+      headers: {}
+    }, {config, authorizedRead: () => true, getStore: () => store});
+    assert.equal(gateway.status, 200);
+
+    const connector = createSpotPaperPairedReportConnector({
+      enabled: true,
+      transport: async () => new Response(JSON.stringify(gateway.body), {
+        status: gateway.status,
+        headers: {'content-type': 'application/json'}
+      })
+    });
+    const connected = await connector.read();
+    assert.equal(connected.status, 'AVAILABLE');
+    assert.equal(connected.report.identity.modelPairId ?? null,
+      evidence.expectedIdentity.modelPairId ?? null);
+    assert.deepEqual(connected.report, dto);
+    connector.dispose();
+  }
+});
+
 test('operator CLI defaults to dry-run and bounds input files before database access', async () => {
   const dir = await mkdtemp(join(tmpdir(), 'paired-report-ingest-'));
   try {
@@ -200,6 +254,43 @@ test('operator CLI defaults to dry-run and bounds input files before database ac
     await writeFile(dashboardPath, 'x'.repeat(32));
     await assert.rejects(readBoundedJsonFile(dashboardPath, 16),
       error => error.code === 'INPUT_TOO_LARGE_OR_NOT_FILE');
+  } finally {
+    await rm(dir, {recursive: true, force: true});
+  }
+});
+
+test('bounded input reader rejects FIFOs, symlinks, nonregular files, and invalid UTF-8', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'paired-report-files-'));
+  const fifoPath = join(dir, 'input.fifo');
+  const regularPath = join(dir, 'regular.json');
+  const symlinkPath = join(dir, 'symlink.json');
+  const readerPath = fileURLToPath(new URL(
+    '../scripts/spot-paper-paired-report/ingest.mjs', import.meta.url
+  ));
+  try {
+    execFileSync('mkfifo', [fifoPath]);
+    const child = spawnSync(process.execPath, ['--input-type=module', '-e',
+      `import {readBoundedJsonFile} from ${JSON.stringify(
+        pathToFileURL(readerPath).href
+      )}; try { await readBoundedJsonFile(process.argv[1], 16); } catch (error) {
+        process.stdout.write(error.code || 'NO_CODE');
+      }`, fifoPath], {encoding: 'utf8', timeout: 1_000});
+    assert.equal(child.error, undefined);
+    assert.equal(child.status, 0);
+    assert.equal(child.stdout, 'INPUT_TOO_LARGE_OR_NOT_FILE');
+
+    await writeFile(regularPath, JSON.stringify({ok: true}));
+    await symlink(regularPath, symlinkPath);
+    await assert.rejects(readBoundedJsonFile(symlinkPath, 128),
+      error => error.code === 'INPUT_SYMLINK_REJECTED');
+    await assert.rejects(readBoundedJsonFile(dir, 128),
+      error => error.code === 'INPUT_TOO_LARGE_OR_NOT_FILE');
+
+    await writeFile(regularPath, Buffer.from([0xc3, 0x28]));
+    await assert.rejects(readBoundedJsonFile(regularPath, 128),
+      error => error.code === 'INPUT_INVALID_UTF8');
+    await assert.rejects(readBoundedJsonFile('relative.json', 128),
+      error => error.code === 'INPUT_PATH_INVALID');
   } finally {
     await rm(dir, {recursive: true, force: true});
   }
