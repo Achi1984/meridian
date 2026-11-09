@@ -386,6 +386,36 @@ test('dashboard projection allowlists legacy and V2 fee assumptions', () => {
   }), null);
 });
 
+test('historical V1 report identity cannot be relabeled as the next-run model pair', () => {
+  const input = fixture();
+  input.expectedIdentity.modelPairId =
+    'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1';
+  input.expectedIdentity.models = [
+    {...input.expectedIdentity.models[0],
+      modelId: 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1'},
+    {...input.expectedIdentity.models[1],
+      modelId: 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1'},
+    input.expectedIdentity.models[2]
+  ];
+  input.report.trendActivityDiagnostic = {
+    schemaVersion: 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1',
+    status: 'PARTIAL_COVERAGE',
+    completedRoundTripCount: 0,
+    requiredCompletedRoundTrips: 5,
+    observedCoverageMs: Math.floor(input.report.elapsedMs),
+    requiredCoverageMs: 86_400_000,
+    completeWindow: false,
+    forcedTrades: false,
+    deadlineExtensionAllowed: false,
+    profitability: 'NOT_ASSESSED'
+  };
+  input.journal.events.at(-1).report =
+    structuredClone(input.report);
+  const result = evaluatePairedPaperEvidence(input);
+  assert.equal(result.evidenceStatus, 'CORRUPT_UNKNOWN');
+  assert.equal(result.reasonCode, 'IDENTITY_MISMATCH');
+});
+
 test('rejects shared observations whose common decision time is not the latest arm decision', () => {
   const input = fixture();
   input.journal.events[1].decisions[0].decidedAt++;

@@ -14,6 +14,8 @@ import {
   SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
   SPOT_PAPER_PAIRED_INTEGRATION, SPOT_PAPER_RESEARCH_COMPARISON_ID,
   SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
   SPOT_PAPER_PAIRED_ACCOUNT_CONTRACT
 } from "../scripts/spot-paper-paired/forward.mjs";
 import {
@@ -296,6 +298,30 @@ test("live runner rejects missing or mismatched research identity before feed ac
   await assert.rejects(runSpotPaperPairedLive({
     ...setup.config,
     researchSourceSha256: SPOT_PAPER_PAIRED_ACCEPTED_RESEARCH_SOURCE_SHA256
+  }), /PROVIDER_INJECTION_FORBIDDEN/);
+  assert.deepEqual(setup.order, []);
+});
+
+test("next-run live entrypoint rejects a wrong source pin and injected provider before feed access", async t => {
+  const setup = await fixture(t);
+  const input = {
+    runId: "next-run-live-gate",
+    dataRoot: setup.dataRoot,
+    modelPairId: SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+    accountContract: SPOT_PAPER_PAIRED_NEXT_RUN_ACCOUNT_CONTRACT,
+    researchSourceSha256: "0".repeat(64),
+    accountIds: {
+      baseline: "next-baseline",
+      challenger: "next-challenger",
+      cash: "next-cash"
+    }
+  };
+  await assert.rejects(runSpotPaperPairedLive(input),
+    /NEXT_RUN_IDENTITY_REQUIRED/);
+  await assert.rejects(runSpotPaperPairedLive({
+    ...input,
+    researchSourceSha256: SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256,
+    provider: setup.config.provider
   }), /PROVIDER_INJECTION_FORBIDDEN/);
   assert.deepEqual(setup.order, []);
 });
