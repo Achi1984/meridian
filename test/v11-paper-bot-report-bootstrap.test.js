@@ -8,6 +8,14 @@ import {
   SPOT_PAPER_REPORT_ENVELOPE_SCHEMA
 } from '../scripts/spot-paper-report-bridge/contract.mjs';
 import {SPOT_PAPER_REPORT_ENDPOINT} from '../v11/spot-paper-cockpit-controller.js';
+import {
+  SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
+  SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA
+} from '../v11/spot-paper-paired-report-connector.js';
+import {
+  syntheticExpectedPairedIdentity,
+  syntheticPairedDashboard
+} from './helpers/spot-paper-paired-dashboard-fixture.mjs';
 
 const TOKEN = 'synthetic-paper-workspace-token';
 const TARGET_MODEL = 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1';
@@ -193,7 +201,10 @@ test('workspace requires unlock and explicit refresh; lock clears read DTO and u
   assert.match(h.overviewRoot.parentNode.textContent,
     /belegt aber nicht die 5-Minuten-Trend-Identität/);
   assert.doesNotMatch(h.overviewRoot.textContent, /−3,57 €|995,25 €/);
-  assert.equal(h.overviewRoot.textContent.includes(TARGET_MODEL), false);
+  assert.match(h.overviewRoot.textContent, new RegExp(TARGET_MODEL),
+    'the overview retains the intended trend-model identity');
+  assert.match(h.overviewRoot.parentNode.textContent, /empfangen: Modell BTC_EUR_SMA5_SMA20_V1/,
+    'the legacy DTO identity is shown only as mismatch detail');
 
   h.access.lock();
   assert.doesNotMatch(h.overviewRoot.textContent, /BTC_EUR_SMA5_SMA20_V1/);
@@ -202,6 +213,89 @@ test('workspace requires unlock and explicit refresh; lock clears read DTO and u
   h.workspace.dispose();
   assert.equal(h.overviewRoot.children.length, 0);
   assert.equal(h.pairedRoot.children.length, 0);
+});
+
+test('paired DTO is read through the real workspace mount and remains visibly synthetic in tests', async () => {
+  const expected = syntheticExpectedPairedIdentity();
+  const report = syntheticPairedDashboard(expected);
+  let calls = 0;
+  let options;
+  const h = harness({
+    fetchImpl: async (url, init) => {
+      calls++;
+      options = {url, ...init};
+      assert.equal(url, SPOT_PAPER_PAIRED_REPORT_ENDPOINT);
+      return new Response(JSON.stringify({
+        schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+        runId: expected.runId,
+        report
+      }), {status: 200, headers: {'content-type': 'application/json'}});
+    }
+  });
+  h.workspace.setActive(true);
+  h.access.unlock();
+  assert.equal(calls, 0, 'unlock and mount do not read paired data');
+  await h.workspace.refreshPaired();
+  assert.equal(calls, 1);
+  assert.equal(options.method, 'GET');
+  assert.equal(options.headers.authorization, 'Bearer ' + TOKEN);
+  assert.equal(options.cache, 'no-store');
+  assert.equal(options.credentials, 'omit');
+  assert.match(h.pairedRoot.textContent, /SYNTHETIC FIXTURE/);
+  assert.match(h.pairedRoot.textContent, /BTC_EUR_RESEARCH_TEST_V1/);
+  assert.match(h.pairedRoot.textContent, /RUNNING_SNAPSHOT/);
+  assert.match(h.pairedRoot.parentNode.textContent, /Gepaarter Bericht geladen/);
+  assert.match(h.pairedRoot.textContent, /Eigenkapital nettoUnbekannt/);
+  assert.match(h.pairedRoot.textContent, /Netto-PnLUnbekannt/);
+
+  h.access.lock();
+  assert.doesNotMatch(h.pairedRoot.textContent, /paired-synthetic-test-only/);
+  assert.match(h.pairedRoot.parentNode.textContent, /Gesperrt/);
+  h.workspace.dispose();
+});
+
+test('paired transport, missing publication, identity and schema failures remain distinct', async () => {
+  const cases = [
+    {status: 503, body: {error: 'spot_paper_paired_transport_not_provisioned'},
+      expected: /Transport ist nicht provisioniert/},
+    {status: 404, body: {error: 'spot_paper_paired_report_not_found'},
+      expected: /Kein gepaarter Bericht veröffentlicht/},
+    {status: 409, body: {error: 'spot_paper_paired_identity_mismatch'},
+      expected: /Identität stimmt nicht/},
+    {status: 422, body: {error: 'spot_paper_paired_schema_unsupported'},
+      expected: /Schema wird nicht unterstützt/},
+    {status: 422, body: {error: 'spot_paper_paired_identity_unsupported'},
+      expected: /Trend-Identität ist bis zum kanonischen #1319-Vertrag nicht unterstützt/},
+    {status: 422, body: {error: 'spot_paper_paired_report_invalid'},
+      expected: /gepaarte Bericht konnte nicht validiert werden/}
+  ];
+  for (const item of cases) {
+    const h = harness({fetchImpl: async url => {
+      assert.equal(url, SPOT_PAPER_PAIRED_REPORT_ENDPOINT);
+      return new Response(JSON.stringify(item.body), {
+        status: item.status,
+        headers: {'content-type': 'application/json'}
+      });
+    }});
+    h.workspace.setActive(true);
+    h.access.unlock();
+    await h.workspace.refreshPaired();
+    assert.match(h.pairedRoot.parentNode.textContent, item.expected);
+    assert.match(h.pairedRoot.textContent, /gemeinsamer Report-Projektor oder DTO nicht verfügbar/);
+    h.workspace.dispose();
+  }
+
+  const unauthorized = harness({fetchImpl: async () => new Response(
+    JSON.stringify({error: 'read_token_required'}), {
+      status: 401, headers: {'content-type': 'application/json'}
+    })});
+  unauthorized.workspace.setActive(true);
+  unauthorized.access.unlock();
+  await unauthorized.workspace.refreshPaired();
+  assert.equal(unauthorized.access.isUnlocked(), false);
+  assert.match(unauthorized.pairedRoot.parentNode.textContent, /Gesperrt/);
+  assert.doesNotMatch(unauthorized.pairedRoot.textContent, /SYNTHETIC FIXTURE/);
+  unauthorized.workspace.dispose();
 });
 
 test('missing paired source and unavailable bot report remain explicit, with no background reads', async () => {
@@ -219,6 +313,7 @@ test('missing paired source and unavailable bot report remain explicit, with no 
   assert.match(h.overviewRoot.textContent, /Unbekannt/);
   assert.match(h.overviewRoot.textContent, /In Vorbereitung/);
   assert.match(h.pairedRoot.textContent, /gemeinsamer Report-Projektor oder DTO nicht verfügbar/);
+  assert.match(h.pairedRoot.parentNode.textContent, /Kein gepaarter Bericht abgerufen/);
   h.workspace.setActive(false);
   h.workspace.setActive(true);
   await new Promise(resolve => setTimeout(resolve, 0));
@@ -231,8 +326,7 @@ test('M11 strategy bootstrap mounts both reviewed panels under existing navigati
   assert.match(source, /mountPaperBotReportWorkspace/);
   assert.match(source, /paper-bot-overview-section/);
   assert.match(source, /paired-paper-report-section/);
-  assert.match(source,
-    /Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt/);
+  assert.match(source, /Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt/);
   assert.match(source, /paperBotReportWorkspace\?\.setActive\(button\.dataset\.v==='strategies'\)/);
   assert.equal((source.match(/addEventListener\(['"]click['"]/g) || []).length, 2,
     'one nav and one strategy shortcut listener remain; no report polling listener is added');

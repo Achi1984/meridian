@@ -113,7 +113,8 @@ export function createPrivateReportStore(db, {
   if (![
     "meridian_paper_reports",
     "meridian_spot_paper_reports",
-    "meridian_spot_paper_host8h_reports"
+    "meridian_spot_paper_host8h_reports",
+    "meridian_spot_paper_paired_reports"
   ].includes(tableName)) {
     throw new TypeError("invalid private report table");
   }

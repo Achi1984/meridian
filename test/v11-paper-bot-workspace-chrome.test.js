@@ -9,10 +9,20 @@ import {withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate, VERIFY_ENDPOINT} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {SPOT_PAPER_REPORT_ENDPOINT} from '../v11/spot-paper-cockpit-controller.js';
+import {
+  SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
+  SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA
+} from '../v11/spot-paper-paired-report-connector.js';
+import {
+  syntheticExpectedPairedIdentity,
+  syntheticPairedDashboard
+} from './helpers/spot-paper-paired-dashboard-fixture.mjs';
 
 const chrome = [process.env.CHROME_BIN, '/usr/bin/google-chrome',
   '/usr/bin/chromium'].find(path => path && existsSync(path));
 const sizes = [320, 390, 1440];
+const pairedIdentity = syntheticExpectedPairedIdentity();
+const pairedFixture = syntheticPairedDashboard(pairedIdentity);
 
 function runFlaggedBrowserTest(name) {
   const env = {...process.env};
@@ -30,10 +40,10 @@ function assertNamedTestPassed(output, name) {
   assert.doesNotMatch(line, /# SKIP(?:\s|$)/);
 }
 
-test('real M11 Paper workspace authenticates manual reads and renders missing states at 320/390px', {
+test('real M11 workspace authenticates both manual sources and renders paired fixture at 320/390px', {
   timeout: 180_000
 }, async () => {
-  const name = 'real M11 Paper workspace authenticates manual reads and renders missing states at 320/390px';
+  const name = 'real M11 workspace authenticates both manual sources and renders paired fixture at 320/390px';
   if (typeof WebSocket !== 'function') {
     const child = runFlaggedBrowserTest(name);
     assert.equal(child.status, 0,
@@ -54,11 +64,13 @@ test('real M11 Paper workspace authenticates manual reads and renders missing st
     for (const width of sizes) {
       const metrics = await withMobileChrome(chrome, width, hosted.url, async call => {
         let reads = 0;
+        let pairedReads = 0;
         let failure = null;
         const off = call.onEvent('Fetch.requestPaused', event => {
           void (async () => {
             if (event.request.url === VERIFY_ENDPOINT) return;
-            if (event.request.url !== SPOT_PAPER_REPORT_ENDPOINT) throw Error('Unexpected report route');
+            if (![SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
+              .includes(event.request.url)) throw Error('Unexpected report route');
             if (event.request.method === 'OPTIONS') {
               await call('Fetch.fulfillRequest', {
                 requestId: event.requestId,
@@ -77,21 +89,40 @@ test('real M11 Paper workspace authenticates manual reads and renders missing st
               .find(([key]) => key.toLowerCase() === 'authorization')?.[1];
             assert.ok(authorization?.startsWith('Bearer '));
             assert.ok(authorization.length > 'Bearer '.length);
-            reads++;
-            await call('Fetch.fulfillRequest', {
-              requestId: event.requestId,
-              responseCode: 404,
-              responseHeaders: [
-                {name: 'Access-Control-Allow-Origin', value: '*'},
-                {name: 'Content-Type', value: 'application/json; charset=utf-8'},
-                {name: 'Cache-Control', value: 'no-store'}
-              ],
-              body: Buffer.from(JSON.stringify({error: 'report_not_found'})).toString('base64')
-            });
+            if (event.request.url === SPOT_PAPER_REPORT_ENDPOINT) {
+              reads++;
+              await call('Fetch.fulfillRequest', {
+                requestId: event.requestId,
+                responseCode: 404,
+                responseHeaders: [
+                  {name: 'Access-Control-Allow-Origin', value: '*'},
+                  {name: 'Content-Type', value: 'application/json; charset=utf-8'},
+                  {name: 'Cache-Control', value: 'no-store'}
+                ],
+                body: Buffer.from(JSON.stringify({error: 'report_not_found'})).toString('base64')
+              });
+            } else {
+              pairedReads++;
+              await call('Fetch.fulfillRequest', {
+                requestId: event.requestId,
+                responseCode: 200,
+                responseHeaders: [
+                  {name: 'Access-Control-Allow-Origin', value: '*'},
+                  {name: 'Content-Type', value: 'application/json; charset=utf-8'},
+                  {name: 'Cache-Control', value: 'no-store'}
+                ],
+                body: Buffer.from(JSON.stringify({
+                  schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+                  runId: pairedIdentity.runId,
+                  report: pairedFixture
+                })).toString('base64')
+              });
+            }
           })().catch(error => { failure = error; });
         });
         await call('Fetch.enable', {patterns: [
-          {urlPattern: SPOT_PAPER_REPORT_ENDPOINT, requestStage: 'Request'}
+          {urlPattern: SPOT_PAPER_REPORT_ENDPOINT, requestStage: 'Request'},
+          {urlPattern: SPOT_PAPER_PAIRED_REPORT_ENDPOINT, requestStage: 'Request'}
         ]});
         try {
           await call('Emulation.setDeviceMetricsOverride', {
@@ -100,7 +131,7 @@ test('real M11 Paper workspace authenticates manual reads and renders missing st
             screenWidth: width, screenHeight: width === 320 ? 568 : width === 390 ? 844 : 900
           });
           await unlockAppThroughGate(call, {
-            additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT]
+            additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
           });
           const evaluate = async expression => {
             const result = await call('Runtime.evaluate', {
@@ -114,11 +145,14 @@ test('real M11 Paper workspace authenticates manual reads and renders missing st
             overview:!!document.querySelector('#paper-bot-overview-root'),
             paired:!!document.querySelector('#paired-paper-report-root'),
             reads:document.querySelectorAll('#paper-bot-overview-section button').length,
+            pairedReads:document.querySelectorAll('#paired-paper-report-section button').length
           })`);
           assert.equal(mounted.overview, true);
           assert.equal(mounted.paired, true);
           assert.equal(mounted.reads, 1);
+          assert.equal(mounted.pairedReads, 1);
           assert.equal(reads, 0, 'unlock and navigation do not read report data');
+          assert.equal(pairedReads, 0, 'unlock and navigation do not read paired data');
           await evaluate(`document.querySelector('#paper-bot-overview-section > summary').click()`);
           await evaluate(`document.querySelector('#paired-paper-report-section > summary').click()`);
           const initial = await evaluate(`({
@@ -150,6 +184,21 @@ test('real M11 Paper workspace authenticates manual reads and renders missing st
           assert.match(unavailable, /Kein authentifizierter Bericht verfügbar/);
           assert.match(unavailable, /In Vorbereitung/);
           assert.doesNotMatch(unavailable, /0,00 €|0 fills/i);
+          await evaluate(`document.querySelector('#paired-paper-report-section button').click()`);
+          for (let attempt = 0; attempt < 150 && pairedReads === 0; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.equal(failure, null, failure?.message);
+          assert.equal(pairedReads, 1, 'one manual paired refresh creates exactly one GET');
+          let pairedText = '';
+          for (let attempt = 0; attempt < 150; attempt++) {
+            pairedText = await evaluate(`document.querySelector('#paired-paper-report-root').textContent`);
+            if (pairedText.includes('SYNTHETIC FIXTURE')) break;
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.match(pairedText, /SYNTHETIC FIXTURE/);
+          assert.match(pairedText, /BTC_EUR_RESEARCH_TEST_V1/);
+          assert.match(pairedText, /RUNNING_SNAPSHOT/);
           const image = await call('Page.captureScreenshot', {format: 'png'});
           writeFileSync(join(evidence, `paper-bot-workspace-${width}.png`),
             Buffer.from(image.data, 'base64'));
@@ -158,16 +207,25 @@ test('real M11 Paper workspace authenticates manual reads and renders missing st
           assert.equal(await evaluate(`document.getElementById('app').hidden`), true);
           assert.equal(reads, 1, 'locking clears state without another read');
           await unlockAppThroughGate(call, {
-            additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT]
+            additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
           });
           await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
           assert.equal(reads, 1, 're-unlock and navigation do not automatically refresh');
+          assert.doesNotMatch(
+            await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
+            /SYNTHETIC FIXTURE/,
+            'lock clears the paired DTO too');
           await evaluate(`document.querySelector('#paper-bot-overview-section button').click()`);
           for (let attempt = 0; attempt < 150 && reads < 2; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
           assert.equal(failure, null, failure?.message);
           assert.equal(reads, 2, 'the second user-initiated read is handled once');
+          await evaluate(`document.querySelector('#paired-paper-report-section button').click()`);
+          for (let attempt = 0; attempt < 150 && pairedReads < 2; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.equal(pairedReads, 2, 're-unlock requires a second manual paired read');
           const finalSize = await evaluate(`({
             width:innerWidth,
             viewport:document.documentElement.clientWidth,

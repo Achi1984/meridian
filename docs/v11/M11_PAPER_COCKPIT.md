@@ -10,9 +10,17 @@ This delivery owns read-only Paper cards and their focused verification:
 - `scripts/spot-paper-report-bridge/contract.mjs` — versioned BTC/EUR display and transfer contracts.
 - `spot-paper-report-gateway.mjs` — separate disabled-by-default authenticated route.
 - `migrations/20261107_meridian_spot_paper_reports.sql` — isolated immutable report table.
+- `v11/spot-paper-paired-report-connector.js` and
+  `spot-paper-paired-report-gateway.mjs` — separate bounded authenticated paired
+  read path; it has no upload route.
+- `migrations/20261109_meridian_spot_paper_paired_reports.sql` — private,
+  bounded paired-report table.
 - `v11/strategy-workspace-bootstrap.js` — mounts the panel at the top of the existing Strategies workspace.
 - `test/v11-spot-paper-cockpit.test.js` and `test/spot-paper-report-*.test.js` — generated BTC/EUR contract, gateway, and cockpit tests.
 - `test/v11-module-cache-identity.test.js` — served V11 module graph assertion.
+- `test/spot-paper-paired-report-gateway.test.js` and
+  `test/v11-paper-bot-report-bootstrap.test.js` — paired transport, identity,
+  lifecycle, and unsupported-source checks.
 - `docs/v11/M11_PAPER_COCKPIT.md` — scope and connection contract.
 
 The cards use existing M11 Strategies navigation and add no dashboard route.
@@ -21,18 +29,63 @@ unchanged. No worker, filesystem, report producer, workflow, or runtime-control
 path is changed.
 
 The reviewed Paper-bot overview and paired comparison are mounted separately
-inside the same Strategies workspace. The overview's explicit manual read uses
-the existing authenticated `/api/private/spot-paper-report` endpoint through
-the existing BTC/EUR report connector. That endpoint's DTO is pinned to
-`BTC_EUR_SMA5_SMA20_V1`; it is not evidence for the
-`BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1` candidate, so the
-new candidate remains `UNKNOWN` and no values are copied across identities.
-USD Lives remains `UNKNOWN`, and LowVol V2 remains `PREPARED` in its native
-USDT unit. The paired panel mounts against the shared paired DTO contract but
-has no authenticated paired-report route or composed report source yet; its
-status and all run/source/profile/fingerprint/host identities remain unknown.
-It performs no paired fetch. Neither component is shown as a completed
-production integration or deployment confirmation.
+inside the same Strategies workspace. Each has an explicit manual read and uses
+the app-access bearer only while unlocked. Lock and navigation clear both DTOs,
+abort in-flight reads, and dispose their connectors.
+
+The overview reads the existing authenticated `/api/private/spot-paper-report`
+route. Its DTO is pinned to `BTC_EUR_SMA5_SMA20_V1`; it is not evidence for the
+`BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1` candidate. The
+overview keeps the candidate's intended identity on its card and reports the
+received legacy identity only as a mismatch detail; runtime status and metrics
+remain unknown. USD Lives remains `UNKNOWN`, and LowVol V2 remains `PREPARED`
+in its native USDT unit.
+
+The paired panel reads only the separate authenticated
+`/api/private/spot-paper-paired-report` route. That route validates the
+`SPOT_PAPER_PAIRED_DASHBOARD_V1` DTO and binds run ID, pair, source/config/
+research hashes, and ordered baseline/challenger/cash model identities to the
+server's expected-identity configuration. It does not widen or relabel the
+legacy BTC/EUR or host8h route. The UI distinguishes an unprovisioned
+transport, no published report, an identity mismatch, an unsupported schema or
+identity, and an authentication failure.
+
+## Paired report source and handoff
+
+The source pipeline is:
+
+1. The reviewed paired host writes its journal and produces a bounded host
+   export:
+   `node scripts/spot-paper-paired/host.mjs export --data-root "$PRIVATE_DATA_ROOT" --run-id "$RUN_ID" > "$WORK_DIR/host-export.json"`.
+2. The operator supplies an independently pinned
+   `SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1` JSON, bound to the reviewed manifest
+   and model/account configuration, and runs:
+   `node scripts/spot-paper-paired-report/cli.mjs "$WORK_DIR/expected-identity.json" "$WORK_DIR/host-export.json" > "$WORK_DIR/paired-dashboard.json"`.
+   This invokes `evaluatePairedPaperEvidence` and emits only the sanitized
+   dashboard DTO; the host export and journal are not browser inputs.
+3. The sanitized DTO is the only supported value for a paired report row in
+   `meridian_spot_paper_paired_reports`. After the operator-reviewed migration
+   is applied, the authenticated GET reads the row through the existing
+   bounded private-report store and revalidates its digest and configured
+   identity before returning it.
+
+The route is read-only: it adds no upload endpoint, token, automatic publisher,
+or production publication. Provisioning is not complete in this change: no
+production expected-identity configuration, paired database row, or approved
+sanitized-DTO ingestion procedure is supplied. Therefore the production UI
+must continue to say “not provisioned” or “not published”; it may not infer
+that a historic run does not exist. The route requires an applied
+`migrations/20261109_meridian_spot_paper_paired_reports.sql` migration and
+server-side `MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED=true`,
+`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED=true`, and
+`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON` matching the report.
+These settings and data have not been provisioned.
+
+The existing paired DTO is not independent authentication and must retain its
+`STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED` qualification.
+The #1319-specific 5-minute model identity remains unsupported until its
+canonical contract lands. No real paired results are synthesized; test-only
+fixtures are visibly labeled `SYNTHETIC FIXTURE`.
 
 ## Evidence shown
 

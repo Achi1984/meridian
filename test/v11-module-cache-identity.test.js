@@ -24,7 +24,7 @@ const expectedModules=[
   'spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js',
   'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js',
   'spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js',
-  'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-view.js','spot-paper-report-connector.js',
+  'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
 ];
 

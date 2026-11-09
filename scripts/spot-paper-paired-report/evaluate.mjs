@@ -61,7 +61,7 @@ function fail(reasonCode) {
   return createUnknownSpotPaperPairedDashboard(reasonCode);
 }
 
-function validExpectedIdentity(expected) {
+export function isValidSpotPaperPairedExpectedIdentity(expected) {
   if (!exactKeys(expected, [
         'schemaVersion', 'runId', 'pair', 'sourceSha256', 'configSha256',
         'researchSourceSha256', 'feedSourceId', 'comparisonEngineId', 'models'
@@ -641,7 +641,9 @@ function nonFinalSnapshotDto(journal, expected, reason) {
 export function evaluatePairedPaperEvidence({
   expectedIdentity, report: rawReport, journal: suppliedJournal
 } = {}) {
-  if (!validExpectedIdentity(expectedIdentity)) return fail('EXPECTED_IDENTITY_INVALID');
+  if (!isValidSpotPaperPairedExpectedIdentity(expectedIdentity)) {
+    return fail('EXPECTED_IDENTITY_INVALID');
+  }
   const normalizedReport = reportInput(rawReport, expectedIdentity, suppliedJournal);
   if (normalizedReport.invalid) return fail('REPORT_WRAPPER_INVALID');
   const report = normalizedReport.report;

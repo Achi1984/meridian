@@ -38,6 +38,11 @@ import {
   spotPaperHost8hReportGatewayConfig,
   writeSpotPaperHost8hReportRouteResponse
 } from "./spot-paper-host8h-report-gateway.mjs";
+import {
+  handleSpotPaperPairedReportGatewayRequest,
+  spotPaperPairedReportGatewayConfig,
+  writeSpotPaperPairedReportRouteResponse
+} from "./spot-paper-paired-report-gateway.mjs";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -57,6 +62,7 @@ const DATABASE_URL = process.env.DATABASE_URL || "";
 const PAPER_REPORT_CONFIG = reportTransferGatewayConfig();
 const SPOT_PAPER_REPORT_CONFIG = spotPaperReportGatewayConfig();
 const SPOT_PAPER_HOST8H_REPORT_CONFIG = spotPaperHost8hReportGatewayConfig();
+const SPOT_PAPER_PAIRED_REPORT_CONFIG = spotPaperPairedReportGatewayConfig();
 const PIONEX_BOT_READ_CONFIGURED=!!(
   String(process.env.PIONEX_BOT_READ_API_KEY||process.env.PIONEX_API_KEY||'').trim() &&
   String(process.env.PIONEX_BOT_READ_API_SECRET||process.env.PIONEX_API_SECRET||'').trim()
@@ -144,6 +150,7 @@ let privatePaperReportPool=null;
 let privatePaperReportStore=null;
 let privateSpotPaperReportStore=null;
 let privateSpotPaperHost8hReportStore=null;
+let privateSpotPaperPairedReportStore=null;
 function pool(){
   if(!DATABASE_URL)return null;
   if(!privatePool)privatePool=new Pool({connectionString:DATABASE_URL,ssl:{rejectUnauthorized:false}});
@@ -182,6 +189,15 @@ function spotPaperHost8hReportStore(){
     });
   }
   return privateSpotPaperHost8hReportStore;
+}
+function spotPaperPairedReportStore(){
+  if(!DATABASE_URL)return null;
+  if(!privateSpotPaperPairedReportStore){
+    privateSpotPaperPairedReportStore=createPrivateReportStore(paperReportPool(),{
+      tableName:"meridian_spot_paper_paired_reports"
+    });
+  }
+  return privateSpotPaperPairedReportStore;
 }
 async function stateGet(key){
   const p=pool(); if(!p)return null;
@@ -360,6 +376,7 @@ const server=http.createServer(async(req,res)=>{
     let reportRoute;
     let spotPaperReportRoute;
     let spotPaperHost8hReportRoute;
+    let spotPaperPairedReportRoute;
     try{
       reportRoute=await handleReportGatewayRequest(req,{
         config:PAPER_REPORT_CONFIG,
@@ -383,6 +400,14 @@ const server=http.createServer(async(req,res)=>{
           signal:reportController.signal
         });
       }
+      if(!reportRoute&&!spotPaperReportRoute&&!spotPaperHost8hReportRoute){
+        spotPaperPairedReportRoute=await handleSpotPaperPairedReportGatewayRequest(req,{
+          config:SPOT_PAPER_PAIRED_REPORT_CONFIG,
+          getStore:spotPaperPairedReportStore,
+          authorizedRead,
+          signal:reportController.signal
+        });
+      }
     }finally{
       req.removeListener("aborted",abortReport);
       res.removeListener("close",abortReportOnClose);
@@ -396,6 +421,11 @@ const server=http.createServer(async(req,res)=>{
     if(spotPaperHost8hReportRoute){
       return writeSpotPaperHost8hReportRouteResponse(
         req,res,spotPaperHost8hReportRoute,origin,writeJson
+      );
+    }
+    if(spotPaperPairedReportRoute){
+      return writeSpotPaperPairedReportRouteResponse(
+        req,res,spotPaperPairedReportRoute,origin,writeJson
       );
     }
     if(req.method==="GET"&&u.pathname==="/gateway-health"){

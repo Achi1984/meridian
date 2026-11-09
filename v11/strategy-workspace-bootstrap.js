@@ -24,13 +24,13 @@ if(catalogRoot?.parentNode){
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';
   pairedSourceStatus.setAttribute('role','status');
-  pairedSourceStatus.textContent='Kein authentifizierter gemeinsamer Baseline-/Challenger-/Cash-Bericht verbunden. Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt; es wird kein Ersatzbericht angefordert oder erzeugt.';
+  pairedSourceStatus.textContent='Kein gepaarter Bericht abgerufen. Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt, bis ein authentifizierter Bericht manuell geprüft wird.';
   pairedReports.append(pairedSourceStatus);
   const pairedRoot=document.createElement('section');
   pairedRoot.id='paired-paper-report-root';
   pairedReports.append(pairedRoot);
   paperBotReportWorkspace=mountPaperBotReportWorkspace(
-    botOverviewRoot,pairedRoot,document
+    botOverviewRoot,pairedRoot,document,{pairedStatus:pairedSourceStatus}
   );
   const host8hRoot=document.createElement('section');
   host8hRoot.id='spot-paper-host8h-root';
