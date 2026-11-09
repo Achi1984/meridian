@@ -2,6 +2,9 @@ import {createHash} from "node:crypto";
 import {
   advanceStrategy, createStrategyState
 } from "../spot-paper-pilot/core.mjs";
+import {USD_MODELED_COSTS} from "../paper-capital-challenge/account-contract.mjs";
+import {PAPER_CAPITAL_CHALLENGE_POLICY as POLICY} from
+  "../paper-capital-challenge/policy.mjs";
 
 export const USD_SMA_CANDIDATE = Object.freeze({
   schemaVersion: "USD_BTC_SMA_CANDIDATE_V1",
@@ -10,6 +13,22 @@ export const USD_SMA_CANDIDATE = Object.freeze({
   sourceVersion: "KRAKEN_NATIVE_BTC_USD_CLOSED_1M_V1",
   warmupClosedCandles: 21
 });
+
+export function createUsdSmaCandidateConfiguration(candidateNotionalCents) {
+  if (!Number.isSafeInteger(candidateNotionalCents) || candidateNotionalCents < 1 ||
+      candidateNotionalCents > USD_MODELED_COSTS.maxEntryCents) {
+    throw new Error("INVALID_USD_CANDIDATE_NOTIONAL");
+  }
+  return Object.freeze({
+    schemaVersion: "USD_BTC_SMA_CANDIDATE_CONFIGURATION_V1",
+    campaignId: POLICY.campaignId,
+    currency: POLICY.currency,
+    strategyVersion: USD_SMA_CANDIDATE.strategyVersion,
+    sourceVersion: USD_SMA_CANDIDATE.sourceVersion,
+    costVersion: USD_MODELED_COSTS.version,
+    candidateNotionalCents
+  });
+}
 
 const DIGEST = /^[a-f0-9]{64}$/;
 const DECIMAL = /^(?:0|[1-9]\d{0,15})(?:\.\d{1,8})?$/;
@@ -108,12 +127,17 @@ export function createProposedUsdSmaCandidate() {
     return pendingDecision;
   }
 
-  function recordSample(sample) {
+  function recordSample(sample, candidateConfiguration) {
     if (!pendingDecision || !pendingCandleEvidence ||
         sample?.candleEvidence !== pendingCandleEvidence ||
         sample.decision !== pendingDecision ||
         sample.schemaVersion !== "BTC_USD_CLOSED_CANDLE_CAUSAL_SAMPLE_V1") {
       throw new Error("USD_CANDIDATE_SAMPLE_MISMATCH");
+    }
+    const frozenConfiguration = createUsdSmaCandidateConfiguration(
+      candidateConfiguration?.candidateNotionalCents);
+    if (canonical(frozenConfiguration) !== canonical(candidateConfiguration)) {
+      throw new Error("USD_CANDIDATE_CONFIGURATION_MISMATCH");
     }
     const decisionAtMs = safeTime(sample.decisionAtMs, "DECISION_TIME");
     const tickerRequestStartedAtMs = safeTime(
@@ -132,6 +156,8 @@ export function createProposedUsdSmaCandidate() {
       strategyVersion: USD_SMA_CANDIDATE.strategyVersion,
       sourceVersion: USD_SMA_CANDIDATE.sourceVersion,
       nativeInstrument: "BTC/USD",
+      candidateConfiguration: frozenConfiguration,
+      candidateConfigurationDigest: digest(frozenConfiguration),
       previousDigest: previousEvidenceDigest,
       candleEvidence: pendingCandleEvidence,
       decision: pendingDecision,
@@ -171,7 +197,12 @@ export function verifyProposedUsdSmaEvidence(evidence, expectedDigest) {
   if (payload.schemaVersion !== "USD_BTC_SMA_CANDIDATE_EVIDENCE_V1" ||
       payload.strategyVersion !== USD_SMA_CANDIDATE.strategyVersion ||
       payload.sourceVersion !== USD_SMA_CANDIDATE.sourceVersion ||
-      payload.nativeInstrument !== "BTC/USD") {
+      payload.nativeInstrument !== "BTC/USD" ||
+      !payload.candidateConfiguration ||
+      canonical(createUsdSmaCandidateConfiguration(
+        payload.candidateConfiguration.candidateNotionalCents)) !==
+        canonical(payload.candidateConfiguration) ||
+      digest(payload.candidateConfiguration) !== payload.candidateConfigurationDigest) {
     throw new Error("USD_STRATEGY_EVIDENCE_MISMATCH");
   }
   return Object.freeze({...payload, digest: recordedDigest});

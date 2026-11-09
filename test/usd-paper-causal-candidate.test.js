@@ -15,6 +15,7 @@ import {
   USD_BTC_SMA_CANDIDATE_CONFIGURATION
 } from "../scripts/usd-paper-composition/host.mjs";
 import {
+  createUsdSmaCandidateConfiguration,
   createProposedUsdSmaCandidate,
   requireRestartableUsdSmaCandidate,
   USD_SMA_CANDIDATE,
@@ -33,12 +34,12 @@ const BINDING = Object.freeze({
 });
 const STORE_DIRECTORIES = new WeakMap();
 
-async function newStore(t) {
+async function newStore(t, binding = BINDING) {
   const root = await mkdtemp(path.join(os.tmpdir(), "usd-sma-candidate-test-"));
   t.after(() => rm(root, {recursive: true, force: true}));
   const directory = path.join(root, "account");
   const store = await UsdAccountJournalStore.createNew(directory, {
-    binding: BINDING
+    binding
   });
   STORE_DIRECTORIES.set(store, directory);
   return store;
@@ -85,7 +86,7 @@ function recordDecision(candidate, evidence, index) {
       observedAtMs: receivedAtMs + 3,
       quote: {id: `test-quote-${index}`, nativeInstrument: "BTC/USD"}
     }
-  });
+  }, createUsdSmaCandidateConfiguration(1_000));
 }
 
 function krakenTicker(price = "43000") {
@@ -159,6 +160,7 @@ test("warmup uses 21 closed candles, has no historical entry, and identical snap
   const candidate = createProposedUsdSmaCandidate();
   const warmup = candleEvidence(Array(21).fill("10000"));
   const firstEvidence = recordDecision(candidate, warmup, 1);
+  assert.equal(firstEvidence.candidateConfiguration.candidateNotionalCents, 1_000);
   assert.equal(firstEvidence.decision.action, "HOLD");
   assert.equal(firstEvidence.decision.warmupComplete, true);
   assert.equal(firstEvidence.decision.lastSeenAt, BASE + 20 * 60_000);
@@ -195,7 +197,8 @@ test("candidate rejects unclosed/future evidence and preserves conflict, gap, an
       observedAtMs: decisionEvidence.receivedAtMs + 4,
       quote: {id: "predecision-quote", nativeInstrument: "BTC/USD"}
     }
-  }), /NONCAUSAL_STRATEGY_EVIDENCE/);
+  }, createUsdSmaCandidateConfiguration(1_000)),
+  /NONCAUSAL_STRATEGY_EVIDENCE/);
 
   const conflict = createProposedUsdSmaCandidate();
   recordDecision(conflict, candleEvidence(Array(21).fill("10000")), 1);
@@ -297,7 +300,8 @@ test("generated BTC/USD candles decide before ticker, then use the real USD jour
       decisionCount++;
       return baseCandidate.decide(evidence);
     },
-    recordSample: sample => baseCandidate.recordSample(sample),
+    recordSample: (sample, configuration) =>
+      baseCandidate.recordSample(sample, configuration),
     snapshot: () => baseCandidate.snapshot(),
     evidenceRecords: () => baseCandidate.evidenceRecords()
   };
@@ -435,6 +439,93 @@ test("reopened account blocks causal provider requests and evidence-retention fa
   assert.equal(appendCalls, 0);
   assert.equal(fresh.replay.entries.length, 0);
   await fresh.close();
+});
+
+test("candidate rejects mismatched account attribution before feed acquisition or writes", async t => {
+  const store = await newStore(t, {
+    ...BINDING,
+    strategyVersion: "unrelated-ledger-strategy-v1"
+  });
+  let requests = 0;
+  let decisions = 0;
+  let appends = 0;
+  const append = store.append.bind(store);
+  store.append = async event => {
+    appends++;
+    return append(event);
+  };
+  await assert.rejects(runProposedUsdSmaCandidateSample({
+    feed: {
+      async fetchCausalSample({decide}) {
+        requests++;
+        return decide(candleEvidence(Array(21).fill("10000")));
+      }
+    },
+    store,
+    candidate: {
+      decide() {
+        decisions++;
+        throw new Error("DECISION_MUST_NOT_RUN");
+      },
+      recordSample() {}
+    },
+    candidateNotionalCents: 1_000,
+    retainStrategyEvidence() {},
+    retainRestartTip() {}
+  }), /USD_CANDIDATE_ACCOUNT_BINDING_MISMATCH/);
+  assert.equal(requests, 0);
+  assert.equal(decisions, 0);
+  assert.equal(appends, 0);
+  assert.equal(store.replay.entries.length, 0);
+  await store.close();
+});
+
+test("candidate notional is pinned after a committed sample and changed sizing has no further effects", async t => {
+  const store = await newStore(t);
+  const clock = {current: BASE + 21 * 60_000 + 5_000};
+  let requests = 0;
+  let decisions = 0;
+  let appends = 0;
+  const feed = createKrakenUsdPublicFeed({
+    now: () => clock.current,
+    monotonicNow: () => 1,
+    fetchImpl: async url => {
+      requests++;
+      return response(url.pathname.endsWith("/OHLC") ?
+        krakenOhlc(Array(21).fill("10000"), clock.current) : krakenTicker());
+    }
+  });
+  const baseCandidate = createProposedUsdSmaCandidate();
+  const candidate = {
+    decide(evidence) {
+      decisions++;
+      return baseCandidate.decide(evidence);
+    },
+    recordSample(sample, configuration) {
+      return baseCandidate.recordSample(sample, configuration);
+    }
+  };
+  const append = store.append.bind(store);
+  store.append = async event => {
+    appends++;
+    return append(event);
+  };
+  const retain = {
+    retainStrategyEvidence() {},
+    retainRestartTip() {}
+  };
+  await runProposedUsdSmaCandidateSample({
+    feed, store, candidate, candidateNotionalCents: 1_000, ...retain
+  });
+  const committedCount = store.replay.entries.length;
+  await assert.rejects(runProposedUsdSmaCandidateSample({
+    feed, store, candidate, candidateNotionalCents: 2_000, ...retain
+  }), /USD_CAMPAIGN_CANDIDATE_CONFIGURATION_CHANGED/);
+  assert.equal(requests, 2);
+  assert.equal(decisions, 1);
+  assert.equal(appends, 1);
+  assert.equal(store.replay.entries.length, committedCount);
+  await store.close();
 });
 
 test("generated causal sample latches after restart-tip retention failure", async t => {

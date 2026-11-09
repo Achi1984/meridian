@@ -9,7 +9,9 @@ import {
 } from "../paper-capital-challenge/account-contract.mjs";
 import {PAPER_CAPITAL_CHALLENGE_POLICY as POLICY} from
   "../paper-capital-challenge/policy.mjs";
-import {USD_SMA_CANDIDATE} from "./sma-candidate.mjs";
+import {
+  createUsdSmaCandidateConfiguration, USD_SMA_CANDIDATE
+} from "./sma-candidate.mjs";
 
 const STORE_SESSIONS = new WeakMap();
 
@@ -68,6 +70,7 @@ export async function runProposedUsdSmaCandidateSample({
     if (!Array.isArray(store.replay?.entries)) {
       throw new TypeError("proposed USD SMA composition requires a replayable account store");
     }
+    validateCandidateAccountBinding(store.binding);
     if (store.replay.entries.length >= MAX_USD_ACCOUNT_JOURNAL_EVENTS) {
       throw new Error("ACCOUNT_JOURNAL_LIMIT_REACHED");
     }
@@ -80,12 +83,19 @@ export async function runProposedUsdSmaCandidateSample({
     if (session.strategyInstance && session.strategyInstance !== candidate) {
       throw new Error("USD_CAMPAIGN_STRATEGY_INSTANCE_CHANGED");
     }
+    if (session.candidateNotionalCents !== null &&
+        session.candidateNotionalCents !== candidateNotionalCents) {
+      throw new Error("USD_CAMPAIGN_CANDIDATE_CONFIGURATION_CHANGED");
+    }
     session.feedInstance ??= feed;
     session.strategyInstance ??= candidate;
+    session.candidateNotionalCents ??= candidateNotionalCents;
+    const candidateConfiguration = createUsdSmaCandidateConfiguration(
+      session.candidateNotionalCents);
     const sample = await feed.fetchCausalSample({
       decide: candleEvidence => candidate.decide(candleEvidence)
     });
-    const strategyEvidence = candidate.recordSample(sample);
+    const strategyEvidence = candidate.recordSample(sample, candidateConfiguration);
     await retainStrategyEvidence(structuredClone(strategyEvidence));
     const prefix = store.replay.entries.map(({event}) => ({
       id: event.id,
@@ -111,6 +121,15 @@ export async function runProposedUsdSmaCandidateSample({
       })
     });
   });
+}
+
+function validateCandidateAccountBinding(binding) {
+  if (!binding || binding.campaignId !== POLICY.campaignId ||
+      binding.currency !== POLICY.currency ||
+      binding.strategyVersion !== USD_SMA_CANDIDATE.strategyVersion ||
+      binding.costVersion !== USD_MODELED_COSTS.version) {
+    throw new Error("USD_CANDIDATE_ACCOUNT_BINDING_MISMATCH");
+  }
 }
 
 function decisionForCandidateSample(candidateDecision, context, candidateNotionalCents) {
@@ -235,6 +254,7 @@ function getStoreSession(store) {
       failure: null,
       feedInstance: null,
       strategyInstance: null,
+      candidateNotionalCents: null,
       feedBudgetRequiresReview: store.createdNew !== true ||
         (store.replay?.entries?.length ?? 0) > 0
     };

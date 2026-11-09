@@ -82,7 +82,11 @@ the new strict ticker observation to the existing USD offline runner, journal,
 and guard. Candle/strategy evidence is a separate digest-bound record handed to
 the caller's retention callback; it is not added to or represented as part of
 the account schema. Callback acceptance does not prove durable, independently
-verified retention. The account journal still does not retain campaign-wide
+verified retention. The evidence digest binds campaign, currency, candidate
+strategy/source versions, cost version, and the explicit USD-cent notional.
+Before acquisition the composition validates the store's campaign/currency/
+strategy/cost binding and pins the notional for that in-process store session;
+a changed value fails before the next feed request. The account journal still does not retain campaign-wide
 feed request/byte counters or strategy state/evidence. Reopened account handles
 therefore remain blocked before provider acquisition, including when strategy
 evidence is supplied. Missing or tampered strategy evidence cannot authorize

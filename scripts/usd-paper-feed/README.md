@@ -91,7 +91,11 @@ disabled, and the candidate adds no stop, spread policy, or forced trade.
 
 Strategy evidence is emitted as a separate digest-bound record through a
 caller-provided retention callback; it is not part of the account journal and
-callback success does not prove durable independent retention. Neither strategy
+binds the candidate's campaign, currency, strategy/source versions, cost
+version, and explicit USD-cent notional. The composition rejects account stores
+whose campaign/currency/strategy/cost binding does not match this candidate and
+pins that notional for the lifetime of the in-process store session. Callback
+success does not prove durable independent retention. Neither strategy
 state/evidence nor campaign-wide adapter request/byte counters survive a
 verified restart today. Reopened account stores therefore remain prohibited
 from acquiring another feed sample. Missing or tampered strategy evidence
