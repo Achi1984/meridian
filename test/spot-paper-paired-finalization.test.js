@@ -20,7 +20,7 @@ const evaluatorPath = fileURLToPath(new URL(
   '../scripts/spot-paper-paired-report/cli.mjs', import.meta.url
 ));
 
-test('480-observation synthetic producer export evaluates and passes no-write validation', async t => {
+test('480-observation journal-shape fixture evaluates and passes no-write validation', async t => {
   const directory = await mkdtemp(join(tmpdir(), 'paired-finalization-'));
   t.after(() => rm(directory, {recursive: true, force: true}));
 
