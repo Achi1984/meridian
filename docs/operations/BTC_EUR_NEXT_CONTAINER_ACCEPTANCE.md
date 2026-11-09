@@ -2,34 +2,48 @@
 
 ## Result and pinned source
 
-Container acceptance passed locally against the updated #1319 candidate source
-commit `4097aa704c12749b72e568768a67ea6babfa5816`. The build context was a Git
-archive of that exact commit; source-side identity was computed from the same
-archive. Dirty and untracked checkout files cannot enter the image or expected
-identity. No #1319 implementation files, host settings, or existing stopped-run
-evidence were modified. These checks do not start a feed, launch a host, or
-establish deployment readiness.
+The #1319 composition merged to main as
+`c19c5d5a8f9492cd56cbe75f8446ea6d2663f096`. Its exact archived source passed a
+local disabled/identity/import/rejection acceptance on that commit. That first
+build used the then-mutable base tag, so it is superseded for deployment.
+
+| Merged-main verification | Value |
+| --- | --- |
+| Source commit | `c19c5d5a8f9492cd56cbe75f8446ea6d2663f096` |
+| Git archive SHA-256 | `97917966c9c81bdea38c878d8eba35d1ac2656bb9d5b209450413d9e586eabd4` |
+| Local image ID (superseded, unpinned base) | `sha256:69a89da4e712073eddc0f848b033ed0d8c7ead65e2bb573ab82ec0012b57060a` |
+| Host source SHA-256 | `68924929a3f2079697dc291ea7e79619cd1bbe87839462fd4694ffabc31b9232` |
+| Config SHA-256 | `07824817f223106f1faa1d0c56c4e4406e53f2f79355ec6c418466c6bfd7f941` |
+
+The final deployment-source acceptance passed on
+`cbf5db1fefa49192f3243975b79d2a8a6585f6c9`, which contains the merged
+composition and pins the base image by digest. The build context was a Git
+archive of that exact source commit; source-side identity was computed from the
+same archive. Dirty and untracked checkout files cannot enter the image or
+expected identity. No market feed or host run was started; no Northflank
+resource or existing stopped-run evidence was modified.
 
 | Build identity | Value |
 | --- | --- |
-| Candidate source commit | `4097aa704c12749b72e568768a67ea6babfa5816` |
-| Exact Git archive SHA-256 | `82e839cf5f7f88ea476a3502209952b50baee1576e22b9d072bc4e814e264faa` |
-| Dockerfile SHA-256 | `4c279e7463c682a09c8d3a99fe5a739c82efd4d9fa2c060cd49813418b4f3f0c` |
-| Dockerfile base reference | `node:20-alpine` (mutable tag) |
-| Resolved base image digest | Unknown; not captured in local image metadata |
-| Local tag | `meridian-spot-paper-paired-acceptance:4097aa704c12` |
-| Local image ID | `sha256:9bfde1a6b169b8c4e6427fb46fe6c1c53507feac96b6b0d08bee09f326256d69` |
+| Merged #1319 composition commit | `c19c5d5a8f9492cd56cbe75f8446ea6d2663f096` |
+| Final deployment-source commit | `cbf5db1fefa49192f3243975b79d2a8a6585f6c9` |
+| Exact Git archive SHA-256 | `6b60168d38ae1eb4d88e2d28a9711b5b085fba654f21e305b8e711360f2f0726` |
+| Dockerfile SHA-256 | `cfa2455decf969ce37d3d8bc4985b5ac093933d05143a97af2f4dcf036539f21` |
+| Pinned base reference | `node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293` |
+| Verified base image ID | `sha256:11cedc39e663e7c5d5cb9cc77a461a0d2adc25537b94e6831a6108f09cb2001b` |
+| Base digest verification | Pulled digest matches image RepoDigest; final image rootfs layer ancestry matches pinned base |
+| Local tag | `meridian-spot-paper-paired-acceptance:cbf5db1fefa4` |
+| Local image ID | `sha256:4210460e7aa52e1a94627ca84c40b12a5d045e20cd738f5d581ccf677e2841ef` |
 | Registry digest | None; image was not pushed |
 | Accepted three-source research digest | `dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25` |
 
-The base-image digest is deliberately reported as unknown: this Dockerfile uses
-a mutable tag and the local build did not retain provenance sufficient to bind
-the resolved base digest. Resolve and pin the base or capture authoritative
-build provenance for the final deployment build. The local image ID is not a
-remotely deployed immutable image reference. Before any launch, build from the
-exact final reviewed source SHA, complete this acceptance on that image, and
-obtain an approved registry `repository@sha256:...` digest. Rebuild and
-revalidate if any packaged source changes.
+The Dockerfile now pins the resolved base manifest digest. Acceptance explicitly
+pulls that digest, checks it against the local base image's RepoDigest, then
+confirms the final image retains the base image's complete rootfs layer prefix.
+The local image ID is still not a remotely deployed immutable image reference.
+Before launch, publish only through the approved registry, record its immutable
+`repository@sha256:...` digest, and configure Northflank with that digest.
+Rebuild and revalidate if any packaged source changes.
 
 ## Commands and observed results
 
@@ -41,16 +55,23 @@ empty temporary evidence directory and removes the fixture when complete:
 
 ```sh
 node scripts/spot-paper-paired-acceptance/acceptance.mjs \
-  --source-dir /tmp/meridian-1319-final \
-  --source-sha 4097aa704c12749b72e568768a67ea6babfa5816
+  --source-dir /home/runner/work/meridian/meridian \
+  --source-sha cbf5db1fefa49192f3243975b79d2a8a6585f6c9
 ```
 
-Observed on that commit:
+The merged composition commit `c19c5d5a8f9492cd56cbe75f8446ea6d2663f096` was
+also tested directly before the Dockerfile base pin was added. The deployment
+receipt below is from the later pinned-source commit, not from stale commits
+`7560892` or `4097aa7`.
 
-- The exact-source archive hash was
-  `82e839cf5f7f88ea476a3502209952b50baee1576e22b9d072bc4e814e264faa`; the
+- The final exact-source archive hash was
+  `6b60168d38ae1eb4d88e2d28a9711b5b085fba654f21e305b8e711360f2f0726`; the
   inspected local image ID was
-  `sha256:9bfde1a6b169b8c4e6427fb46fe6c1c53507feac96b6b0d08bee09f326256d69`.
+  `sha256:4210460e7aa52e1a94627ca84c40b12a5d045e20cd738f5d581ccf677e2841ef`.
+  The pinned base is
+  `node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293`;
+  pulled image ID and rootfs layer ancestry were verified by the acceptance
+  entrypoint.
   The default image command returned `DISABLED` / `NO_RUN_REQUESTED`; the
   identity-only command selected account contract
   `BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2` and model pair
@@ -59,7 +80,7 @@ Observed on that commit:
   - host source SHA-256:
     `68924929a3f2079697dc291ea7e79619cd1bbe87839462fd4694ffabc31b9232`
   - config SHA-256:
-    `cd7c1ca3dde11eeb4cbc8f4790355d04a5bb7a117712de8f96e52a9ac7d237ff`
+    `f8faa2080a14d67d92b1cee88dbdf3b77256b8bfa40dcec3c7017a63f7991cb7`
   - research source SHA-256:
     `dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25`
 - All 15 required host, paired-runner, report/evaluator, and research modules
@@ -84,9 +105,19 @@ node --test test/spot-paper-paired-host.test.js \
 
 The final #1319 focused source suites passed **56/56**, including the verified
 trend-activity exit-count reconciliation regression. The added archive
-regression passed **1/1**, proving dirty tracked and untracked checkout files
-are excluded from the build context. These tests are synthetic/offline. No full
-repository suite was repeated.
+regression and pinned-Dockerfile guard brought the complete focused set to
+**57/57**, proving dirty tracked and untracked checkout files
+are excluded from the build context. The source identity matched exactly
+between archive-side composition and container command. The default,
+identity-only, imports, and invalid-selection/path checks ran with networking
+disabled and did not create a run journal. These tests are synthetic/offline.
+No full repository suite was repeated.
+
+Release Safety run `42674276430` for final-source HEAD
+`cbf5db1fefa49192f3243975b79d2a8a6585f6c9` was still in progress when this
+record was updated; its latest observed completed steps were deterministic
+install, release coordination guard, backend/frontend syntax, and frozen
+research lineage. Refresh this status after the workflow completes.
 
 ## Northflank handoff — do not launch from this record
 
