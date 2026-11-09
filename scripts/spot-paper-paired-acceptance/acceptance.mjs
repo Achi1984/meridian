@@ -95,6 +95,20 @@ async function main(argv) {
     );
     const dockerfilePath = join(contextPath, "Dockerfile.spot-paper-paired");
     const dockerfile = await readFile(dockerfilePath);
+    const fromMatches = [...dockerfile.toString("utf8")
+      .matchAll(/^FROM\s+(\S+)\s*$/gm)];
+    assert.equal(fromMatches.length, 1, "Expected exactly one pinned base image");
+    const baseImageRef = fromMatches[0][1];
+    const digestMatch = baseImageRef.match(/^node:20-alpine@(sha256:[a-f0-9]{64})$/);
+    assert(digestMatch, "Base image must be pinned to node:20-alpine@sha256 digest");
+    const baseImageDigest = digestMatch[1];
+    execute("docker", ["pull", baseImageRef]);
+    const baseImage = parseJson(execute("docker", [
+      "image", "inspect", "--format", "{{json .}}", baseImageRef
+    ]).stdout, "Pinned base image inspection");
+    assert((baseImage.RepoDigests ?? []).some(reference =>
+      reference.endsWith(`@${baseImageDigest}`)),
+    "Pinned base digest was not present in the pulled image metadata");
     const imageTag = `meridian-spot-paper-paired-acceptance:${sourceSha.slice(0, 12)}`;
     execute("docker", [
       "build",
@@ -109,6 +123,10 @@ async function main(argv) {
     ]).stdout, "Docker image inspection");
     assert.equal(image.Config.Labels["org.opencontainers.image.revision"], sourceSha);
     assert.equal(image.Config.User, "node");
+    assert(baseImage.RootFS.Layers.length <= image.RootFS.Layers.length &&
+      baseImage.RootFS.Layers.every((layer, index) =>
+        image.RootFS.Layers[index] === layer),
+    "Built image root filesystem does not preserve the pinned base layers");
     const imageId = image.Id;
 
     const dataRoot = join(tempRoot, "evidence-root");
@@ -226,8 +244,11 @@ async function main(argv) {
       imageId,
       repoDigests,
       dockerfileSha256: createHash("sha256").update(dockerfile).digest("hex"),
-      baseImageDigest: null,
-      baseImageDigestStatus: "UNKNOWN_NOT_CAPTURED_IN_LOCAL_IMAGE_METADATA",
+      baseImageRef,
+      baseImageDigest,
+      baseImageId: baseImage.Id,
+      baseImageRepoDigests: baseImage.RepoDigests ?? [],
+      baseImageStatus: "PINNED_DIGEST_VERIFIED_AND_LAYER_ANCESTRY_MATCHED",
       disabledStatus: disabled.status,
       disabledReason: disabled.reason,
       identity: containerIdentity,
