@@ -1,16 +1,16 @@
-# Mountable paper-bot overview
+# Paper-Bot-Übersicht — technische Integration
 
-The v11 overview is an isolated, read-only UI component for three distinct
-prospective paper-bot identities: a BTC/EUR trend candidate, a separate BTC/USD
-Lives challenge, and LowVol V2. It does not replace the paired-paper comparison:
-Baseline, challenger, and cash remain arms within a single BTC/EUR run, not
-independent bots. No entrypoint, network route, authentication flow, runtime,
-deployment, or trading control is changed.
+Diese isolierte, schreibgeschützte Ansicht ist für drei getrennte Paper-Bot-
+Identitäten vorgesehen: BTC/EUR Trend, BTC/USD Lives und LowVol V2. Sie ersetzt
+nicht den gepaarten Vergleich: Baseline, Challenger und Cash sind Arme eines
+einzelnen BTC/EUR-Laufs. Die Ansicht ist vorbereitet, aber weder in Meridian
+eingehängt noch bereitgestellt. Sie greift nicht auf Konten zu und startet keine
+Bots.
 
-## Mount seam
+## Technischer Mount-Punkt
 
-Import `/home/runner/work/meridian/meridian/v11/spot-paper-bot-overview-controller.js`
-from a host and inject one sanitized report and its explicit projector per bot:
+Der Host importiert `v11/spot-paper-bot-overview-controller.js` und übergibt je
+Bot ausschließlich einen bereinigten Bericht und dessen expliziten Projektor:
 
 ```js
 import {mountSpotPaperBotOverview} from './spot-paper-bot-overview-controller.js';
@@ -27,14 +27,14 @@ overview.update(nextAdapters);
 overview.dispose();
 ```
 
-Adapter IDs are `btc-eur-trend`, `btc-usd-lives`, and `lowvol-v2`. Each projector
-must map its owning source's already-sanitized report to the view model's
-per-bot fields; the component does not guess schemas, retrieve reports, or
-provide a production fixture. A missing adapter leaves a bot unknown, except
-LowVol V2, which is explicitly shown as “In Vorbereitung” with no runtime
-metrics. That prepared placeholder is not a running state. The view imports no
-backend or network module, and a host may update or dispose it without adding
-controls.
+Adapter-IDs sind `btc-eur-trend`, `btc-usd-lives` und `lowvol-v2`. Die Projektoren
+bilden ausschließlich bereits bereinigte Quelldaten auf die unten genannten
+Ansichtsfelder ab. Die Komponente errät keine Quellformate und ruft keine Daten
+ab. Bei fehlenden Laufdaten bleiben die ersten beiden Bots unbekannt. LowVol V2
+bleibt stets „In Vorbereitung“, bis ein eigener kanonischer Adapter für das
+native USDT-M-Perpetual-Instrument und dessen Universum vorhanden ist. Bis dahin
+werden auch übergebene LowVol-Berichte nicht als Laufzeitdaten angenommen. Es
+gibt keinen Demo-Fallback.
 
 ## Adapter presentation fields
 
@@ -51,31 +51,39 @@ quantity, currency-tagged price and amount, and an optional reason. All strings
 are inserted as text, not markup. Trade quantity is labelled with the base
 asset from the validated market identity.
 
-Only `EUR` and `USD` are currently accepted. BTC/EUR and BTC/USD identity and
-currency must match their respective overview cards. A mismatch fails closed
-for that bot. Missing or invalid values remain “Unbekannt” with a reason.
-Stale or unknown freshness suppresses financial and trade details; the component
-does not calculate freshness from the machine clock.
+Für die beiden angebundenen Ansichtstypen werden nur EUR und USD akzeptiert;
+Instrument und Währung müssen jeweils zusammenpassen. Ein Widerspruch wird
+abgewiesen. Fehlende oder ungültige Werte bleiben „Unbekannt“. Veraltete oder
+unbekannt frische Daten unterdrücken Finanz- und Handelsdetails. Die Ansicht
+leitet Datenfrische nicht aus der Rechneruhr ab.
 
-The Lives card shows net-equity high-water drawdown and remaining USD 100 loss
-allowance only when its projector sets `risk.status: 'VALIDATED'`, confirms a
-USD 100 limit, and supplies nonnegative values in USD. Otherwise both remain
-unknown. The UI does not calculate either risk value.
+Die Lives-Risikowerte benötigen `risk.status: 'VALIDATED'`, das USD-100-Limit,
+Höchststand, Eigenkapital, Rückgang, verbleibenden Betrag sowie den
+Pause-Latch-Status. Die Ansicht prüft die rechnerische Übereinstimmung:
+Rückgang = Höchststand − Eigenkapital und Restbetrag = max(0, Limit − Rückgang).
+Bei erreichtem Limit muss die Pause aktiv und mit einer Beobachtungs-ID
+begründet sein. Eine ausgelöste Pause bleibt auch nach Erholung aktiv. Bei
+fehlenden oder widersprüchlichen Angaben bleiben Risikowerte unbekannt; ein
+gemeldeter Überschreitungsbetrag wird nicht abgeschnitten.
 
-Normalized curves are omitted unless all three projectors provide an
-`INITIAL_CAPITAL_INDEX_100` basis, identical explicit coverage bounds, and the
-same validated timestamps for every point. No aggregate EUR/USD amount or
-cross-horizon ranking is presented.
+Kurven werden nur mit mindestens zwei geeigneten Laufdaten verglichen. Jeder
+Kurvenpunkt muss innerhalb der gemeldeten Abdeckung liegen, zeitlich strikt
+ansteigen und beim Abdeckungsbeginn auf 100 normiert sein. Verglichene Kurven
+benötigen dieselbe Abdeckung und dieselben Zeitpunkte. Nicht geeignete Bots
+werden ausgeschlossen und benannt; unterschiedliche Horizonte werden nicht
+gerankt. Es gibt keine EUR/USD-Gesamtsumme.
 
-## Status and integration boundary
+## Projektionsfelder und Integrationsgrenze
 
-Runtime states are rendered only from the injected projector. Missing or
-invalid adapter evidence is “Unbekannt”; LowVol V2 remains “In Vorbereitung”
-until a source adapter has genuine validated runtime evidence. At present this
-is a mountable UI preparation only: no production adapters, v11 integration,
-runtime behavior, or deployment are claimed.
+Laufstatus wird nur aus geprüften, übergebenen Quelldaten angezeigt. Produkttexte
+übersetzen technische Fehlercodes in verständliche deutsche Hinweise; der Host
+behält Quellschema, Authentifizierung und Datenerhebung.
 
-Run the focused model and mobile-render tests with:
+Der vorliegende Stand ist eine mountbare UI-Vorbereitung. Es sind keine
+Produktionsadapter, keine Meridian-Einbindung, kein Laufzeitverhalten und keine
+Bereitstellung enthalten.
+
+Die fokussierten Modell- und Mobiltests laufen mit:
 
 ```sh
 node --test test/v11-spot-paper-bot-overview.test.js

@@ -16,6 +16,8 @@ export const SPOT_PAPER_BOT_DEFINITIONS = Object.freeze([
     label: 'LowVol V2',
     market: null,
     currency: null,
+    instrument: 'Perpetual-Portfolio (USDT-marginiert)',
+    nativeUnit: 'USDT',
     strategyIdentity: 'LowVol V2'
   })
 ]);
@@ -27,7 +29,7 @@ const ISO_UTC = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/;
 const MONEY_FIELDS = Object.freeze([
   ['capital', false, true],
   ['netPnl', true, false],
-  ['equity', false, true],
+  ['equity', true, false],
   ['realizedPnl', true, false],
   ['unrealizedPnl', true, false],
   ['fees', false, false],
@@ -101,49 +103,67 @@ function validateTrade(trade, currency, baseAsset) {
   };
 }
 
-function validatedRisk(risk, botId) {
+function validatedRisk(risk, botId, {
+  metricsFresh = false,
+  state = 'UNKNOWN',
+  equity = unknown('METRIC_NOT_REPORTED')
+} = {}) {
   const unavailable = reason => ({
     available: false,
     drawdown: unknown(reason),
     allowance: unknown(reason)
   });
   if (botId !== 'btc-usd-lives') return unavailable('NOT_APPLICABLE_TO_THIS_BOT');
+  if (!metricsFresh || !equity.available) {
+    return unavailable('LIVES_RISK_NOT_VALIDATED');
+  }
   if (!isRecord(risk) || risk.status !== 'VALIDATED' ||
       !isRecord(risk.lossAllowanceLimit) ||
       risk.lossAllowanceLimit.amount !== 100 ||
-      risk.lossAllowanceLimit.currency !== 'USD') {
+      risk.lossAllowanceLimit.currency !== 'USD' ||
+      typeof risk.paused !== 'boolean' ||
+      (risk.paused ?
+        typeof risk.pauseObservationId !== 'string' || risk.pauseObservationId.length === 0 :
+        risk.pauseObservationId !== null)) {
     return unavailable('LIVES_RISK_NOT_VALIDATED');
   }
+  const highWaterEquity = amountMetric(risk.highWaterEquity, 'USD', 'USD');
   const drawdown = amountMetric(risk.netEquityHighWaterDrawdown, 'USD', 'USD');
   const allowance = amountMetric(risk.remainingLossAllowance, 'USD', 'USD');
-  if (!drawdown.available || !allowance.available ||
-      allowance.value > 100) {
+  if (!highWaterEquity.available || !drawdown.available || !allowance.available ||
+      highWaterEquity.value < equity.value ||
+      Math.abs(highWaterEquity.value - equity.value - drawdown.value) > 0.005 ||
+      Math.abs(Math.max(0, 100 - drawdown.value) - allowance.value) > 0.005 ||
+      (drawdown.value >= 100 && !risk.paused) ||
+      (risk.paused && state !== 'PAUSED')) {
     return unavailable('LIVES_RISK_NOT_VALIDATED');
   }
   return {available: true, drawdown, allowance};
 }
 
 function preparedBot(definition) {
-  const metrics = Object.fromEntries(MONEY_FIELDS.map(([key]) =>
-    [key, unknown('NO_RUNTIME_EVIDENCE')]));
   return {
     ...definition,
     state: 'PREPARED',
-    stateReason: 'Noch keine Laufzeit-Evidenz.',
+    stateReason: 'LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE',
     strategy: 'LowVol V2',
     version: unknown('VERSION_NOT_REPORTED'),
-    market: unknown('MARKET_NOT_REPORTED'),
-    currency: unknown('CURRENCY_NOT_REPORTED'),
-    metrics,
-    netPnlPercent: unknown('NO_RUNTIME_EVIDENCE'),
+    market: unknown('LOWVOL_INSTRUMENT_ADAPTER_NOT_AVAILABLE'),
+    currency: unknown('LOWVOL_NATIVE_UNIT_ADAPTER_NOT_AVAILABLE'),
+    metrics: Object.fromEntries(MONEY_FIELDS.map(([key]) =>
+      [key, unknown('LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE')])),
+    netPnlPercent: unknown('LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE'),
     roundTrips: countMetric(null),
-    timeInvestedMs: unknown('NO_RUNTIME_EVIDENCE'),
-    lastTradeAt: unknown('NO_RUNTIME_EVIDENCE'),
-    freshness: {status: 'UNKNOWN', at: null, ageMs: null, reason: 'NO_RUNTIME_EVIDENCE'},
-    reason: 'LowVol V2 bleibt in Vorbereitung, bis ein validierter Runtime-Report vorliegt.',
+    timeInvestedMs: unknown('LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE'),
+    lastTradeAt: unknown('LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE'),
+    freshness: {
+      status: 'UNKNOWN', at: null, ageMs: null,
+      reason: 'LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE'
+    },
+    reason: 'LowVol V2 bleibt in Vorbereitung; die native USDT-Integration fehlt.',
     risk: validatedRisk(null, definition.id),
     trades: [],
-    tradesReason: 'NO_RUNTIME_EVIDENCE'
+    tradesReason: 'LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE'
   };
 }
 
@@ -167,7 +187,7 @@ function unknownBot(definition, reason) {
     timeInvestedMs: unknown(reason),
     lastTradeAt: unknown(reason),
     freshness: {status: 'UNKNOWN', at: null, ageMs: null, reason},
-    reason: 'Unbekannt — ' + reason,
+    reason,
     risk: validatedRisk(null, definition.id),
     trades: [],
     tradesReason: reason
@@ -175,9 +195,9 @@ function unknownBot(definition, reason) {
 }
 
 function projectBot(definition, adapter) {
+  if (definition.id === 'lowvol-v2') return preparedBot(definition);
   if (!adapter || typeof adapter.project !== 'function') {
-    return definition.id === 'lowvol-v2' ?
-      preparedBot(definition) : unknownBot(definition, 'REPORT_ADAPTER_NOT_PROVIDED');
+    return unknownBot(definition, 'REPORT_ADAPTER_NOT_PROVIDED');
   }
   let report;
   try {
@@ -259,8 +279,12 @@ function projectBot(definition, adapter) {
   const pauseReason = safeText(report.pauseReason);
   const reason = resultState === 'PAUSED' ? pauseReason :
     (resultState === 'PREPARED' || report.roundTrips === 0 || !report.lastTradeAt ?
-      noTradeReason || 'Unbekannt — NO_TRADE_REASON_NOT_REPORTED' : null);
-  const risk = validatedRisk(metricsFresh ? report.risk : null, definition.id);
+      noTradeReason || 'NO_TRADE_REASON_NOT_REPORTED' : null);
+  const risk = validatedRisk(report.risk, definition.id, {
+    metricsFresh,
+    state: resultState,
+    equity: metrics.equity
+  });
   return {
     ...definition,
     state: resultState,
@@ -281,9 +305,9 @@ function projectBot(definition, adapter) {
     lastTradeAt,
     freshness,
     reason: reason || (resultState === 'PAUSED' ?
-      'Unbekannt — PAUSE_REASON_NOT_REPORTED' :
+      'PAUSE_REASON_NOT_REPORTED' :
       resultState === 'PREPARED' ? 'Noch keine Laufzeit-Evidenz.' :
-        stateReason ? 'Unbekannt — ' + stateReason : null),
+        stateReason),
     risk,
     trades,
     tradesReason: tradesValid ? null :
@@ -293,33 +317,33 @@ function projectBot(definition, adapter) {
   };
 }
 
-function alignedCurve(bots) {
-  const unavailable = reason => ({available: false, reason, points: []});
-  if (bots.some(bot => bot.state !== 'RUNNING' && bot.state !== 'PAUSED' &&
-      bot.state !== 'COMPLETED')) {
-    return unavailable('ALL_BOTS_NEED_VALIDATED_CURVE_DATA');
-  }
-  const curves = bots.map(bot => bot.curve);
-  if (curves.some(curve => !isRecord(curve) ||
-      curve.basis !== 'INITIAL_CAPITAL_INDEX_100' ||
+function validCurve(curve) {
+  if (!isRecord(curve) || curve.basis !== 'INITIAL_CAPITAL_INDEX_100' ||
       !validTimestamp(curve.coverageStart) || !validTimestamp(curve.coverageEnd) ||
       !Array.isArray(curve.points) || curve.points.length < 2 ||
-      curve.points.length > 100)) {
-    return unavailable('CURVE_BASIS_OR_COVERAGE_NOT_VALIDATED');
-  }
-  const first = curves[0];
-  const firstStart = Date.parse(first.coverageStart);
-  const firstEnd = Date.parse(first.coverageEnd);
-  const orderedPoints = first.points.every((point, index) => {
+      curve.points.length > 100) return false;
+  const start = Date.parse(curve.coverageStart);
+  const end = Date.parse(curve.coverageEnd);
+  if (start >= end || curve.points[0]?.at !== curve.coverageStart ||
+      curve.points.at(-1)?.at !== curve.coverageEnd ||
+      curve.points[0]?.index !== 100) return false;
+  return curve.points.every((point, index) => {
+    if (!isRecord(point)) return false;
     const at = validTimestamp(point.at);
-    const value = Date.parse(point.at);
-    return at !== null && value >= firstStart && value <= firstEnd &&
+    const timestamp = Date.parse(point.at);
+    return at !== null && timestamp >= start && timestamp <= end &&
       Number.isFinite(point.index) && point.index >= 0 &&
-      (index === 0 || value > Date.parse(first.points[index - 1].at));
+      (index === 0 || timestamp > Date.parse(curve.points[index - 1].at));
   });
-  if (firstStart > firstEnd || !orderedPoints) {
-    return unavailable('CURVE_COVERAGE_INVALID');
-  }
+}
+
+function alignedCurve(bots) {
+  const unavailable = reason => ({available: false, reason, points: []});
+  const eligible = bots.filter(bot =>
+    ['RUNNING', 'PAUSED', 'COMPLETED'].includes(bot.state) && validCurve(bot.curve));
+  if (eligible.length < 2) return unavailable('CURVE_NEEDS_TWO_ELIGIBLE_BOTS');
+  const curves = eligible.map(bot => bot.curve);
+  const first = curves[0];
   const sameCoverage = curves.every(curve =>
     curve.coverageStart === first.coverageStart &&
     curve.coverageEnd === first.coverageEnd &&
@@ -327,8 +351,7 @@ function alignedCurve(bots) {
     curve.points.every((point, index) =>
       point.at === first.points[index]?.at &&
       Number.isFinite(point.index) && point.index >= 0));
-  if (!sameCoverage || !first.points.every(point =>
-    validTimestamp(point.at) && Number.isFinite(point.index) && point.index >= 0)) {
+  if (!sameCoverage) {
     return unavailable('CURVE_HORIZONS_NOT_ALIGNED');
   }
   return {
@@ -336,9 +359,11 @@ function alignedCurve(bots) {
     basis: first.basis,
     coverageStart: first.coverageStart,
     coverageEnd: first.coverageEnd,
+    botIds: eligible.map(bot => bot.id),
+    excludedBotIds: bots.filter(bot => !eligible.includes(bot)).map(bot => bot.id),
     points: first.points.map((point, index) => ({
       at: point.at,
-      values: Object.fromEntries(bots.map((bot, botIndex) =>
+      values: Object.fromEntries(eligible.map((bot, botIndex) =>
         [bot.id, curves[botIndex].points[index].index]))
     }))
   };

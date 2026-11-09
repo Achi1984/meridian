@@ -40,8 +40,11 @@ function sourceReport(id, overrides = {}) {
     risk: isLives ? {
       status: 'VALIDATED',
       lossAllowanceLimit: {amount: 100, currency: 'USD'},
+      highWaterEquity: {amount: 1000, currency: 'USD'},
       netEquityHighWaterDrawdown: {amount: 12, currency: 'USD'},
-      remainingLossAllowance: {amount: 88, currency: 'USD'}
+      remainingLossAllowance: {amount: 88, currency: 'USD'},
+      paused: false,
+      pauseObservationId: null
     } : null,
     trades: [{
       at: freshAt,
@@ -141,6 +144,8 @@ test('projects explicit sanitized adapters without combining currencies', () => 
   assert.equal(model.bots[1].risk.allowance.value, 88);
   assert.equal(model.bots[2].state, 'PREPARED');
   assert.equal(model.bots[2].metrics.netPnl.available, false);
+  assert.equal(model.bots[2].nativeUnit, 'USDT');
+  assert.equal(model.bots[2].instrument, 'Perpetual-Portfolio (USDT-marginiert)');
   assert.equal(model.curve.available, false);
 });
 
@@ -149,7 +154,7 @@ test('missing, rejected, unvalidated, stale, and mixed-currency reports fail clo
   assert.equal(missing.bots[0].state, 'UNKNOWN');
   assert.equal(missing.bots[1].state, 'UNKNOWN');
   assert.equal(missing.bots[2].state, 'PREPARED');
-  assert.equal(missing.bots[2].stateReason, 'Noch keine Laufzeit-Evidenz.');
+  assert.equal(missing.bots[2].stateReason, 'LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE');
 
   const rejected = presentSpotPaperBotOverview([
     adapter('btc-eur-trend', sourceReport('btc-eur-trend'), () => { throw Error('no'); })
@@ -184,6 +189,22 @@ test('missing, rejected, unvalidated, stale, and mixed-currency reports fail clo
   assert.equal(staleLives.bots[1].risk.available, false);
   assert.equal(staleLives.bots[1].risk.allowance.reason, 'LIVES_RISK_NOT_VALIDATED');
 
+  for (const lifecycle of ['PREPARED', 'UNKNOWN']) {
+    const nonrunningLives = presentSpotPaperBotOverview([
+      adapter('btc-usd-lives', sourceReport('btc-usd-lives', {lifecycle}))
+    ]);
+    assert.equal(nonrunningLives.bots[1].risk.available, false);
+  }
+
+  const mismatchedLives = presentSpotPaperBotOverview([
+    adapter('btc-usd-lives', sourceReport('btc-usd-lives', {
+      market: 'BTC/EUR',
+      currency: 'EUR',
+      equity: {amount: 988, currency: 'EUR'}
+    }))
+  ]);
+  assert.equal(mismatchedLives.bots[1].risk.available, false);
+
   const mixed = presentSpotPaperBotOverview([
     adapter('btc-eur-trend',
       sourceReport('btc-eur-trend', {currency: 'USD', market: 'BTC/USD'}))
@@ -193,24 +214,95 @@ test('missing, rejected, unvalidated, stale, and mixed-currency reports fail clo
   assert.equal(mixed.bots[0].currency.available, false);
 });
 
-test('only validated USD risk DTOs expose Lives loss allowance; reasons and trade details are bounded', () => {
+test('validated Lives risk is arithmetically consistent and preserves latched drawdown overshoot', () => {
   const invalidRisk = sourceReport('btc-usd-lives', {
     lifecycle: 'PAUSED',
     risk: {
       status: 'ASSERTED',
       lossAllowanceLimit: {amount: 100, currency: 'USD'},
+      highWaterEquity: {amount: 1000, currency: 'USD'},
       netEquityHighWaterDrawdown: {amount: 12, currency: 'USD'},
-      remainingLossAllowance: {amount: 88, currency: 'USD'}
+      remainingLossAllowance: {amount: 88, currency: 'USD'},
+      paused: true,
+      pauseObservationId: 'limit'
     },
-    pauseReason: '<b>exchange pause</b>'
+    pauseReason: 'Verlustlimit erreicht'
   });
   const model = presentSpotPaperBotOverview([
     adapter('btc-usd-lives', invalidRisk)
   ]);
   assert.equal(model.bots[1].risk.available, false);
   assert.equal(model.bots[1].risk.allowance.reason, 'LIVES_RISK_NOT_VALIDATED');
-  assert.equal(model.bots[1].reason, '<b>exchange pause</b>');
+  assert.equal(model.bots[1].reason, 'Verlustlimit erreicht');
   assert.equal(model.bots[1].trades.length, 1);
+
+  const inconsistent = sourceReport('btc-usd-lives', {
+    risk: {
+      status: 'VALIDATED',
+      lossAllowanceLimit: {amount: 100, currency: 'USD'},
+      highWaterEquity: {amount: 1000, currency: 'USD'},
+      netEquityHighWaterDrawdown: {amount: 12, currency: 'USD'},
+      remainingLossAllowance: {amount: 89, currency: 'USD'},
+      paused: false,
+      pauseObservationId: null
+    }
+  });
+  assert.equal(presentSpotPaperBotOverview([
+    adapter('btc-usd-lives', inconsistent)
+  ]).bots[1].risk.available, false);
+
+  const overshoot = sourceReport('btc-usd-lives', {
+    lifecycle: 'PAUSED',
+    equity: {amount: 875, currency: 'USD'},
+    netPnl: {amount: -125, currency: 'USD'},
+    netPnlPercent: {value: -12.5, basis: 'INITIAL_CAPITAL'},
+    risk: {
+      status: 'VALIDATED',
+      lossAllowanceLimit: {amount: 100, currency: 'USD'},
+      highWaterEquity: {amount: 1000, currency: 'USD'},
+      netEquityHighWaterDrawdown: {amount: 125, currency: 'USD'},
+      remainingLossAllowance: {amount: 0, currency: 'USD'},
+      paused: true,
+      pauseObservationId: 'overshoot'
+    }
+  });
+  const overshootBot = presentSpotPaperBotOverview([
+    adapter('btc-usd-lives', overshoot)
+  ]).bots[1];
+  assert.equal(overshootBot.risk.available, true);
+  assert.equal(overshootBot.risk.drawdown.value, 125);
+  assert.equal(overshootBot.risk.allowance.value, 0);
+
+  const unlatchedOvershoot = sourceReport('btc-usd-lives', {
+    equity: {amount: 875, currency: 'USD'},
+    risk: {
+      ...overshoot.risk,
+      netEquityHighWaterDrawdown: {amount: 125, currency: 'USD'},
+      remainingLossAllowance: {amount: 0, currency: 'USD'},
+      paused: false,
+      pauseObservationId: null
+    }
+  });
+  assert.equal(presentSpotPaperBotOverview([
+    adapter('btc-usd-lives', unlatchedOvershoot)
+  ]).bots[1].risk.available, false);
+
+  const recoveredLatch = sourceReport('btc-usd-lives', {
+    lifecycle: 'PAUSED',
+    equity: {amount: 1000, currency: 'USD'},
+    risk: {
+      status: 'VALIDATED',
+      lossAllowanceLimit: {amount: 100, currency: 'USD'},
+      highWaterEquity: {amount: 1000, currency: 'USD'},
+      netEquityHighWaterDrawdown: {amount: 0, currency: 'USD'},
+      remainingLossAllowance: {amount: 100, currency: 'USD'},
+      paused: true,
+      pauseObservationId: 'prior-breach'
+    }
+  });
+  assert.equal(presentSpotPaperBotOverview([
+    adapter('btc-usd-lives', recoveredLatch)
+  ]).bots[1].risk.available, true);
 
   const invalidTrade = presentSpotPaperBotOverview([
     adapter('btc-eur-trend', sourceReport('btc-eur-trend', {
@@ -224,13 +316,48 @@ test('only validated USD risk DTOs expose Lives loss allowance; reasons and trad
     adapter('btc-eur-trend', sourceReport('btc-eur-trend', {
       roundTrips: 0,
       lastTradeAt: null,
-      noTradeReason: 'No entry signal yet'
+      noTradeReason: 'Noch kein Einstiegssignal.'
     }))
   ]);
-  assert.equal(noTrade.bots[0].reason, 'No entry signal yet');
+  assert.equal(noTrade.bots[0].reason, 'Noch kein Einstiegssignal.');
 });
 
-test('normalized curves require explicit same basis and identical coverage', () => {
+test('zero and negative equity remain visible while capital stays strictly positive', () => {
+  for (const equity of [0, -25]) {
+    const report = sourceReport('btc-eur-trend', {
+      equity: {amount: equity, currency: 'EUR'}
+    });
+    const model = presentSpotPaperBotOverview([adapter('btc-eur-trend', report)]);
+    assert.equal(model.bots[0].metrics.equity.available, true);
+    assert.equal(model.bots[0].metrics.equity.value, equity);
+  }
+  const {root: zeroRoot, document: zeroDocument} = harness();
+  mountSpotPaperBotOverview(zeroRoot, {
+    adapters: [adapter('btc-eur-trend', sourceReport('btc-eur-trend', {
+      equity: {amount: 0, currency: 'EUR'}
+    }))],
+    document: zeroDocument
+  });
+  assert.match(zeroRoot.textContent, /Eigenkapital0,00\s+€/);
+  const invalidCapital = presentSpotPaperBotOverview([
+    adapter('btc-eur-trend', sourceReport('btc-eur-trend', {
+      capital: {amount: 0, currency: 'EUR'}
+    }))
+  ]);
+  assert.equal(invalidCapital.bots[0].metrics.capital.available, false);
+  const {root, document} = harness();
+  mountSpotPaperBotOverview(root, {
+    adapters: [adapter('btc-eur-trend', sourceReport('btc-eur-trend', {
+      equity: {amount: -25, currency: 'EUR'}
+    }))],
+    document
+  });
+  assert.match(root.textContent, /[-−]25,00\s+€/);
+  assert.ok(visit(root).some(item => item.className === 'tone-danger' &&
+    /[-−]25,00 €/.test(item.textContent)));
+});
+
+test('normalized curves compare eligible subsets and reject invalid coverage or normalization', () => {
   const coverage = {
     coverageStart: '2026-11-09T11:00:00.000Z',
     coverageEnd: '2026-11-09T12:00:00.000Z',
@@ -244,23 +371,26 @@ test('normalized curves require explicit same basis and identical coverage', () 
     adapter('btc-eur-trend', sourceReport('btc-eur-trend', {curve: structuredClone(coverage)})),
     adapter('btc-usd-lives', sourceReport('btc-usd-lives', {curve: structuredClone(coverage)})),
     adapter('lowvol-v2', sourceReport('lowvol-v2', {
-      strategy: 'LowVol V2',
-      market: 'BTC/EUR',
-      currency: 'EUR',
+      strategy: 'LowVol V2', market: 'BTC/EUR', currency: 'EUR',
       curve: structuredClone(coverage)
     }))
   ];
   const aligned = presentSpotPaperBotOverview(adapters);
   assert.equal(aligned.curve.available, true);
+  assert.deepEqual(aligned.curve.botIds, ['btc-eur-trend', 'btc-usd-lives']);
+  assert.deepEqual(aligned.curve.excludedBotIds, ['lowvol-v2']);
   assert.deepEqual(aligned.curve.points[1].values, {
     'btc-eur-trend': 101,
-    'btc-usd-lives': 101,
-    'lowvol-v2': 101
+    'btc-usd-lives': 101
   });
   const {root, document} = harness();
   mountSpotPaperBotOverview(root, {adapters, document});
-  assert.match(root.textContent, /Basis INITIAL_CAPITAL_INDEX_100/);
+  assert.match(root.textContent, /Auf Startkapital normiert/);
   assert.match(root.textContent, /BTC\/EUR Trend-Kandidat: 101/);
+  assert.match(root.textContent, /Nicht enthalten: LowVol V2 \(noch in Vorbereitung\)/);
+  assert.equal(aligned.bots[2].state, 'PREPARED');
+  assert.equal(aligned.bots[2].market.available, false);
+  assert.equal(aligned.bots[2].currency.available, false);
   const mismatched = presentSpotPaperBotOverview([
     adapters[0],
     adapters[1],
@@ -271,17 +401,37 @@ test('normalized curves require explicit same basis and identical coverage', () 
       curve: {...structuredClone(coverage), coverageEnd: '2026-11-09T11:59:00.000Z'}
     }))
   ]);
-  assert.equal(mismatched.curve.available, false);
-  assert.equal(mismatched.curve.reason, 'CURVE_HORIZONS_NOT_ALIGNED');
-  const reversed = presentSpotPaperBotOverview(adapters.map(item => {
-    const report = sourceReport(item.id, {
-      curve: {...structuredClone(coverage), coverageStart: coverage.coverageEnd},
-      ...(item.id === 'lowvol-v2' ? {strategy: 'LowVol V2'} : {})
-    });
-    return adapter(item.id, report);
-  }));
-  assert.equal(reversed.curve.available, false);
-  assert.equal(reversed.curve.reason, 'CURVE_COVERAGE_INVALID');
+  assert.equal(mismatched.curve.available, true);
+  assert.equal(mismatched.curve.botIds.length, 2);
+
+  const validPair = adapters.slice(0, 2);
+  for (const mutate of [
+    curve => ({...curve, coverageStart: curve.coverageEnd}),
+    curve => ({...curve, points: [{at: curve.coverageStart, index: 99}, ...curve.points.slice(1)]}),
+    curve => ({...curve, points: [curve.points[0], curve.points[0], curve.points[2]]}),
+    curve => ({...curve, points: [curve.points[0],
+      {at: '2026-11-09T12:01:00.000Z', index: 100}, curve.points[1]]})
+  ]) {
+    const invalid = presentSpotPaperBotOverview(validPair.map(item => {
+      const report = sourceReport(item.id, {
+        curve: mutate(structuredClone(coverage))
+      });
+      return adapter(item.id, report);
+    }));
+    assert.equal(invalid.curve.available, false);
+  }
+  const mismatchedPair = presentSpotPaperBotOverview([
+    validPair[0],
+    adapter('btc-usd-lives', sourceReport('btc-usd-lives', {
+      curve: {...structuredClone(coverage), coverageEnd: '2026-11-09T11:59:00.000Z',
+        points: [
+          {at: '2026-11-09T11:00:00.000Z', index: 100},
+          {at: '2026-11-09T11:59:00.000Z', index: 101}
+        ]}
+    }))
+  ]);
+  assert.equal(mismatchedPair.curve.available, false);
+  assert.equal(mismatchedPair.curve.reason, 'CURVE_HORIZONS_NOT_ALIGNED');
 });
 
 test('mount is host-controlled, accessible, collapsible, and renders signed PnL text', () => {
@@ -298,14 +448,16 @@ test('mount is host-controlled, accessible, collapsible, and renders signed PnL 
   });
   assert.equal(root.attrs.role, 'region');
   assert.ok(root.attrs['aria-labelledby']);
-  assert.match(root.textContent, /SYNTHETIC FIXTURE/);
+  assert.match(root.textContent, /Vorschau mit Testdaten/);
+  assert.match(root.textContent, /Schreibgeschützte Ansicht/);
+  assert.doesNotMatch(root.textContent, /REPORT_ADAPTER|RUNTIME_EVIDENCE|SOURCE_FRESH/);
   assert.match(root.textContent, /Paper-Bot-Übersicht/);
   assert.match(root.textContent, /BTC\/EUR/);
   assert.match(root.textContent, /BTC\/USD/);
   assert.match(root.textContent, /\+25,00\s+€/);
   assert.match(root.textContent, /Verlust/);
   assert.match(root.textContent, /88,00\s+\$/);
-  assert.match(root.textContent, /Trade-Details \(1\)/);
+  assert.match(root.textContent, /Handelsdetails \(1\)/);
   assert.match(root.textContent, /LowVol V2 bleibt in Vorbereitung/);
   assert.match(root.textContent, /<b>Loss limit reached<\/b>/);
   const nodes = visit(root);
@@ -357,10 +509,35 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
     join(tmpdir(), 'meridian-spot-paper-bot-overview-evidence');
   mkdirSync(evidence, {recursive: true});
   const source = JSON.stringify(sourceReport('btc-eur-trend'));
+  const negativeSource = JSON.stringify(sourceReport('btc-eur-trend', {
+    equity: {amount: -25, currency: 'EUR'}
+  }));
   const lives = JSON.stringify(sourceReport('btc-usd-lives'));
+  const curve = {
+    coverageStart: '2026-11-09T11:00:00.000Z',
+    coverageEnd: '2026-11-09T12:00:00.000Z',
+    basis: 'INITIAL_CAPITAL_INDEX_100',
+    points: [
+      {at: '2026-11-09T11:00:00.000Z', index: 100},
+      {at: '2026-11-09T12:00:00.000Z', index: 101}
+    ]
+  };
+  const trendCurve = JSON.stringify(sourceReport('btc-eur-trend', {curve}));
+  const livesCurve = JSON.stringify(sourceReport('btc-usd-lives', {curve}));
   try {
     for (const width of [320, 390]) {
       const metrics = await withMobileChrome(chrome, width, hosted.url, async call => {
+        const pageErrors = [];
+        call.onEvent('Runtime.exceptionThrown', () => pageErrors.push('exception'));
+        call.onEvent('Runtime.consoleAPICalled', event => {
+          if (event.type === 'error') pageErrors.push('console');
+        });
+        call.onEvent('Log.entryAdded', event => {
+          if (event.entry.level === 'error') {
+            pageErrors.push({text: event.entry.text, url: event.entry.url});
+          }
+        });
+        await call('Log.enable');
         const expression = `(async()=>{
           const project=report=>({
             state:report.lifecycle,runtimeEvidence:report.runtimeEvidence,
@@ -371,16 +548,30 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
             fees:report.fees,slippage:report.slippage,funding:report.funding,
             roundTrips:report.roundTrips,timeInvestedMs:report.timeInvestedMs,
             lastTradeAt:report.lastTradeAt,freshness:report.freshness,
-            risk:report.risk,trades:report.trades,syntheticFixture:true
+            risk:report.risk,trades:report.trades,curve:report.curve,syntheticFixture:true
           });
           const {mountSpotPaperBotOverview}=await import(
             './spot-paper-bot-overview-controller.js?v=B16-M11-FIX14');
           const root=document.createElement('section');
           document.body.replaceChildren(root);
+          mountSpotPaperBotOverview(root,{adapters:[]});
+          const emptyRendered=root.textContent.includes('Unbekannt')&&
+            root.textContent.includes('In Vorbereitung');
           mountSpotPaperBotOverview(root,{adapters:[
             {id:'btc-eur-trend',report:${source},project},
             {id:'btc-usd-lives',report:${lives},project}
           ]});
+          const validRendered=root.textContent.includes('BTC/EUR Trend-Kandidat')&&
+            root.textContent.includes('+25,00')&&root.textContent.includes('Pausiert')===false;
+          mountSpotPaperBotOverview(root,{adapters:[
+            {id:'btc-eur-trend',report:${negativeSource},project}
+          ]});
+          const negativeRendered=root.textContent.includes('Eigenkapital-25,00');
+          const curveMount=mountSpotPaperBotOverview(root,{adapters:[
+            {id:'btc-eur-trend',report:${trendCurve},project},
+            {id:'btc-usd-lives',report:${livesCurve},project}
+          ]});
+          const curveModel=curveMount.render();
           for (const disclosure of root.querySelectorAll('details')) disclosure.open=true;
           return {
             width:innerWidth,viewport:document.documentElement.clientWidth,
@@ -388,9 +579,15 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
             bodyWidth:document.body.scrollWidth,rootWidth:root.clientWidth,
             rootScrollWidth:root.scrollWidth,
             details:root.querySelectorAll('details').length,
+            emptyRendered,validRendered,negativeRendered,
+            alignedCurve:curveModel.curve.available,
+            curveBotIds:curveModel.curve.botIds,
+            curveRendered:root.textContent.includes('Auf Startkapital normiert')&&
+              root.textContent.includes('BTC/EUR Trend-Kandidat: 101')&&
+              root.textContent.includes('BTC/USD Lives-Challenge: 101'),
             hasNamedRegion:root.getAttribute('role')==='region'&&
               Boolean(root.getAttribute('aria-labelledby')),
-            synthetic:root.textContent.includes('SYNTHETIC FIXTURE'),
+            synthetic:root.textContent.includes('Vorschau mit Testdaten'),
             currencies:root.textContent.includes('EUR')&&root.textContent.includes('USD'),
             prepared:root.textContent.includes('In Vorbereitung')
           };
@@ -400,11 +597,19 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
         });
         assert.ok(!response.exceptionDetails, JSON.stringify(response.exceptionDetails));
         const result = response.result.value;
+        await new Promise(resolve => setTimeout(resolve, 50));
+        assert.deepEqual(pageErrors, []);
         assert.equal(result.width, width);
         assert.ok(result.documentWidth <= result.viewport + 1, JSON.stringify(result));
         assert.ok(result.bodyWidth <= result.viewport + 1, JSON.stringify(result));
         assert.ok(result.rootScrollWidth <= result.rootWidth + 1, JSON.stringify(result));
         assert.ok(result.details >= 4);
+        assert.equal(result.emptyRendered, true);
+        assert.equal(result.validRendered, true);
+        assert.equal(result.negativeRendered, true);
+        assert.equal(result.alignedCurve, true);
+        assert.deepEqual(result.curveBotIds, ['btc-eur-trend', 'btc-usd-lives']);
+        assert.equal(result.curveRendered, true);
         assert.equal(result.hasNamedRegion, true);
         assert.equal(result.synthetic, true);
         assert.equal(result.currencies, true);
@@ -413,6 +618,15 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
         writeFileSync(join(evidence, `bot-overview-${width}.png`),
           Buffer.from(image.data, 'base64'));
         return result;
+      }, 844, async call => {
+        await call('Page.addScriptToEvaluateOnNewDocument', {
+          source: `document.addEventListener('DOMContentLoaded',()=>{
+            if(!document.querySelector('link[rel~="icon"]')){
+              const icon=document.createElement('link');
+              icon.rel='icon';icon.href='data:,';document.head.append(icon);
+            }
+          },{once:true});`
+        });
       });
       assert.equal(metrics.width, width);
       console.log('V11_SPOT_PAPER_BOT_OVERVIEW_SIZE ' + JSON.stringify(metrics));
