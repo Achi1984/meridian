@@ -1,6 +1,9 @@
 import assert from 'node:assert/strict';
 import {before, test} from 'node:test';
 import {constants} from 'node:fs';
+import {mkdtemp, readFile, rm, stat} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join, resolve} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {createHash} from 'node:crypto';
 import {Readable} from 'node:stream';
@@ -26,6 +29,15 @@ import {
 import {
   createSpotPaperPairedProgressConnector
 } from '../v11/spot-paper-paired-progress-connector.js';
+import {
+  createSpotPaperPairedNextRunConfig, nextRunResearchSourceDigest
+} from '../scripts/spot-paper-paired/next-run-composition.mjs';
+import {
+  runSpotPaperPairedSynthetic, SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
+  SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256
+} from '../scripts/spot-paper-paired/forward.mjs';
+import * as confirmationExports from '../scripts/spot-paper-research/entry-confirmation.mjs';
+import * as trendExports from '../scripts/spot-paper-research/five-minute-trend.mjs';
 
 let exportedFixture;
 function memoryFile(bytes, {regular = true, size = bytes.length, fd = 99} = {}) {
@@ -141,8 +153,7 @@ test('publisher posts once only to approved HTTPS endpoint with redirect refusal
   assert.equal(calls, 1);
 });
 
-test('real journal export, publisher, authenticated gateway/store and browser preserve financial evidence', async () => {
-  const {identity, payload} = fixture();
+function publicationFixture(identity) {
   const token = 'progress-roundtrip-test';
   const reader = 'progress-roundtrip-reader';
   const config = spotPaperPairedProgressGatewayConfig({
@@ -162,8 +173,15 @@ test('real journal export, publisher, authenticated gateway/store and browser pr
       assert.deepEqual(JSON.parse(values[1]), identity);
       if (sql === PAIRED_PROGRESS_UPSERT_SQL) {
         writes++;
-        if (stored) return {rows: []};
-        stored = JSON.parse(values[5]);
+        const next = JSON.parse(values[5]);
+        if (stored && !(stored.journalSequence < next.journalSequence &&
+            stored.terminal.status === 'UNKNOWN' &&
+            ['observedAt', 'valuationAt', 'latestEventAt'].every(key =>
+              stored[key] <= next[key]))) return {rows: []};
+        assert.equal(values[2], next.journalSequence);
+        assert.equal(values[3], next.journalSha256);
+        assert.equal(values[4], next.terminal.status);
+        stored = next;
       }
       return {rows: stored ? [{payload: structuredClone(stored)}] : []};
     }
@@ -180,6 +198,13 @@ test('real journal export, publisher, authenticated gateway/store and browser pr
     if (options.method === 'POST') receipts.push(reply.body);
     return jsonResponse(reply.body, reply.status);
   };
+  return {token, reader, fetchImpl, receipts, get writes() { return writes; }};
+}
+
+test('real journal export, publisher, authenticated gateway/store and browser preserve financial evidence', async () => {
+  const {identity, payload} = fixture();
+  const pipeline = publicationFixture(identity);
+  const {token, reader, fetchImpl, receipts} = pipeline;
   assert.deepEqual(await publishProgress(payload, {
     expectedIdentity: identity, enabled: true, token, fetchImpl
   }), {status: 'PUBLISHED'});
@@ -188,7 +213,7 @@ test('real journal export, publisher, authenticated gateway/store and browser pr
   }), {status: 'PUBLISHED'});
   assert.deepEqual(receipts[0], receipt(payload));
   assert.deepEqual(receipts[1], receipt(payload));
-  assert.equal(writes, 2, 'each explicit publish makes one store attempt with no retry');
+  assert.equal(pipeline.writes, 2, 'each explicit publish makes one store attempt with no retry');
   assert.equal((await fetchImpl(PROGRESS_ENDPOINT, {
     method: 'GET', headers: {authorization: 'Bearer ' + token}
   })).status, 401, 'publisher credential cannot read private progress');
@@ -211,6 +236,225 @@ test('real journal export, publisher, authenticated gateway/store and browser pr
   assert.equal(read.progress.arms[0].completedRoundTripCount, 1);
   instance.dispose();
 });
+
+test('actual next-run producer checkpoints and terminal journal traverse the private progress pipeline',
+  {timeout: 20_000}, async t => {
+    const dataRoot = await mkdtemp(join(tmpdir(), 'paired-progress-producer-'));
+    const paused = deferred();
+    const resume = deferred();
+    const abort = new AbortController();
+    const deadline = setTimeout(() => {
+      abort.abort(new Error('PRODUCER_TEST_DEADLINE'));
+      resume.resolve();
+    }, 10_000);
+    const bounded = async promise => {
+      let timer;
+      try {
+        return await Promise.race([promise, new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error('PRODUCER_GATE_DEADLINE')), 5_000);
+        })]);
+      } finally {
+        clearTimeout(timer);
+      }
+    };
+    const minute = 60_000;
+    const base = Date.UTC(2025, 0, 1);
+    let wall = base + 105 * minute + 1_000;
+    let monotonic = 100;
+    let cycles = 0;
+    const counters = {requests: 0, bytes: 0};
+    const candle = index => index < 105 ? 100 :
+      index === 105 ? 120 : index === 106 ? 130 : 80;
+    const row = index => {
+      const close = `${candle(index)}.00000000`;
+      return [(base + index * minute) / 1000,
+        close, close, close, close, close, '1.00000000', 1];
+    };
+    const response = data => {
+      counters.requests++;
+      const requestStartedAt = wall + 1;
+      const receivedAt = requestStartedAt + 1;
+      const raw = JSON.stringify(data);
+      const bytes = Buffer.byteLength(raw);
+      counters.bytes += bytes;
+      wall = receivedAt;
+      return {data, raw, bytes, requestStartedAt, receivedAt,
+        sha256: createHash('sha256').update(raw).digest('hex')};
+    };
+    const provider = {
+      sourceId: SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
+      async fetchOhlc() {
+        cycles++;
+        const rows = Array.from({length: 105 + cycles}, (_, index) => row(index));
+        return response({error: [], result: {XXBTZEUR: rows, last: rows.at(-1)[0]}});
+      },
+      async fetchTicker() {
+        return response({error: [], result: {XXBTZEUR: {
+          a: [cycles === 4 ? '29001.00000000' : '30001.00000000', '1', '1.00000000'],
+          b: [cycles === 4 ? '29000.00000000' : '29999.00000000', '1', '1.00000000']
+        }}});
+      },
+      counters: () => ({...counters})
+    };
+    let producer;
+    let browser;
+    try {
+      const [comparisonBytes, entryConfirmationBytes, fiveMinuteTrendBytes] =
+        await Promise.all(['comparison', 'entry-confirmation', 'five-minute-trend'].map(name =>
+          readFile(new URL(`../scripts/spot-paper-research/${name}.mjs`, import.meta.url))));
+      const researchSourceSha256 = nextRunResearchSourceDigest({
+        comparisonBytes, entryConfirmationBytes, fiveMinuteTrendBytes
+      });
+      assert.equal(researchSourceSha256,
+        SPOT_PAPER_PAIRED_NEXT_RUN_ACCEPTED_RESEARCH_SOURCE_SHA256);
+      const config = createSpotPaperPairedNextRunConfig({
+        runId: 'progress-real-next-run', dataRoot, sourceSha256: 'a'.repeat(64),
+        researchSourceSha256, provider, confirmationExports, trendExports,
+        accountIds: {baseline: 'progress-confirm2', challenger: 'progress-trend',
+          cash: 'progress-cash'},
+        maxCycles: 4, maxRequests: 8, maxDurationMs: 4 * minute,
+        pollIntervalMs: minute, signal: abort.signal,
+        now: () => wall++, monotonicNow: () => monotonic,
+        sleep: async duration => {
+          if (cycles === 3) {
+            paused.resolve();
+            await bounded(resume.promise);
+          }
+          wall += duration;
+          monotonic += duration;
+        }
+      });
+      const identity = {
+        schemaVersion: 'SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1',
+        runId: config.runId, pair: 'BTC/EUR', sourceSha256: config.sourceSha256,
+        configSha256: config.configSha256,
+        researchSourceSha256: config.researchSourceSha256,
+        feedSourceId: provider.sourceId, comparisonEngineId: config.comparisonEngine.id,
+        modelPairId: config.modelPair.id,
+        models: config.arms.map(({role, modelId, accountId}) => ({role, modelId, accountId}))
+      };
+      const runDirectory = join(dataRoot, config.runId);
+      const journalPath = join(runDirectory, 'journal.json');
+      const pipeline = publicationFixture(identity);
+      let browserNow;
+      browser = createSpotPaperPairedProgressConnector({
+        enabled: true, expectedIdentity: identity, now: () => browserNow,
+        staleAfterMs: 61_000,
+        transport: ({signal}) => pipeline.fetchImpl(PROGRESS_ENDPOINT, {
+          method: 'GET', headers: {authorization: 'Bearer ' + pipeline.reader}, signal
+        })
+      });
+      const exportAndPublish = async terminal => {
+        const lockPath = join(runDirectory, 'writer.lock');
+        if (terminal) await assert.rejects(stat(lockPath), {code: 'ENOENT'});
+        else assert.ok((await stat(lockPath)).isFile(),
+          'acknowledged checkpoint remains exportable while its producer owns the writer lock');
+        const bytes = await readFile(journalPath);
+        const journal = JSON.parse(bytes).payload;
+        const observations = journal.events.filter(event => event.type === 'shared_observation');
+        const last = observations.at(-1);
+        assert.equal(observations.length, terminal ? 4 : 3);
+        assert.equal(journal.events.at(-1).type, terminal ? 'terminal' : 'shared_observation');
+        const exportedAt = wall + minute;
+        const exported = await exportProgress({
+          runDirectory, expectedIdentity: identity, now: () => exportedAt
+        });
+        assert.equal(exported.status, 'EXPORTED');
+        const payload = exported.progress;
+        assert.equal(payload.classification, 'OBSERVED_CHECKPOINT');
+        assert.equal(payload.terminal.status, terminal ? 'TERMINAL_RECORDED' : 'UNKNOWN');
+        assert.equal(payload.journalSequence, journal.sequence);
+        assert.equal(payload.journalSha256, createHash('sha256')
+          .update(JSON.stringify(journal)).digest('hex'));
+        assert.equal(payload.valuationAt, last.effectAt);
+        assert.equal(payload.observedAt, last.observedAt);
+        assert.ok(exportedAt > payload.latestEventAt);
+        browserNow = exportedAt + 1_000;
+        assert.deepEqual(await publishProgress(payload, {
+          expectedIdentity: identity, enabled: true,
+          token: pipeline.token, fetchImpl: pipeline.fetchImpl
+        }), {status: 'PUBLISHED'});
+        const read = await browser.read();
+        assert.equal(read.status, 'STALE');
+        assert.deepEqual(read.progress, payload);
+        assert.equal(read.ageMs, browserNow - last.effectAt);
+        assert.equal(read.ageMs, terminal ? 61_002 : 61_001);
+        assert.ok(read.ageMs > browserNow - payload.exportedAt);
+        if (terminal) {
+          assert.ok(payload.terminal.at > last.effectAt);
+          assert.equal(payload.latestEventAt, payload.terminal.at);
+          assert.ok(read.ageMs > browserNow - payload.terminal.at);
+        }
+        for (const [index, arm] of payload.arms.entries()) {
+          const valuation = last.valuations[index];
+          const fills = observations.flatMap(event => event.fills[index].fills);
+          assert.equal(arm.netEquityCents, valuation.netEquityCents);
+          assert.equal(arm.netPnlCents, valuation.netEquityCents - arm.startingCapitalCents);
+          assert.equal(arm.bookedFeesCents, valuation.feesCents);
+          assert.equal(arm.modeledSlippageCents, valuation.slippageCents);
+          assert.equal(arm.bookedFeesCents + arm.modeledSlippageCents,
+            valuation.modeledCostsCents);
+          assert.equal(arm.fillCount, fills.length);
+          assert.equal(arm.completedRoundTripCount, Math.floor(fills.length / 2));
+          assert.deepEqual(arm.recentFills, observations.flatMap(event =>
+            event.fills[index].fills.map(fill => ({
+              side: fill.side, grossCents: fill.grossCents, feeCents: fill.feeCents,
+              executionAt: event.effectAt
+            }))));
+        }
+        const baseline = payload.arms[0];
+        assert.ok(baseline.bookedFeesCents > 0);
+        assert.ok(baseline.modeledSlippageCents > 0);
+        assert.equal(baseline.bookedFeesCents, terminal ? 39 : 20);
+        assert.equal(baseline.modeledSlippageCents, terminal ? 20 : 10);
+        assert.equal(baseline.netEquityCents, terminal ? 99_609 : 99_940);
+        assert.equal(baseline.netPnlCents, terminal ? -391 : -60);
+        assert.equal(baseline.fillCount, terminal ? 2 : 1);
+        assert.equal(baseline.completedRoundTripCount, terminal ? 1 : 0);
+        assert.equal(baseline.recentFills.length, terminal ? 2 : 1);
+        assert.notEqual(baseline.netPnlCents, baseline.netEquityCents -
+          baseline.startingCapitalCents - baseline.bookedFeesCents -
+          baseline.modeledSlippageCents);
+        assert.deepEqual(await readFile(journalPath), bytes,
+          'export, upload, store and browser read must leave actual journal bytes untouched');
+        if (terminal) await assert.rejects(stat(lockPath), {code: 'ENOENT'});
+        else assert.ok((await stat(lockPath)).isFile());
+        t.diagnostic(JSON.stringify({terminal: payload.terminal.status,
+          classification: payload.classification, browserStatus: read.status, ageMs: read.ageMs,
+          valuationAt: payload.valuationAt, terminalAt: payload.terminal.at,
+          exportedAt, baseline: {bookedFeesCents: baseline.bookedFeesCents,
+            modeledSlippageCents: baseline.modeledSlippageCents,
+            netEquityCents: baseline.netEquityCents, netPnlCents: baseline.netPnlCents,
+            fillCount: baseline.fillCount,
+            completedRoundTripCount: baseline.completedRoundTripCount}}));
+        return payload;
+      };
+      producer = runSpotPaperPairedSynthetic(config);
+      await bounded(Promise.race([paused.promise, producer.then(() => {
+        throw new Error('PRODUCER_DID_NOT_PAUSE');
+      })]));
+      const checkpoint = await exportAndPublish(false);
+      assert.equal((await pipeline.fetchImpl(PROGRESS_ENDPOINT, {
+        method: 'GET', headers: {authorization: 'Bearer ' + pipeline.token}
+      })).status, 401, 'upload credential cannot read the real producer checkpoint');
+      resume.resolve();
+      const report = await bounded(producer);
+      assert.equal(report.outcome, 'COMPLETED_BOUNDED');
+      assert.equal(report.cycles, 4);
+      const terminal = await exportAndPublish(true);
+      assert.ok(terminal.journalSequence > checkpoint.journalSequence);
+      assert.notEqual(terminal.journalSha256, checkpoint.journalSha256);
+      assert.equal(pipeline.writes, 2, 'terminal advances the same identity through real store.put');
+      assert.deepEqual(pipeline.receipts, [receipt(checkpoint), receipt(terminal)]);
+    } finally {
+      resume.resolve();
+      abort.abort(new Error('PRODUCER_TEST_CLEANUP'));
+      if (producer) await producer.catch(() => {});
+      browser?.dispose();
+      clearTimeout(deadline);
+      await rm(dataRoot, {recursive: true, force: true});
+    }
+  });
 
 test('publisher accepts only the exact four-key versioned ACCEPTED receipt', async () => {
   const {identity, payload} = fixture();
