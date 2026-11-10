@@ -1,4 +1,4 @@
-import {renderSpotPaperPaired} from './spot-paper-paired-view.js?v=B16-M11-FIX15';
+import {renderSpotPaperPaired} from './spot-paper-paired-view.js?v=B16-M11-FIX16';
 
 export function mountSpotPaperPairedPanel(root, {
   dto = null,

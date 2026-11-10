@@ -35,7 +35,15 @@ test('release identity requires exactly five coherent approved local entries',()
 });
 
 test('served index is recognized without a second manually maintained version manifest',()=>{
-  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B16-M11-FIX15');
+  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B16-M11-FIX16');
+});
+
+test('a loaded FIX15 page detects and applies the served FIX16 release',async()=>{
+  const index=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
+  const f=fixture({currentRelease:'B16-M11-FIX15',
+    fetchImpl:async()=>new Response(index,{headers:{'content-type':'text/html; charset=utf-8'}})});
+  await f.update.check();
+  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B16-M11-FIX16#view-bots']);
 });
 
 test('locked safe tab checks only public HTML without credentials and reloads a newer release once',async()=>{

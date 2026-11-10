@@ -1,4 +1,4 @@
-import {presentSpotPaperBotOverview} from './spot-paper-bot-overview-model.js?v=B16-M11-FIX15';
+import {presentSpotPaperBotOverview} from './spot-paper-bot-overview-model.js?v=B16-M11-FIX16';
 
 const STATE_LABELS = Object.freeze({
   PREPARED: 'In Vorbereitung',
