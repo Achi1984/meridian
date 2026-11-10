@@ -11,6 +11,7 @@ import {
 const TREND_MODEL = 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1';
 const messages = Object.freeze({
   locked: 'Gesperrt. Vor dem Abruf den App-Zugang öffnen.',
+  authentication_failed: 'Authentifizierung fehlgeschlagen. Bitte App-Zugang erneut öffnen.',
   ready: 'Kein Bot-Bericht abgerufen. Der Abruf erfolgt nur nach manueller Auswahl.',
   loading: 'Der bestehende BTC/EUR-Bericht wird einmalig gelesen.',
   available: 'Der bestehende Bericht ist authentifiziert, belegt aber nicht die 5-Minuten-Trend-Identität.',
@@ -19,6 +20,7 @@ const messages = Object.freeze({
 });
 const pairedMessages = Object.freeze({
   locked: 'Gesperrt. Vor dem Abruf den App-Zugang öffnen.',
+  authentication_failed: 'Authentifizierung fehlgeschlagen. Bitte App-Zugang erneut öffnen.',
   ready: 'Kein gepaarter Bericht abgerufen; Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt.',
   loading: 'Der gepaarte BTC/EUR-Bericht wird einmalig gelesen.',
   available: 'Gepaarter Bericht geladen; Identitäten und Kennzahlen stammen aus dem validierten DTO.',
@@ -129,6 +131,7 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
   let pairedGeneration = 0;
   let requestOwner = null;
   let pairedRequestOwner = null;
+  let authenticationFailed = false;
 
   function render() {
     if (disposed) return;
@@ -138,7 +141,7 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     pairedRefresh.disabled = !enabled || !active || !access.isUnlocked() || pairedReading;
     pairedRefresh.setAttribute('aria-busy', String(pairedReading));
     pairedStateNode.textContent = pairedMessages[pairedState] || pairedMessages.unavailable;
-    overview.update(report ? [sourceAdapter(report)] : []);
+    overview.update(report ? [sourceAdapter(report)] : [], pairedReport);
     paired.setLoading(pairedReading);
     paired.render(pairedReport, pairedState);
   }
@@ -154,8 +157,10 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     pairedRequestOwner = null;
     if (connector && !connector.isDisposed()) connector.dispose();
     if (pairedConnector && !pairedConnector.isDisposed()) pairedConnector.dispose();
-    state = enabled && active ? (access.isUnlocked() ? 'ready' : 'locked') : 'missing';
-    pairedState = enabled && active ? (access.isUnlocked() ? 'ready' : 'locked') :
+    state = authenticationFailed ? 'authentication_failed' :
+      enabled && active ? (access.isUnlocked() ? 'ready' : 'locked') : 'missing';
+    pairedState = authenticationFailed ? 'authentication_failed' :
+      enabled && active ? (access.isUnlocked() ? 'ready' : 'locked') :
       'transport_unavailable';
     render();
   }
@@ -186,7 +191,10 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
         signal
       }).then(response => {
         if ((response.status === 401 || response.status === 403) &&
-            owns(owner, signal)) access.lock();
+            owns(owner, signal)) {
+          authenticationFailed = true;
+          access.lock();
+        }
         return response;
       });
     };
@@ -224,6 +232,7 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
       if (!ownsRequest(owner) || !access.isUnlocked()) return;
       reading = false;
       if (result.status === 'AUTH_REQUIRED') {
+        authenticationFailed = true;
         access.lock();
         return;
       }
@@ -278,6 +287,7 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
       if (!ownsPairedRequest(owner) || !access.isUnlocked()) return;
       pairedReading = false;
       if (result.status === 'AUTH_REQUIRED') {
+        authenticationFailed = true;
         access.lock();
         return;
       }
@@ -316,10 +326,14 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     if (disposed) return;
     if (change?.status === 'locked' || change?.status === 'checking') {
       clearPrivate();
-    } else if (change?.status === 'unlocked' && !report) {
+    } else if (change?.status === 'unlocked') {
+      authenticationFailed = false;
       state = enabled ? 'ready' : 'missing';
       pairedState = enabled ? 'ready' : 'transport_unavailable';
       render();
+      if (active && enabled && !pairedReport && !pairedReading) {
+        void readPaired();
+      }
     }
   });
   render();
@@ -336,6 +350,7 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
         pairedState = enabled ? (access.isUnlocked() ? 'ready' : 'locked') :
           'transport_unavailable';
         render();
+        if (enabled && access.isUnlocked() && !pairedReport) void readPaired();
       }
     },
     refresh: read,

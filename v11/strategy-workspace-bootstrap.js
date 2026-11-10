@@ -17,6 +17,7 @@ let paperBotReportWorkspace = null;
 if(catalogRoot?.parentNode){
   const workspace=catalogRoot.parentNode;
   const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
+  botReports.open=true;
   const botOverviewRoot=document.createElement('section');
   botOverviewRoot.id='paper-bot-overview-root';
   botReports.append(botOverviewRoot);

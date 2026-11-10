@@ -1,3 +1,9 @@
+import {
+  projectSpotPaperPairedDashboard,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
+  SPOT_PAPER_PAIRED_NEXT_RUN_MODELS
+} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX14';
+
 export const SPOT_PAPER_BOT_DEFINITIONS = Object.freeze([
   Object.freeze({
     id: 'btc-eur-trend',
@@ -317,6 +323,80 @@ function projectBot(definition, adapter) {
   };
 }
 
+function pairedSnapshotBot(input) {
+  let report;
+  try {
+    report = projectSpotPaperPairedDashboard(input);
+  } catch {
+    report = null;
+  }
+  const definition = SPOT_PAPER_BOT_DEFINITIONS[0];
+  if (!isRecord(report)) return unknownBot(definition, 'PAIRED_REPORT_NOT_VALIDATED');
+  const challenger = report.arms.challenger;
+  const trendModel = SPOT_PAPER_PAIRED_NEXT_RUN_MODELS[1];
+  if (report.identity.pair !== 'BTC/EUR' ||
+      report.identity.modelPairId !== SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR ||
+      report.identity.models[1]?.modelId !== trendModel ||
+      challenger.modelId !== trendModel) {
+    return unknownBot(definition, 'PAIRED_REPORT_IDENTITY_NOT_SUPPORTED');
+  }
+  if (report.evidenceStatus === 'CORRUPT_UNKNOWN') {
+    return unknownBot(definition, 'PAIRED_REPORT_EVIDENCE_UNKNOWN');
+  }
+
+  const snapshotMetric = (cents, reason) => {
+    if (cents === null) return unknown(reason || 'METRIC_MISSING');
+    return {available: true, value: cents / 100, currency: 'EUR', reason: null};
+  };
+  const unknownHistorical = unknown('REPORT_SNAPSHOT_HISTORICAL');
+  return {
+    ...definition,
+    state: 'UNKNOWN',
+    stateReason: 'REPORT_SNAPSHOT_HISTORICAL',
+    strategy: trendModel,
+    version: unknown('VERSION_NOT_REPORTED'),
+    market: {available: true, value: 'BTC/EUR', reason: null},
+    currency: {available: true, value: 'EUR', reason: null},
+    metrics: {
+      capital: unknown('METRIC_NOT_REPORTED'),
+      netPnl: snapshotMetric(challenger.netPnlCents,
+        challenger.metricReasons.netPnlCents),
+      equity: snapshotMetric(challenger.netEquityCents,
+        challenger.metricReasons.netEquityCents),
+      realizedPnl: unknownHistorical,
+      unrealizedPnl: unknownHistorical,
+      fees: snapshotMetric(challenger.bookedFeesCents,
+        challenger.metricReasons.bookedFeesCents),
+      slippage: snapshotMetric(challenger.modeledSlippageCents,
+        challenger.metricReasons.modeledSlippageCents),
+      funding: unknownHistorical
+    },
+    netPnlPercent: unknownHistorical,
+    roundTrips: unknown('ROUND_TRIPS_NOT_REPORTED'),
+    timeInvestedMs: unknownHistorical,
+    lastTradeAt: unknownHistorical,
+    freshness: {
+      status: 'UNKNOWN',
+      at: null,
+      ageMs: null,
+      reason: 'REPORT_SNAPSHOT_HISTORICAL'
+    },
+    reason: 'REPORT_SNAPSHOT_HISTORICAL',
+    risk: validatedRisk(null, definition.id),
+    trades: [],
+    tradesReason: 'TRADE_DETAILS_NOT_REPORTED',
+    syntheticFixture: report.syntheticFixture,
+    reportSnapshot: {
+      runId: report.identity.runId,
+      valuationAt: report.timing.valuationAt,
+      evidenceStatus: report.evidenceStatus,
+      feeBpsPerSide: report.assumptions.feeBpsPerSide,
+      slippageBpsPerSide: report.assumptions.slippageBpsPerSide,
+      ratesVerified: report.assumptions.ratesVerified
+    }
+  };
+}
+
 function validCurve(curve) {
   if (!isRecord(curve) || curve.basis !== 'INITIAL_CAPITAL_INDEX_100' ||
       !validTimestamp(curve.coverageStart) || !validTimestamp(curve.coverageEnd) ||
@@ -369,7 +449,7 @@ function alignedCurve(bots) {
   };
 }
 
-export function presentSpotPaperBotOverview(adapters = []) {
+export function presentSpotPaperBotOverview(adapters = [], {pairedReport = null} = {}) {
   if (!Array.isArray(adapters) || adapters.length > SPOT_PAPER_BOT_DEFINITIONS.length) {
     return {
       bots: SPOT_PAPER_BOT_DEFINITIONS.map(definition =>
@@ -393,5 +473,8 @@ export function presentSpotPaperBotOverview(adapters = []) {
   }
   const bots = SPOT_PAPER_BOT_DEFINITIONS.map(definition =>
     projectBot(definition, byId.get(definition.id)));
+  if (pairedReport !== null && pairedReport !== undefined) {
+    bots[0] = pairedSnapshotBot(pairedReport);
+  }
   return {bots, curve: alignedCurve(bots)};
 }

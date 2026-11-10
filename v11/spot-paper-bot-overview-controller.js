@@ -2,23 +2,28 @@ import {renderSpotPaperBotOverview} from './spot-paper-bot-overview-view.js?v=B1
 
 export function mountSpotPaperBotOverview(root, {
   adapters = [],
+  pairedReport = null,
   document = root?.ownerDocument
 } = {}) {
   if (!root || !document) throw new TypeError('Paper bot overview container is required');
   let currentAdapters = adapters;
+  let currentPairedReport = pairedReport;
   let disposed = false;
 
-  function render(nextAdapters = currentAdapters) {
+  function render(nextAdapters = currentAdapters, nextPairedReport = currentPairedReport) {
     if (disposed) return null;
     currentAdapters = nextAdapters;
-    return renderSpotPaperBotOverview(root, currentAdapters, document);
+    currentPairedReport = nextPairedReport;
+    return renderSpotPaperBotOverview(root, currentAdapters, document, {
+      pairedReport: currentPairedReport
+    });
   }
 
   render();
   return Object.freeze({
     render,
-    update(nextAdapters) {
-      return render(nextAdapters);
+    update(nextAdapters, nextPairedReport) {
+      return render(nextAdapters, nextPairedReport);
     },
     dispose() {
       if (disposed) return;

@@ -9,6 +9,10 @@ import {withMobileChrome} from './helpers/v11-cdp.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {presentSpotPaperBotOverview} from '../v11/spot-paper-bot-overview-model.js';
 import {mountSpotPaperBotOverview} from '../v11/spot-paper-bot-overview-controller.js';
+import {
+  syntheticExpectedPairedIdentity,
+  syntheticPairedDashboard
+} from './helpers/spot-paper-paired-dashboard-fixture.mjs';
 
 const freshAt = '2026-11-09T12:00:00.000Z';
 
@@ -91,6 +95,38 @@ function projectSource(report) {
 
 function adapter(id, report, project = projectSource) {
   return {id, report, project};
+}
+
+function pairedSnapshot({modelPair = true, evidenceStatus = 'RUNNING_SNAPSHOT',
+  netPnlCents = -357, netEquityCents = 99_525, bookedFeesCents = 350,
+  modeledSlippageCents = 40} = {}) {
+  const report = syntheticPairedDashboard(
+    syntheticExpectedPairedIdentity({modelPair}));
+  report.evidenceStatus = evidenceStatus;
+  report.timing.valuationAt = Date.parse(freshAt);
+  if (evidenceStatus === 'INTERRUPTED') {
+    report.timing.actualElapsedMs = 1_000;
+    report.timing.observedCoverageMs = 1_000;
+    report.trendActivityDiagnostic = {
+      schemaVersion: 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1',
+      status: 'PARTIAL_COVERAGE',
+      completedRoundTripCount: 0,
+      requiredCompletedRoundTrips: 5,
+      observedCoverageMs: 1_000,
+      requiredCoverageMs: 86_400_000,
+      completeWindow: false,
+      forcedTrades: false,
+      deadlineExtensionAllowed: false,
+      profitability: 'NOT_ASSESSED'
+    };
+  }
+  const challenger = report.arms.challenger;
+  challenger.netPnlCents = netPnlCents;
+  challenger.netEquityCents = netEquityCents;
+  challenger.bookedFeesCents = bookedFeesCents;
+  challenger.modeledSlippageCents = modeledSlippageCents;
+  challenger.fillCount = 7;
+  return report;
 }
 
 class Element {
@@ -386,6 +422,88 @@ test('zero and negative equity remain visible while capital stays strictly posit
   assert.match(root.textContent, /[-−]25,00\s+€/);
   assert.ok(visit(root).some(item => item.className === 'tone-danger' &&
     /[-−]25,00 €/.test(item.textContent)));
+});
+
+test('paired challenger snapshot maps historical EUR metrics without inventing runtime or trades', () => {
+  const report = pairedSnapshot();
+  const model = presentSpotPaperBotOverview([], {pairedReport: report});
+  const eur = model.bots[0];
+  assert.equal(eur.state, 'UNKNOWN');
+  assert.equal(eur.stateReason, 'REPORT_SNAPSHOT_HISTORICAL');
+  assert.equal(eur.freshness.status, 'UNKNOWN');
+  assert.equal(eur.metrics.netPnl.value, -3.57);
+  assert.equal(eur.metrics.equity.value, 995.25);
+  assert.equal(eur.metrics.fees.value, 3.5);
+  assert.equal(eur.metrics.slippage.value, 0.4);
+  assert.equal(eur.strategy, 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1');
+  assert.equal(eur.reportSnapshot.runId, 'paired-synthetic-test-only');
+  assert.equal(eur.reportSnapshot.valuationAt, Date.parse(freshAt));
+  assert.equal(eur.roundTrips.available, false);
+  assert.equal(eur.timeInvestedMs.available, false);
+  assert.equal(eur.lastTradeAt.available, false);
+  assert.equal(eur.trades.length, 0);
+
+  const {root, document} = harness();
+  const mounted = mountSpotPaperBotOverview(root, {pairedReport: report, document});
+  assert.match(root.textContent, /Historischer Snapshot/);
+  assert.match(root.textContent, /−3,57\s+€/);
+  assert.match(root.textContent, /995,25\s+€/);
+  assert.match(root.textContent, /3,50\s+€/);
+  assert.match(root.textContent, /0,40\s+€/);
+  assert.match(root.textContent, /paired-synthetic-test-only/);
+  assert.match(root.textContent, /Historischer Bericht-Snapshot; kein aktueller Laufstatus/);
+  assert.doesNotMatch(root.textContent, /Läuft · Aktuell/);
+
+  const eurCard = visit(root).find(item =>
+    item.spotPaperDisclosureKey === 'card:btc-eur-trend');
+  eurCard.open = true;
+  const usdCard = visit(root).find(item =>
+    item.spotPaperDisclosureKey === 'card:btc-usd-lives');
+  usdCard.open = true;
+  mounted.update([], {...report, reasonCode: 'REFRESHED'});
+  const refreshed = visit(root);
+  assert.equal(refreshed.find(item =>
+    item.spotPaperDisclosureKey === 'card:btc-eur-trend').open, true);
+  assert.equal(refreshed.find(item =>
+    item.spotPaperDisclosureKey === 'card:btc-usd-lives').open, true);
+  mounted.dispose();
+});
+
+test('paired snapshot rejects wrong identity and corrupt evidence, while null, zero and negative values stay honest', () => {
+  const wrongIdentity = presentSpotPaperBotOverview([], {
+    pairedReport: pairedSnapshot({modelPair: false})
+  }).bots[0];
+  assert.equal(wrongIdentity.state, 'UNKNOWN');
+  assert.equal(wrongIdentity.metrics.netPnl.available, false);
+
+  const missingMetrics = presentSpotPaperBotOverview([], {
+    pairedReport: pairedSnapshot({
+      netPnlCents: null, netEquityCents: null,
+      bookedFeesCents: null, modeledSlippageCents: null
+    })
+  }).bots[0];
+  assert.equal(missingMetrics.metrics.netPnl.available, false);
+  assert.equal(missingMetrics.metrics.equity.available, false);
+  assert.equal(missingMetrics.metrics.fees.available, false);
+  assert.equal(missingMetrics.metrics.slippage.available, false);
+
+  const historical = presentSpotPaperBotOverview([], {
+    pairedReport: pairedSnapshot({
+      evidenceStatus: 'INTERRUPTED', netPnlCents: 0, netEquityCents: 0,
+      bookedFeesCents: 0, modeledSlippageCents: 0
+    })
+  }).bots[0];
+  assert.equal(historical.state, 'UNKNOWN');
+  assert.equal(historical.freshness.status, 'UNKNOWN');
+  assert.equal(historical.metrics.netPnl.value, 0);
+  assert.equal(historical.metrics.equity.value, 0);
+  assert.equal(historical.metrics.fees.value, 0);
+  assert.equal(historical.metrics.slippage.value, 0);
+
+  const corrupt = presentSpotPaperBotOverview([], {
+    pairedReport: pairedSnapshot({evidenceStatus: 'CORRUPT_UNKNOWN'})
+  }).bots[0];
+  assert.equal(corrupt.metrics.netPnl.available, false);
 });
 
 test('normalized curves compare eligible subsets and reject invalid coverage or normalization', () => {
