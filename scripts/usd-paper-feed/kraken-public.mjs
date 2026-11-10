@@ -87,7 +87,7 @@ function parseTicker(data) {
   return { bid: ticker.b[0], ask: ticker.a[0] };
 }
 
-function parseClosedMinute(data, receivedAtMs) {
+function parseClosedCandles(data, receivedAtMs) {
   const result = resultObject(data, "OHLC");
   const rows = nativePair(result, "OHLC", true);
   if (!Array.isArray(rows) || rows.length < 1 || !Number.isSafeInteger(result.last) ||
@@ -95,7 +95,7 @@ function parseClosedMinute(data, receivedAtMs) {
     throw new Error("INVALID_OHLC_SCHEMA");
   }
   let previousAtMs = null;
-  const closed = [];
+  const candles = [];
   for (const row of rows) {
     if (!Array.isArray(row) || row.length !== 8 ||
         !Number.isSafeInteger(row[0]) || row[0] < 0) {
@@ -120,15 +120,24 @@ function parseClosedMinute(data, receivedAtMs) {
         (volume === 0n && vwap !== 0n && (vwap < low || vwap > high))) {
       throw new Error("INVALID_OHLC_VALUES");
     }
-    if (timestamp + 60_000 <= receivedAtMs) closed.push(timestamp);
+    if (timestamp + 60_000 <= receivedAtMs) {
+      candles.push(Object.freeze({
+        timestamp,
+        open: row[1],
+        high: row[2],
+        low: row[3],
+        close: row[4],
+        closeNano: String(close)
+      }));
+    }
     previousAtMs = timestamp;
   }
   const cursorAtMs = result.last * 1000;
   if (!Number.isSafeInteger(cursorAtMs) || cursorAtMs < previousAtMs) {
     throw new Error("INVALID_OHLC_CURSOR");
   }
-  if (!closed.length) throw new Error("NO_CLOSED_MINUTE");
-  return closed.at(-1);
+  if (!candles.length) throw new Error("NO_CLOSED_MINUTE");
+  return Object.freeze(candles);
 }
 
 function responseAbortError() {
@@ -267,6 +276,7 @@ export function createKrakenUsdPublicFeed({
       assertActive();
       return {
         data,
+        requestStartedAt,
         receivedAt,
         sha256: createHash("sha256").update(body).digest("hex")
       };
@@ -307,7 +317,7 @@ export function createKrakenUsdPublicFeed({
     }
   }
 
-  async function fetchObservation(runtime = {}) {
+  async function fetchSample({ runtime = {}, decide = null } = {}) {
     if (inFlight) throw new Error("SAMPLE_ALREADY_IN_FLIGHT");
     inFlight = true;
     let attemptStarted = false;
@@ -331,8 +341,45 @@ export function createKrakenUsdPublicFeed({
 
       lastAttemptAtMs = startedAt;
       attemptStarted = true;
-      const ticker = await get("Ticker", { pair: KRAKEN_PAIR }, runtime);
-      const ohlc = await get("OHLC", { pair: KRAKEN_PAIR, interval: "1" }, runtime);
+      let ticker;
+      let ohlc;
+      let candles;
+      let candleEvidence = null;
+      let candidateDecision = null;
+      let decisionAtMs = null;
+      if (decide) {
+        ohlc = await get("OHLC", { pair: KRAKEN_PAIR, interval: "1" }, runtime);
+        candles = parseClosedCandles(ohlc.data, ohlc.receivedAt);
+        const latestClosedMinuteAtMs = candles.at(-1).timestamp;
+        if (observedAtMsPast(ohlc.receivedAt, latestClosedMinuteAtMs)) {
+          throw new Error("STALE_CLOSED_MINUTE");
+        }
+        candleEvidence = Object.freeze({
+          schemaVersion: "NATIVE_BTC_USD_CLOSED_CANDLES_V1",
+          nativeInstrument: PAIR,
+          intervalMinutes: 1,
+          responseDigest: ohlc.sha256,
+          receivedAtMs: ohlc.receivedAt,
+          candles
+        });
+        candidateDecision = decide(candleEvidence);
+        if (candidateDecision &&
+            (typeof candidateDecision === "object" || typeof candidateDecision === "function") &&
+            typeof candidateDecision.then === "function") {
+          if (candidateDecision instanceof Promise) {
+            void candidateDecision.catch(() => {});
+          }
+          throw new Error("ASYNC_CAUSAL_DECISION_UNSUPPORTED");
+        }
+        if (signal?.aborted || runtime.signal?.aborted) throw responseAbortError();
+        decisionAtMs = safeTime(now(), "DECISION_TIME");
+        if (decisionAtMs < ohlc.receivedAt) throw new Error("CLOCK_MOVED_BACKWARDS");
+        ticker = await get("Ticker", { pair: KRAKEN_PAIR }, runtime);
+      } else {
+        ticker = await get("Ticker", { pair: KRAKEN_PAIR }, runtime);
+        ohlc = await get("OHLC", { pair: KRAKEN_PAIR, interval: "1" }, runtime);
+        candles = parseClosedCandles(ohlc.data, ohlc.receivedAt);
+      }
       const observedAtMs = safeTime(now(), "OBSERVATION_TIME");
       if (observedAtMs < ticker.receivedAt || observedAtMs < ohlc.receivedAt) {
         throw new Error("CLOCK_MOVED_BACKWARDS");
@@ -340,7 +387,7 @@ export function createKrakenUsdPublicFeed({
       if (firstObservedAtMs !== null && observedAtMs - firstObservedAtMs > MAX_SPAN_MS) {
         throw new Error("OBSERVATION_WINDOW_LIMIT_REACHED");
       }
-      const latestClosedMinuteAtMs = parseClosedMinute(ohlc.data, ohlc.receivedAt);
+      const latestClosedMinuteAtMs = candles.at(-1).timestamp;
       const prices = parseTicker(ticker.data);
       if (previousQuoteAtMs !== null && ticker.receivedAt < previousQuoteAtMs) {
         throw new Error("QUOTE_OUT_OF_ORDER");
@@ -369,6 +416,25 @@ export function createKrakenUsdPublicFeed({
         observedAtMs,
         quote: Object.freeze(quote)
       });
+      if (decide) {
+        if (decisionAtMs > ticker.requestStartedAt ||
+            ticker.requestStartedAt > ticker.receivedAt ||
+            ticker.receivedAt > observedAtMs) {
+          throw new Error("NONCAUSAL_SAMPLE_TIMING");
+        }
+        if (firstObservedAtMs === null) firstObservedAtMs = observedAtMs;
+        previousQuoteAtMs = ticker.receivedAt;
+        counters.events++;
+        return Object.freeze({
+          schemaVersion: "BTC_USD_CLOSED_CANDLE_CAUSAL_SAMPLE_V1",
+          candleEvidence,
+          decision: candidateDecision,
+          decisionAtMs,
+          tickerRequestStartedAtMs: ticker.requestStartedAt,
+          tickerReceivedAtMs: ticker.receivedAt,
+          observation
+        });
+      }
       if (firstObservedAtMs === null) firstObservedAtMs = observedAtMs;
       previousQuoteAtMs = ticker.receivedAt;
       counters.events++;
@@ -386,8 +452,22 @@ export function createKrakenUsdPublicFeed({
     }
   }
 
+  function fetchObservation(runtime = {}) {
+    return fetchSample({ runtime });
+  }
+
+  function fetchCausalSample({ decide, runtime = {} } = {}) {
+    if (typeof decide !== "function") throw new TypeError("INVALID_CAUSAL_DECISION");
+    return fetchSample({ runtime, decide });
+  }
+
   return Object.freeze({
     fetchObservation,
+    fetchCausalSample,
     counters: () => Object.freeze({ ...counters })
   });
+}
+
+function observedAtMsPast(receivedAtMs, latestClosedMinuteAtMs) {
+  return receivedAtMs - latestClosedMinuteAtMs - 60_000 > MAX_CLOSED_MINUTE_AGE_MS;
 }
