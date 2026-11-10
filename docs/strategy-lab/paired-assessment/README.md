@@ -16,7 +16,7 @@ node scripts/spot-paper-paired-assessment/cli.mjs --format json /absolute/path/d
 ```
 
 The CLI is offline and read-only. It requires one absolute path, reads at most
-the existing 16 MiB host-export bound, writes the Markdown or JSON assessment
+the existing 256 KiB DTO/report bound, writes the Markdown or JSON assessment
 to stdout, and does not create output files. Invalid or oversized input produces
 a generic error code on stderr and a nonzero exit.
 
