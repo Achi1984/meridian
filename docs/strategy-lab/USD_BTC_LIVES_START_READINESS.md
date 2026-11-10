@@ -43,28 +43,56 @@ Within one store session, the wrapper also pins the first feed object and
 rejects replacement; it cannot establish that an arbitrary callback reuses
 its transport's internal counters.
 
-The strategy identity is deliberately `null` and `UNAPPROVED`. The documented
-SMA(5/20) baseline in `SPOT_PAPER_NEXT_EXPERIMENT_PROPOSAL.md` is conditional on
-independently validated BTC/USD adapter/profile/ledger integration and is not
-an approved frozen strategy. This candidate does not bind it, invent a new
-signal, or claim a causal strategy. A future strategy review must freeze the
+The disabled lives host's strategy identity remains `null` and `UNAPPROVED`.
+The separate candidate composition binds a versioned SMA(5/20) proposal only
+for offline evaluation; it does not change host configuration, invent another
+signal, or approve the candidate. A future independent review must freeze the
 exact BTC/USD input, closed-bar/warm-up and cutoff rules, decision-to-fill
-timing, and identity before use; it must prevent lookahead. Until then, only
-explicitly synthetic decisions are accepted by the offline harness.
+timing, and identity before any operational use. The existing synthetic
+acceptance harness remains available, but its callbacks are separate from the
+new provider-shaped candidate path.
 
-## Missing candle and strategy interface
+## Proposed causal candle and strategy composition
 
-The existing Kraken adapter does not provide candles to a decision function.
-`scripts/usd-paper-feed/kraken-public.mjs` validates OHLC rows and returns only
-the latest closed-minute timestamp from that response; its emitted observation
-contains the ticker bid/ask quote, not the candle open/high/low/close values.
-`runUsdOfflineStream` consequently receives quote observations and persisted
-account history, not a candle series. A candle-based SMA(5/20) strategy cannot
-be integrated through this interface today. Do not synthesize candle closes
-from bid/ask, substitute ticker sampling for bars, or claim the existing EUR
-rule was preserved. The SMA reference remains unapproved and conditional; the
-real feed-to-frozen-strategy composition is unfinished and blocks every
-production path. Synthetic callbacks validate plumbing only.
+The versioned `fetchCausalSample()` API in
+`scripts/usd-paper-feed/kraken-public.mjs` performs one bounded sample in this
+order: native BTC/USD OHLC response, caller's candle decision, then native
+BTC/USD ticker response. It returns separate closed-candle evidence and the
+unchanged strict account observation. The candle evidence includes the native
+instrument, one-minute timestamps, original decimal OHLC values, OHLC receipt
+time, and response SHA-256. Unclosed bars are excluded; future bars, malformed
+or non-USD pair keys, and invalid OHLC sequences fail closed. The legacy
+`fetchObservation()` contract and request order remain unchanged.
+
+`scripts/usd-paper-composition/sma-candidate.mjs` reuses only
+`createStrategyState()` and `advanceStrategy()` from the existing spot-pilot
+core. It is an explicit `PROPOSED_UNAPPROVED` BTC/USD candidate, not an
+approved strategy and not the EUR feed, parser, ledger, fee schedule, or host.
+It freezes a 21-closed-candle initial cutoff with no historical entry, uses
+the core's duplicate/conflict/gap/multiple-missed-bar semantics, and records
+the candle decision before the ticker request. The subsequent ticker is used
+only for account valuation/fill. The candidate requires an explicit USD-cent
+entry notional from its caller, bounded by the existing USD 100 maximum and
+cash after modeled costs; it has no production sizing default. Exit signals
+close the full existing position. No additional stop, spread policy, or forced
+trade was introduced.
+
+The composition passes the complete persisted account-observation prefix plus
+the new strict ticker observation to the existing USD offline runner, journal,
+and guard. Candle/strategy evidence is a separate digest-bound record handed to
+the caller's retention callback; it is not added to or represented as part of
+the account schema. Callback acceptance does not prove durable, independently
+verified retention. The evidence digest binds campaign, currency, candidate
+strategy/source versions, cost version, and the explicit USD-cent notional.
+Before acquisition the composition validates the store's campaign/currency/
+strategy/cost binding and pins the notional for that in-process store session;
+a changed value fails before the next feed request. The account journal still does not retain campaign-wide
+feed request/byte counters or strategy state/evidence. Reopened account handles
+therefore remain blocked before provider acquisition, including when strategy
+evidence is supplied. Missing or tampered strategy evidence cannot authorize
+resume, and even valid evidence does not remove the feed-budget review gate.
+Do not claim restartability until candle/strategy evidence and campaign
+request/byte budgets survive verified restart.
 
 ## Preserved account and campaign limits
 
@@ -140,6 +168,7 @@ Run the focused composition, feed, and durable-account suites:
 ```sh
 node --test test/usd-paper-composition.test.js \
   test/usd-paper-feed-kraken-public.test.js \
+  test/usd-paper-causal-candidate.test.js \
   test/paper-capital-challenge-account-store.test.js
 ```
 
@@ -147,9 +176,10 @@ These synthetic tests exercise default-disabled start, one-time modeled entry
 and exit fees, zero trades, stale and wrong-currency rejection, drawdown latch
 and overshoot, paused-entry denial with risk-reducing exit, journal exhaustion,
 interrupted-writer UNKNOWN handling, mismatched and correct restart tips,
-full-prefix continuation without redecision, and finite acceptance output.
-Provider fixtures use injected responses. None of these checks reports
-profitability or production readiness.
+full-prefix continuation without redecision, causal candle timing, 21-bar
+warm-up/crossover, missed bars, evidence tamper rejection, and finite
+acceptance output. Provider fixtures use injected responses. None of these
+checks reports profitability or production readiness.
 
 ## Start blockers and checklist
 
@@ -157,9 +187,10 @@ profitability or production readiness.
 synthetic PASS does not satisfy any of them.
 
 - [ ] Obtain technical and independent methodology review before integration.
-- [ ] Approve and freeze an exact, causal native BTC/USD strategy identity and
-  its bar, warm-up, cutoff, decision, and execution-delay contract. The current
-  SMA(5/20) mention is a conditional comparator proposal, not approval.
+- [ ] Independently review and, if appropriate, approve/freeze the proposed
+  causal native BTC/USD strategy identity and its bar, warm-up, cutoff,
+  decision, and execution-delay contract. The SMA(5/20) candidate remains
+  explicitly unapproved.
 - [ ] Independently qualify native-USD quote provenance, timestamps, executable
   bid valuation, and source/venue applicability. The present adapter's local
   receipt time and caller assertion are insufficient.
@@ -178,10 +209,11 @@ synthetic PASS does not satisfy any of them.
   adapter-instance scoped, and current account checkpoints do not retain them;
   the composition fail-closes feed acquisition through any reopened account
   handle until this is resolved.
-- [ ] Provide the actual closed-candle values required by the approved causal
-  strategy, bind the exact strategy/version to those inputs, and test that
-  adapter-to-decision contract. Current adapter exports no candle values to the
-  runner, so synthetic callback tests do not satisfy this blocker.
+- [ ] Independently qualify and retain the actual closed-candle values and
+  strategy evidence, bind the exact strategy/version to those inputs, and
+  verify the adapter-to-decision evidence through restart. The staged source
+  interface and generated provider-shaped tests do not establish provider
+  qualification or durable evidence retention.
 - [ ] Complete explicit owner authorization, host admission, and separate
   operational/cost review before any future start. No such authorization is
   implied here.
