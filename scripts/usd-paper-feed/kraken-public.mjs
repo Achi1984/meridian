@@ -191,6 +191,18 @@ export function createKrakenUsdPublicFeed({
       throw error;
     }
   }
+  async function completeSample(observedAtMs) {
+    const completedAtMs = safeTime(now(), "COMPLETION_TIME");
+    await budget.completeSample(sampleId, observedAtMs, completedAtMs);
+    await retainTip();
+    return completedAtMs;
+  }
+  function admitReturn(completedAtMs) {
+    const returnedAtMs = safeTime(now(), "RETURN_TIME");
+    budget.assertCampaignTime(returnedAtMs);
+    if (returnedAtMs < completedAtMs) throw new Error("CLOCK_MOVED_BACKWARDS");
+    sampleId = null;
+  }
 
   const counters = { requests: 0, bytes: 0, events: 0 };
   let firstObservedAtMs = null;
@@ -208,7 +220,7 @@ export function createKrakenUsdPublicFeed({
     const clock = runtime.monotonicNow ?? monotonicNow;
     const startedMono = clock();
     if (!Number.isFinite(startedMono) || startedMono < 0) throw new Error("INVALID_MONOTONIC_CLOCK");
-    const requestStartedAt = safeTime(now(), "CLOCK");
+    let requestStartedAt = safeTime(now(), "CLOCK");
     const parentSignals = [signal, runtime.signal].filter(Boolean);
     if (parentSignals.some(parent => typeof parent.addEventListener !== "function")) {
       throw new TypeError("INVALID_ABORT_SIGNAL");
@@ -254,6 +266,12 @@ export function createKrakenUsdPublicFeed({
     counters.requests++;
     const work = (async () => {
       assertActive();
+      if (budget) {
+        const dispatchAtMs = safeTime(now(), "DISPATCH_TIME");
+        budget.assertCampaignTime(dispatchAtMs);
+        if (dispatchAtMs < requestStartedAt) throw new Error("CLOCK_MOVED_BACKWARDS");
+        requestStartedAt = dispatchAtMs;
+      }
       response = await fetchImpl(url, {
         method: "GET",
         headers: { accept: "application/json" },
@@ -446,9 +464,7 @@ export function createKrakenUsdPublicFeed({
           throw new Error("NONCAUSAL_SAMPLE_TIMING");
         }
         if (budget) {
-          await budget.completeSample(sampleId);
-          await retainTip();
-          sampleId = null;
+          admitReturn(await completeSample(observedAtMs));
         }
         if (firstObservedAtMs === null) firstObservedAtMs = observedAtMs;
         previousQuoteAtMs = ticker.receivedAt;
@@ -464,9 +480,7 @@ export function createKrakenUsdPublicFeed({
         });
       }
       if (budget) {
-        await budget.completeSample(sampleId);
-        await retainTip();
-        sampleId = null;
+        admitReturn(await completeSample(observedAtMs));
       }
       if (firstObservedAtMs === null) firstObservedAtMs = observedAtMs;
       previousQuoteAtMs = ticker.receivedAt;

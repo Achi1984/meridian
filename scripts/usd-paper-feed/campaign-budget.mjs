@@ -5,9 +5,9 @@ import { canonicalCheckpointBytes, CheckpointStore } from "../memecoin-paper/che
 import { createUsdSmaCandidateConfiguration } from "../usd-paper-composition/sma-candidate.mjs";
 import { USD_PAPER_FEED_LIMITS as LIMITS } from "./limits.mjs";
 
-export const USD_CAMPAIGN_BUDGET_VERSION = "USD_CAMPAIGN_ACQUISITION_BUDGET_V1";
+export const USD_CAMPAIGN_BUDGET_VERSION = "USD_CAMPAIGN_ACQUISITION_BUDGET_V2";
 export const MAX_USD_CAMPAIGN_BUDGET_BYTES = 512 * 1024;
-const TIP_VERSION = "USD_CAMPAIGN_ACQUISITION_TIP_V1";
+const TIP_VERSION = "USD_CAMPAIGN_ACQUISITION_TIP_V2";
 const MAX_RECORDS = 1 + LIMITS.maxEvents * 2 + LIMITS.maxRequests * 2;
 const TOKEN = Symbol("campaign budget");
 const hash = bytes => createHash("sha256").update(bytes).digest("hex");
@@ -38,6 +38,17 @@ function initialState() {
 
 function time(value) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error("INVALID_BUDGET_TIME");
+}
+
+function campaignTime(state, atMs) {
+  time(atMs);
+  if (state.firstAttemptAtMs === null || atMs < state.lastSampleAtMs ||
+      (state.lastRequestAtMs !== null && atMs < state.lastRequestAtMs)) {
+    throw new Error("BUDGET_CLOCK_ROLLBACK");
+  }
+  if (atMs - state.firstAttemptAtMs > LIMITS.maxSpanMs) {
+    throw new Error("OBSERVATION_WINDOW_LIMIT_REACHED");
+  }
 }
 
 function transition(previous, event) {
@@ -102,11 +113,14 @@ function transition(previous, event) {
     state.pendingSample.activeRequest = null;
     if (event.outcome === "FAILED") state.terminal = true;
   } else if (event.kind === "COMPLETE") {
-    exact(event, ["kind", "sampleId"]);
+    exact(event, ["kind", "sampleId", "observedAtMs", "completedAtMs"]);
     if (!state.pendingSample || state.pendingSample.id !== event.sampleId ||
         state.pendingSample.requests !== 2 || state.pendingSample.activeRequest !== null) {
       throw new Error("INVALID_CAMPAIGN_SAMPLE_COMPLETION");
     }
+    campaignTime(state, event.observedAtMs);
+    campaignTime(state, event.completedAtMs);
+    if (event.completedAtMs < event.observedAtMs) throw new Error("BUDGET_CLOCK_ROLLBACK");
     state.pendingSample = null;
   } else if (event.kind === "STOP") {
     exact(event, ["kind", "sampleId"]);
@@ -122,7 +136,7 @@ function transition(previous, event) {
 
 function checkpoint(config, records) {
   return {
-    version: 1, schemaVersion: USD_CAMPAIGN_BUDGET_VERSION,
+    version: 2, schemaVersion: USD_CAMPAIGN_BUDGET_VERSION,
     configuration: config, nativeInstrument: "BTC/USD",
     sourceId: "kraken-public-btc-usd", limits: LIMITS,
     sequence: records.length - 1, records
@@ -274,6 +288,11 @@ export class UsdCampaignBudget {
     this.#assertWritable();
   }
 
+  assertCampaignTime(atMs) {
+    this.#assertWritable();
+    campaignTime(this.#state, atMs);
+  }
+
   #assertWritable() {
     if (this.#closed || this.#blocked || !this.#writable) {
       throw new Error("CAMPAIGN_BUDGET_INSPECTION_ONLY_OR_BLOCKED");
@@ -322,7 +341,9 @@ export class UsdCampaignBudget {
     return this.#append({ kind: "BODY", reservationId, rawBodyBytes, outcome });
   }
 
-  completeSample(sampleId) { return this.#append({ kind: "COMPLETE", sampleId }); }
+  completeSample(sampleId, observedAtMs, completedAtMs) {
+    return this.#append({ kind: "COMPLETE", sampleId, observedAtMs, completedAtMs });
+  }
 
   async stopSample(sampleId) {
     if (!this.#state.terminal) await this.#append({ kind: "STOP", sampleId });

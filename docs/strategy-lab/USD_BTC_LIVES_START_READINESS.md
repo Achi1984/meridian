@@ -98,7 +98,7 @@ Do not claim candidate restartability or host readiness.
 ## Durable acquisition budget: resolved implementation scope
 
 `scripts/usd-paper-feed/campaign-budget.mjs` provides the separate
-`USD_CAMPAIGN_ACQUISITION_BUDGET_V1` sidecar. It reuses `CheckpointStore`'s
+`USD_CAMPAIGN_ACQUISITION_BUDGET_V2` sidecar. It reuses `CheckpointStore`'s
 exclusive never-stolen lock, canonical checkpoint, predecessor hash, synced
 pending marker, atomic rename, directory fsync, and exact readback. The USD
 account schema is unchanged. Storage is bounded to 512 KiB and at most 1,537
@@ -106,6 +106,9 @@ records, including creation, sample attempts/completions, reservations and
 body outcomes. The checkpoint binds the explicit candidate configuration
 (campaign, USD currency, source/strategy/cost versions, notional cents), native
 BTC/USD source identity, and all unchanged feed limits.
+V2 completion records bind validated observation and completion timestamps to
+the persisted first campaign attempt. V1 sidecars/tips are rejected, not migrated
+or reset: timestamp-free completion evidence cannot authorize continuation.
 
 The optional feed argument is
 `campaignBudget: { store, configuration, retainRestartTip }`. `store` must be a
@@ -129,6 +132,17 @@ After a crash, unread or unfinalized body bytes are unknown, not zero-consumptio
 evidence: their entire precharged reservation remains. Timeout/abort freezes the
 known byte count; late completion cannot authorize another request, alter the
 settled count, refund bytes, or finish a sample. There are no retries.
+
+The original campaign's 24-hour horizon is checked again at actual dispatch,
+after awaiting reservation and tip retention, not just at reservation time.
+Completion validates both observation and completion times against that persisted
+origin, including after adapter replacement or verified budget reopen. A final
+response or durable handoff crossing the horizon cannot return an observation;
+all request charges and known body bytes remain accounted. The return path
+rechecks the clock after completion publication and tip retention as well.
+The existing inclusive boundary is unchanged: exactly 24 hours is allowed,
+later times are rejected. This is a maximum horizon, not a capacity/readiness
+claim; the conservative 128-sample byte ceiling still applies.
 
 `createNew` requires a new dedicated directory; it cannot overwrite an existing
 campaign sidecar. A fresh adapter using that sidecar cannot renew its allowance.
@@ -272,6 +286,13 @@ the reopened-account acquisition block or redecide persisted account events.
 The tests replace global fetch with a rejecting sentinel and inject local
 responses only. No EUR, active-host, account-schema, capital, drawdown or fee
 configuration changes are part of this scope.
+Injected-clock fixtures cover horizon crossings during either reservation
+handoff, final body consumption, body-result retention, completion publication
+and completion retention,
+for both causal/noncausal paths after adapter replacement and verified reopen.
+They check no late dispatch or returned observation, unchanged irreversible
+charges, exact-boundary acceptance, timestamp validation on append/replay, and
+rejection of the timestamp-free V1 format.
 
 ## Start blockers and checklist
 

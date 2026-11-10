@@ -21,7 +21,7 @@ if (mode === "continue") {
   await store.finalizeRequest(reservation, 7, "SUCCESS");
   const second = await store.reserveRequest(sample, "OHLC", 125_000);
   await store.finalizeRequest(second, 9, "SUCCESS");
-  await store.completeSample(sample);
+  await store.completeSample(sample, 125_000, 125_000);
   process.stdout.write(JSON.stringify(store.snapshot()));
   await store.close();
 } else {

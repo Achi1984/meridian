@@ -74,7 +74,7 @@ async function complete(store, atMs, bytes = 10) {
     const reservation = await store.reserveRequest(sample, endpoint, atMs);
     await store.finalizeRequest(reservation, bytes, "SUCCESS");
   }
-  await store.completeSample(sample);
+  await store.completeSample(sample, atMs, atMs);
 }
 
 test("durable reservation and independent tip handoff precede each causal transport", async t => {
@@ -221,6 +221,173 @@ test("durable cadence and span survive adapter replacement without transport", a
   }).fetchObservation(), /WINDOW_LIMIT/);
   assert.equal(calls, 0);
   assert.equal(store.snapshot().requests, 2);
+});
+
+test("persisted horizon gates dispatch and completion across fresh adapters and verified reopen", async t => {
+  for (const reopen of [false, true]) for (const causal of [false, true]) {
+    for (const crossing of ["first-reservation", "second-reservation", "final-body",
+      "final-body-retention", "completion-write", "completion-retention", "exact-boundary"]) {
+      await t.test(`${reopen ? "reopen" : "replacement"}:${causal ? "causal" : "legacy"}:${crossing}`,
+        async st => {
+          const horizon = TIME + LIMITS.maxSpanMs;
+          let current = horizon - 1000;
+          let completionSequence = null;
+          const onPhase = (phase, details) => {
+            if (crossing === "completion-write" &&
+                details.sequence === completionSequence && phase === "before-ack") {
+              current = horizon + 1;
+            }
+          };
+          const created = await setup(st, { onPhase });
+          let store = created.store;
+          await provider(store, { fetchImpl: async url => fixture(url) }).fetchObservation();
+          const retainedTip = structuredClone(store.tip);
+          completionSequence = retainedTip.revision + 6;
+          if (reopen) {
+            await store.close();
+            store = await UsdCampaignBudget.reopenExisting(created.directory, {
+              configuration: CONFIG, expectedTip: retainedTip, onPhase
+            });
+            st.after(() => store.close().catch(() => {}));
+          }
+          let calls = 0;
+          let knownBytes = 0;
+          let returned;
+          const before = store.snapshot();
+          const feed = provider(store, {
+            now: () => current,
+            campaignBudget: { store, configuration: CONFIG, retainRestartTip(tip) {
+              const sequence = tip.revision - retainedTip.revision;
+              if ((crossing === "first-reservation" && sequence === 2) ||
+                  (crossing === "second-reservation" && sequence === 4) ||
+                  (crossing === "final-body-retention" && sequence === 5) ||
+                  (crossing === "completion-retention" && sequence === 6)) {
+                current = horizon + 1;
+              }
+            } },
+            fetchImpl: async url => {
+              calls++;
+              assert.ok(current <= horizon, "transport must never dispatch after the persisted horizon");
+              const body = Buffer.from(await fixture(url, current).text());
+              knownBytes += body.length;
+              let read = false;
+              return {
+                ok: true, headers: new Headers({ "content-type": "application/json" }),
+                body: { getReader() { return {
+                  async read() {
+                    if (!read) {
+                      read = true;
+                      return { done: false, value: body };
+                    }
+                    if (calls === 2 && ["final-body", "exact-boundary"].includes(crossing)) {
+                      current = horizon + (crossing === "final-body" ? 1 : 0);
+                    }
+                    return { done: true };
+                  },
+                  cancel() {}, releaseLock() {}
+                }; }, cancel() {} }
+              };
+            }
+          });
+          const sample = async () => {
+            returned = causal ? await feed.fetchCausalSample({ decide() { return "HOLD"; } }) :
+              await feed.fetchObservation();
+          };
+          if (crossing === "exact-boundary") {
+            await sample();
+            assert.equal((causal ? returned.observation : returned).observedAtMs, horizon);
+            assert.equal(feed.counters().events, 1);
+          } else {
+            await assert.rejects(sample(), /OBSERVATION_WINDOW_LIMIT_REACHED/);
+            assert.equal(returned, undefined);
+            assert.equal(feed.counters().events, 0);
+            await assert.rejects(sample(), /FEED_TERMINAL_FAILURE/);
+          }
+          const expectedRequests = crossing === "first-reservation" ? 1 : 2;
+          assert.equal(calls, crossing === "first-reservation" ? 0 :
+            crossing === "second-reservation" ? 1 : 2);
+          const state = store.snapshot();
+          assert.equal(state.firstAttemptAtMs, TIME);
+          assert.equal(state.requests, before.requests + expectedRequests);
+          assert.equal(state.chargedBytes, before.chargedBytes + expectedRequests * LIMITS.maxResponseBytes);
+          assert.equal(state.usedBytes, before.usedBytes + knownBytes);
+          assert.equal(state.usedBytes + state.reservedBytes, state.chargedBytes);
+          const inspected = await inspectUsdCampaignBudget(created.directory, { configuration: CONFIG });
+          assert.equal(inspected.status, "OK");
+          assert.deepEqual(inspected.tip, state.tip);
+          if (!["completion-write", "completion-retention", "exact-boundary"].includes(crossing)) {
+            assert.equal(state.terminal, true);
+            assert.notEqual(state.pendingSample, null);
+            await store.close();
+            const stopped = await UsdCampaignBudget.reopenExisting(created.directory, {
+              configuration: CONFIG, expectedTip: state.tip
+            });
+            assert.equal(stopped.snapshot().writable, false);
+            await stopped.close();
+          }
+          const checkpoint = JSON.parse(await readFile(path.join(created.directory, "checkpoint.json")));
+          const completions = checkpoint.records.filter(record => record.event?.kind === "COMPLETE");
+          assert.equal(completions.length,
+            ["completion-write", "completion-retention", "exact-boundary"].includes(crossing) ? 2 : 1);
+          if (crossing === "exact-boundary") {
+            assert.equal(completions.at(-1).event.observedAtMs, horizon);
+            assert.equal(completions.at(-1).event.completedAtMs, horizon);
+          }
+        });
+    }
+  }
+});
+
+test("completion timestamps are required, monotone and bounded by the persisted campaign origin", async t => {
+  for (const [observed, completed, error] of [
+    [undefined, undefined, /INVALID_BUDGET_TIME/],
+    [TIME, NaN, /INVALID_BUDGET_TIME/],
+    [TIME - 1, TIME, /ROLLBACK/],
+    [TIME + 1, TIME, /ROLLBACK/],
+    [TIME, TIME + LIMITS.maxSpanMs + 1, /WINDOW_LIMIT/],
+    [TIME + LIMITS.maxSpanMs + 1, TIME + LIMITS.maxSpanMs + 1, /WINDOW_LIMIT/]
+  ]) await t.test(`${observed}:${completed}`, async st => {
+    const { store } = await setup(st);
+    const sample = await store.beginSample(TIME);
+    for (const endpoint of ["Ticker", "OHLC"]) {
+      const request = await store.reserveRequest(sample, endpoint, TIME);
+      await store.finalizeRequest(request, 10, "SUCCESS");
+    }
+    const before = store.snapshot();
+    await assert.rejects(store.completeSample(sample, observed, completed), error);
+    assert.deepEqual(store.snapshot(), before);
+    await store.stopSample(sample);
+    assert.equal(store.snapshot().terminal, true);
+    assert.equal(store.snapshot().chargedBytes, 2 * LIMITS.maxResponseBytes);
+  });
+});
+
+test("replay rejects timestamp-free V1 budgets and invalid completion evidence", async t => {
+  const { store, directory } = await setup(t);
+  await complete(store, TIME);
+  await store.close();
+  const file = path.join(directory, "checkpoint.json");
+  const original = JSON.parse(await readFile(file));
+  for (const invalid of ["V1", "missing-time", "rollback", "horizon"]) {
+    const checkpoint = structuredClone(original);
+    const event = checkpoint.records.at(-1).event;
+    if (invalid === "V1") {
+      checkpoint.version = 1;
+      checkpoint.schemaVersion = "USD_CAMPAIGN_ACQUISITION_BUDGET_V1";
+      delete event.observedAtMs;
+      delete event.completedAtMs;
+    } else if (invalid === "missing-time") {
+      delete event.completedAtMs;
+    } else if (invalid === "rollback") {
+      event.completedAtMs = TIME - 1;
+    } else {
+      event.completedAtMs = TIME + LIMITS.maxSpanMs + 1;
+    }
+    await writeFile(file, canonicalCheckpointBytes(checkpoint));
+    assert.equal((await inspectUsdCampaignBudget(directory, { configuration: CONFIG })).status, "CORRUPT");
+    await assert.rejects(UsdCampaignBudget.reopenExisting(directory, { configuration: CONFIG }),
+      /SCHEMA_MISMATCH|INVALID_CAMPAIGN_BUDGET_RECORD|ROLLBACK|WINDOW_LIMIT/);
+  }
 });
 
 test("conservative 32MiB exhaustion survives a new adapter and verified reopen", async t => {
