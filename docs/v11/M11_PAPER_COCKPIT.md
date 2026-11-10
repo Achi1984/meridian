@@ -13,6 +13,10 @@ This delivery owns read-only Paper cards and their focused verification:
 - `v11/spot-paper-paired-report-connector.js` and
   `spot-paper-paired-report-gateway.mjs` — separate bounded authenticated paired
   read path; it has no upload route.
+- `v11/spot-paper-paired-progress-connector.js` and
+  `v11/spot-paper-paired-progress-config.js` — bounded authenticated checkpoint
+  read bound to the reviewed diagnostic identity and a five-minute valuation-age
+  display policy.
 - `migrations/20261109_meridian_spot_paper_paired_reports.sql` — private,
   bounded paired-report table.
 - `v11/strategy-workspace-bootstrap.js` — mounts the panel at the top of the existing Strategies workspace.
@@ -49,6 +53,37 @@ server's expected-identity configuration. It does not widen or relabel the
 legacy BTC/EUR or host8h route. The UI distinguishes an unprovisioned
 transport, no published report, an identity mismatch, an unsupported schema or
 identity, and an authentication failure.
+
+The observed-checkpoint route is a separate read source at
+`/api/private/spot-paper-paired-progress`. M11 pins it to the exact
+`btc-eur-paired-diag-20261110-001` expected identity recorded in the reviewed
+receipt and uses a finite five-minute age policy based on `valuationAt`, not
+export time. Each authenticated entry to the active Strategies workspace makes
+one bounded no-store GET; the dedicated manual checkpoint control makes one
+additional GET. Both use the current `appAccess` bearer with redirects refused
+and credentials omitted. The browser has no upload credential or run-discovery
+path. Lock, navigation and disposal abort the read and clear the private result.
+
+The challenger card projects only the checkpoint's challenger arm; the paired
+comparison preserves baseline, challenger and cash. Checkpoint values are
+labelled `OBSERVED_CHECKPOINT` and never imply a running worker. `terminal.status`
+is displayed only as a recorded terminal observation, separately from any
+terminal dashboard report's evidence status and independent-authentication
+claim. When the pinned run identity and valuation timestamp match, checkpoint
+metrics have deterministic precedence for that observation while report
+evidence remains separately labelled. A matching run with a different
+valuation timestamp is shown as two separate snapshots without merging values.
+Identity disagreement rejects checkpoint projection. Missing USD and LowVol
+values remain unknown; checkpoint costs already included in net equity/PnL are
+not deducted again. Old valuations remain visible and are marked stale without
+replacing their original valuation time.
+
+This code integration does not deploy the gateway, apply the progress migration,
+configure production authority, transfer or publish the frozen journal, or
+perform a production readback. Those lead-owned steps remain outstanding; the
+diagnostic shell read is not publication evidence. Acceptance still requires a
+sanitized checkpoint publication and readback matched on run, sequence, digest,
+and valuation, followed by authenticated visual inspection.
 
 ## Paired report source and handoff
 

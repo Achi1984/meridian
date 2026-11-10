@@ -937,7 +937,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','paper-bot-report-bootstrap.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-report-connector.js','paper-readiness.js','paper-readiness-view.js','release-update.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','pionex-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js','spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js','spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js','spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
+const moduleNames=['ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','paper-bot-report-bootstrap.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-report-connector.js','paper-readiness.js','paper-readiness-view.js','release-update.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','pionex-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js','spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js','spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js','spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-progress-config.js','spot-paper-paired-progress-connector.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -980,6 +980,8 @@ function deploymentServer(){
     readFileSync(new URL('../scripts/spot-paper-report-bridge/contract.mjs',import.meta.url),'utf8'));
   modules.set('/meridian/scripts/spot-paper-paired-report/contract.mjs',
     readFileSync(new URL('../scripts/spot-paper-paired-report/contract.mjs',import.meta.url),'utf8'));
+  modules.set('/meridian/scripts/spot-paper-paired-progress/contract.mjs',
+    readFileSync(new URL('../scripts/spot-paper-paired-progress/contract.mjs',import.meta.url),'utf8'));
   modules.set('/meridian/docs/strategy-lab/campaign-20261013.json',readFileSync(new URL('../docs/strategy-lab/campaign-20261013.json',import.meta.url),'utf8'));
   modules.set('/meridian/public/js/m11-agent-status.js',readFileSync(new URL('../public/js/m11-agent-status.js',import.meta.url),'utf8'));
   const server=createServer((request,response)=>{
@@ -988,7 +990,8 @@ function deploymentServer(){
     const versionedModule=(path.startsWith('/meridian/v11/')&&moduleNames.includes(path.slice('/meridian/v11/'.length))||
       path.startsWith('/meridian/scripts/memecoin-paper-report-bridge/')||
       path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
-      path.startsWith('/meridian/scripts/spot-paper-paired-report/'))&&url.search==='?v=B16-M11-FIX15';
+      path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
+      path.startsWith('/meridian/scripts/spot-paper-paired-progress/'))&&url.search==='?v=B16-M11-FIX15';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -1056,7 +1059,8 @@ function deploymentServer(){
       [...modules.keys()].map(path=>origin+path+(path.startsWith('/meridian/v11/')||
         path.startsWith('/meridian/scripts/memecoin-paper-report-bridge/')||
         path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
-        path.startsWith('/meridian/scripts/spot-paper-paired-report/')?'?v=B16-M11-FIX15':'')).join(' '):"'none'";
+        path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
+        path.startsWith('/meridian/scripts/spot-paper-paired-progress/')?'?v=B16-M11-FIX15':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+host8hEndpoint+' '+origin+'/meridian/v11/index.html '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);

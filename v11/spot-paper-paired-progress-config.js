@@ -1,0 +1,30 @@
+export const SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY = Object.freeze({
+  schemaVersion: 'SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1',
+  runId: 'btc-eur-paired-diag-20261110-001',
+  pair: 'BTC/EUR',
+  sourceSha256: 'c2549c37e05a64960991bda9a9c7658bcd4fb712587ce0079f75470ff3bcfa0d',
+  configSha256: 'a055960c9d6041fb32988d578d8f5f1b0d5c779eb1861ae8db836bc2ddaeef2e',
+  researchSourceSha256: 'dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25',
+  feedSourceId: 'KRAKEN_PUBLIC_SPOT_XBTEUR',
+  comparisonEngineId: 'SPOT_PAPER_SMA_COMPARISON_V1',
+  modelPairId: 'BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1',
+  models: Object.freeze([
+    Object.freeze({
+      role: 'baseline',
+      modelId: 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1',
+      accountId: 'btc-eur-paired-diag-20261110-001-baseline'
+    }),
+    Object.freeze({
+      role: 'challenger',
+      modelId: 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1',
+      accountId: 'btc-eur-paired-diag-20261110-001-challenger'
+    }),
+    Object.freeze({
+      role: 'cash',
+      modelId: 'CASH_CONTROL_V1',
+      accountId: 'btc-eur-paired-diag-20261110-001-cash'
+    })
+  ])
+});
+
+export const SPOT_PAPER_PAIRED_PROGRESS_STALE_AFTER_MS = 5 * 60 * 1000;

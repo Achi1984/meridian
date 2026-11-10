@@ -7,6 +7,7 @@ const v11Root=new URL('../v11/',import.meta.url);
 const indexUrl=new URL('index.html',v11Root);
 const bridgeRoot=new URL('../scripts/memecoin-paper-report-bridge/',v11Root);
 const spotBridgeRoot=new URL('../scripts/spot-paper-report-bridge/',v11Root);
+const pairedProgressRoot=new URL('../scripts/spot-paper-paired-progress/',v11Root);
 const CACHE_ID='?v=B16-M11-FIX15';
 const diskPath=url=>fileURLToPath(new URL(url.pathname,url));
 const readModule=url=>readFileSync(diskPath(url),'utf8');
@@ -24,7 +25,7 @@ const expectedModules=[
   'spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js',
   'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js',
   'spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js',
-  'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js',
+  'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-progress-config.js','spot-paper-paired-progress-connector.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
 ];
 
@@ -47,6 +48,10 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists,impor
       const name=`spot-bridge:${url.pathname.slice(spotBridgeRoot.pathname.length)}`;
       if(!identities.has(name))identities.set(name,new Set());
       identities.get(name).add(href);
+    }else if(url.pathname.startsWith(pairedProgressRoot.pathname)){
+      const name=`paired-progress:${url.pathname.slice(pairedProgressRoot.pathname.length)}`;
+      if(!identities.has(name))identities.set(name,new Set());
+      identities.get(name).add(href);
     }
     for(const specifier of specifiers(read(url))){
       let target=new URL(specifier,url);
@@ -63,6 +68,10 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists,impor
         }else if(target.pathname.startsWith(spotBridgeRoot.pathname)){
           assert.equal(target.search,CACHE_ID,`spot-paper bridge module must use ${CACHE_ID}`);
           external.add(`../scripts/spot-paper-report-bridge/${target.pathname.slice(spotBridgeRoot.pathname.length)}${target.search}`);
+          visit(target);
+        }else if(target.pathname.startsWith(pairedProgressRoot.pathname)){
+          assert.equal(target.search,CACHE_ID,`paired-progress contract must use ${CACHE_ID}`);
+          external.add(`../scripts/spot-paper-paired-progress/${target.pathname.slice(pairedProgressRoot.pathname.length)}${target.search}`);
           visit(target);
         }else external.add(specifier);
         continue;
@@ -101,6 +110,7 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
     '../ledger-manual-snapshot.js','../portfolio-data-contract.js','../public/js/m11-agent-status.js',
     '../research/strategy-paper-arena.js','../scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX15',
     '../scripts/memecoin-paper-report-bridge/index.mjs?v=B16-M11-FIX15',
+    '../scripts/spot-paper-paired-progress/contract.mjs?v=B16-M11-FIX15',
     '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX15',
     '../scripts/spot-paper-report-bridge/contract.mjs?v=B16-M11-FIX15',
     '../v8-clean/live-price-core-r18.js'

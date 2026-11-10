@@ -7,6 +7,14 @@ import {
   createSpotPaperPairedReportConnector,
   SPOT_PAPER_PAIRED_REPORT_ENDPOINT
 } from './spot-paper-paired-report-connector.js?v=B16-M11-FIX15';
+import {
+  createSpotPaperPairedProgressConnector,
+  SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT
+} from './spot-paper-paired-progress-connector.js?v=B16-M11-FIX15';
+import {
+  SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY,
+  SPOT_PAPER_PAIRED_PROGRESS_STALE_AFTER_MS
+} from './spot-paper-paired-progress-config.js?v=B16-M11-FIX15';
 
 const TREND_MODEL = 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1';
 const messages = Object.freeze({
@@ -31,6 +39,18 @@ const pairedMessages = Object.freeze({
   unsupported_identity: 'Die neue Trend-Identität ist bis zum kanonischen #1319-Vertrag nicht unterstützt.',
   rejected: 'Der gepaarte Bericht konnte nicht validiert werden.',
   unavailable: 'Der gepaarte Bericht ist derzeit nicht verfügbar.'
+});
+const progressMessages = Object.freeze({
+  locked: 'Gesperrt. Vor dem Abruf den App-Zugang öffnen.',
+  authentication_failed: 'Authentifizierung fehlgeschlagen. Bitte App-Zugang erneut öffnen.',
+  ready: 'Kein Checkpoint abgerufen; Kennzahlen bleiben unbekannt.',
+  loading: 'Der freigegebene Paper-Checkpoint wird einmalig gelesen.',
+  available: 'Beobachteter Checkpoint geladen; dies belegt keinen aktuellen Lauf.',
+  stale: 'Checkpoint-Bewertung ist älter als die konfigurierte Frischegrenze.',
+  not_found: 'Kein Checkpoint veröffentlicht; Kennzahlen bleiben unbekannt.',
+  unavailable: 'Der Checkpoint ist derzeit nicht verfügbar.',
+  rejected: 'Der Checkpoint konnte nicht validiert werden.',
+  identity_mismatch: 'Die Checkpoint-Identität stimmt nicht mit der freigegebenen Identität überein.'
 });
 
 function node(document, parent, tag, text = '') {
@@ -78,6 +98,11 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
   enabled = true,
   createConnector = createSpotPaperReportConnector,
   createPairedConnector = createSpotPaperPairedReportConnector,
+  createProgressConnector = createSpotPaperPairedProgressConnector,
+  progressExpectedIdentity = SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY,
+  progressStaleAfterMs = SPOT_PAPER_PAIRED_PROGRESS_STALE_AFTER_MS,
+  progressEnabled = true,
+  now = Date.now,
   pairedStatus = null
 } = {}) {
   if (!overviewRoot || !pairedRoot || !document || !access ||
@@ -87,12 +112,18 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
       typeof access.subscribe !== 'function' ||
       typeof fetchImpl !== 'function' ||
       typeof createConnector !== 'function' ||
-      typeof createPairedConnector !== 'function') {
+      typeof createPairedConnector !== 'function' ||
+      typeof createProgressConnector !== 'function' ||
+      typeof progressEnabled !== 'boolean' ||
+      typeof now !== 'function' ||
+      !Number.isSafeInteger(progressStaleAfterMs) || progressStaleAfterMs < 0) {
     throw new TypeError('Paper report workspace dependencies are invalid');
   }
 
   const overview = mountSpotPaperBotOverview(overviewRoot, {document});
-  const paired = mountSpotPaperPairedPanel(pairedRoot, {dto: null, document});
+  const paired = mountSpotPaperPairedPanel(pairedRoot, {
+    dto: null, expectedIdentity: progressExpectedIdentity, document
+  });
   const controls = document.createElement('div');
   controls.setAttribute('style', 'display:grid;gap:8px;min-width:0;margin:0 0 12px');
   const refresh = node(document, controls, 'button', 'BTC/EUR-Quelle manuell prüfen');
@@ -115,22 +146,38 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
   pairedStateNode.setAttribute('aria-live', 'polite');
   pairedStateNode.setAttribute('aria-atomic', 'true');
   pairedRoot.parentNode?.insertBefore(pairedControls, pairedRoot);
+  const progressRefresh = node(document, pairedControls, 'button',
+    'Paper-Checkpoint manuell prüfen');
+  progressRefresh.type = 'button';
+  progressRefresh.setAttribute('style', 'min-height:44px;max-width:100%;white-space:normal');
+  const progressStateNode = node(document, pairedControls, 'p');
+  progressStateNode.setAttribute('role', 'status');
+  progressStateNode.setAttribute('aria-live', 'polite');
+  progressStateNode.setAttribute('aria-atomic', 'true');
 
   let connector = null;
   let pairedConnector = null;
+  let progressConnector = null;
   let report = null;
   let pairedReport = null;
+  let progressSnapshot = null;
   let state = enabled ? (access.isUnlocked() ? 'ready' : 'locked') : 'missing';
   let pairedState = enabled ? (access.isUnlocked() ? 'ready' : 'locked') :
     'transport_unavailable';
+  let progressState = enabled && progressEnabled ?
+    (access.isUnlocked() ? 'ready' : 'locked') :
+    'unavailable';
   let active = false;
   let disposed = false;
   let reading = false;
   let pairedReading = false;
+  let progressReading = false;
   let generation = 0;
   let pairedGeneration = 0;
+  let progressGeneration = 0;
   let requestOwner = null;
   let pairedRequestOwner = null;
+  let progressRequestOwner = null;
   let authenticationFailed = false;
 
   function render() {
@@ -140,28 +187,44 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     refresh.setAttribute('aria-busy', String(reading));
     pairedRefresh.disabled = !enabled || !active || !access.isUnlocked() || pairedReading;
     pairedRefresh.setAttribute('aria-busy', String(pairedReading));
+    progressRefresh.disabled = !enabled || !progressEnabled || !active || !access.isUnlocked() ||
+      progressReading;
+    progressRefresh.setAttribute('aria-busy', String(progressReading));
     pairedStateNode.textContent = pairedMessages[pairedState] || pairedMessages.unavailable;
-    overview.update(report ? [sourceAdapter(report)] : [], pairedReport);
+    progressStateNode.textContent = progressMessages[progressState] ||
+      progressMessages.unavailable;
+    overview.update(report ? [sourceAdapter(report)] : [], pairedReport,
+      progressSnapshot, progressExpectedIdentity);
     paired.setLoading(pairedReading);
-    paired.render(pairedReport, pairedState);
+    paired.render(pairedReport, pairedState, progressSnapshot ?
+      {...progressSnapshot, status: progressState.toUpperCase()} :
+      {status: progressState.toUpperCase(), progress: null, ageMs: null},
+    progressExpectedIdentity);
   }
 
   function clearPrivate() {
     generation++;
     pairedGeneration++;
+    progressGeneration++;
     reading = false;
     pairedReading = false;
+    progressReading = false;
     report = null;
     pairedReport = null;
+    progressSnapshot = null;
     requestOwner = null;
     pairedRequestOwner = null;
+    progressRequestOwner = null;
     if (connector && !connector.isDisposed()) connector.dispose();
     if (pairedConnector && !pairedConnector.isDisposed()) pairedConnector.dispose();
+    if (progressConnector && !progressConnector.isDisposed()) progressConnector.dispose();
     state = authenticationFailed ? 'authentication_failed' :
       enabled && active ? (access.isUnlocked() ? 'ready' : 'locked') : 'missing';
     pairedState = authenticationFailed ? 'authentication_failed' :
       enabled && active ? (access.isUnlocked() ? 'ready' : 'locked') :
       'transport_unavailable';
+    progressState = authenticationFailed ? 'authentication_failed' :
+      enabled && active ? (access.isUnlocked() ? 'ready' : 'locked') : 'unavailable';
     render();
   }
 
@@ -173,6 +236,11 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
 
   function ownsPairedRequest(owner, signal) {
     return owner !== null && owner.generation === pairedGeneration &&
+      !signal?.aborted && !disposed && active && access.isUnlocked() &&
+      access.getToken() === owner.token;
+  }
+  function ownsProgressRequest(owner, signal) {
+    return owner !== null && owner.generation === progressGeneration &&
       !signal?.aborted && !disposed && active && access.isUnlocked() &&
       access.getToken() === owner.token;
   }
@@ -317,10 +385,74 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     }
   }
 
+  async function readProgress() {
+    if (disposed || !active) return;
+    if (!enabled || !progressEnabled) {
+      progressSnapshot = null;
+      progressState = 'unavailable';
+      render();
+      return;
+    }
+    if (!access.isUnlocked() || !access.getToken()) {
+      progressSnapshot = null;
+      progressState = 'locked';
+      render();
+      return;
+    }
+    if (progressReading || progressConnector?.isBusy()) return;
+    if (progressConnector?.isDisposed()) progressConnector = null;
+    if (!progressConnector) progressConnector = createProgressConnector({
+      enabled,
+      expectedIdentity: progressExpectedIdentity,
+      now,
+      staleAfterMs: progressStaleAfterMs,
+      transport: transportFor(SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT,
+        () => progressRequestOwner, ownsProgressRequest)
+    });
+
+    const owner = {generation: ++progressGeneration, token: access.getToken()};
+    progressRequestOwner = owner;
+    progressReading = true;
+    progressState = 'loading';
+    render();
+    try {
+      const result = await progressConnector.read();
+      if (!ownsProgressRequest(owner) || !access.isUnlocked()) return;
+      progressReading = false;
+      if (result.status === 'AUTH_REQUIRED') {
+        authenticationFailed = true;
+        access.lock();
+        return;
+      }
+      if (['AVAILABLE', 'STALE'].includes(result.status) && result.progress) {
+        progressSnapshot = result;
+        progressState = result.status === 'STALE' ? 'stale' : 'available';
+      } else {
+        progressSnapshot = null;
+        progressState = ({
+          NOT_FOUND: 'not_found',
+          REJECTED: 'rejected',
+          IDENTITY_MISMATCH: 'identity_mismatch'
+        })[result.status] || 'unavailable';
+      }
+      render();
+    } catch {
+      if (owner.generation !== progressGeneration || disposed || !active) return;
+      progressReading = false;
+      progressSnapshot = null;
+      progressState = 'unavailable';
+      render();
+    } finally {
+      if (progressRequestOwner === owner) progressRequestOwner = null;
+    }
+  }
+
   const onClick = () => { void read(); };
   const onPairedClick = () => { void readPaired(); };
+  const onProgressClick = () => { void readProgress(); };
   refresh.addEventListener('click', onClick);
   pairedRefresh.addEventListener('click', onPairedClick);
+  progressRefresh.addEventListener('click', onProgressClick);
   const unregister = access.registerReader(clearPrivate);
   const unsubscribe = access.subscribe(change => {
     if (disposed) return;
@@ -330,10 +462,12 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
       authenticationFailed = false;
       state = enabled ? 'ready' : 'missing';
       pairedState = enabled ? 'ready' : 'transport_unavailable';
+      progressState = enabled && progressEnabled ? 'ready' : 'unavailable';
       render();
       if (active && enabled && !pairedReport && !pairedReading) {
         void readPaired();
       }
+      if (active && enabled && progressEnabled && !progressReading) void readProgress();
     }
   });
   render();
@@ -349,12 +483,16 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
         state = enabled ? (access.isUnlocked() ? 'ready' : 'locked') : 'missing';
         pairedState = enabled ? (access.isUnlocked() ? 'ready' : 'locked') :
           'transport_unavailable';
+        progressState = enabled && progressEnabled ?
+          (access.isUnlocked() ? 'ready' : 'locked') : 'unavailable';
         render();
         if (enabled && access.isUnlocked() && !pairedReport) void readPaired();
+        if (enabled && progressEnabled && access.isUnlocked()) void readProgress();
       }
     },
     refresh: read,
     refreshPaired: readPaired,
+    refreshProgress: readProgress,
     dispose() {
       if (disposed) return;
       active = false;
@@ -364,8 +502,10 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
       unsubscribe();
       refresh.removeEventListener('click', onClick);
       pairedRefresh.removeEventListener('click', onPairedClick);
+      progressRefresh.removeEventListener('click', onProgressClick);
       connector?.dispose();
       pairedConnector?.dispose();
+      progressConnector?.dispose();
       overview.dispose();
       paired.dispose();
       controls.remove();

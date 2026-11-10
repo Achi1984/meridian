@@ -37,6 +37,11 @@ const REASON_LABELS = Object.freeze({
   REPORT_ADAPTER_NOT_PROVIDED: 'Noch keine Laufdaten verfügbar.',
   REPORT_ADAPTER_REJECTED: 'Laufdaten konnten nicht geprüft werden.',
   REPORT_SNAPSHOT_HISTORICAL: 'Historischer Bericht-Snapshot; kein aktueller Laufstatus.',
+  OBSERVED_CHECKPOINT_NOT_RUNTIME_STATUS: 'Beobachteter Bewertungs-Checkpoint; kein Laufstatus.',
+  PAIRED_PROGRESS_IDENTITY_MISMATCH: 'Checkpoint und freigegebene Run-Identität stimmen nicht überein.',
+  CHECKPOINT_METRIC_NOT_REPORTED: 'Wert im Checkpoint nicht gemeldet.',
+  CHECKPOINT_FILL_DETAILS_LIMITED: 'Nur geprüfte Füllungszahl; keine vollständigen Handelsdetails.',
+  NO_FILL_REPORTED: 'Keine Füllung im Checkpoint gemeldet.',
   RUNTIME_EVIDENCE_NOT_VALIDATED: 'Laufstatus ist nicht belegt.',
   PAIRED_REPORT_EVIDENCE_UNKNOWN: 'Berichtsevidenz ist unbekannt.',
   PAIRED_REPORT_IDENTITY_NOT_SUPPORTED: 'Trend-Modellidentität wird nicht unterstützt.',
@@ -164,9 +169,11 @@ function summaryStatus(bot) {
     const evidence = {
       VERIFIED_COMPLETE: 'strukturell vollständig',
       INTERRUPTED: 'unterbrochen',
-      RUNNING_SNAPSHOT: 'Zwischenstand'
+      RUNNING_SNAPSHOT: 'Zwischenstand',
+      OBSERVED_CHECKPOINT: 'beobachtet'
     }[bot.reportSnapshot.evidenceStatus] || 'Evidenz unbekannt';
-    return `Historischer Snapshot · ${evidence}`;
+    return `${bot.reportSnapshot.evidenceStatus === 'OBSERVED_CHECKPOINT' ?
+      'Checkpoint' : 'Historischer Snapshot'} · ${evidence}`;
   }
   const state = STATE_LABELS[bot.state] || STATE_LABELS.UNKNOWN;
   if (bot.state === 'PREPARED' || bot.state === 'UNKNOWN') return state;
@@ -326,6 +333,34 @@ function renderBot(document, parent, bot, disclosures, disclosureStates) {
     field(document, details, 'Evidenzstatus', bot.reportSnapshot.evidenceStatus);
     field(document, details, 'Bewertungszeitpunkt',
       snapshotTimestamp(bot.reportSnapshot.valuationAt));
+    if (bot.reportSnapshot.terminalStatus) {
+      field(document, details, 'Aufgezeichneter Endstatus',
+        bot.reportSnapshot.terminalStatus);
+      field(document, details, 'Geprüfte Füllungen',
+        String(bot.reportSnapshot.fillCount));
+      field(document, details, 'Bestand am Checkpoint',
+        bot.reportSnapshot.inventoryStatus === 'OPEN' ? 'Offene Position' :
+          bot.reportSnapshot.inventoryStatus === 'FLAT' ? 'Keine offene Position' :
+            'Unbekannt');
+      if (bot.reportSnapshot.recentFills.length > 0) {
+        const fills = document.createElement('section');
+        node(document, fills, 'h4',
+          `Letzte geprüfte Füllungen (${bot.reportSnapshot.recentFills.length})`);
+        const list = document.createElement('ol');
+        list.setAttribute('style',
+          'padding-inline-start:24px;min-width:0;overflow-wrap:anywhere');
+        for (const fill of bot.reportSnapshot.recentFills) {
+          node(document, list, 'li',
+            `${fill.side} · ${timestamp({available: true,
+              value: new Date(fill.executionAt).toISOString()})} · ` +
+            `Volumen ${amount({available: true, value: fill.grossCents / 100,
+              currency: 'EUR'})} · Gebühr ${amount({available: true,
+              value: fill.feeCents / 100, currency: 'EUR'})}`);
+        }
+        fills.append(list);
+        details.append(fills);
+      }
+    }
     field(document, details, 'Kostenannahmen',
       `${bot.reportSnapshot.feeBpsPerSide} bp Gebühr und ` +
       `${bot.reportSnapshot.slippageBpsPerSide} bp Slippage je Seite; ` +
@@ -383,7 +418,7 @@ function renderCurve(document, root, curve, bots) {
 }
 
 export function renderSpotPaperBotOverview(root, adapters, document = root?.ownerDocument,
-  {pairedReport = null} = {}) {
+  {pairedReport = null, pairedProgress = null, expectedIdentity = null} = {}) {
   if (!root || !document) return null;
   const disclosureStates = new Map();
   const rememberDisclosures = element => {
@@ -393,7 +428,9 @@ export function renderSpotPaperBotOverview(root, adapters, document = root?.owne
     for (const child of element?.children || []) rememberDisclosures(child);
   };
   rememberDisclosures(root);
-  const model = presentSpotPaperBotOverview(adapters, {pairedReport});
+  const model = presentSpotPaperBotOverview(adapters, {
+    pairedReport, pairedProgress, expectedIdentity
+  });
   root.replaceChildren();
   root.setAttribute('style',
     'box-sizing:border-box;display:grid;gap:12px;min-width:0;max-width:100%;padding:12px;overflow-wrap:anywhere');
