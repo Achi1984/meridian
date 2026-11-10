@@ -4,9 +4,10 @@ export const VERIFY_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/
 const TEST_PASSWORD='synthetic-browser-gate-password';
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-export async function unlockAppThroughGate(call,{additionalFetchUrls=[]}={}){
+export async function unlockAppThroughGate(call,{additionalFetchUrls=[],blockOtherRequests=false}={}){
  const additional=new Set(additionalFetchUrls);
- assert.ok(Array.isArray(additionalFetchUrls)&&additional.size===additionalFetchUrls.length);
+ assert.ok(Array.isArray(additionalFetchUrls)&&additional.size===additionalFetchUrls.length&&
+  typeof blockOtherRequests==='boolean');
  for(const url of additional)assert.ok(typeof url==='string'&&url.startsWith('https://')&&!url.includes('*')&&url!==VERIFY_ENDPOINT,
   'additional interception must identify exact HTTPS URLs owned by another fixture listener');
  const patterns=urls=>urls.map(url=>({urlPattern:url,requestStage:'Request'}));
@@ -74,7 +75,9 @@ export async function unlockAppThroughGate(call,{additionalFetchUrls=[]}={}){
    JSON.stringify(finalState.result.value)+'; verified='+verified+'; failure='+(failure?.message||'none'));
  }finally{
   off();
-  if(additional.size)await call('Fetch.enable',{patterns:patterns([...additional])});
+  if(additional.size||blockOtherRequests)await call('Fetch.enable',{patterns:patterns([
+   ...additional,...(blockOtherRequests?['*']:[])
+  ])});
   else await call('Fetch.disable');
  }
 }
