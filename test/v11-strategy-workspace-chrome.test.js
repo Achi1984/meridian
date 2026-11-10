@@ -568,7 +568,9 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(resetHistory.count,'5 von 5 Zusammenfassungen angezeigt.');
         assert.equal(resetHistory.entries,5);
         assert.equal(resetHistory.overflow,false);
-        assert.ok(catalog.resources.every(path=>!/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
+        const pairedPath=new URL(SPOT_PAPER_PAIRED_REPORT_ENDPOINT).pathname;
+        assert.ok(catalog.resources.every(path=>path===pairedPath||
+          !/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
         assert.ok(catalog.resources.includes('/docs/strategy-lab/campaign-20261013.json'));
         await evaluate(`(()=>{
           const first=document.querySelector('#strategy-comparison-first');

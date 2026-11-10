@@ -71,6 +71,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
       const metrics = await withMobileChrome(chrome, width, hosted.url, async call => {
         let reads = 0;
         let pairedReads = 0;
+        let pendingPairedRequestId = null;
         let pairedResponseMode = width === 320 ? 'unprovisioned' :
           width === 390 ? 'not_found' : 'legacy';
         let failure = null;
@@ -112,6 +113,10 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             } else {
               pairedReads++;
               const mode = pairedResponseMode;
+              if (mode === 'hold') {
+                pendingPairedRequestId = event.requestId;
+                return;
+              }
               if (mode === 'unprovisioned' || mode === 'not_found') {
                 await call('Fetch.fulfillRequest', {
                   requestId: event.requestId,
@@ -324,9 +329,40 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           writeFileSync(join(evidence, `paper-bot-workspace-${width}-${pairedResponseMode}.png`),
             Buffer.from(image.data, 'base64'));
 
+          pairedResponseMode = 'hold';
+          await evaluate(`[...document.querySelectorAll(
+            '#paired-paper-report-section button')].find(button =>
+              button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen').click()`);
+          for (let attempt = 0; attempt < 150 && pendingPairedRequestId === null; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.ok(pendingPairedRequestId, 'the pending paired request is intercepted before lock');
           await evaluate(`document.getElementById('app-access-lock').click()`);
           assert.equal(await evaluate(`document.getElementById('app').hidden`), true);
           assert.equal(reads, 1, 'locking clears state without another read');
+          try {
+            await call('Fetch.fulfillRequest', {
+              requestId: pendingPairedRequestId,
+              responseCode: 200,
+              responseHeaders: [
+                {name: 'Access-Control-Allow-Origin', value: '*'},
+                {name: 'Content-Type', value: 'application/json; charset=utf-8'},
+                {name: 'Cache-Control', value: 'no-store'}
+              ],
+              body: Buffer.from(JSON.stringify({
+                schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+                runId: pairedIdentity.runId,
+                report: pairedTrendFixture
+              })).toString('base64')
+            });
+          } catch {
+            // The browser may already have discarded the paused request after abort.
+          }
+          await new Promise(resolve => setTimeout(resolve, 50));
+          assert.doesNotMatch(
+            await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
+            /SYNTHETIC FIXTURE|5M-SMA20-Trend/,
+            'a response released after lock cannot repaint private paired data');
           pairedResponseMode = 'trend';
           await unlockAppThroughGate(call, {
             additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
@@ -336,12 +372,18 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             await new Promise(resolve => setTimeout(resolve, 10));
           }
           assert.equal(reads, 1, 're-unlock does not refresh the legacy report');
-          assert.equal(pairedReads, 3,
+          assert.equal(pairedReads, 4,
             're-unlock while active creates exactly one new paired read');
-          assert.doesNotMatch(
+          for (let attempt = 0; attempt < 150; attempt++) {
+            const pairedText = await evaluate(
+              `document.querySelector('#paired-paper-report-root').textContent`);
+            if (pairedText.includes('5M-SMA20-Trend')) break;
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.match(
             await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
-            /SYNTHETIC FIXTURE/,
-            'lock clears the paired DTO too');
+            /5M-SMA20-Trend/,
+            'the active unlock re-entry read restores the current paired DTO');
           await evaluate(`[...document.querySelectorAll(
             '#paper-bot-overview-section button')].find(button =>
               button.textContent.trim()==='BTC/EUR-Quelle manuell prüfen').click()`);
@@ -353,10 +395,10 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           await evaluate(`[...document.querySelectorAll(
             '#paired-paper-report-section button')].find(button =>
               button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen').click()`);
-          for (let attempt = 0; attempt < 150 && pairedReads < 4; attempt++) {
+          for (let attempt = 0; attempt < 150 && pairedReads < 5; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
-          assert.equal(pairedReads, 4,
+          assert.equal(pairedReads, 5,
             'manual refresh after re-unlock remains explicit and single-flight');
           for (let attempt = 0; attempt < 150; attempt++) {
             const panelText = await evaluate(

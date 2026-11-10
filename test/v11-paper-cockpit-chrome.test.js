@@ -150,6 +150,10 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         const intercepted=await interceptGeneratedPaperReport(call,report);
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
         assert.equal(intercepted.count(),0,'unlock and navigation do not read a Paper report');
+        for(let attempt=0;attempt<150&&intercepted.pairedCount()===0;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
         assert.equal(intercepted.pairedCount(),1,
           'authenticated active Strategies entry performs exactly one paired read');
         for(let attempt=0;attempt<150;attempt++){
@@ -348,6 +352,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(before.longRunId,true);
         assert.equal(before.longReason,true);
 
+        await evaluate(`document.querySelector('#paper-bot-overview-section').open=true`);
         const focus=await evaluate(`(()=>{
           document.getElementById('app-main').focus();
           return document.activeElement===document.getElementById('app-main');
@@ -363,12 +368,20 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-section > summary')`),
           true,'Paper-bot overview disclosure follows the primary report details');
         await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-section button')`),
+          true,'overview refresh is keyboard reachable before its disclosure controls');
+        await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-root button')`),
-          true,'open overview exposes its disclosure controls before the paired report');
+          true,'open-all disclosure is keyboard reachable');
         await key('Tab','Tab',9);
-        await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelectorAll('#paper-bot-overview-root button')[1]`),
+          true,'close-all disclosure is keyboard reachable');
+        for(let attempt=0;attempt<30&&
+            !(await evaluate(`document.activeElement===document.querySelector('#paired-paper-report-section > summary')`));attempt++){
+          await key('Tab','Tab',9);
+        }
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paired-paper-report-section > summary')`),
-          true,'paired Paper disclosure follows the overview controls');
+          true,'paired Paper disclosure follows the overview controls and cards');
         await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-history-section > summary')`),
           true,'the history disclosure follows the new Paper-bot sections');
