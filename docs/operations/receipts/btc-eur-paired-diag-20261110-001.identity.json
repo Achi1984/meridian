@@ -1,0 +1,99 @@
+{
+  "schemaVersion": "MERIDIAN_PAIRED_PAPER_DISABLED_CANDIDATE_V1",
+  "candidateStatus": "PROVISIONAL_HOST_UNIQUENESS_PENDING",
+  "candidateRunId": "btc-eur-paired-diag-20261110-001",
+  "acceptedImage": {
+    "immutableImageId": "sha256:9e5f7a26a9c3827d4f0935da31568d39d38c0507a24c0999674b3c70877cdae1",
+    "localTag": "meridian-spot-paper-paired-acceptance:ae9241418543",
+    "sourceSha": "ae924141854362257738322ac9a1022cd47e0b02",
+    "sourceArchiveSha256": "39ee4d8f21c1f4e59e6a5a812be13e98dce879ec1ca86964717e26021e9b5843",
+    "baseImageRef": "node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293",
+    "baseImageId": "sha256:11cedc39e663e7c5d5cb9cc77a461a0d2adc25537b94e6831a6108f09cb2001b",
+    "registryDigest": null
+  },
+  "identityCommand": {
+    "mode": "identity-only",
+    "network": "none",
+    "readOnlyRootFilesystem": true,
+    "tmpfsMounts": [
+      "/tmp:rw,noexec,nosuid,nodev,size=16m",
+      "/evidence-root:rw,nosuid,nodev,size=16m,mode=1777"
+    ],
+    "persistentVolumeMounted": false,
+    "hostPaperRunStarted": false
+  },
+  "identity": {
+    "schemaVersion": "SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1",
+    "runId": "btc-eur-paired-diag-20261110-001",
+    "pair": "BTC/EUR",
+    "sourceSha256": "c2549c37e05a64960991bda9a9c7658bcd4fb712587ce0079f75470ff3bcfa0d",
+    "configSha256": "a055960c9d6041fb32988d578d8f5f1b0d5c779eb1861ae8db836bc2ddaeef2e",
+    "researchSourceSha256": "dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25",
+    "feedSourceId": "KRAKEN_PUBLIC_SPOT_XBTEUR",
+    "comparisonEngineId": "SPOT_PAPER_SMA_COMPARISON_V1",
+    "accountContractId": "BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2",
+    "modelPairId": "BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1",
+    "models": [
+      {
+        "role": "baseline",
+        "modelId": "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1",
+        "accountId": "btc-eur-paired-diag-20261110-001-baseline"
+      },
+      {
+        "role": "challenger",
+        "modelId": "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1",
+        "accountId": "btc-eur-paired-diag-20261110-001-challenger"
+      },
+      {
+        "role": "cash",
+        "modelId": "CASH_CONTROL_V1",
+        "accountId": "btc-eur-paired-diag-20261110-001-cash"
+      }
+    ]
+  },
+  "preservedSelection": {
+    "accountContract": {
+      "version": 2,
+      "feeBpsPerSide": 20,
+      "feeBasis": "EEA_SPOT_ONLY_TAKER_ASSUMPTION",
+      "feeAsOf": "2026-11-09",
+      "accountTier": "UNKNOWN",
+      "ratesVerified": false,
+      "slippageBpsPerSide": 10
+    },
+    "budgetsAndBounds": {
+      "initialCashCents": 100000,
+      "maxEntryCents": 10000,
+      "maxExposureCents": 10000,
+      "maxSessionLossCents": 2000,
+      "stopLossBps": 200,
+      "maxDurationMs": 28800000,
+      "maxCycles": 480,
+      "maxRequests": 960,
+      "maxBytes": 67108864,
+      "maxResponseBytes": 262144,
+      "requestTimeoutMs": 5000,
+      "pollIntervalMs": 60000
+    }
+  },
+  "guardrails": {
+    "hostUniquenessCheck": "PENDING",
+    "hostPaperRun": false,
+    "feedStarted": false,
+    "journalCreated": false,
+    "credentialsUsed": false,
+    "volumeMutated": false,
+    "registryPush": false,
+    "activation": false,
+    "promotion": false
+  },
+  "promotionGate": {
+    "status": "BLOCKED_PENDING_REQUIRED_POSTCHECKS",
+    "requiredPostchecks": {
+      "safety": "Safety42862034874",
+      "runtime": "Runtime42862034724",
+      "coordinator": "Coordinator42862034745",
+      "pages": "Pages42862033804"
+    }
+  }
+}

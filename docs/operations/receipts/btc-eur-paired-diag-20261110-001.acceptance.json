@@ -1,0 +1,79 @@
+{
+  "acceptanceResult": "PASS",
+  "sourceSha": "ae924141854362257738322ac9a1022cd47e0b02",
+  "sourceDir": "/home/runner/work/meridian/meridian",
+  "sourceArchiveSha256": "39ee4d8f21c1f4e59e6a5a812be13e98dce879ec1ca86964717e26021e9b5843",
+  "buildContext": "git archive of requested commit",
+  "imageTag": "meridian-spot-paper-paired-acceptance:ae9241418543",
+  "imageId": "sha256:9e5f7a26a9c3827d4f0935da31568d39d38c0507a24c0999674b3c70877cdae1",
+  "repoDigests": [],
+  "dockerfileSha256": "cfa2455decf969ce37d3d8bc4985b5ac093933d05143a97af2f4dcf036539f21",
+  "baseImageRef": "node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293",
+  "baseImageDigest": "sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293",
+  "baseImageId": "sha256:11cedc39e663e7c5d5cb9cc77a461a0d2adc25537b94e6831a6108f09cb2001b",
+  "baseImageRepoDigests": [
+    "node@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293"
+  ],
+  "baseImageStatus": "PINNED_DIGEST_VERIFIED_AND_LAYER_ANCESTRY_MATCHED",
+  "disabledStatus": "DISABLED",
+  "disabledReason": "NO_RUN_REQUESTED",
+  "identity": {
+    "schemaVersion": "SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1",
+    "runId": "accept-ae9241418543",
+    "pair": "BTC/EUR",
+    "sourceSha256": "c2549c37e05a64960991bda9a9c7658bcd4fb712587ce0079f75470ff3bcfa0d",
+    "configSha256": "1a0dd3a0e8952eb5d6a1c0af501317e53c2385ea8d54127c6f7745e5f3ca41fd",
+    "researchSourceSha256": "dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25",
+    "feedSourceId": "KRAKEN_PUBLIC_SPOT_XBTEUR",
+    "comparisonEngineId": "SPOT_PAPER_SMA_COMPARISON_V1",
+    "modelPairId": "BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1",
+    "models": [
+      {
+        "role": "baseline",
+        "modelId": "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1",
+        "accountId": "accept-ae9241418543-baseline"
+      },
+      {
+        "role": "challenger",
+        "modelId": "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1",
+        "accountId": "accept-ae9241418543-challenger"
+      },
+      {
+        "role": "cash",
+        "modelId": "CASH_CONTROL_V1",
+        "accountId": "accept-ae9241418543-cash"
+      }
+    ]
+  },
+  "packagedModulesImported": [
+    "scripts/spot-paper-paired/host.mjs",
+    "scripts/spot-paper-paired/forward.mjs",
+    "scripts/spot-paper-paired/fee-scenario.mjs",
+    "scripts/spot-paper-paired/feed.mjs",
+    "scripts/spot-paper-paired/provider.mjs",
+    "scripts/spot-paper-paired/next-run-composition.mjs",
+    "scripts/spot-paper-pilot/core.mjs",
+    "scripts/spot-paper-pilot/journal.mjs",
+    "scripts/spot-paper-pilot/provider.mjs",
+    "scripts/spot-paper-pilot/package-host-evidence.mjs",
+    "scripts/spot-paper-paired-report/contract.mjs",
+    "scripts/spot-paper-paired-report/evaluate.mjs",
+    "scripts/spot-paper-paired-report/cli.mjs",
+    "scripts/spot-paper-research/comparison.mjs",
+    "scripts/spot-paper-research/entry-confirmation.mjs",
+    "scripts/spot-paper-research/five-minute-trend.mjs"
+  ],
+  "rejectedCases": [
+    "unknown model pair",
+    "unknown account contract",
+    "model pair with incompatible account contract",
+    "malformed model pair selection",
+    "existing evidence path"
+  ],
+  "evidenceRootEmptyAfterDefaultAndIdentity": true,
+  "existingFixturePreserved": true,
+  "networkMode": "none",
+  "launchedFeed": false,
+  "runJournalCreated": false,
+  "remotelyPushed": false
+}
