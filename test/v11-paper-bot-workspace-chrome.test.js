@@ -71,7 +71,8 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
       const metrics = await withMobileChrome(chrome, width, hosted.url, async call => {
         let reads = 0;
         let pairedReads = 0;
-        let pairedResponseMode = 'legacy';
+        let pairedResponseMode = width === 320 ? 'unprovisioned' :
+          width === 390 ? 'not_found' : 'legacy';
         let failure = null;
         const off = call.onEvent('Fetch.requestPaused', event => {
           void (async () => {
@@ -189,7 +190,24 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.deepEqual(mounted.overviewControls,
             ['Alle Details öffnen', 'Alle Details schließen']);
           assert.equal(reads, 0, 'unlock and navigation do not read report data');
-          assert.equal(pairedReads, 0, 'unlock and navigation do not read paired data');
+          for (let attempt = 0; attempt < 150 && pairedReads === 0; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.equal(pairedReads, 1,
+            'authenticated active-tab entry creates exactly one paired GET');
+          const entryState = width === 320 ? 'unprovisioned' :
+            width === 390 ? 'empty' : 'running_snapshot';
+          let entryPanel = null;
+          for (let attempt = 0; attempt < 150; attempt++) {
+            entryPanel = await evaluate(`(()=>{
+              const root=document.querySelector('#paired-paper-report-root');
+              return {state:root.dataset.state,text:root.textContent};
+            })()`);
+            if (entryPanel.state === entryState) break;
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.equal(entryPanel?.state, entryState,
+            'active entry renders its bounded read result');
           await evaluate(`document.querySelector('#paper-bot-overview-section > summary').click()`);
           await evaluate(`document.querySelector('#paired-paper-report-section > summary').click()`);
           const initial = await evaluate(`({
@@ -213,9 +231,17 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.equal(initial.disabled, false);
           assert.match(initial.text, /In Vorbereitung/);
           assert.match(initial.text, /Unbekannt/);
-          assert.match(initial.paired, /Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt/);
-          assert.equal(initial.pairedPanelState, 'idle');
-          assert.match(initial.pairedPanel, /Noch kein Bericht geladen/);
+          if (width === 320) {
+            assert.match(initial.paired, /Transport ist nicht provisioniert/);
+            assert.match(initial.pairedPanel, /Transport nicht provisioniert/);
+          } else if (width === 390) {
+            assert.match(initial.paired, /Kein gepaarter Bericht veröffentlicht/);
+            assert.match(initial.pairedPanel, /Kein gepaarter Bericht veröffentlicht/);
+          } else {
+            assert.match(initial.paired, /Gepaarter Bericht geladen/);
+            assert.match(initial.pairedPanel, /CONFIRM2_COOLDOWN10/);
+          }
+          assert.equal(initial.pairedPanelState, entryState);
           assert.doesNotMatch(initial.pairedPanel, /CORRUPT_UNKNOWN|Report-Projektor/);
           assert.equal(initial.badges.length, 3);
           for (const badge of initial.badges) {
@@ -251,7 +277,8 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.equal(toggleCheck.allClosed, true, 'close-all collapses bot and trade details');
           await new Promise(resolve => setTimeout(resolve, 50));
           assert.equal(reads, 0, 'overview disclosure controls do not request the BTC/EUR report');
-          assert.equal(pairedReads, 0, 'overview disclosure controls do not request the paired report');
+          assert.equal(pairedReads, 1,
+            'overview disclosure controls do not add paired requests');
 
           await evaluate(`[...document.querySelectorAll(
             '#paper-bot-overview-section button')].find(button =>
@@ -270,19 +297,17 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.match(unavailable, /Kein authentifizierter Bericht verfügbar/);
           assert.match(unavailable, /In Vorbereitung/);
           assert.doesNotMatch(unavailable, /0,00 €|0 fills/i);
-          pairedResponseMode = width === 320 ? 'unprovisioned' :
-            width === 390 ? 'not_found' : 'legacy';
+          pairedResponseMode = 'trend';
           await evaluate(`[...document.querySelectorAll(
             '#paired-paper-report-section button')].find(button =>
               button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen').click()`);
-          for (let attempt = 0; attempt < 150 && pairedReads === 0; attempt++) {
+          for (let attempt = 0; attempt < 150 && pairedReads < 2; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
           assert.equal(failure, null, failure?.message);
-          assert.equal(pairedReads, 1, 'one manual paired refresh creates exactly one GET');
+          assert.equal(pairedReads, 2, 'explicit refresh creates exactly one additional GET');
           let pairedSnapshot = null;
-          const expectedFirstState = width === 320 ? 'unprovisioned' :
-            width === 390 ? 'empty' : 'running_snapshot';
+          const expectedFirstState = 'running_snapshot';
           for (let attempt = 0; attempt < 150; attempt++) {
             pairedSnapshot = await evaluate(`(()=>{
               const root=document.querySelector('#paired-paper-report-root');
@@ -292,16 +317,9 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             await new Promise(resolve => setTimeout(resolve, 10));
           }
           assert.equal(pairedSnapshot?.state, expectedFirstState);
-          if (width === 320) {
-            assert.match(pairedSnapshot.text, /Transport nicht provisioniert/);
-            assert.doesNotMatch(pairedSnapshot.text, /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
-          } else if (width === 390) {
-            assert.match(pairedSnapshot.text, /Kein gepaarter Bericht veröffentlicht/);
-            assert.doesNotMatch(pairedSnapshot.text, /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
-          } else {
-            assert.match(pairedSnapshot.text, /CONFIRM2_COOLDOWN10/);
-            assert.doesNotMatch(pairedSnapshot.text, /5M-SMA20-Trend/);
-          }
+          assert.match(pairedSnapshot.text, /5M-SMA20-Trend/);
+          assert.doesNotMatch(pairedSnapshot.text,
+            /CORRUPT_UNKNOWN|gemeinsamer Bericht konnte nicht geprüft werden/);
           const image = await call('Page.captureScreenshot', {format: 'png'});
           writeFileSync(join(evidence, `paper-bot-workspace-${width}-${pairedResponseMode}.png`),
             Buffer.from(image.data, 'base64'));
@@ -309,11 +327,17 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           await evaluate(`document.getElementById('app-access-lock').click()`);
           assert.equal(await evaluate(`document.getElementById('app').hidden`), true);
           assert.equal(reads, 1, 'locking clears state without another read');
+          pairedResponseMode = 'trend';
           await unlockAppThroughGate(call, {
             additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
           });
           await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
-          assert.equal(reads, 1, 're-unlock and navigation do not automatically refresh');
+          for (let attempt = 0; attempt < 150 && pairedReads < 3; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.equal(reads, 1, 're-unlock does not refresh the legacy report');
+          assert.equal(pairedReads, 3,
+            're-unlock while active creates exactly one new paired read');
           assert.doesNotMatch(
             await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
             /SYNTHETIC FIXTURE/,
@@ -326,14 +350,14 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           }
           assert.equal(failure, null, failure?.message);
           assert.equal(reads, 2, 'the second user-initiated read is handled once');
-          pairedResponseMode = width === 320 ? 'legacy' : 'trend';
           await evaluate(`[...document.querySelectorAll(
             '#paired-paper-report-section button')].find(button =>
               button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen').click()`);
-          for (let attempt = 0; attempt < 150 && pairedReads < 2; attempt++) {
+          for (let attempt = 0; attempt < 150 && pairedReads < 4; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
-          assert.equal(pairedReads, 2, 're-unlock requires a second manual paired read');
+          assert.equal(pairedReads, 4,
+            'manual refresh after re-unlock remains explicit and single-flight');
           for (let attempt = 0; attempt < 150; attempt++) {
             const panelText = await evaluate(
               `document.querySelector('#paired-paper-report-root').textContent`);

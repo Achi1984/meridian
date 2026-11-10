@@ -12,6 +12,7 @@ import {reportFixtures} from './fixtures/memecoin-paper-operator-report/scenario
 import {PAPER_REPORT_ENVELOPE_SCHEMA} from '../scripts/memecoin-paper-report-bridge/index.mjs';
 import {PAPER_REPORT_ENDPOINT} from '../v11/paper-cockpit-controller.js';
 import {SPOT_PAPER_HOST8H_REPORT_ENDPOINT} from '../v11/spot-paper-host8h-controller.js';
+import {SPOT_PAPER_PAIRED_REPORT_ENDPOINT} from '../v11/spot-paper-paired-report-connector.js';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const sizes=[
@@ -45,12 +46,13 @@ async function interceptGeneratedPaperReport(call,report){
   const body=Buffer.from(JSON.stringify({
     schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
   })).toString('base64');
-  let reads=0,host8hReads=0,failure=null,verificationOwned=false;
+  let reads=0,host8hReads=0,pairedReads=0,failure=null,verificationOwned=false;
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
       if(verificationOwned&&event.request.url===VERIFY_ENDPOINT)return;
-      assert.ok([PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT].includes(event.request.url),
-        'only the exact approved Paper and host8h endpoints are intercepted');
+      assert.ok([PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,
+        SPOT_PAPER_PAIRED_REPORT_ENDPOINT].includes(event.request.url),
+        'only the exact approved Paper endpoints are intercepted');
       if(event.request.method==='OPTIONS'){
         await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,responseHeaders:[
           {name:'Access-Control-Allow-Origin',value:'*'},
@@ -72,6 +74,18 @@ async function interceptGeneratedPaperReport(call,report){
         body:Buffer.from(JSON.stringify({error:'host8h_transport_not_provisioned'})).toString('base64')});
         return;
       }
+      if(event.request.url===SPOT_PAPER_PAIRED_REPORT_ENDPOINT){
+        const authorization=Object.entries(event.request.headers||{})
+          .find(([name])=>name.toLowerCase()==='authorization')?.[1];
+        assert.equal(authorization,'Bearer '+PAPER_PASSWORD);
+        pairedReads++;
+        await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:404,responseHeaders:[
+          {name:'Access-Control-Allow-Origin',value:'*'},
+          {name:'Content-Type',value:'application/json; charset=utf-8'},
+          {name:'Cache-Control',value:'no-store'}],
+        body:Buffer.from(JSON.stringify({error:'spot_paper_paired_report_not_found'})).toString('base64')});
+        return;
+      }
       const authorization=Object.entries(event.request.headers||{})
         .find(([name])=>name.toLowerCase()==='authorization')?.[1];
       assert.equal(authorization,'Bearer '+PAPER_PASSWORD);
@@ -84,10 +98,12 @@ async function interceptGeneratedPaperReport(call,report){
   });
   await call('Fetch.enable',{patterns:[
     {urlPattern:PAPER_REPORT_ENDPOINT+'*',requestStage:'Request'},
-    {urlPattern:SPOT_PAPER_HOST8H_REPORT_ENDPOINT+'*',requestStage:'Request'}
+    {urlPattern:SPOT_PAPER_HOST8H_REPORT_ENDPOINT+'*',requestStage:'Request'},
+    {urlPattern:SPOT_PAPER_PAIRED_REPORT_ENDPOINT+'*',requestStage:'Request'}
   ]});
   return {
     count:()=>reads,
+    pairedCount:()=>pairedReads,
     host8hCount:()=>host8hReads,
     assertHealthy(){if(failure)throw failure;},
     async unlockApp(){
@@ -134,6 +150,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         const intercepted=await interceptGeneratedPaperReport(call,report);
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
         assert.equal(intercepted.count(),0,'unlock and navigation do not read a Paper report');
+        assert.equal(intercepted.pairedCount(),1,
+          'authenticated active Strategies entry performs exactly one paired read');
         for(let attempt=0;attempt<150;attempt++){
           if(await evaluate(`document.querySelector('#paper-cockpit-root.paper-cockpit') !== null`))break;
           await new Promise(resolve=>setTimeout(resolve,10));
@@ -148,6 +166,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.getElementById('paper-history-section').open`),true,
           'native Enter opens previous reports before reading or measuring them');
         assert.equal(intercepted.count(),0,'opening previous reports does not fetch a report');
+        assert.equal(intercepted.pairedCount(),1,
+          'opening history does not add paired reads');
         const liveRead=await evaluate(`(()=>{
           const button=document.querySelector('#paper-cockpit-root button');
           return button?{text:button.textContent,height:button.getBoundingClientRect().height,
@@ -156,6 +176,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.ok(liveRead,'native browser module graph mounts the real controller');
         assert.equal(liveRead.height>=44,true,'manual report read target is at least 44px');
         assert.equal(intercepted.count(),0,'controller mount remains a no-read operation');
+        assert.equal(intercepted.pairedCount(),1,
+          'mounting the legacy report controller does not add paired reads');
         assert.equal(await evaluate(`(()=>{
           const button=document.querySelector('#paper-cockpit-root button');
           button.focus();
@@ -264,8 +286,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX14');
-          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX14');
+          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX15');
+          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX15');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
@@ -341,8 +363,12 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-section > summary')`),
           true,'Paper-bot overview disclosure follows the primary report details');
         await key('Tab','Tab',9);
+        assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-root button')`),
+          true,'open overview exposes its disclosure controls before the paired report');
+        await key('Tab','Tab',9);
+        await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paired-paper-report-section > summary')`),
-          true,'paired Paper disclosure follows the bot overview');
+          true,'paired Paper disclosure follows the overview controls');
         await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-history-section > summary')`),
           true,'the history disclosure follows the new Paper-bot sections');

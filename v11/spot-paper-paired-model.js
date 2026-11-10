@@ -2,7 +2,7 @@ import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_NEXT_RUN_MODELS,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
-} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX14';
+} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX15';
 
 const ARM_DEFINITIONS = Object.freeze([
   {id: 'baseline', label: 'Baseline'},

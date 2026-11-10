@@ -1,12 +1,12 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX14';
-import {mountSpotPaperBotOverview} from './spot-paper-bot-overview-controller.js?v=B16-M11-FIX14';
-import {mountSpotPaperPairedPanel} from './spot-paper-paired-controller.js?v=B16-M11-FIX14';
-import {SPOT_PAPER_REPORT_ENDPOINT} from './spot-paper-cockpit-controller.js?v=B16-M11-FIX14';
-import {createSpotPaperReportConnector} from './spot-paper-report-connector.js?v=B16-M11-FIX14';
+import {appAccess} from './app-access.js?v=B16-M11-FIX15';
+import {mountSpotPaperBotOverview} from './spot-paper-bot-overview-controller.js?v=B16-M11-FIX15';
+import {mountSpotPaperPairedPanel} from './spot-paper-paired-controller.js?v=B16-M11-FIX15';
+import {SPOT_PAPER_REPORT_ENDPOINT} from './spot-paper-cockpit-controller.js?v=B16-M11-FIX15';
+import {createSpotPaperReportConnector} from './spot-paper-report-connector.js?v=B16-M11-FIX15';
 import {
   createSpotPaperPairedReportConnector,
   SPOT_PAPER_PAIRED_REPORT_ENDPOINT
-} from './spot-paper-paired-report-connector.js?v=B16-M11-FIX14';
+} from './spot-paper-paired-report-connector.js?v=B16-M11-FIX15';
 
 const TREND_MODEL = 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1';
 const messages = Object.freeze({
