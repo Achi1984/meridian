@@ -1,0 +1,193 @@
+PAIRED PAPER CHECKPOINT PUBLICATION — INACTIVE OPERATOR WORKFLOW
+
+Scope and evidence boundary
+---------------------------
+This package adds missing publication plumbing, not current-run telemetry.
+No scheduler, migration, credentials, mount, deployment or publisher is
+activated by this change. Deploying this code alone WILL NOT populate the
+current btc-eur-paired-diag-20261110-001 run. Its frozen image
+ae924141854362257738322ac9a1022cd47e0b02 has no publisher. Separate, approved
+read-only volume access or a coherent operator-controlled transfer has NOT
+been established and is a prerequisite, not a result of this work.
+
+Do not edit/restart the running container, change its volumes/host configuration,
+read credentials from it, or modify its strategy/source/journal/account state.
+Do not alias the legacy host8h run or use immutable completed-report storage.
+This lane does not assess profitability, actual exchange fees, process liveness,
+operational readiness or automatic promotion. It cannot authorize trading.
+
+OBSERVED_CHECKPOINT means a stable committed journal snapshot was observed.
+writer.lock is never read, removed or treated as liveness. A terminal event is
+reported as TERMINAL_RECORDED or INTERRUPTED_RECORDED, NOT VERIFIED_COMPLETE.
+It is not the terminal evaluator's independent verification. Pending, incoherent,
+unrecognized or invalid evidence yields BUSY/UNKNOWN with no publishable payload.
+
+Contract and resource bounds
+----------------------------
+SPOT_PAPER_PAIRED_PROGRESS_V1 is separate from all final-report schemas. It binds
+the full expected run, source/config/research hashes, feed, comparison engine,
+model-pair, roles/models/account identities, journal sequence and SHA256 of
+JSON.stringify(payload) in the existing journal envelope. Hash verification is
+integrity checking, not a signature or independent verification of source code.
+The exact reviewed expected identity must be supplied independently of the
+journal. Never derive the expected identity from an untrusted upload.
+
+Only the EUR next-run three-role model pair is supported. It is not a USD lane.
+Amounts are EUR CENTS. netPnlCents = committed netEquityCents - starting capital.
+Never subtract booked fees or modeled slippage again from net equity/PnL.
+Slippage is an execution-price assumption; fees are the unverified modeled
+20 bps per side EEA taker assumption, slippage 10 bps per side. These are NOT
+actual charged exchange fees or evidence of the account's fee tier.
+
+Valuations come only from the last committed shared_observation, not a strategy
+replay, a fresh market feed, a later failure, or a terminal report's revaluation.
+observedAt/valuationAt survive export/upload unchanged. exportedAt is NOT a
+freshness clock. latestEventAt and terminal.at may be later without freshening
+financial metrics. Null cash/hypothetical exit costs mean UNKNOWN, not zero;
+the journal summary does not separately establish these amounts.
+
+Fills are validated for role, order, quantity/notional rounding, modeled fees,
+timestamps and cumulative fee/turnover consistency. At most 12 recent fills
+per role are published. fillCount counts executions; completedRoundTripCount
+counts alternating completed BUY/SELL pairs, not individual fills. Risk stop
+codes are allowlisted; strategy/risk state, paths, raw responses, free-text
+errors and secrets are never exported.
+
+Exporter: Linux /proc/self/fd is required. Each directory component is opened
+O_NOFOLLOW|O_NONBLOCK|O_DIRECTORY, pinning the directory chain. Journal opens
+use O_NOFOLLOW|O_NONBLOCK and regular-file checks, 16 MiB/1024-event/480-observation
+caps and a 3 second deadline (configurable library cap 5 seconds). Two bounded
+reads and file/directory identity/size/mtime/ctime checks bracket pending-state
+checks. A concurrent append, rename or transient pending rewrite is rejected.
+No lock, pending marker, source response, ledger or account file is modified.
+Missing required committed valuations are UNKNOWN; there is no legacy fallback.
+
+Transport: 64 KiB progress cap, 5 second request-body cap, two concurrent gateway
+requests and two bounded store operations. Pool statement/lock/connection
+deadlines are reused from the reviewed private report pool. Publisher: one
+8 second request by default (maximum 10 seconds), 4 KiB receipt cap, fixed HTTPS
+endpoint, no redirects and no retry. A timeout/lost response can occur after
+a database commit: UNKNOWN requires operator inspection, not blind retry.
+Browser connector: default disabled, at most one read, maximum 10 second deadline.
+Capacity stays busy until uncooperative underlying work actually settles.
+
+Provisioning prerequisites — separate approval required
+-------------------------------------------------------
+1. Establish an operator-controlled read-only mount of the entire run directory,
+   or a quiescent/coherently captured transfer. A copied journal alone without
+   its pending-state context is not evidence that an active writer acknowledged
+   the snapshot. Do not copy during pending publication. A filesystem snapshot
+   containing journal.pending is rejected. Preserve the journal envelope bytes.
+2. Independently approve the expected identity against the pinned image receipt:
+   /home/runner/work/meridian/meridian/docs/operations/receipts/btc-eur-paired-diag-20261110-001.expected-identity.json
+   Do not substitute any host8h expected identity or claim that this receipt
+   grants read-only access. It does not.
+3. Review/apply, in a separately authorized deployment, the additive migration:
+   /home/runner/work/meridian/meridian/migrations/20261110_meridian_spot_paper_paired_progress.sql
+   This task does NOT apply it. Provision only the necessary private application
+   database privileges on the dedicated progress table. Existing final tables
+   and report ingest policies remain unchanged.
+4. Configure the gateway's database/TLS settings using the existing private
+   report-pool policy. Provision a separate high-entropy uploader bearer token;
+   never reuse dashboard read, write, or completed-report upload credentials.
+   Keep the raw upload token only in the operator publisher's secret environment:
+     MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_PUBLISH_TOKEN
+   Configure only its SHA256 digest on the gateway:
+     MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_UPLOAD_TOKEN_SHA256
+   Existing MERIDIAN_READ_TOKEN[_SHA256] remains the independent GET authority.
+   No credentials belong in files, shell history, URLs, receipts or logs.
+5. Explicitly configure all gateway gates:
+     MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_ENABLED=true
+     MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_DEPLOYMENT_VERIFIED=true
+     MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY_JSON=<approved JSON>
+   Missing/invalid gates or overlapping credentials disable the lane.
+   There is one exact run allowlist, not a caller-selectable run/query parameter.
+
+One-shot export, inspect and dry-run (no network by default)
+----------------------------------------------------------
+Run from the separately authorized operator environment with a read-only source
+and a private writable output directory. Replace the illustrative /mnt paths with
+approved mount/transfer paths; they do not imply existing access.
+
+  umask 077
+  EXPECTED=/home/runner/work/meridian/meridian/docs/operations/receipts/btc-eur-paired-diag-20261110-001.expected-identity.json
+  node /home/runner/work/meridian/meridian/scripts/spot-paper-paired-progress/export-cli.mjs \
+    --run-directory /mnt/approved-readonly/btc-eur-paired-diag-20261110-001 \
+    --expected-identity-json "$(cat "$EXPECTED")" > /tmp/paired-progress.json
+
+Continue ONLY on exit 0. BUSY/UNKNOWN emits only a status and exit 1, never a
+publishable checkpoint. Inspect the sanitized result and source valuation age.
+
+  node /home/runner/work/meridian/meridian/scripts/spot-paper-paired-progress/publish.mjs \
+    --snapshot /tmp/paired-progress.json --expected-identity "$EXPECTED"
+
+DRY_RUN validates locally and performs no upload. After separate credential
+provisioning and explicit operator approval, add --publish for ONE request:
+
+  node /home/runner/work/meridian/meridian/scripts/spot-paper-paired-progress/publish.mjs \
+    --snapshot /tmp/paired-progress.json --expected-identity "$EXPECTED" --publish
+
+The only destination is:
+  https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-paired-progress
+
+GET requires the dashboard read bearer; POST requires the distinct progress
+upload bearer. No query parameters or endpoint overrides are accepted.
+Identical sequence/digest/checkpoint content is idempotent (exportedAt alone
+may differ; storage preserves the original). Old/conflicting sequences, full
+identity changes, valuation regression and terminal regression are rejected by
+transactional compare-and-swap. Terminal records are frozen except exact replay.
+After UNKNOWN, inspect authenticated readback sequence/digest before considering
+any further action. A fresh upload of old data remains old.
+
+This workflow's cadence is exactly one sample and at most one upload. It installs
+no loop, timer, cron or workflow scheduler. Any future cadence requires separate
+finite limits and operational approval. A future runtime image may enqueue a
+bounded nonblocking checkpoint only AFTER journal.append acknowledges success.
+Its publication errors must never change decisions, trading, budget, retries or
+journal/account writes. The frozen running image is outside this task's scope.
+
+Follow-up UI integration — owned separately
+-------------------------------------------
+Only this new module is supplied, with no automatic import or mount:
+  /home/runner/work/meridian/meridian/v11/spot-paper-paired-progress-connector.js
+
+The #1344 UI owner must separately integrate it with existing read-access state:
+  createSpotPaperPairedProgressConnector({
+    enabled: <explicit approved feature flag>,
+    expectedIdentity: <independently approved full identity>,
+    now: Date.now,
+    staleAfterMs: <explicit finite product freshness policy>,
+    transport: <existing authenticated read-access wrapper for fixed endpoint>
+  })
+
+Use the existing authenticated read transport/lock lifecycle, not localStorage,
+URL tokens or an unauthenticated fetch. Transport must use redirect:error and
+the fixed endpoint, no-store, bounded response handling and AbortSignal. Do not
+give the browser uploader authority. Handle DISABLED, AUTH_REQUIRED, NOT_FOUND,
+BUSY, TIMEOUT, DISPOSED, REJECTED, UNAVAILABLE, AVAILABLE and STALE distinctly.
+Use ageMs from valuationAt. STALE may carry the last validated metrics, but must
+not appear fresh or live. Lock clears/disposal must discard any late result.
+
+The existing access owner is createAppAccess in:
+  /home/runner/work/meridian/meridian/v11/app-access.js
+Register a clear callback that purges displayed/cached private progress and
+disposes the connector through access.registerReader. Capture the
+current in-memory access.getToken() for each request, and call access.lock() on
+401/403 only if that same token still owns the request. Unregister and dispose
+when the UI workspace unmounts. Re-unlock must construct a new connector rather
+than revive a disposed instance. The offline auth test covers this lock/reader
+disposal and cancellation lifecycle without editing the shared access module.
+
+The UI owner must add exact shared cache identities for any new reachable
+module edges, wire an explicit refresh/dispose lifecycle, and label checkpoint,
+terminal-recorded and unknown states without claiming RUNNING or verified
+completion. Never replace terminal-report proof with this progress payload.
+No #1344 bootstrap/cards, entrypoints or existing legacy connector are changed.
+
+Offline verification
+--------------------
+The focused Node suites cover exporter safety, authenticated API/CAS, publisher,
+connector, late completion and the offline journal-to-browser fixture. The store
+test can additionally exercise a disposable Postgres via the existing pg
+dependency; no production migration or external feed is required.
+Hosted release safety remains responsible for complete candidate regression.
