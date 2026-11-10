@@ -985,6 +985,78 @@ test("paired transport adapter reports response stages without changing legacy p
   });
 });
 
+test("paired transport adapter fences late headers and reports a stalled body", async () => {
+  const headerController = new AbortController();
+  const headerPhases = [];
+  let resolveHeaders;
+  const headerProvider = createSpotPaperPairedKrakenProvider({
+    fetchImpl: () => new Promise(resolve => {
+      resolveHeaders = resolve;
+    })
+  });
+  const headerRequest = headerProvider.fetchOhlc({
+    signal: headerController.signal,
+    deadlineAt: performance.now() + 5_000,
+    monotonicNow: () => performance.now(),
+    onTransportState: (phase, bytes) => headerPhases.push([phase, bytes])
+  });
+  while (!resolveHeaders) await new Promise(resolve => setImmediate(resolve));
+  headerController.abort();
+  await assert.rejects(headerRequest, {name: "AbortError"});
+  assert.deepEqual(headerPhases, [["HEADERS", 0]]);
+  const lateResponse = new Response("late");
+  resolveHeaders(lateResponse);
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(lateResponse.bodyUsed, true);
+  assert.deepEqual(headerPhases, [["HEADERS", 0]]);
+
+  const bodyController = new AbortController();
+  const bodyPhases = [];
+  let beginBodyRead;
+  let cancelBodyRead;
+  const stalledResponse = {
+    ok: true,
+    status: 200,
+    headers: new Headers({"content-type": "application/json"}),
+    body: {
+      getReader() {
+        return {
+          read() {
+            beginBodyRead();
+            return new Promise(() => {});
+          },
+          cancel() {
+            cancelBodyRead();
+            return Promise.resolve();
+          },
+          releaseLock() {}
+        };
+      }
+    }
+  };
+  const bodyStarted = new Promise(resolve => {
+    beginBodyRead = resolve;
+  });
+  let bodyCancelled = false;
+  cancelBodyRead = () => {
+    bodyCancelled = true;
+  };
+  const bodyProvider = createSpotPaperPairedKrakenProvider({
+    fetchImpl: async () => stalledResponse
+  });
+  const bodyRequest = bodyProvider.fetchOhlc({
+    signal: bodyController.signal,
+    deadlineAt: performance.now() + 5_000,
+    monotonicNow: () => performance.now(),
+    onTransportState: (phase, bytes) => bodyPhases.push([phase, bytes])
+  });
+  await bodyStarted;
+  bodyController.abort();
+  await assert.rejects(bodyRequest, {name: "AbortError"});
+  assert.equal(bodyCancelled, true);
+  assert.deepEqual(bodyPhases, [["HEADERS", 0], ["BODY", 0]]);
+});
+
 test("research source pin matches the exact merged #1299 bytes and rejects changed bytes", async () => {
   const [comparisonBytes, entryConfirmationBytes] = await Promise.all([
     readFile(new URL("../scripts/spot-paper-research/comparison.mjs", import.meta.url)),

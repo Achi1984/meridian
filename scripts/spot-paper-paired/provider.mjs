@@ -4,8 +4,8 @@ import { SPOT_PAPER_PILOT_LIMITS } from "../spot-paper-pilot/core.mjs";
 export const SPOT_PAPER_PAIRED_TRANSPORT_ADAPTER_VERSION =
   "SPOT_PAPER_PAIRED_KRAKEN_TRANSPORT_ADAPTER_V1";
 
-function instrumentResponse(response, onTransportState) {
-  onTransportState?.("BODY", 0);
+function instrumentResponse(response, reportState) {
+  reportState("BODY", 0);
   if (!response.body) {
     return {
       ok: response.ok, status: response.status,
@@ -20,10 +20,10 @@ function instrumentResponse(response, onTransportState) {
         async read() {
           const result = await reader.read();
           if (result.done) {
-            onTransportState?.("RESPONSE", bytes);
+            reportState("RESPONSE", bytes);
           } else {
             bytes += result.value.byteLength;
-            onTransportState?.("BODY",
+            reportState("BODY",
               Math.min(bytes, SPOT_PAPER_PILOT_LIMITS.maxResponseBytes));
           }
           return result;
@@ -50,13 +50,17 @@ export function createSpotPaperPairedKrakenProvider({
     maxRequests, maxBytes, requestTimeoutMs,
     fetchImpl: async (url, options) => {
       const state = activeTransportState;
-      state?.onTransportState?.("HEADERS", 0);
+      state?.reportState("HEADERS", 0);
       const response = await fetchImpl(url, options);
-      return instrumentResponse(response, state?.onTransportState);
+      return instrumentResponse(response, state?.reportState);
     }
   });
   const fetch = method => runtime => {
-    const state = {onTransportState: runtime?.onTransportState};
+    const state = {
+      reportState(phase, bytes) {
+        if (!runtime?.signal?.aborted) runtime?.onTransportState?.(phase, bytes);
+      }
+    };
     activeTransportState = state;
     return provider[method](runtime).finally(() => {
       if (activeTransportState === state) activeTransportState = null;
