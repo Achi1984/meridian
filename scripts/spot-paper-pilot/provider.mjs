@@ -8,9 +8,7 @@ function abortError(signal) {
   return signal?.reason ?? new Error("REQUEST_ABORTED");
 }
 
-async function readBoundedBody(
-  response, counters, maxBytes, readerRef, assertActive, onProgress
-) {
+async function readBoundedBody(response, counters, maxBytes, readerRef, assertActive) {
   const reader = response.body?.getReader();
   if (!reader) throw new Error("EMPTY_HTTP_BODY");
   readerRef.reader = reader;
@@ -23,7 +21,6 @@ async function readBoundedBody(
     if (done) break;
     length += value.byteLength;
     counters.bytes += value.byteLength;
-    onProgress?.(length);
     if (length > SPOT_PAPER_PILOT_LIMITS.maxResponseBytes ||
         counters.bytes > maxBytes) {
       try { void Promise.resolve(reader.cancel()).catch(() => {}); } catch {}
@@ -84,7 +81,6 @@ export function createKrakenProvider({
       throw new Error("INVALID_CLOCK");
     }
     counters.requests++;
-    runtime.onTransportState?.("HEADERS", 0);
     const url = new URL(path, API_ORIGIN);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     const effectiveDeadline = Math.min(
@@ -141,11 +137,8 @@ export function createKrakenProvider({
       assertActive();
       if (!response.ok) {
         if (response.body) {
-          runtime.onTransportState?.("BODY", 0);
           await readBoundedBody(
-            response, counters, maxBytes, readerRef, assertActive,
-            bytes => runtime.onTransportState?.("BODY",
-              Math.min(bytes, SPOT_PAPER_PILOT_LIMITS.maxResponseBytes)));
+            response, counters, maxBytes, readerRef, assertActive);
         }
         if (response.status === 429) throw new Error("HTTP_429");
         throw new Error(`HTTP_${response.status}`);
@@ -153,12 +146,8 @@ export function createKrakenProvider({
       if (!/^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) {
         throw new Error("INVALID_CONTENT_TYPE");
       }
-      runtime.onTransportState?.("BODY", 0);
       const rawBytes = await readBoundedBody(
-        response, counters, maxBytes, readerRef, assertActive,
-        bytes => runtime.onTransportState?.("BODY",
-          Math.min(bytes, SPOT_PAPER_PILOT_LIMITS.maxResponseBytes)));
-      runtime.onTransportState?.("RESPONSE", rawBytes.byteLength);
+        response, counters, maxBytes, readerRef, assertActive);
       const receivedAt = now();
       if (!Number.isSafeInteger(receivedAt) || receivedAt < requestStartedAt) {
         throw new Error("CLOCK_MOVED_BACKWARDS");

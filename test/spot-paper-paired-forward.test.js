@@ -946,7 +946,43 @@ test("offline test adapters make no network or order calls", async t => {
 test("paired Kraken provider construction is inert and starts with an unused budget", () => {
   const provider = createSpotPaperPairedKrakenProvider();
   assert.equal(provider.sourceId, SPOT_PAPER_PAIRED_SOURCE_ID);
+  assert.equal(provider.transportAdapterVersion,
+    "SPOT_PAPER_PAIRED_KRAKEN_TRANSPORT_ADAPTER_V1");
   assert.deepEqual(provider.counters(), { requests: 0, bytes: 0 });
+});
+
+test("paired transport adapter reports response stages without changing legacy provider", async () => {
+  const raw = JSON.stringify({error: [], result: {}});
+  const phases = [];
+  let fetchCalls = 0;
+  const provider = createSpotPaperPairedKrakenProvider({
+    now: () => BASE,
+    fetchImpl: async (url, options) => {
+      fetchCalls++;
+      assert.equal(url.origin, "https://api.kraken.com");
+      assert.equal(url.pathname, "/0/public/OHLC");
+      assert.equal(options.method, "GET");
+      return new Response(raw, {
+        headers: {"content-type": "application/json"}
+      });
+    }
+  });
+  const response = await provider.fetchOhlc({
+    deadlineAt: performance.now() + 5_000,
+    monotonicNow: () => performance.now(),
+    onTransportState: (phase, bytes) => phases.push([phase, bytes])
+  });
+  assert.equal(fetchCalls, 1);
+  assert.equal(response.raw, raw);
+  assert.deepEqual(phases, [
+    ["HEADERS", 0],
+    ["BODY", 0],
+    ["BODY", Buffer.byteLength(raw)],
+    ["RESPONSE", Buffer.byteLength(raw)]
+  ]);
+  assert.deepEqual(provider.counters(), {
+    requests: 1, bytes: Buffer.byteLength(raw)
+  });
 });
 
 test("research source pin matches the exact merged #1299 bytes and rejects changed bytes", async () => {

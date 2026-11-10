@@ -16,6 +16,7 @@ const REQUIRED_MODULES = [
   "scripts/spot-paper-paired/forward.mjs",
   "scripts/spot-paper-paired/fee-scenario.mjs",
   "scripts/spot-paper-paired/feed.mjs",
+  "scripts/spot-paper-paired/provider.mjs",
   "scripts/spot-paper-paired/next-run-composition.mjs",
   "scripts/spot-paper-pilot/core.mjs",
   "scripts/spot-paper-pilot/journal.mjs",
