@@ -598,6 +598,17 @@ test('separates attempted from completed cycles when a shared-feed cycle fails',
   report.stopReason = 'SHARED_FEED_FAILURE';
   report.cycles = 2;
   report.requests = 3;
+  report.transportDiagnostic = {
+    schemaVersion: 'SPOT_PAPER_PAIRED_TRANSPORT_DIAGNOSTIC_V1',
+    requestKind: 'OHLC',
+    phase: 'BODY',
+    termination: 'REQUEST_TIMEOUT',
+    attemptedCycle: 2,
+    requestCount: 3,
+    byteCount: report.deliveredBytes,
+    requestBytes: 50,
+    elapsedMs: 60_000
+  };
   report.endedAt = 62_000;
   report.elapsedMs = 61_000;
   report.wallClockElapsedMs = 61_000;
@@ -619,7 +630,8 @@ test('separates attempted from completed cycles when a shared-feed cycle fails',
       id: 'shared-failure:2:SHARED_FEED_FAILURE',
       type: 'shared_feed_failure',
       cycle: 2,
-      reason: 'synthetic provider failure'
+      reason: 'UNKNOWN_FAILURE',
+      transportDiagnostic: structuredClone(report.transportDiagnostic)
     },
     {
       id: 'paired-terminal',
@@ -637,6 +649,24 @@ test('separates attempted from completed cycles when a shared-feed cycle fails',
   assert.equal(output.timing.attemptedCycles, 2);
   assert.equal(output.timing.completedCycles, 1);
   assert.equal(output.timing.valuationAt, 61_000);
+  assert.deepEqual(output.transportDiagnostic, report.transportDiagnostic);
+
+  for (const mutate of [
+    diagnostic => { diagnostic.requestCount = 4; },
+    diagnostic => { diagnostic.requestBytes = 65 * 1024 * 1024; },
+    diagnostic => { diagnostic.phase = 'BODY_AND_HEADERS'; },
+    diagnostic => { diagnostic.secret = 'must-not-be-persisted'; }
+  ]) {
+    const invalid = structuredClone(input);
+    mutate(invalid.report.transportDiagnostic);
+    assert.equal(evaluatePairedPaperEvidence(invalid).reasonCode,
+      'INVALID_REPORT_FIELDS');
+  }
+
+  const mismatchedEvent = structuredClone(input);
+  mismatchedEvent.journal.events[2].transportDiagnostic.phase = 'HEADERS';
+  assert.equal(evaluatePairedPaperEvidence(mismatchedEvent).reasonCode,
+    'JOURNAL_REPORT_MISMATCH');
 
   const reordered = structuredClone(input);
   reordered.journal.events = [

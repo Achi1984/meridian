@@ -22,6 +22,9 @@ export const SPOT_PAPER_PAIRED_NEXT_RUN_MODELS = Object.freeze([
 const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
+const MAX_TRANSPORT_BYTES = 64 * 1024 * 1024;
+const MAX_TRANSPORT_RESPONSE_BYTES = 256 * 1024;
+const MAX_TRANSPORT_ELAPSED_MS = 28_805_000;
 const REASON_CODE = /^[A-Z][A-Z0-9_]{0,63}$/;
 const ARM_STOP_REASONS = new Set([
   'SAMPLED_2PCT_BID_STOP', 'SESSION_LOSS_LIMIT'
@@ -98,6 +101,56 @@ function safeTrendActivityDiagnostic(value) {
     forcedTrades: value.forcedTrades,
     deadlineExtensionAllowed: value.deadlineExtensionAllowed,
     profitability: value.profitability
+  };
+}
+
+function safeTransportDiagnostic(value, timing) {
+  const keys = [
+    'schemaVersion', 'requestKind', 'phase', 'termination', 'attemptedCycle',
+    'requestCount', 'byteCount', 'requestBytes', 'elapsedMs'
+  ];
+  if (!isRecord(value) ||
+      Object.keys(value).sort().join(',') !== [...keys].sort().join(',') ||
+      value.schemaVersion !== 'SPOT_PAPER_PAIRED_TRANSPORT_DIAGNOSTIC_V1' ||
+      !['OHLC', 'TICKER'].includes(value.requestKind) ||
+      !['HEADERS', 'BODY', 'RESPONSE'].includes(value.phase) ||
+      !['REQUEST_TIMEOUT', 'OUTER_TIMEOUT', 'CANCELLATION',
+        'TRANSPORT_ERROR'].includes(value.termination) ||
+      !isInteger(value.attemptedCycle) || value.attemptedCycle < 1 ||
+      value.attemptedCycle > 480 ||
+      value.attemptedCycle !== timing.attemptedCycles ||
+      !isInteger(value.requestCount) || value.requestCount < 1 ||
+      value.requestCount > 960 ||
+      (value.requestCount === value.attemptedCycle * 2 - 1 ?
+        value.requestKind !== 'OHLC' :
+        value.requestCount !== value.attemptedCycle * 2 ||
+          value.requestKind !== 'TICKER') ||
+      !isInteger(value.byteCount) || value.byteCount < 0 ||
+      value.byteCount > MAX_TRANSPORT_BYTES ||
+      !isInteger(value.requestBytes) || value.requestBytes < 0 ||
+      value.requestBytes > MAX_TRANSPORT_RESPONSE_BYTES ||
+      value.requestBytes > value.byteCount ||
+      !isInteger(value.elapsedMs) || value.elapsedMs < 0 ||
+      value.elapsedMs > MAX_TRANSPORT_ELAPSED_MS ||
+      timing.actualElapsedMs === null ||
+      value.elapsedMs > timing.actualElapsedMs ||
+      value.termination === 'CANCELLATION' &&
+        timing.stopReason !== 'OPERATOR_STOP' ||
+      value.termination === 'OUTER_TIMEOUT' &&
+        !['DURATION_LIMIT', 'SHARED_FEED_FAILURE', 'OPERATOR_STOP']
+          .includes(timing.stopReason) ||
+      !['CANCELLATION', 'OUTER_TIMEOUT'].includes(value.termination) &&
+        timing.stopReason !== 'SHARED_FEED_FAILURE') return null;
+  return {
+    schemaVersion: value.schemaVersion,
+    requestKind: value.requestKind,
+    phase: value.phase,
+    termination: value.termination,
+    attemptedCycle: value.attemptedCycle,
+    requestCount: value.requestCount,
+    byteCount: value.byteCount,
+    requestBytes: value.requestBytes,
+    elapsedMs: value.elapsedMs
   };
 }
 
@@ -182,6 +235,7 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
   const trendActivityDiagnostic = hasTrendDiagnostic ?
     safeTrendActivityDiagnostic(input.trendActivityDiagnostic) : null;
   if (hasTrendDiagnostic && !trendActivityDiagnostic) return null;
+  const hasTransportDiagnostic = Object.hasOwn(input, 'transportDiagnostic');
 
   const timingKeys = [
     'requestedDurationMs', 'observedCoverageMs', 'actualElapsedMs',
@@ -234,6 +288,9 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
       (timing.actualElapsedMs === null ||
        trendActivityDiagnostic.observedCoverageMs !==
          Math.floor(timing.actualElapsedMs))) return null;
+  const transportDiagnostic = hasTransportDiagnostic ?
+    safeTransportDiagnostic(input.transportDiagnostic, timingResult) : null;
+  if (hasTransportDiagnostic && !transportDiagnostic) return null;
 
   const assumptions = input.assumptions;
   const legacyFees = assumptions.feeBpsPerSide === 50 &&
@@ -309,6 +366,7 @@ export function sanitizeSpotPaperPairedDashboardDto(input) {
     timing: timingResult,
     assumptions: assumptionsResult,
     ...(trendActivityDiagnostic ? {trendActivityDiagnostic} : {}),
+    ...(transportDiagnostic ? {transportDiagnostic} : {}),
     arms,
     deltas,
     decision: 'NO_WINNER_OR_PROMOTION'

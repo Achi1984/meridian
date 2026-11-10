@@ -7,6 +7,21 @@ import {
 } from "../spot-paper-pilot/core.mjs";
 
 const MAX_RESEARCH_SOURCE_BYTES = 1024 * 1024;
+const PAIRED_TRANSPORT_FAILURE = Symbol("pairedTransportFailure");
+const PAIRED_TRANSPORT_DIAGNOSTIC_SCHEMA =
+  "SPOT_PAPER_PAIRED_TRANSPORT_DIAGNOSTIC_V1";
+const SAFE_FAILURE_REASONS = new Set([
+  "REQUEST_TIMEOUT", "REQUEST_ABORTED", "REQUEST_BUDGET_EXHAUSTED",
+  "REQUEST_LIMIT", "DURATION_LIMIT", "RUN_BYTE_LIMIT", "RESPONSE_BYTE_LIMIT",
+  "EMPTY_HTTP_BODY", "TRUNCATED_HTTP_BODY", "INVALID_CONTENT_TYPE",
+  "INVALID_RESPONSE_HEADERS", "INVALID_RESPONSE_URL", "INVALID_JSON_RESPONSE",
+  "HTTP_ERROR", "CLOCK_MOVED_BACKWARDS", "INVALID_CLOCK", "STALE_OHLC",
+  "INVALID_OHLC", "INVALID_TICKER", "INVALID_ACQUISITION",
+  "PROVIDER_COUNTER_MISMATCH", "OBSERVATION_OUT_OF_ORDER",
+  "DECISION_PRECEDES_OBSERVATION", "TICKER_PREDATES_DECISION",
+  "TICKER_NOT_CAUSAL", "NON_CAUSAL_FILL", "NON_CAUSAL_RISK_FILL",
+  "CLOCK_ERROR"
+]);
 
 export const SPOT_PAPER_PAIRED = Object.freeze({
   pair: "BTC/EUR",
@@ -515,11 +530,49 @@ function acquisition(response, counters, config, bytesAlreadyCounted = false) {
   return response;
 }
 
-function boundedCall(operation, context) {
-  if (context.signal?.aborted) return Promise.reject(context.signal.reason ?? new Error("ABORTED"));
+function boundedCall(operation, context, {
+  requestKind, cycle, monotonicStart, counters, provider
+}) {
+  const transportState = { phase: "HEADERS", requestBytes: 0 };
+  const diagnostic = termination => {
+    try {
+      if (!syncProviderCounters(provider, counters)) return null;
+      const elapsed = context.monotonicNow() - monotonicStart;
+      const elapsedMs = Math.floor(elapsed);
+      if (!Number.isSafeInteger(elapsedMs) || elapsedMs < 0 ||
+          !Number.isSafeInteger(counters.requests) || counters.requests < 0 ||
+          !Number.isSafeInteger(counters.bytes) || counters.bytes < 0) return null;
+      return {
+        schemaVersion: PAIRED_TRANSPORT_DIAGNOSTIC_SCHEMA,
+        requestKind, phase: transportState.phase, termination,
+        attemptedCycle: cycle, requestCount: counters.requests,
+        byteCount: counters.bytes, requestBytes: transportState.requestBytes,
+        elapsedMs
+      };
+    } catch {
+      return null;
+    }
+  };
+  const rejectWithDiagnostic = (error, termination) => {
+    if (!(error instanceof Error)) error = new Error("TRANSPORT_ERROR");
+    const value = diagnostic(termination);
+    if (value) {
+      try {
+        Object.defineProperty(error, PAIRED_TRANSPORT_FAILURE, { value });
+      } catch {
+        // Diagnostics must not replace the original request failure.
+      }
+    }
+    return error;
+  };
+  if (context.signal?.aborted) {
+    return Promise.reject(rejectWithDiagnostic(
+      context.signal.reason ?? new Error("REQUEST_ABORTED"), "CANCELLATION"));
+  }
   const remaining = context.deadlineAt - context.monotonicNow();
   if (!Number.isFinite(remaining) || remaining <= 0) {
-    return Promise.reject(new Error("DURATION_LIMIT"));
+    return Promise.reject(rejectWithDiagnostic(
+      new Error("DURATION_LIMIT"), "OUTER_TIMEOUT"));
   }
   const controller = new AbortController();
   const onAbort = () => controller.abort(context.signal.reason ?? new Error("RUN_ABORTED"));
@@ -529,9 +582,19 @@ function boundedCall(operation, context) {
   const timeoutCode = callDeadline >= context.deadlineAt ? "DURATION_LIMIT" : "REQUEST_TIMEOUT";
   let timer;
   let abortListener;
+  let settled = false;
   const task = Promise.resolve().then(() => operation({
     deadlineAt: callDeadline, monotonicNow: context.monotonicNow,
-    requestTimeoutMs: context.requestTimeoutMs, signal: controller.signal
+    requestTimeoutMs: context.requestTimeoutMs, signal: controller.signal,
+    onTransportState: (phase, requestBytes) => {
+      if (["HEADERS", "BODY", "RESPONSE"].includes(phase)) {
+        transportState.phase = phase;
+      }
+      if (Number.isSafeInteger(requestBytes) && requestBytes >= 0 &&
+          requestBytes <= SPOT_PAPER_PAIRED.maxResponseBytes) {
+        transportState.requestBytes = requestBytes;
+      }
+    }
   }));
   task.catch(() => {});
   return new Promise((resolve, reject) => {
@@ -544,24 +607,62 @@ function boundedCall(operation, context) {
       if (!controller.signal.aborted) controller.abort(new Error("REQUEST_FINISHED"));
     };
     timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       controller.abort(new Error(timeoutCode));
       cleanup();
-      reject(new Error(timeoutCode));
+      reject(rejectWithDiagnostic(new Error(timeoutCode), "OUTER_TIMEOUT"));
     }, Math.min(remaining, context.requestTimeoutMs));
     abortListener = () => {
+      if (settled) return;
+      settled = true;
       cleanup();
-      reject(context.signal.reason ?? new Error("RUN_ABORTED"));
+      reject(rejectWithDiagnostic(
+        context.signal.reason ?? new Error("REQUEST_ABORTED"), "CANCELLATION"));
     };
     context.signal?.addEventListener("abort", abortListener, { once: true });
     task.then(value => {
+      if (settled) return;
+      let now;
+      try {
+        now = context.monotonicNow();
+      } catch (error) {
+        settled = true;
+        cleanup();
+        reject(rejectWithDiagnostic(error, "TRANSPORT_ERROR"));
+        return;
+      }
+      settled = true;
       cleanup();
-      if (context.monotonicNow() >= callDeadline) reject(new Error(timeoutCode));
-      else resolve(value);
+      if (now >= callDeadline) {
+        reject(rejectWithDiagnostic(new Error(timeoutCode), "OUTER_TIMEOUT"));
+      } else {
+        resolve(value);
+      }
     }, error => {
+      if (settled) return;
+      settled = true;
       cleanup();
-      reject(error);
+      const termination = context.signal?.aborted ? "CANCELLATION" :
+        error?.message === "REQUEST_TIMEOUT" ? "REQUEST_TIMEOUT" :
+          error?.message === "DURATION_LIMIT" ? "OUTER_TIMEOUT" :
+            "TRANSPORT_ERROR";
+      reject(rejectWithDiagnostic(error, termination));
+    }).catch(error => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(rejectWithDiagnostic(error, "TRANSPORT_ERROR"));
     });
   });
+}
+
+function safeFailureReason(error) {
+  const reason = error instanceof Error ? error.message : "";
+  if (SAFE_FAILURE_REASONS.has(reason) || /^HTTP_[1-5][0-9]{2}$/.test(reason)) {
+    return reason;
+  }
+  return "UNKNOWN_FAILURE";
 }
 
 async function boundedSleep(config, durationMs, deadlineAt) {
@@ -624,12 +725,15 @@ function slippageForFillCents(fill, quote) {
 }
 
 function syncProviderCounters(provider, counters) {
-  const reported = typeof provider.counters === "function" ? provider.counters() : null;
-  if (Number.isSafeInteger(reported?.requests)) {
+  try {
+    const reported = typeof provider.counters === "function" ? provider.counters() : null;
+    if (!Number.isSafeInteger(reported?.requests) || reported.requests < 0 ||
+        !Number.isSafeInteger(reported?.bytes) || reported.bytes < 0) return false;
     counters.requests = Math.max(counters.requests, reported.requests);
-  }
-  if (Number.isSafeInteger(reported?.bytes)) {
     counters.bytes = Math.max(counters.bytes, reported.bytes);
+    return true;
+  } catch {
+    return false;
   }
 }
 
@@ -752,6 +856,7 @@ async function runPairedForward(input, testOnly) {
   const maxDrawdown = config.arms.map(() => 0);
   let stopReason = null;
   let failureReason = null;
+  let failureDiagnostic = null;
   let previousObservationAt = null;
   let previousCycleEnd = null;
   let cycle = 0;
@@ -813,9 +918,12 @@ async function runPairedForward(input, testOnly) {
         counters.requests++;
         const ohlcBytesBefore = counters.bytes;
         ohlcResponse = await boundedCall(
-          runtime => config.provider.fetchOhlc(runtime), runContext);
-        syncProviderCounters(config.provider, counters);
-        if (counters.requests !== cycle * 2 - 1 ||
+          runtime => config.provider.fetchOhlc(runtime), runContext, {
+            requestKind: "OHLC", cycle, monotonicStart, counters,
+            provider: config.provider
+          });
+        if (!syncProviderCounters(config.provider, counters) ||
+            counters.requests !== cycle * 2 - 1 ||
             counters.bytes - ohlcBytesBefore !== ohlcResponse?.bytes) {
           throw new Error("PROVIDER_COUNTER_MISMATCH");
         }
@@ -854,9 +962,12 @@ async function runPairedForward(input, testOnly) {
         counters.requests++;
         const tickerBytesBefore = counters.bytes;
         tickerResponse = await boundedCall(
-          runtime => config.provider.fetchTicker(runtime), runContext);
-        syncProviderCounters(config.provider, counters);
-        if (counters.requests !== cycle * 2 ||
+          runtime => config.provider.fetchTicker(runtime), runContext, {
+            requestKind: "TICKER", cycle, monotonicStart, counters,
+            provider: config.provider
+          });
+        if (!syncProviderCounters(config.provider, counters) ||
+            counters.requests !== cycle * 2 ||
             counters.bytes - tickerBytesBefore !== tickerResponse?.bytes) {
           throw new Error("PROVIDER_COUNTER_MISMATCH");
         }
@@ -1024,11 +1135,13 @@ async function runPairedForward(input, testOnly) {
           error?.message === "REQUEST_LIMIT" ? "REQUEST_LIMIT" :
           error?.message === "DURATION_LIMIT" ? "DURATION_LIMIT" : "SHARED_FEED_FAILURE";
         failureReason = stopReason === "SHARED_FEED_FAILURE" ?
-          String(error?.message ?? error).slice(0, 120) : null;
+          safeFailureReason(error) : null;
+        failureDiagnostic = error?.[PAIRED_TRANSPORT_FAILURE] ?? null;
         await journal.append({
           id: `shared-failure:${cycle}:${stopReason}`,
           type: "shared_feed_failure", cycle, at: config.now(),
-          reason: String(error?.message ?? error).slice(0, 120),
+          reason: safeFailureReason(error),
+          ...(failureDiagnostic ? {transportDiagnostic: failureDiagnostic} : {}),
           responses: { ohlc: storedOhlc, ticker: storedTicker },
           decisions: cycleDecisions.map((decision, index) => ({
             role: config.arms[index].role, decidedAt: decision.decidedAt,
@@ -1127,6 +1240,7 @@ async function runPairedForward(input, testOnly) {
       stopReason, startedAt, endedAt, elapsedMs,
       wallClockElapsedMs: endedAt - startedAt,
       failureReason,
+      ...(failureDiagnostic ? {transportDiagnostic: failureDiagnostic} : {}),
       fullEightHourCompletion: stopReason === "DURATION_LIMIT" &&
         elapsedMs >= SPOT_PAPER_PAIRED.maxDurationMs,
       coverage: elapsedMs >= config.maxDurationMs ?
