@@ -147,9 +147,19 @@ function describeReason(bot) {
 function summaryStatus(bot) {
   const state = STATE_LABELS[bot.state] || STATE_LABELS.UNKNOWN;
   if (bot.state === 'PREPARED' || bot.state === 'UNKNOWN') return state;
-  if (bot.freshness.status === 'STALE') return 'Daten veraltet';
-  if (bot.freshness.status !== 'FRESH') return 'Status unbekannt';
-  return `${state} · Aktuell`;
+  return `${state} · ${freshnessPresentation(bot)}`;
+}
+
+function freshnessPresentation(bot) {
+  const freshness = bot?.freshness;
+  if (freshness?.status === 'STALE') return 'Daten veraltet';
+  const validTimestamp = typeof freshness?.at === 'string' &&
+    Number.isFinite(Date.parse(freshness.at));
+  const validAge = Number.isFinite(freshness?.ageMs) && freshness.ageMs >= 0;
+  if (freshness?.status === 'FRESH' && validTimestamp && validAge) {
+    return 'Aktuell';
+  }
+  return 'Datenfrische unbekannt';
 }
 
 function renderTradeDetails(document, parent, bot, disclosures) {
@@ -272,8 +282,7 @@ function renderBot(document, parent, bot, disclosures) {
   const reportedState = STATE_LABELS[bot.state] || STATE_LABELS.UNKNOWN;
   field(document, details, 'Gemeldeter Laufstatus',
     bot.state === 'PREPARED' || bot.state === 'UNKNOWN' ? reportedState :
-      `${reportedState} · ${bot.freshness.status === 'STALE' ? 'Daten veraltet' :
-        bot.freshness.status === 'FRESH' ? 'Aktuell' : 'Datenfrische unbekannt'}`);
+      `${reportedState} · ${freshnessPresentation(bot)}`);
   field(document, details, 'Datenfrische',
     `${FRESHNESS_LABELS[bot.freshness.status] || FRESHNESS_LABELS.UNKNOWN} · ${reasonText(bot.freshness.reason)}` +
     (bot.freshness.at ? ` · ${timestamp({available: true, value: bot.freshness.at})}` : ''));

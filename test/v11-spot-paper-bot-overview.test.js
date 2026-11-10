@@ -222,6 +222,29 @@ test('missing, rejected, unvalidated, stale, and mixed-currency reports fail clo
   assert.equal(mixed.bots[0].currency.available, false);
 });
 
+test('FRESH status requires both a valid source timestamp and nonnegative age', () => {
+  for (const freshness of [
+    {status: 'FRESH', at: null, ageMs: 2000, reason: 'FRESHNESS_METADATA_INCOMPLETE'},
+    {status: 'FRESH', at: freshAt, ageMs: null, reason: 'FRESHNESS_METADATA_INCOMPLETE'}
+  ]) {
+    const {root, document} = harness();
+    const mounted = mountSpotPaperBotOverview(root, {
+      adapters: [adapter('btc-eur-trend', sourceReport('btc-eur-trend', {freshness}))],
+      document
+    });
+    const model = mounted.render();
+    const summary = visit(root).find(item =>
+      item.className?.includes('spot-paper-bot-status'));
+    assert.equal(model.bots[0].state, 'RUNNING');
+    assert.equal(model.bots[0].freshness.status, 'FRESH');
+    assert.equal(model.bots[0].metrics.netPnl.available, false);
+    assert.equal(summary.textContent, 'Läuft · Datenfrische unbekannt');
+    assert.match(root.textContent,
+      /Gemeldeter LaufstatusLäuft · Datenfrische unbekannt/);
+    assert.doesNotMatch(summary.textContent, /Aktuell/);
+  }
+});
+
 test('validated Lives risk is arithmetically consistent and preserves latched drawdown overshoot', () => {
   const invalidRisk = sourceReport('btc-usd-lives', {
     lifecycle: 'PAUSED',
@@ -578,6 +601,11 @@ test('Chrome renders compact responsive cards and supports keyboard disclosure c
           }
         });
         await call('Log.enable');
+        await call('Emulation.setDeviceMetricsOverride', {
+          width, height: width === 320 ? 568 : 844, deviceScaleFactor: 1,
+          mobile: width < 600, screenWidth: width,
+          screenHeight: width === 320 ? 568 : 844
+        });
         const expression = `(async()=>{
           const project=report=>({
             state:report.lifecycle,runtimeEvidence:report.runtimeEvidence,
@@ -662,8 +690,7 @@ test('Chrome renders compact responsive cards and supports keyboard disclosure c
               Boolean(root.getAttribute('aria-labelledby')),
             synthetic:root.textContent.includes('Vorschau mit Testdaten'),
             currencies:root.textContent.includes('EUR')&&root.textContent.includes('USD'),
-            prepared:root.textContent.includes('In Vorbereitung'),
-            buttonOverflow:controlButtons.some(button=>button.scrollWidth>button.clientWidth+1)
+            prepared:root.textContent.includes('In Vorbereitung')
           };
         })()`;
         const response = await call('Runtime.evaluate', {
@@ -687,11 +714,58 @@ test('Chrome renders compact responsive cards and supports keyboard disclosure c
         await key('keyDown', 'Enter', 'Enter', 13);
         await key('keyUp', 'Enter', 'Enter', 13);
         const opened = await call('Runtime.evaluate', {
-         expression: `({all:[...document.querySelectorAll('#paper-bot-overview-root details')]
-           .every(item=>item.open),badge:getComputedStyle(document.querySelector(
-             '#paper-bot-overview-root .spot-paper-bot-status')).transform})`,
+         expression: `(()=>{
+           const root=document.querySelector('#paper-bot-overview-root');
+           const buttons=[...root.querySelectorAll('button')];
+           const bounds=root.getBoundingClientRect();
+           return {
+             all:[...root.querySelectorAll('details')].every(item=>item.open),
+             badge:getComputedStyle(root.querySelector('.spot-paper-bot-status')).transform,
+             viewport:document.documentElement.clientWidth,
+             documentWidth:document.documentElement.scrollWidth,
+             bodyWidth:document.body.scrollWidth,
+             rootWidth:root.clientWidth,
+             rootScrollWidth:root.scrollWidth,
+             rootLeft:bounds.left,
+             rootRight:bounds.right,
+             cards:[...root.querySelectorAll('.spot-paper-bot-card')].map(card=>{
+               const cardBounds=card.getBoundingClientRect();
+               return {left:cardBounds.left,right:cardBounds.right,
+                 width:card.clientWidth,scrollWidth:card.scrollWidth};
+             }),
+             cardOverflow:[...root.querySelectorAll('.spot-paper-bot-card')].some(card=>{
+               const cardBounds=card.getBoundingClientRect();
+               return card.scrollWidth>card.clientWidth+1||
+                 cardBounds.left<0||cardBounds.right>innerWidth+1;
+             }),
+             buttonOverflow:buttons.some(button=>!root.contains(button)||
+               button.scrollWidth>button.clientWidth+1||
+               button.getBoundingClientRect().left<0||
+               button.getBoundingClientRect().right>innerWidth+1)
+           };
+         })()`,
          returnByValue: true
         });
+        const expandedLayout = opened.result.value;
+        result.expandedLayout = expandedLayout;
+        assert.equal(expandedLayout.all, true);
+        assert.ok(expandedLayout.documentWidth <= expandedLayout.viewport + 1,
+          JSON.stringify(expandedLayout));
+        assert.ok(expandedLayout.bodyWidth <= expandedLayout.viewport + 1,
+          JSON.stringify(expandedLayout));
+        assert.ok(expandedLayout.rootScrollWidth <= expandedLayout.rootWidth + 1,
+          JSON.stringify(expandedLayout));
+        assert.ok(expandedLayout.rootLeft >= -1 &&
+          expandedLayout.rootRight <= expandedLayout.viewport + 1,
+        JSON.stringify(expandedLayout));
+        assert.equal(expandedLayout.cards.length, 3, JSON.stringify(expandedLayout));
+        assert.equal(expandedLayout.cardOverflow, false, JSON.stringify(expandedLayout));
+        assert.equal(expandedLayout.buttonOverflow, false, JSON.stringify(expandedLayout));
+        const expandedImage = await call('Page.captureScreenshot', {
+          format: 'png', captureBeyondViewport: true
+        });
+        writeFileSync(join(evidence, `bot-overview-${width}-expanded.png`),
+          Buffer.from(expandedImage.data, 'base64'));
         const allCloseFocus = await call('Runtime.evaluate', {
          expression: `(()=>{const b=[...document.querySelectorAll('button')].find(
            item=>item.textContent==='Alle Details schließen');b.focus();return document.activeElement===b})()`,
@@ -714,6 +788,20 @@ test('Chrome renders compact responsive cards and supports keyboard disclosure c
         result.disclosuresComplete = result.disclosureEvidence.allOpenFocus &&
          result.disclosureEvidence.opened && result.disclosureEvidence.badgeTransform === 'none' &&
          result.disclosureEvidence.allCloseFocus && result.disclosureEvidence.closed;
+        const connectedLayout = await call('Runtime.evaluate', {
+          expression: `(()=>{
+            const root=document.querySelector('#paper-bot-overview-root');
+            const buttons=[...root.querySelectorAll('button')];
+            return {
+              rootWidth:root.clientWidth,
+              rootScrollWidth:root.scrollWidth,
+              buttonOverflow:buttons.some(button=>!root.contains(button)||
+                button.scrollWidth>button.clientWidth+1)
+            };
+          })()`,
+          returnByValue: true
+        });
+        result.buttonOverflow = connectedLayout.result.value.buttonOverflow;
         await new Promise(resolve => setTimeout(resolve, 50));
         assert.deepEqual(pageErrors, []);
         assert.equal(result.width, width);
@@ -731,7 +819,7 @@ test('Chrome renders compact responsive cards and supports keyboard disclosure c
         assert.ok(result.validSummaries.some(summary=>summary.includes('Pausiert · Aktuell')));
         assert.ok(result.validSummaries.some(summary=>summary.includes('In Vorbereitung')));
         assert.ok(result.staleAndCompleted.some(summary=>
-          summary.includes('Daten veraltet')&&!summary.includes('Läuft')));
+          summary.includes('Läuft · Daten veraltet')));
         assert.ok(result.staleAndCompleted.some(summary=>summary.includes('Abgeschlossen · Aktuell')));
         assert.equal(result.staleDetails, true);
         assert.equal(result.statusBadgeReadable, true);
