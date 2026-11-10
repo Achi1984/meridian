@@ -6,6 +6,10 @@ receipt and candidate identity are
 [machine-readable acceptance](receipts/btc-eur-paired-diag-20261110-001.acceptance.json)
 and
 [provisional identity](receipts/btc-eur-paired-diag-20261110-001.identity.json).
+Consumers should use the standalone, canonical expected-identity document
+[here](receipts/btc-eur-paired-diag-20261110-001.expected-identity.json) for
+evaluator/ingester input. It preserves the raw host identity schema; account
+contract selection remains wrapper metadata and is not an identity field.
 
 The acceptance passed from a Git archive of the pinned source. It verified the
 pinned Node base digest and layer ancestry, confirmed the default image command
@@ -33,5 +37,7 @@ the accepted research digest remains
 `dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25`.
 
 Promotion waits for the #1339 postchecks: Safety42862034874,
-Runtime42862034724, Coordinator42862034745, and Pages42862033804. The historical
-002 export is separate and is not included in this handoff.
+Runtime42862034724, Coordinator42862034745, and Pages42862033804. All four
+postchecks are now `SUCCESS` (completion 6774630648). Promotion remains blocked
+pending a registry digest, host uniqueness check, and activation authorization.
+The historical 002 export is separate and is not included in this handoff.
