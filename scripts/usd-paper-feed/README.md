@@ -13,7 +13,10 @@ fetches OHLC first, passes bounded native BTC/USD closed-candle evidence to the
 decision callback, and requests Ticker only after that callback returns. Its
 result carries the candle response digest, exact decimal candle values and
 timestamps, OHLC receipt time, decision time, ticker request/receipt times, and
-the unchanged strict account observation. It uses the same adapter instance,
+the unchanged strict account observation. The callback contract is synchronous:
+thenables are rejected, the sample is latched terminally, and no Ticker is
+requested. Cancellation observed after OHLC also terminates before Ticker. It
+uses the same adapter instance,
 single-flight guard, sample cadence, request deadlines, and request/byte/event
 budgets as `fetchObservation()`; it does not reserve a fresh allowance or alter
 the legacy method's output/order.
