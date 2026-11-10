@@ -23,6 +23,7 @@ const MAX_REQUESTS = 960;
 const MAX_BYTES = 64 * 1024 * 1024;
 const MAX_QUOTE_AGE_MS = 10_000;
 const MAX_RESPONSE_BYTES = 256 * 1024;
+const MAX_TRANSPORT_ELAPSED_MS = MAX_DURATION_MS + 5_000;
 const HASH = /^[a-f0-9]{64}$/;
 const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/;
@@ -31,6 +32,8 @@ const isRecord = value => value !== null && typeof value === 'object' &&
 const isInteger = Number.isSafeInteger;
 const exactKeys = (value, keys) => isRecord(value) &&
   Object.keys(value).sort().join(',') === [...keys].sort().join(',');
+const TRANSPORT_DIAGNOSTIC_SCHEMA =
+  'SPOT_PAPER_PAIRED_TRANSPORT_DIAGNOSTIC_V1';
 
 function stableJson(value) {
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
@@ -158,6 +161,43 @@ function validTrendActivityDiagnostic(diagnostic, report) {
     diagnostic.profitability === 'NOT_ASSESSED';
 }
 
+function validTransportDiagnostic(diagnostic, report) {
+  return exactKeys(diagnostic, [
+    'schemaVersion', 'requestKind', 'phase', 'termination', 'attemptedCycle',
+    'requestCount', 'byteCount', 'requestBytes', 'elapsedMs'
+  ]) &&
+    diagnostic.schemaVersion === TRANSPORT_DIAGNOSTIC_SCHEMA &&
+    ['OHLC', 'TICKER'].includes(diagnostic.requestKind) &&
+    ['HEADERS', 'BODY', 'RESPONSE'].includes(diagnostic.phase) &&
+    ['REQUEST_TIMEOUT', 'OUTER_TIMEOUT', 'CANCELLATION',
+      'TRANSPORT_ERROR'].includes(diagnostic.termination) &&
+    isInteger(diagnostic.attemptedCycle) &&
+    diagnostic.attemptedCycle > 0 && diagnostic.attemptedCycle <= MAX_CYCLES &&
+    diagnostic.attemptedCycle === report.cycles &&
+    isInteger(diagnostic.requestCount) && diagnostic.requestCount > 0 &&
+    diagnostic.requestCount <= MAX_REQUESTS &&
+    diagnostic.requestCount === report.requests &&
+    (diagnostic.requestCount === diagnostic.attemptedCycle * 2 - 1 ?
+      diagnostic.requestKind === 'OHLC' :
+      diagnostic.requestCount === diagnostic.attemptedCycle * 2 &&
+        diagnostic.requestKind === 'TICKER') &&
+    isInteger(diagnostic.byteCount) && diagnostic.byteCount >= 0 &&
+    diagnostic.byteCount <= MAX_BYTES &&
+    diagnostic.byteCount === report.deliveredBytes &&
+    isInteger(diagnostic.requestBytes) && diagnostic.requestBytes >= 0 &&
+    diagnostic.requestBytes <= MAX_RESPONSE_BYTES &&
+    diagnostic.requestBytes <= diagnostic.byteCount &&
+    isInteger(diagnostic.elapsedMs) && diagnostic.elapsedMs >= 0 &&
+    diagnostic.elapsedMs <= MAX_TRANSPORT_ELAPSED_MS &&
+    diagnostic.elapsedMs <= report.elapsedMs &&
+    (diagnostic.termination === 'CANCELLATION' ?
+      report.stopReason === 'OPERATOR_STOP' :
+      diagnostic.termination === 'OUTER_TIMEOUT' ?
+        ['DURATION_LIMIT', 'SHARED_FEED_FAILURE', 'OPERATOR_STOP']
+          .includes(report.stopReason) :
+        report.stopReason === 'SHARED_FEED_FAILURE');
+}
+
 function getJournalPayload(journal) {
   if (!isRecord(journal)) return null;
   if (isRecord(journal.payload)) {
@@ -235,6 +275,8 @@ function reportIsValid(report, expected) {
       typeof report.elapsedMs !== 'number' || !Number.isFinite(report.elapsedMs) ||
       report.elapsedMs < 0 ||
       report.elapsedMs > MAX_DURATION_MS + 5_000 ||
+      Object.hasOwn(report, 'transportDiagnostic') &&
+        !validTransportDiagnostic(report.transportDiagnostic, report) ||
       report.wallClockElapsedMs !== report.endedAt - report.startedAt ||
       report.endedAt - report.startedAt > MAX_DURATION_MS + 5_000 ||
       !isInteger(report.cycles) || report.cycles < 0 || report.cycles > MAX_CYCLES ||
@@ -462,7 +504,12 @@ function validateTerminalJournal(journal, report, expected) {
           failures[0].cycle !== observations.length + 1 ||
           failures[0].cycle !== report.cycles ||
           failures[0].id !==
-            `shared-failure:${report.cycles}:${report.stopReason}`) ||
+            `shared-failure:${report.cycles}:${report.stopReason}` ||
+          stableJson(failures[0].transportDiagnostic ?? null) !==
+            stableJson(report.transportDiagnostic ?? null)) ||
+      Boolean(report.transportDiagnostic) !==
+        Boolean(failures.length === 1 &&
+          failures[0].transportDiagnostic !== undefined) ||
       observations.length < report.cycles &&
         failures.length === 0 &&
         !['OPERATOR_STOP', 'DURATION_LIMIT'].includes(report.stopReason) ||
@@ -786,6 +833,9 @@ function buildDto(report, expected, status, reasonCode, reportValid = true) {
     },
     assumptions: report?.assumptions ??
       {feeBpsPerSide: 50, slippageBpsPerSide: 10, ratesVerified: false},
+    ...(reportValid && report?.transportDiagnostic ? {
+      transportDiagnostic: report.transportDiagnostic
+    } : {}),
     ...(expected.modelPairId ? {
       trendActivityDiagnostic: report?.trendActivityDiagnostic
     } : {}),

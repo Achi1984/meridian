@@ -29,6 +29,10 @@ boundary. The projector returns only this minimal shape:
     completedCycles, stopReason
   },
   assumptions: {feeBpsPerSide, slippageBpsPerSide, ratesVerified},
+  transportDiagnostic?: {
+    schemaVersion, requestKind, phase, termination,
+    attemptedCycle, requestCount, byteCount, requestBytes, elapsedMs
+  },
   arms: {
     baseline|challenger|cash: {
       role, modelId, tradingStoppedAt, stopReason, inventoryStatus,
@@ -129,6 +133,15 @@ reconcile with all three forward-report accounts. A missing/stale open-position
 mark makes that arm's common-horizon equity and deltas unavailable. No
 statistical significance, alpha, ranking, or winner is inferred from one run.
 Unfavourable and zero-fill results are retained.
+
+An interrupted run caused by a request failure may include the optional
+`SPOT_PAPER_PAIRED_TRANSPORT_DIAGNOSTIC_V1` extension. Its endpoint, request
+phase (`HEADERS`, `BODY`, or `RESPONSE`), termination class
+(`REQUEST_TIMEOUT`, `OUTER_TIMEOUT`, `CANCELLATION`, or `TRANSPORT_ERROR`),
+attempted cycle, bounded request/byte counts, and elapsed time are checked
+against the report and failure event. It contains no URL, response body,
+credential, or free-form exception text. Historical reports without this
+extension remain readable.
 
 Historical V1 reports declare 50 bp fees and 10 bp slippage per side. The
 explicit V2 next-run contract declares a 20 bp EEA spot-only taker assumption

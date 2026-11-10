@@ -79,14 +79,23 @@ async function fixture(t, options = {}) {
   let challengerApplyCount = 0;
   let sleepCount = 0;
   let replayObservations = null;
+  let resolveOhlcPending;
+  const pendingOhlc = new Promise(resolve => {
+    resolveOhlcPending = resolve;
+  });
   const challengerStatesSeen = [];
   const challengerSellStates = [];
   const provider = {
     sourceId: SPOT_PAPER_PAIRED_SYNTHETIC_SOURCE_ID,
-    async fetchOhlc() {
+    async fetchOhlc(runtime = {}) {
       order.push("ohlc");
       providerCounts.requests++;
       ohlcRequests++;
+      if (options.hangOhlcPhase) {
+        runtime.onTransportState?.(options.hangOhlcPhase, 0);
+        resolveOhlcPending();
+        return new Promise(() => {});
+      }
       const started = wall;
       const received = started + 5;
       wall = received;
@@ -96,10 +105,16 @@ async function fixture(t, options = {}) {
       providerCounts.bytes += response.bytes;
       return response;
     },
-    async fetchTicker() {
+    async fetchTicker(runtime = {}) {
       order.push("ticker");
       providerCounts.requests++;
       tickerRequests++;
+      if (options.failTickerAt === tickerRequests) {
+        const partialBytes = options.failTickerBytes ?? 0;
+        runtime.onTransportState?.(options.failTickerPhase ?? "BODY", partialBytes);
+        providerCounts.bytes += partialBytes;
+        throw new Error(options.failTickerMessage ?? "SYNTHETIC_PROVIDER_FAILURE");
+      }
       const started = wall + (options.predatingTicker ? -1 : 1);
       const tickerDelay = typeof options.tickerDelayMs === "function" ?
         options.tickerDelayMs(tickerRequests) :
@@ -219,7 +234,7 @@ async function fixture(t, options = {}) {
     maxDurationMs: options.maxDurationMs ?? 180_000,
     pollIntervalMs: SPOT_PAPER_PAIRED.pollIntervalMs,
     now: () => wall,
-    monotonicNow: () => mono,
+    monotonicNow: options.realMonotonic ? () => performance.now() : () => mono,
     sleep: async ms => {
       const wallAdvance = typeof options.wallSleepAdvanceMs === "function" ?
         options.wallSleepAdvanceMs(ms, sleepCount++) :
@@ -232,6 +247,7 @@ async function fixture(t, options = {}) {
     challengerExports: challenge,
     comparisonExports,
     comparisonEngine,
+    signal: options.signal,
     journalOptions: options.journalOptions
   };
   config.configSha256 = pairedConfigDigest(config);
@@ -240,6 +256,7 @@ async function fixture(t, options = {}) {
     get challengerApplyCount() { return challengerApplyCount; },
     challengerStatesSeen, challengerSellStates,
     get replayObservations() { return replayObservations; },
+    pendingOhlc,
     dataRoot };
 }
 
@@ -361,6 +378,76 @@ test("shared request, byte, and monotonic deadline bounds apply to the whole run
   const deadlineReport = await runSpotPaperPairedSynthetic(deadline.config);
   assert.equal(deadlineReport.stopReason, "DURATION_LIMIT");
   assert.equal(deadlineReport.requests, 1);
+});
+
+test("paired transport failures are bounded, sanitized, and leave the failed cycle unapplied", async t => {
+  const setup = await fixture(t, {
+    enterOnCycleOne: true,
+    failTickerAt: 1,
+    failTickerBytes: 7,
+    failTickerPhase: "BODY",
+    failTickerMessage: "https://example.test/?token=do-not-persist"
+  });
+  const report = await runSpotPaperPairedSynthetic(setup.config);
+  const diagnostic = report.transportDiagnostic;
+  assert.deepEqual(diagnostic, {
+    schemaVersion: "SPOT_PAPER_PAIRED_TRANSPORT_DIAGNOSTIC_V1",
+    requestKind: "TICKER",
+    phase: "BODY",
+    termination: "TRANSPORT_ERROR",
+    attemptedCycle: 1,
+    requestCount: 2,
+    byteCount: report.deliveredBytes,
+    requestBytes: 7,
+    elapsedMs: 0
+  });
+  assert.equal(report.stopReason, "SHARED_FEED_FAILURE");
+  assert.equal(report.failureReason, "UNKNOWN_FAILURE");
+  assert.equal(report.arms.every(arm =>
+    arm.decisions.length === 0 && arm.fills.length === 0), true);
+  assert.equal(setup.challengerApplyCount, 0);
+  const journal = await readRunJournal({
+    dataRoot: setup.dataRoot, runId: setup.config.runId
+  });
+  const failure = journal.events.find(event =>
+    event.type === "shared_feed_failure");
+  assert.deepEqual(failure.transportDiagnostic, diagnostic);
+  assert.equal(failure.reason, "UNKNOWN_FAILURE");
+  assert.equal(JSON.stringify({report, failure}).includes("do-not-persist"), false);
+  assert.equal(JSON.stringify({report, failure}).includes("example.test"), false);
+});
+
+test("outer deadlines and explicit aborts retain the stalled request phase", async t => {
+  for (const phase of ["HEADERS", "BODY"]) {
+    const setup = await fixture(t, {
+      maxCycles: 1, maxRequests: 2, maxDurationMs: 80,
+      realMonotonic: true, hangOhlcPhase: phase
+    });
+    const pending = runSpotPaperPairedSynthetic(setup.config);
+    await setup.pendingOhlc;
+    const report = await pending;
+    assert.equal(report.stopReason, "DURATION_LIMIT");
+    assert.equal(report.requests, 1);
+    assert.equal(report.transportDiagnostic.requestKind, "OHLC");
+    assert.equal(report.transportDiagnostic.phase, phase);
+    assert.equal(report.transportDiagnostic.termination, "OUTER_TIMEOUT");
+    assert.equal(report.transportDiagnostic.attemptedCycle, 1);
+    assert.equal(report.arms.every(arm => arm.fills.length === 0), true);
+  }
+
+  const controller = new AbortController();
+  const aborted = await fixture(t, {
+    maxCycles: 1, maxRequests: 2, signal: controller.signal,
+    hangOhlcPhase: "BODY"
+  });
+  const pending = runSpotPaperPairedSynthetic(aborted.config);
+  await aborted.pendingOhlc;
+  controller.abort(new Error("unrestricted caller detail"));
+  const report = await pending;
+  assert.equal(report.stopReason, "OPERATOR_STOP");
+  assert.equal(report.transportDiagnostic.termination, "CANCELLATION");
+  assert.equal(report.transportDiagnostic.phase, "BODY");
+  assert.equal(JSON.stringify(report).includes("unrestricted caller detail"), false);
 });
 
 test("per-arm loss termination preserves an open position and never trades again", async t => {

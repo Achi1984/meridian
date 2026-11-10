@@ -1616,19 +1616,24 @@ test("compressed body receipt uses decoded body bytes, while its wire Content-Le
 
 test("provider bounds fetch and body reads that ignore abort, and cleans late responses", async () => {
   let resolveFetch;
+  const headerStates = [];
   const provider = createKrakenProvider({
     fetchImpl: () => new Promise(resolve => { resolveFetch = resolve; })
   });
   const deadlineAt = performance.now() + 30;
   await assert.rejects(provider.fetchOhlc({
-    deadlineAt, monotonicNow: () => performance.now()
+    deadlineAt, monotonicNow: () => performance.now(),
+    onTransportState: (phase, bytes) => headerStates.push([phase, bytes])
   }), /REQUEST_TIMEOUT/);
+  assert.deepEqual(headerStates, [["HEADERS", 0]]);
   const late = new Response("{}", { headers: { "content-type": "application/json" } });
   resolveFetch(late);
   await new Promise(resolve => setImmediate(resolve));
   assert.equal(late.bodyUsed, true);
+  assert.equal(provider.counters().bytes, 0);
 
   let cancelCalled = false;
+  const bodyStates = [];
   const readerResponse = {
     ok: true, status: 200,
     headers: { get: name => name === "content-type" ? "application/json" : null },
@@ -1645,9 +1650,11 @@ test("provider bounds fetch and body reads that ignore abort, and cleans late re
   };
   const readerProvider = createKrakenProvider({ fetchImpl: async () => readerResponse });
   await assert.rejects(readerProvider.fetchOhlc({
-    deadlineAt: performance.now() + 30, monotonicNow: () => performance.now()
+    deadlineAt: performance.now() + 30, monotonicNow: () => performance.now(),
+    onTransportState: (phase, bytes) => bodyStates.push([phase, bytes])
   }), /REQUEST_TIMEOUT/);
   assert.equal(cancelCalled, true);
+  assert.deepEqual(bodyStates, [["HEADERS", 0], ["BODY", 0]]);
 });
 
 test("provider cancels and releases readers on parent abort and invalid response", async () => {
@@ -1671,13 +1678,17 @@ test("provider cancels and releases readers on parent abort and invalid response
     }) }
   };
   const controller = new AbortController();
+  const phases = [];
   const provider = createKrakenProvider({
     signal: controller.signal, fetchImpl: async () => response
   });
-  const request = provider.fetchOhlc();
+  const request = provider.fetchOhlc({
+    onTransportState: (phase, bytes) => phases.push([phase, bytes])
+  });
   await readStarted;
   controller.abort();
   await assert.rejects(request, /REQUEST_ABORTED|This operation was aborted/);
+  assert.deepEqual(phases, [["HEADERS", 0], ["BODY", 0]]);
   await new Promise(resolve => setImmediate(resolve));
   assert.ok(cancelCalls >= 1);
   assert.ok(releaseCalls >= 1);
