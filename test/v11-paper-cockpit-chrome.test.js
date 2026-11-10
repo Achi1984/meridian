@@ -108,7 +108,9 @@ async function interceptGeneratedPaperReport(call,report){
     assertHealthy(){if(failure)throw failure;},
     async unlockApp(){
       verificationOwned=true;
-      try{await unlockAppThroughGate(call,{additionalFetchUrls:[PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT]});}
+      try{await unlockAppThroughGate(call,{additionalFetchUrls:[
+        PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT
+      ]});}
       finally{verificationOwned=false;}
     },
     async close(){off();await call('Fetch.disable');}
@@ -246,6 +248,12 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           'navigation clears private report DOM');
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
         assert.equal(intercepted.count(),1,'returning to the cockpit does not read automatically');
+        for(let attempt=0;attempt<150&&intercepted.pairedCount()<2;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(intercepted.pairedCount(),2,
+          'returning to active Strategies serves one additional mocked paired read');
         await evaluate(`document.querySelector('#paper-cockpit-root button').focus()`);
         await key('Enter','Enter',13);
         for(let attempt=0;attempt<150;attempt++){
@@ -276,6 +284,30 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`),{appHidden:false,state:'ready',button:true,privateData:false},
         'unlock after restoration keeps Strategies active without restoring the cleared report');
         assert.equal(intercepted.count(),2,'unlock after restoration does not start a report read');
+        for(let attempt=0;attempt<150&&intercepted.pairedCount()<3;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(intercepted.pairedCount(),3,
+          're-unlock while Strategies is active serves one mocked paired read');
+        for(let attempt=0;attempt<150;attempt++){
+          const settled=await evaluate(`(()=>{
+            const root=document.querySelector('#paired-paper-report-root');
+            const refresh=[...document.querySelectorAll(
+              '#paired-paper-report-section button')].find(button =>
+                button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen');
+            return root?.dataset.state==='empty' && !!refresh && !refresh.disabled;
+          })()`);
+          if(settled)break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(await evaluate(`(()=>{
+          const root=document.querySelector('#paired-paper-report-root');
+          const refresh=[...document.querySelectorAll(
+            '#paired-paper-report-section button')].find(button =>
+              button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen');
+          return root?.dataset.state==='empty' && !!refresh && !refresh.disabled;
+        })()`),true,'mocked paired response settles and leaves refresh enabled');
         // Host8h automatically reads after re-unlock. Keep its generated 503
         // intercepted until settled; this state has no retry backoff and its
         // enabled refresh must remain the first native Tab target below.

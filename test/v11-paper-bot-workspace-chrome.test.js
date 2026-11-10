@@ -340,6 +340,10 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           await evaluate(`document.getElementById('app-access-lock').click()`);
           assert.equal(await evaluate(`document.getElementById('app').hidden`), true);
           assert.equal(reads, 1, 'locking clears state without another read');
+          assert.doesNotMatch(
+            await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
+            /SYNTHETIC FIXTURE|5M-SMA20-Trend/,
+            'lock clears private paired DTO before the next unlock');
           try {
             await call('Fetch.fulfillRequest', {
               requestId: pendingPairedRequestId,
@@ -368,22 +372,32 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
           });
           await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
-          for (let attempt = 0; attempt < 150 && pairedReads < 3; attempt++) {
+          for (let attempt = 0; attempt < 150 && pairedReads < 4; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
           assert.equal(reads, 1, 're-unlock does not refresh the legacy report');
           assert.equal(pairedReads, 4,
             're-unlock while active creates exactly one new paired read');
           for (let attempt = 0; attempt < 150; attempt++) {
-            const pairedText = await evaluate(
-              `document.querySelector('#paired-paper-report-root').textContent`);
-            if (pairedText.includes('5M-SMA20-Trend')) break;
+            const settled = await evaluate(`(()=>{
+              const root=document.querySelector('#paired-paper-report-root');
+              const refresh=[...document.querySelectorAll(
+                '#paired-paper-report-section button')].find(button =>
+                  button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen');
+              return root.textContent.includes('5M-SMA20-Trend') &&
+                !!refresh && !refresh.disabled;
+            })()`);
+            if (settled) break;
             await new Promise(resolve => setTimeout(resolve, 10));
           }
-          assert.match(
-            await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
-            /5M-SMA20-Trend/,
-            'the active unlock re-entry read restores the current paired DTO');
+          assert.equal(await evaluate(`(()=>{
+            const root=document.querySelector('#paired-paper-report-root');
+            const refresh=[...document.querySelectorAll(
+              '#paired-paper-report-section button')].find(button =>
+                button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen');
+            return root.textContent.includes('5M-SMA20-Trend') &&
+              !!refresh && !refresh.disabled;
+          })()`),true,'paired result and refresh control settle after active unlock');
           await evaluate(`[...document.querySelectorAll(
             '#paper-bot-overview-section button')].find(button =>
               button.textContent.trim()==='BTC/EUR-Quelle manuell prüfen').click()`);
