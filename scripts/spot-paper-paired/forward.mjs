@@ -535,27 +535,33 @@ function boundedCall(operation, context, {
 }) {
   const transportState = { phase: "HEADERS", requestBytes: 0 };
   const diagnostic = termination => {
-    syncProviderCounters(provider, counters);
-    const elapsed = context.monotonicNow() - monotonicStart;
-    return {
-      schemaVersion: PAIRED_TRANSPORT_DIAGNOSTIC_SCHEMA,
-      requestKind, phase: transportState.phase, termination,
-      attemptedCycle: cycle, requestCount: counters.requests,
-      byteCount: counters.bytes, requestBytes: transportState.requestBytes,
-      elapsedMs: Number.isFinite(elapsed) ? Math.max(0, Math.floor(elapsed)) : 0
-    };
+    try {
+      if (!syncProviderCounters(provider, counters)) return null;
+      const elapsed = context.monotonicNow() - monotonicStart;
+      const elapsedMs = Math.floor(elapsed);
+      if (!Number.isSafeInteger(elapsedMs) || elapsedMs < 0 ||
+          !Number.isSafeInteger(counters.requests) || counters.requests < 0 ||
+          !Number.isSafeInteger(counters.bytes) || counters.bytes < 0) return null;
+      return {
+        schemaVersion: PAIRED_TRANSPORT_DIAGNOSTIC_SCHEMA,
+        requestKind, phase: transportState.phase, termination,
+        attemptedCycle: cycle, requestCount: counters.requests,
+        byteCount: counters.bytes, requestBytes: transportState.requestBytes,
+        elapsedMs
+      };
+    } catch {
+      return null;
+    }
   };
   const rejectWithDiagnostic = (error, termination) => {
     if (!(error instanceof Error)) error = new Error("TRANSPORT_ERROR");
-    try {
-      Object.defineProperty(error, PAIRED_TRANSPORT_FAILURE, {
-        value: diagnostic(termination)
-      });
-    } catch {
-      error = new Error("TRANSPORT_ERROR");
-      Object.defineProperty(error, PAIRED_TRANSPORT_FAILURE, {
-        value: diagnostic(termination)
-      });
+    const value = diagnostic(termination);
+    if (value) {
+      try {
+        Object.defineProperty(error, PAIRED_TRANSPORT_FAILURE, { value });
+      } catch {
+        // Diagnostics must not replace the original request failure.
+      }
     }
     return error;
   };
@@ -576,6 +582,7 @@ function boundedCall(operation, context, {
   const timeoutCode = callDeadline >= context.deadlineAt ? "DURATION_LIMIT" : "REQUEST_TIMEOUT";
   let timer;
   let abortListener;
+  let settled = false;
   const task = Promise.resolve().then(() => operation({
     deadlineAt: callDeadline, monotonicNow: context.monotonicNow,
     requestTimeoutMs: context.requestTimeoutMs, signal: controller.signal,
@@ -600,29 +607,52 @@ function boundedCall(operation, context, {
       if (!controller.signal.aborted) controller.abort(new Error("REQUEST_FINISHED"));
     };
     timer = setTimeout(() => {
+      if (settled) return;
+      settled = true;
       controller.abort(new Error(timeoutCode));
       cleanup();
       reject(rejectWithDiagnostic(new Error(timeoutCode), "OUTER_TIMEOUT"));
     }, Math.min(remaining, context.requestTimeoutMs));
     abortListener = () => {
+      if (settled) return;
+      settled = true;
       cleanup();
       reject(rejectWithDiagnostic(
         context.signal.reason ?? new Error("REQUEST_ABORTED"), "CANCELLATION"));
     };
     context.signal?.addEventListener("abort", abortListener, { once: true });
     task.then(value => {
-      cleanup();
-      if (context.monotonicNow() >= callDeadline) {
-        reject(rejectWithDiagnostic(new Error(timeoutCode), "OUTER_TIMEOUT"));
+      if (settled) return;
+      let now;
+      try {
+        now = context.monotonicNow();
+      } catch (error) {
+        settled = true;
+        cleanup();
+        reject(rejectWithDiagnostic(error, "TRANSPORT_ERROR"));
+        return;
       }
-      else resolve(value);
+      settled = true;
+      cleanup();
+      if (now >= callDeadline) {
+        reject(rejectWithDiagnostic(new Error(timeoutCode), "OUTER_TIMEOUT"));
+      } else {
+        resolve(value);
+      }
     }, error => {
+      if (settled) return;
+      settled = true;
       cleanup();
       const termination = context.signal?.aborted ? "CANCELLATION" :
         error?.message === "REQUEST_TIMEOUT" ? "REQUEST_TIMEOUT" :
           error?.message === "DURATION_LIMIT" ? "OUTER_TIMEOUT" :
             "TRANSPORT_ERROR";
       reject(rejectWithDiagnostic(error, termination));
+    }).catch(error => {
+      if (settled) return;
+      settled = true;
+      cleanup();
+      reject(rejectWithDiagnostic(error, "TRANSPORT_ERROR"));
     });
   });
 }
@@ -695,12 +725,15 @@ function slippageForFillCents(fill, quote) {
 }
 
 function syncProviderCounters(provider, counters) {
-  const reported = typeof provider.counters === "function" ? provider.counters() : null;
-  if (Number.isSafeInteger(reported?.requests)) {
+  try {
+    const reported = typeof provider.counters === "function" ? provider.counters() : null;
+    if (!Number.isSafeInteger(reported?.requests) || reported.requests < 0 ||
+        !Number.isSafeInteger(reported?.bytes) || reported.bytes < 0) return false;
     counters.requests = Math.max(counters.requests, reported.requests);
-  }
-  if (Number.isSafeInteger(reported?.bytes)) {
     counters.bytes = Math.max(counters.bytes, reported.bytes);
+    return true;
+  } catch {
+    return false;
   }
 }
 

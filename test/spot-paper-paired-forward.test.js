@@ -67,6 +67,20 @@ function receipt(data, requestStartedAt, receivedAt) {
     bytes: Buffer.byteLength(raw), requestStartedAt, receivedAt };
 }
 
+async function waitFor(promise, label, timeoutMs = 1_000) {
+  let timer;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), timeoutMs);
+      })
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 async function fixture(t, options = {}) {
   const dataRoot = await mkdtemp(join(tmpdir(), "paired-forward-"));
   t.after(() => rm(dataRoot, { recursive: true, force: true }));
@@ -234,7 +248,8 @@ async function fixture(t, options = {}) {
     maxDurationMs: options.maxDurationMs ?? 180_000,
     pollIntervalMs: SPOT_PAPER_PAIRED.pollIntervalMs,
     now: () => wall,
-    monotonicNow: options.realMonotonic ? () => performance.now() : () => mono,
+    monotonicNow: options.monotonicClock ??
+      (options.realMonotonic ? () => performance.now() : () => mono),
     sleep: async ms => {
       const wallAdvance = typeof options.wallSleepAdvanceMs === "function" ?
         options.wallSleepAdvanceMs(ms, sleepCount++) :
@@ -419,13 +434,15 @@ test("paired transport failures are bounded, sanitized, and leave the failed cyc
 
 test("outer deadlines and explicit aborts retain the stalled request phase", async t => {
   for (const phase of ["HEADERS", "BODY"]) {
+    let monotonic = 100;
     const setup = await fixture(t, {
-      maxCycles: 1, maxRequests: 2, maxDurationMs: 80,
-      realMonotonic: true, hangOhlcPhase: phase
+      maxCycles: 1, maxRequests: 2, maxDurationMs: 40,
+      monotonicClock: () => monotonic, hangOhlcPhase: phase
     });
     const pending = runSpotPaperPairedSynthetic(setup.config);
-    await setup.pendingOhlc;
-    const report = await pending;
+    await waitFor(setup.pendingOhlc, "OHLC_ENTRY");
+    monotonic += setup.config.maxDurationMs;
+    const report = await waitFor(pending, "OUTER_TIMEOUT");
     assert.equal(report.stopReason, "DURATION_LIMIT");
     assert.equal(report.requests, 1);
     assert.equal(report.transportDiagnostic.requestKind, "OHLC");
@@ -441,13 +458,89 @@ test("outer deadlines and explicit aborts retain the stalled request phase", asy
     hangOhlcPhase: "BODY"
   });
   const pending = runSpotPaperPairedSynthetic(aborted.config);
-  await aborted.pendingOhlc;
+  await waitFor(aborted.pendingOhlc, "ABORT_ENTRY");
   controller.abort(new Error("unrestricted caller detail"));
-  const report = await pending;
+  const report = await waitFor(pending, "CANCELLATION");
   assert.equal(report.stopReason, "OPERATOR_STOP");
   assert.equal(report.transportDiagnostic.termination, "CANCELLATION");
   assert.equal(report.transportDiagnostic.phase, "BODY");
   assert.equal(JSON.stringify(report).includes("unrestricted caller detail"), false);
+});
+
+test("paired timeout keeps terminal handling when diagnostic counters throw", async t => {
+  let monotonic = 100;
+  const setup = await fixture(t, {
+    maxCycles: 1, maxRequests: 2, maxDurationMs: 40,
+    monotonicClock: () => monotonic, hangOhlcPhase: "BODY"
+  });
+  const fetchOhlc = setup.provider.fetchOhlc.bind(setup.provider);
+  setup.provider.fetchOhlc = runtime => {
+    setup.provider.counters = () => {
+      throw new Error("counter read failed");
+    };
+    return fetchOhlc(runtime);
+  };
+  const pending = runSpotPaperPairedSynthetic(setup.config);
+  await waitFor(setup.pendingOhlc, "COUNTER_TIMEOUT_ENTRY");
+  monotonic += setup.config.maxDurationMs;
+  const report = await waitFor(pending, "COUNTER_TIMEOUT");
+  assert.equal(report.stopReason, "DURATION_LIMIT");
+  assert.equal(report.requests, 1);
+  assert.equal(Object.hasOwn(report, "transportDiagnostic"), false);
+  const journal = await readRunJournal({
+    dataRoot: setup.dataRoot, runId: setup.config.runId
+  });
+  assert.equal(journal.events.some(event =>
+    event.type === "shared_feed_failure" && event.reason === "DURATION_LIMIT"), true);
+});
+
+test("paired cancellation omits a failed clock diagnostic and fences late completion", async t => {
+  let monotonic = 100;
+  let throwNextClockRead = false;
+  let markRequestEntered;
+  let resolveLateResponse;
+  const requestEntered = new Promise(resolve => {
+    markRequestEntered = resolve;
+  });
+  const unhandled = [];
+  const onUnhandled = reason => unhandled.push(reason);
+  process.on("unhandledRejection", onUnhandled);
+  try {
+    const controller = new AbortController();
+    const setup = await fixture(t, {
+      maxCycles: 1, maxRequests: 2, maxDurationMs: 5_000,
+      monotonicClock: () => {
+        if (throwNextClockRead) {
+          throwNextClockRead = false;
+          throw new Error("clock read failed");
+        }
+        return monotonic;
+      },
+      signal: controller.signal
+    });
+    setup.provider.fetchOhlc = runtime => {
+      runtime.onTransportState?.("BODY", 0);
+      markRequestEntered();
+      return new Promise(resolve => {
+        resolveLateResponse = resolve;
+      });
+    };
+    const pending = runSpotPaperPairedSynthetic(setup.config);
+    await waitFor(requestEntered, "CLOCK_ABORT_ENTRY");
+    throwNextClockRead = true;
+    controller.abort(new Error("unrestricted caller detail"));
+    const report = await waitFor(pending, "CLOCK_CANCELLATION");
+    assert.equal(report.stopReason, "OPERATOR_STOP");
+    assert.equal(report.requests, 1);
+    assert.equal(report.arms.every(arm =>
+      arm.decisions.length === 0 && arm.fills.length === 0), true);
+    assert.equal(Object.hasOwn(report, "transportDiagnostic"), false);
+    resolveLateResponse(receipt(ohlc(BASE + 22 * MINUTE + 1_000), BASE, BASE + 1));
+    await new Promise(resolve => setImmediate(resolve));
+    assert.deepEqual(unhandled, []);
+  } finally {
+    process.off("unhandledRejection", onUnhandled);
+  }
 });
 
 test("per-arm loss termination preserves an open position and never trades again", async t => {
