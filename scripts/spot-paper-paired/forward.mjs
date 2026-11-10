@@ -922,8 +922,8 @@ async function runPairedForward(input, testOnly) {
             requestKind: "OHLC", cycle, monotonicStart, counters,
             provider: config.provider
           });
-        syncProviderCounters(config.provider, counters);
-        if (counters.requests !== cycle * 2 - 1 ||
+        if (!syncProviderCounters(config.provider, counters) ||
+            counters.requests !== cycle * 2 - 1 ||
             counters.bytes - ohlcBytesBefore !== ohlcResponse?.bytes) {
           throw new Error("PROVIDER_COUNTER_MISMATCH");
         }
@@ -966,8 +966,8 @@ async function runPairedForward(input, testOnly) {
             requestKind: "TICKER", cycle, monotonicStart, counters,
             provider: config.provider
           });
-        syncProviderCounters(config.provider, counters);
-        if (counters.requests !== cycle * 2 ||
+        if (!syncProviderCounters(config.provider, counters) ||
+            counters.requests !== cycle * 2 ||
             counters.bytes - tickerBytesBefore !== tickerResponse?.bytes) {
           throw new Error("PROVIDER_COUNTER_MISMATCH");
         }

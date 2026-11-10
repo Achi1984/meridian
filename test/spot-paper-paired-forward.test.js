@@ -67,6 +67,12 @@ function receipt(data, requestStartedAt, receivedAt) {
     bytes: Buffer.byteLength(raw), requestStartedAt, receivedAt };
 }
 
+function zeroByteReceipt(data, at) {
+  const raw = "";
+  return { data, raw, sha256: sha256(Buffer.from(raw, "utf8")),
+    bytes: 0, requestStartedAt: at, receivedAt: at };
+}
+
 async function waitFor(promise, label, timeoutMs = 1_000) {
   let timer;
   try {
@@ -541,6 +547,50 @@ test("paired cancellation omits a failed clock diagnostic and fences late comple
   } finally {
     process.off("unhandledRejection", onUnhandled);
   }
+});
+
+test("successful zero-byte acquisitions fail closed when provider counters are unusable", async t => {
+  const ohlcSetup = await fixture(t, {
+    maxCycles: 1, maxRequests: 2, enterOnCycleOne: true
+  });
+  ohlcSetup.provider.fetchOhlc = () => {
+    ohlcSetup.provider.counters = () => {
+      throw new Error("counter read failed");
+    };
+    return zeroByteReceipt(ohlc(ohlcSetup.wall), ohlcSetup.wall);
+  };
+  const ohlcReport = await runSpotPaperPairedSynthetic(ohlcSetup.config);
+  assert.equal(ohlcReport.stopReason, "SHARED_FEED_FAILURE");
+  assert.equal(ohlcReport.failureReason, "PROVIDER_COUNTER_MISMATCH");
+  assert.equal(ohlcReport.arms.every(arm =>
+    arm.decisions.length === 0 && arm.fills.length === 0), true);
+
+  const tickerSetup = await fixture(t, {
+    maxCycles: 1, maxRequests: 2, enterOnCycleOne: true
+  });
+  const counters = tickerSetup.provider.counters;
+  let tickerEntered = false;
+  tickerSetup.provider.fetchTicker = () => {
+    tickerEntered = true;
+    return zeroByteReceipt(ticker(), tickerSetup.wall);
+  };
+  tickerSetup.provider.counters = () => {
+    const current = counters();
+    return tickerEntered ?
+      {requests: Number.NaN, bytes: current.bytes} : current;
+  };
+  const tickerReport = await runSpotPaperPairedSynthetic(tickerSetup.config);
+  assert.equal(tickerReport.stopReason, "SHARED_FEED_FAILURE");
+  assert.equal(tickerReport.failureReason, "PROVIDER_COUNTER_MISMATCH");
+  assert.equal(tickerReport.arms.every(arm =>
+    arm.decisions.length === 0 && arm.fills.length === 0), true);
+  const journal = await readRunJournal({
+    dataRoot: tickerSetup.dataRoot, runId: tickerSetup.config.runId
+  });
+  assert.equal(journal.events.some(event => event.type === "shared_observation"), false);
+  assert.equal(journal.events.some(event =>
+    event.type === "shared_feed_failure" &&
+    event.reason === "PROVIDER_COUNTER_MISMATCH"), true);
 });
 
 test("per-arm loss termination preserves an open position and never trades again", async t => {
