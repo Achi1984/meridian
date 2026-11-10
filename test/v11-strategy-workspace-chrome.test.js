@@ -15,6 +15,7 @@ import {
   createInsufficientEvidenceProfile,createInsufficientEvidenceSeries
 } from '../scripts/research-supervisor/test_b1_generated_fixture.mjs';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {SPOT_PAPER_PAIRED_REPORT_ENDPOINT} from '../v11/spot-paper-paired-report-connector.js';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const repository=fileURLToPath(new URL('../',import.meta.url));
@@ -255,6 +256,40 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
     for(const size of sizes){
       const previousSourceRequests=hosted.requests.filter(request=>request.path==='/docs/strategy-lab/campaign-20261013.json').length;
       const metrics=await withMobileChrome(chrome,size.width,hosted.url,async call=>{
+        let pairedReads=0;
+        let fetchFailure=null;
+        const stopPairedIntercept=call.onEvent('Fetch.requestPaused',event=>{
+          void (async()=>{
+            if(event.request.method==='OPTIONS'){
+              await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,
+                responseHeaders:[
+                  {name:'Access-Control-Allow-Origin',value:'*'},
+                  {name:'Access-Control-Allow-Methods',value:'GET'},
+                  {name:'Access-Control-Allow-Headers',value:'accept,authorization'},
+                  {name:'Access-Control-Max-Age',value:'0'}
+                ]});
+              return;
+            }
+            assert.equal(event.request.url,SPOT_PAPER_PAIRED_REPORT_ENDPOINT);
+            assert.equal(event.request.method,'GET');
+            const authorization=Object.entries(event.request.headers||{})
+              .find(([name])=>name.toLowerCase()==='authorization')?.[1];
+            assert.ok(authorization?.startsWith('Bearer '));
+            pairedReads++;
+            await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:404,
+              responseHeaders:[
+                {name:'Access-Control-Allow-Origin',value:'*'},
+                {name:'Content-Type',value:'application/json; charset=utf-8'},
+                {name:'Cache-Control',value:'no-store'}
+              ],
+              body:Buffer.from(JSON.stringify({
+                error:'spot_paper_paired_report_not_found'
+              })).toString('base64')});
+          })().catch(error=>{fetchFailure=error;});
+        });
+        await call('Fetch.enable',{patterns:[
+          {urlPattern:SPOT_PAPER_PAIRED_REPORT_ENDPOINT,requestStage:'Request'}
+        ]});
         const evaluate=async expression=>{
           const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
           const exception=result.exceptionDetails;
@@ -533,7 +568,9 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(resetHistory.count,'5 von 5 Zusammenfassungen angezeigt.');
         assert.equal(resetHistory.entries,5);
         assert.equal(resetHistory.overflow,false);
-        assert.ok(catalog.resources.every(path=>!/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
+        const pairedPath=new URL(SPOT_PAPER_PAIRED_REPORT_ENDPOINT).pathname;
+        assert.ok(catalog.resources.every(path=>path===pairedPath||
+          !/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
         assert.ok(catalog.resources.includes('/docs/strategy-lab/campaign-20261013.json'));
         await evaluate(`(()=>{
           const first=document.querySelector('#strategy-comparison-first');
@@ -1102,7 +1139,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         const hostilePresentation=await evaluate(`(async()=>{
-          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B16-M11-FIX14');
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B16-M11-FIX15');
           const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
           const root=document.createElement('div');
           root.style.cssText='max-width:100%;min-width:0';
@@ -1127,7 +1164,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B16-M11-FIX14');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B16-M11-FIX15');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});
@@ -1226,7 +1263,11 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         })()`);
         assert.match(arena.notice,/SYNTHETISCHE TESTDATEN · KEINE MARKTEVIDENZ/);
         assert.equal(arena.cards,5);assert.equal(arena.h9,true);assert.equal(arena.overflow,false);assert.equal(arena.bottom,true);
-        assert.ok(arena.network.every(url=>new URL(url).origin===new URL(hosted.url).origin),'no external or market requests');
+        assert.equal(fetchFailure,null,fetchFailure?.message);
+        assert.equal(pairedReads,1,'active Strategies entry performs exactly one authorized paired read');
+        assert.ok(arena.network.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
+          url===SPOT_PAPER_PAIRED_REPORT_ENDPOINT),
+        'no external or market requests beyond the bounded paired report read');
         if(evidence){
           await evaluate(`document.querySelector('#strategy-arena-root .arena-model-card').scrollIntoView({block:'start'})`);
           const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
@@ -1235,6 +1276,11 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
 
         await evaluate(`document.querySelector('#nav button[data-v="command"]').click()`);
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
+        for(let attempt=0;attempt<100&&pairedReads<2;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(fetchFailure,null,fetchFailure?.message);
+        assert.equal(pairedReads,2,'returning to active Strategies reads the paired report once');
         assert.equal(await evaluate(`document.querySelector('.view.active').id`),'view-strategies',
           'the consolidated navigation opens strategies from Command');
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true);
@@ -1244,6 +1290,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(host8hReads.length>0,'host8h uses only the local unavailable transport fixture');
         assert.ok(host8hReads.every(request=>request.method==='GET'&&request.authorized),
            'the local host8h fixture requires the authenticated read-only request');
+        stopPairedIntercept();
+        await call('Fetch.disable');
         return {width:size.width,sourceFetches:requestPaths.filter(path=>path==='/docs/strategy-lab/campaign-20261013.json').length,
           families:catalog.families,models:arena.cards,overflow:catalog.overflow,synthetic:true,
           explorerPaths:44,selectionLimit:2,quarterlyValues:'producer-exact',importReset:true,

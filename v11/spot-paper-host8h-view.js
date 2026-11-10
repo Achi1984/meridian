@@ -2,7 +2,7 @@ import {
   createSpotPaperHost8hAdapter,
   presentSpotPaperHost8h,
   SPOT_PAPER_HOST8H_REQUESTED_DURATION_MS
-} from './spot-paper-host8h-model.js?v=B16-M11-FIX14';
+} from './spot-paper-host8h-model.js?v=B16-M11-FIX15';
 
 function node(document, parent, tag, text = '', className = '') {
   const element = document.createElement(tag);

@@ -1,4 +1,4 @@
-import {presentSpotPaperBotOverview} from './spot-paper-bot-overview-model.js?v=B16-M11-FIX14';
+import {presentSpotPaperBotOverview} from './spot-paper-bot-overview-model.js?v=B16-M11-FIX15';
 
 const STATE_LABELS = Object.freeze({
   PREPARED: 'In Vorbereitung',
@@ -28,6 +28,7 @@ const REASON_LABELS = Object.freeze({
   LOWVOL_NATIVE_UNIT_ADAPTER_NOT_AVAILABLE: 'Native Einheit USDT; Anbindung noch ausstehend.',
   LOWVOL_RUNTIME_ADAPTER_NOT_AVAILABLE: 'Laufzeitdaten noch nicht angebunden.',
   METRIC_NOT_REPORTED: 'Wert nicht gemeldet.',
+  METRIC_MISSING: 'Wert nicht gemeldet.',
   NO_TRADE_REASON_NOT_REPORTED: 'Kein Handelsgrund gemeldet.',
   NO_TRADES_REPORTED: 'Noch keine Handelsdetails gemeldet.',
   NOT_APPLICABLE_TO_THIS_BOT: 'Für diesen Bot nicht vorgesehen.',
@@ -35,8 +36,14 @@ const REASON_LABELS = Object.freeze({
   PERCENT_BASIS_NOT_VALIDATED: 'Berechnungsbasis nicht belegt.',
   REPORT_ADAPTER_NOT_PROVIDED: 'Noch keine Laufdaten verfügbar.',
   REPORT_ADAPTER_REJECTED: 'Laufdaten konnten nicht geprüft werden.',
+  REPORT_SNAPSHOT_HISTORICAL: 'Historischer Bericht-Snapshot; kein aktueller Laufstatus.',
   RUNTIME_EVIDENCE_NOT_VALIDATED: 'Laufstatus ist nicht belegt.',
+  PAIRED_REPORT_EVIDENCE_UNKNOWN: 'Berichtsevidenz ist unbekannt.',
+  PAIRED_REPORT_IDENTITY_NOT_SUPPORTED: 'Trend-Modellidentität wird nicht unterstützt.',
+  PAIRED_REPORT_NOT_VALIDATED: 'Gepaarter Bericht konnte nicht validiert werden.',
   TRADE_DETAILS_NOT_VALIDATED: 'Handelsdetails konnten nicht geprüft werden.',
+  TRADE_DETAILS_NOT_REPORTED: 'Handelsdetails wurden nicht gemeldet.',
+  ROUND_TRIPS_NOT_REPORTED: 'Handelsrunden wurden nicht gemeldet.',
   VERSION_NOT_REPORTED: 'Version nicht gemeldet.',
   SOURCE_FRESH: 'Quelle meldet aktuelle Daten.',
   SOURCE_STALE: 'Quelle meldet veraltete Daten.'
@@ -136,6 +143,14 @@ function timestamp(value) {
   }).format(date)} (Europe/Wien)`;
 }
 
+function snapshotTimestamp(value) {
+  if (!Number.isSafeInteger(value) || value < 0 ||
+      !Number.isFinite(new Date(value).getTime())) {
+    return 'Unbekannt — Bewertungszeitpunkt fehlt oder ist ungültig.';
+  }
+  return timestamp({available: true, value: new Date(value).toISOString()});
+}
+
 function describeReason(bot) {
   if (bot.reason) return reasonText(bot.reason);
   if (bot.state === 'PAUSED') return 'Unbekannt — Pausengrund nicht gemeldet.';
@@ -145,6 +160,14 @@ function describeReason(bot) {
 }
 
 function summaryStatus(bot) {
+  if (bot.reportSnapshot) {
+    const evidence = {
+      VERIFIED_COMPLETE: 'strukturell vollständig',
+      INTERRUPTED: 'unterbrochen',
+      RUNNING_SNAPSHOT: 'Zwischenstand'
+    }[bot.reportSnapshot.evidenceStatus] || 'Evidenz unbekannt';
+    return `Historischer Snapshot · ${evidence}`;
+  }
   const state = STATE_LABELS[bot.state] || STATE_LABELS.UNKNOWN;
   if (bot.state === 'PREPARED' || bot.state === 'UNKNOWN') return state;
   return `${state} · ${freshnessPresentation(bot)}`;
@@ -162,8 +185,12 @@ function freshnessPresentation(bot) {
   return 'Datenfrische unbekannt';
 }
 
-function renderTradeDetails(document, parent, bot, disclosures) {
+function renderTradeDetails(document, parent, bot, disclosures, disclosureStates) {
   const details = document.createElement('details');
+  details.spotPaperDisclosureKey = `trades:${bot.id}`;
+  if (disclosureStates.has(details.spotPaperDisclosureKey)) {
+    details.open = disclosureStates.get(details.spotPaperDisclosureKey);
+  }
   details.setAttribute('style', 'margin-top:10px;min-width:0');
   node(document, details, 'summary', `Handelsdetails (${bot.trades.length})`);
   if (bot.trades.length === 0) {
@@ -189,9 +216,13 @@ function renderTradeDetails(document, parent, bot, disclosures) {
   disclosures.push(details);
 }
 
-function renderBot(document, parent, bot, disclosures) {
+function renderBot(document, parent, bot, disclosures, disclosureStates) {
   const card = document.createElement('details');
   card.className = 'spot-paper-bot-card';
+  card.spotPaperDisclosureKey = `card:${bot.id}`;
+  if (disclosureStates.has(card.spotPaperDisclosureKey)) {
+    card.open = disclosureStates.get(card.spotPaperDisclosureKey);
+  }
   card.setAttribute('style',
     'border:1px solid currentColor;border-radius:12px;padding:12px;min-width:0;overflow-wrap:anywhere');
   const summary = document.createElement('summary');
@@ -210,8 +241,10 @@ function renderBot(document, parent, bot, disclosures) {
     amount(summaryPnl, true) : 'Unbekannt'}`;
   summaryValue.className = amountTone(summaryPnl, true);
   summary.append(summaryValue);
-  node(document, summary, 'small', `Quelle: ${bot.freshness.at ?
-    timestamp({available: true, value: bot.freshness.at}) : 'Zeitpunkt nicht gemeldet.'}`);
+  node(document, summary, 'small', bot.reportSnapshot ?
+    `Bewertung: ${snapshotTimestamp(bot.reportSnapshot.valuationAt)}` :
+      `Quelle: ${bot.freshness.at ?
+        timestamp({available: true, value: bot.freshness.at}) : 'Zeitpunkt nicht gemeldet.'}`);
   card.append(summary);
   disclosures.push(card);
 
@@ -261,7 +294,7 @@ function renderBot(document, parent, bot, disclosures) {
   field(document, costMetrics, 'Zeit investiert', time(bot.timeInvestedMs));
   field(document, costMetrics, 'Letzter Trade', timestamp(bot.lastTradeAt));
   costs.append(costMetrics);
-  renderTradeDetails(document, costs, bot, disclosures);
+  renderTradeDetails(document, costs, bot, disclosures, disclosureStates);
   content.append(costs);
 
   const details = document.createElement('section');
@@ -288,6 +321,16 @@ function renderBot(document, parent, bot, disclosures) {
     (bot.freshness.at ? ` · ${timestamp({available: true, value: bot.freshness.at})}` : ''));
   field(document, details, bot.state === 'PAUSED' ? 'Pause-Grund' : 'Handels-/Statusgrund',
     describeReason(bot));
+  if (bot.reportSnapshot) {
+    field(document, details, 'Bericht-Snapshot · Run-ID', bot.reportSnapshot.runId);
+    field(document, details, 'Evidenzstatus', bot.reportSnapshot.evidenceStatus);
+    field(document, details, 'Bewertungszeitpunkt',
+      snapshotTimestamp(bot.reportSnapshot.valuationAt));
+    field(document, details, 'Kostenannahmen',
+      `${bot.reportSnapshot.feeBpsPerSide} bp Gebühr und ` +
+      `${bot.reportSnapshot.slippageBpsPerSide} bp Slippage je Seite; ` +
+      `${bot.reportSnapshot.ratesVerified ? 'Sätze verifiziert.' : 'Sätze nicht verifiziert.'}`);
+  }
   content.append(details);
 
   if (bot.id === 'btc-usd-lives') {
@@ -339,9 +382,18 @@ function renderCurve(document, root, curve, bots) {
   root.append(section);
 }
 
-export function renderSpotPaperBotOverview(root, adapters, document = root?.ownerDocument) {
+export function renderSpotPaperBotOverview(root, adapters, document = root?.ownerDocument,
+  {pairedReport = null} = {}) {
   if (!root || !document) return null;
-  const model = presentSpotPaperBotOverview(adapters);
+  const disclosureStates = new Map();
+  const rememberDisclosures = element => {
+    if (element?.tagName === 'DETAILS' && element.spotPaperDisclosureKey) {
+      disclosureStates.set(element.spotPaperDisclosureKey, element.open);
+    }
+    for (const child of element?.children || []) rememberDisclosures(child);
+  };
+  rememberDisclosures(root);
+  const model = presentSpotPaperBotOverview(adapters, {pairedReport});
   root.replaceChildren();
   root.setAttribute('style',
     'box-sizing:border-box;display:grid;gap:12px;min-width:0;max-width:100%;padding:12px;overflow-wrap:anywhere');
@@ -371,7 +423,9 @@ export function renderSpotPaperBotOverview(root, adapters, document = root?.owne
     'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;min-width:0');
   cards.id = `${heading.id}-cards`;
   const disclosures = [];
-  for (const bot of model.bots) renderBot(document, cards, bot, disclosures);
+  for (const bot of model.bots) {
+    renderBot(document, cards, bot, disclosures, disclosureStates);
+  }
   const controls = document.createElement('div');
   controls.setAttribute('style', 'display:flex;flex-wrap:wrap;gap:8px;min-width:0');
   for (const [label, open] of [['Alle Details öffnen', true], ['Alle Details schließen', false]]) {

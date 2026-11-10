@@ -389,7 +389,7 @@ test('mobile Chrome renders canonical synthetic DTO without horizontal overflow'
         const fixture = JSON.stringify(dto());
         const expression = `(async()=>{
           const {mountSpotPaperPairedPanel}=await import(
-            './spot-paper-paired-controller.js?v=B16-M11-FIX14');
+            './spot-paper-paired-controller.js?v=B16-M11-FIX15');
           const root=document.createElement('section');
           root.id='paired-panel';
           document.documentElement.style.margin='0';

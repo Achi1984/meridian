@@ -2,7 +2,7 @@ import {
   ARM_DEFINITIONS,
   MONEY_FIELDS,
   presentSpotPaperPairedReport
-} from './spot-paper-paired-model.js?v=B16-M11-FIX14';
+} from './spot-paper-paired-model.js?v=B16-M11-FIX15';
 
 let panelSequence = 0;
 const MONEY_LABELS = new Map(MONEY_FIELDS.map(([key, label]) => [key, label]));
