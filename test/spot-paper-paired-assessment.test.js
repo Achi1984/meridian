@@ -1,9 +1,11 @@
 import assert from 'node:assert/strict';
-import {spawnSync} from 'node:child_process';
+import {execFileSync, spawnSync} from 'node:child_process';
 import {mkdtemp, readdir, rm, writeFile} from 'node:fs/promises';
 import {tmpdir} from 'node:os';
 import {join, resolve} from 'node:path';
 import {test} from 'node:test';
+import {SPOT_PAPER_PAIRED_REPORT_MAX_BYTES} from
+  '../scripts/spot-paper-paired-report/envelope.mjs';
 import {
   createSpotPaperPairedAssessmentSummary,
   formatSpotPaperPairedAssessment
@@ -174,7 +176,8 @@ test('rejects malformed DTOs, invalid metrics, and unsupported output formats', 
   });
 });
 
-test('offline CLI reads one bounded sanitized file and writes only the assessment to stdout', async () => {
+test('offline CLI uses bounded regular-file input and writes only the assessment to stdout',
+  {timeout: 10_000}, async () => {
   const directory = await mkdtemp(join(tmpdir(), 'paired-assessment-'));
   const inputPath = join(directory, 'dashboard.json');
   try {
@@ -182,7 +185,7 @@ test('offline CLI reads one bounded sanitized file and writes only the assessmen
     const result = spawnSync(process.execPath, [
       resolve('scripts/spot-paper-paired-assessment/cli.mjs'),
       '--format', 'json', inputPath
-    ], {encoding: 'utf8'});
+    ], {encoding: 'utf8', timeout: 2_000});
     assert.equal(result.status, 0, result.stderr);
     assert.equal(result.stderr, '');
     assert.equal(JSON.parse(result.stdout).evidence.syntheticFixture, true);
@@ -192,10 +195,31 @@ test('offline CLI reads one bounded sanitized file and writes only the assessmen
     await writeFile(malformedPath, '{"sensitive":"not echoed"');
     const malformed = spawnSync(process.execPath, [
       resolve('scripts/spot-paper-paired-assessment/cli.mjs'), malformedPath
-    ], {encoding: 'utf8'});
+    ], {encoding: 'utf8', timeout: 2_000});
     assert.equal(malformed.status, 1);
     assert.equal(malformed.stdout, '');
     assert.equal(malformed.stderr, 'INPUT_INVALID_OR_OVERSIZED\n');
+
+    const oversizedPath = join(directory, 'oversized.json');
+    await writeFile(oversizedPath,
+      Buffer.alloc(SPOT_PAPER_PAIRED_REPORT_MAX_BYTES + 1, 0x20));
+    const oversized = spawnSync(process.execPath, [
+      resolve('scripts/spot-paper-paired-assessment/cli.mjs'), oversizedPath
+    ], {encoding: 'utf8', timeout: 2_000});
+    assert.equal(oversized.status, 1);
+    assert.equal(oversized.error, undefined);
+    assert.equal(oversized.stdout, '');
+    assert.equal(oversized.stderr, 'INPUT_INVALID_OR_OVERSIZED\n');
+
+    const fifoPath = join(directory, 'input.fifo');
+    execFileSync('mkfifo', [fifoPath]);
+    const fifo = spawnSync(process.execPath, [
+      resolve('scripts/spot-paper-paired-assessment/cli.mjs'), fifoPath
+    ], {encoding: 'utf8', timeout: 2_000});
+    assert.equal(fifo.status, 1);
+    assert.equal(fifo.error, undefined);
+    assert.equal(fifo.stdout, '');
+    assert.equal(fifo.stderr, 'INPUT_INVALID_OR_OVERSIZED\n');
   } finally {
     await rm(directory, {recursive: true, force: true});
   }

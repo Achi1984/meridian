@@ -1,9 +1,8 @@
 import {resolve} from 'node:path';
 import {pathToFileURL} from 'node:url';
-import {
-  readBoundedJsonFile,
-  SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES
-} from '../spot-paper-paired-report/evaluate.mjs';
+import {readBoundedJsonFile} from '../spot-paper-paired-report/ingest.mjs';
+import {SPOT_PAPER_PAIRED_REPORT_MAX_BYTES} from
+  '../spot-paper-paired-report/envelope.mjs';
 import {formatSpotPaperPairedAssessment} from './format.mjs';
 
 function usage(stderr) {
@@ -42,7 +41,7 @@ export async function main(argv = process.argv.slice(2), {
 
   try {
     const dto = await readBoundedJsonFile(
-      inputPath, SPOT_PAPER_PAIRED_MAX_HOST_EXPORT_BYTES
+      inputPath, SPOT_PAPER_PAIRED_REPORT_MAX_BYTES
     );
     stdout.write(formatSpotPaperPairedAssessment(dto, format));
     return 0;
