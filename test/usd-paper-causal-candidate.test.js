@@ -124,6 +124,17 @@ function candleRow(index, close) {
   ];
 }
 
+function currentOhlc(current) {
+  const timestampMs = Math.floor(current / 60_000) * 60_000 - 60_000;
+  const row = [
+    timestampMs / 1000, "9000", "12000", "8000", "10000", "10000", "1", 1
+  ];
+  return {
+    error: [],
+    result: {XXBTZUSD: [row], last: row[0]}
+  };
+}
+
 function response(data) {
   return new Response(JSON.stringify(data), {
     headers: {"content-type": "application/json"}
@@ -278,6 +289,78 @@ test("staged feed excludes an unclosed candle and rejects future or non-USD inst
     }).fetchCausalSample({decide: () => ({action: "HOLD"})}),
     /UNEXPECTED_OHLC_PAIR/);
   }
+});
+
+test("causal decisions are synchronous; unresolved thenables and cancellation stop before Ticker and latch", async () => {
+  const current = BASE + 125_000;
+  const endpoints = [];
+  const feed = createKrakenUsdPublicFeed({
+    now: () => current,
+    monotonicNow: () => 1,
+    fetchImpl: async url => {
+      endpoints.push(url.pathname.endsWith("/OHLC") ? "OHLC" : "Ticker");
+      return response(url.pathname.endsWith("/OHLC") ?
+        currentOhlc(current) : krakenTicker());
+    }
+  });
+  await assert.rejects(feed.fetchCausalSample({
+    decide: () => new Promise(() => {})
+  }), /ASYNC_CAUSAL_DECISION_UNSUPPORTED/);
+  assert.deepEqual(endpoints, ["OHLC"]);
+  await assert.rejects(feed.fetchCausalSample({
+    decide: () => ({action: "HOLD"})
+  }), /FEED_TERMINAL_FAILURE/);
+  assert.deepEqual(endpoints, ["OHLC"]);
+
+  const controller = new AbortController();
+  const canceledEndpoints = [];
+  const canceled = createKrakenUsdPublicFeed({
+    now: () => current,
+    monotonicNow: () => 1,
+    fetchImpl: async url => {
+      canceledEndpoints.push(url.pathname.endsWith("/OHLC") ? "OHLC" : "Ticker");
+      return response(url.pathname.endsWith("/OHLC") ?
+        currentOhlc(current) : krakenTicker());
+    }
+  });
+  await assert.rejects(canceled.fetchCausalSample({
+    runtime: {signal: controller.signal},
+    decide: () => {
+      controller.abort();
+      return {action: "HOLD"};
+    }
+  }), /REQUEST_ABORTED/);
+  assert.deepEqual(canceledEndpoints, ["OHLC"]);
+  await assert.rejects(canceled.fetchObservation(), /FEED_TERMINAL_FAILURE/);
+  assert.deepEqual(canceledEndpoints, ["OHLC"]);
+});
+
+test("legacy and causal interfaces exhaust the same feed event and request budgets", async () => {
+  let current = BASE + 125_000;
+  const provider = createKrakenUsdPublicFeed({
+    now: () => current,
+    monotonicNow: () => 1,
+    fetchImpl: async url => response(url.pathname.endsWith("/OHLC") ?
+      currentOhlc(current) : krakenTicker())
+  });
+  const mixedSamples = 256;
+  for (let index = 0; index < mixedSamples; index++) {
+    if (index % 2 === 0) {
+      await provider.fetchObservation();
+    } else {
+      await provider.fetchCausalSample({decide: () => ({action: "HOLD"})});
+    }
+    current += 60_000;
+  }
+  assert.equal(provider.counters().requests, 512);
+  assert.ok(provider.counters().bytes > 0);
+  assert.equal(provider.counters().events, 256);
+  const exhaustedCounters = provider.counters();
+  await assert.rejects(provider.fetchCausalSample({
+    decide: () => ({action: "HOLD"})
+  }), /EVENT_LIMIT_REACHED/);
+  await assert.rejects(provider.fetchObservation(), /FEED_TERMINAL_FAILURE/);
+  assert.deepEqual(provider.counters(), exhaustedCounters);
 });
 
 test("generated BTC/USD candles decide before ticker, then use the real USD journal for entry, pause, and full exit", async t => {

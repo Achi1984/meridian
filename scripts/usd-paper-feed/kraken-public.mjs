@@ -362,7 +362,16 @@ export function createKrakenUsdPublicFeed({
           receivedAtMs: ohlc.receivedAt,
           candles
         });
-        candidateDecision = await decide(candleEvidence);
+        candidateDecision = decide(candleEvidence);
+        if (candidateDecision &&
+            (typeof candidateDecision === "object" || typeof candidateDecision === "function") &&
+            typeof candidateDecision.then === "function") {
+          if (candidateDecision instanceof Promise) {
+            void candidateDecision.catch(() => {});
+          }
+          throw new Error("ASYNC_CAUSAL_DECISION_UNSUPPORTED");
+        }
+        if (signal?.aborted || runtime.signal?.aborted) throw responseAbortError();
         decisionAtMs = safeTime(now(), "DECISION_TIME");
         if (decisionAtMs < ohlc.receivedAt) throw new Error("CLOCK_MOVED_BACKWARDS");
         ticker = await get("Ticker", { pair: KRAKEN_PAIR }, runtime);
