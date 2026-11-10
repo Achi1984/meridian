@@ -46,10 +46,10 @@ function assertNamedTestPassed(output, name) {
   assert.doesNotMatch(line, /# SKIP(?:\s|$)/);
 }
 
-test('real M11 workspace authenticates both manual sources and renders paired fixture at 320/390px', {
+test('real M11 workspace authenticates both manual sources and renders paired fixtures at 320/390/1440px', {
   timeout: 180_000
 }, async () => {
-  const name = 'real M11 workspace authenticates both manual sources and renders paired fixture at 320/390px';
+  const name = 'real M11 workspace authenticates both manual sources and renders paired fixtures at 320/390/1440px';
   if (typeof WebSocket !== 'function') {
     const child = runFlaggedBrowserTest(name);
     assert.equal(child.status, 0,
@@ -171,13 +171,23 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           const mounted = await evaluate(`({
             overview:!!document.querySelector('#paper-bot-overview-root'),
             paired:!!document.querySelector('#paired-paper-report-root'),
-            reads:document.querySelectorAll('#paper-bot-overview-section button').length,
-            pairedReads:document.querySelectorAll('#paired-paper-report-section button').length
+            readControls:[...document.querySelectorAll(
+              '#paper-bot-overview-section button')].filter(button =>
+                button.type==='button' &&
+                button.textContent.trim()==='BTC/EUR-Quelle manuell prüfen').length,
+            pairedReadControls:[...document.querySelectorAll(
+              '#paired-paper-report-section button')].filter(button =>
+                button.type==='button' &&
+                button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen').length,
+            overviewControls:[...document.querySelectorAll(
+              '#paper-bot-overview-root button')].map(button=>button.textContent.trim())
           })`);
           assert.equal(mounted.overview, true);
           assert.equal(mounted.paired, true);
-          assert.equal(mounted.reads, 1);
-          assert.equal(mounted.pairedReads, 1);
+          assert.equal(mounted.readControls, 1, 'one explicitly labelled overview read control');
+          assert.equal(mounted.pairedReadControls, 1, 'one explicitly labelled paired read control');
+          assert.deepEqual(mounted.overviewControls,
+            ['Alle Details öffnen', 'Alle Details schließen']);
           assert.equal(reads, 0, 'unlock and navigation do not read report data');
           assert.equal(pairedReads, 0, 'unlock and navigation do not read paired data');
           await evaluate(`document.querySelector('#paper-bot-overview-section > summary').click()`);
@@ -194,7 +204,9 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
                   writingMode:style.writingMode,width:bounds.width,height:bounds.height,
                   scrollWidth:element.scrollWidth,clientWidth:element.clientWidth};
               }),
-            disabled:document.querySelector('#paper-bot-overview-section button').disabled,
+            disabled:[...document.querySelectorAll(
+              '#paper-bot-overview-section button')].find(button =>
+                button.textContent.trim()==='BTC/EUR-Quelle manuell prüfen').disabled,
             viewport:document.documentElement.clientWidth,
             documentWidth:document.documentElement.scrollWidth
           })`);
@@ -218,7 +230,32 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           writeFileSync(join(evidence, `paper-bot-workspace-${width}-idle.png`),
             Buffer.from(idleImage.data, 'base64'));
 
-          await evaluate(`document.querySelector('#paper-bot-overview-section button').click()`);
+          const toggleCheck = await evaluate(`(()=>{
+            const root=document.querySelector('#paper-bot-overview-root');
+            const buttons=[...root.querySelectorAll('button')];
+            const open=buttons.find(button=>button.textContent.trim()==='Alle Details öffnen');
+            const close=buttons.find(button=>button.textContent.trim()==='Alle Details schließen');
+            const details=[...root.querySelectorAll('details')];
+            open.click();
+            const allOpened=details.length>0&&details.every(item=>item.open);
+            close.click();
+            return {
+              controls:buttons.map(button=>button.textContent.trim()),
+              allOpened,
+              allClosed:details.every(item=>!item.open)
+            };
+          })()`);
+          assert.deepEqual(toggleCheck.controls,
+            ['Alle Details öffnen', 'Alle Details schließen']);
+          assert.equal(toggleCheck.allOpened, true, 'open-all expands bot and trade details');
+          assert.equal(toggleCheck.allClosed, true, 'close-all collapses bot and trade details');
+          await new Promise(resolve => setTimeout(resolve, 50));
+          assert.equal(reads, 0, 'overview disclosure controls do not request the BTC/EUR report');
+          assert.equal(pairedReads, 0, 'overview disclosure controls do not request the paired report');
+
+          await evaluate(`[...document.querySelectorAll(
+            '#paper-bot-overview-section button')].find(button =>
+              button.textContent.trim()==='BTC/EUR-Quelle manuell prüfen').click()`);
           for (let attempt = 0; attempt < 150 && reads === 0; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
@@ -235,7 +272,9 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.doesNotMatch(unavailable, /0,00 €|0 fills/i);
           pairedResponseMode = width === 320 ? 'unprovisioned' :
             width === 390 ? 'not_found' : 'legacy';
-          await evaluate(`document.querySelector('#paired-paper-report-section button').click()`);
+          await evaluate(`[...document.querySelectorAll(
+            '#paired-paper-report-section button')].find(button =>
+              button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen').click()`);
           for (let attempt = 0; attempt < 150 && pairedReads === 0; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
@@ -279,14 +318,18 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
             /SYNTHETIC FIXTURE/,
             'lock clears the paired DTO too');
-          await evaluate(`document.querySelector('#paper-bot-overview-section button').click()`);
+          await evaluate(`[...document.querySelectorAll(
+            '#paper-bot-overview-section button')].find(button =>
+              button.textContent.trim()==='BTC/EUR-Quelle manuell prüfen').click()`);
           for (let attempt = 0; attempt < 150 && reads < 2; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
           assert.equal(failure, null, failure?.message);
           assert.equal(reads, 2, 'the second user-initiated read is handled once');
           pairedResponseMode = width === 320 ? 'legacy' : 'trend';
-          await evaluate(`document.querySelector('#paired-paper-report-section button').click()`);
+          await evaluate(`[...document.querySelectorAll(
+            '#paired-paper-report-section button')].find(button =>
+              button.textContent.trim()==='Gepaarte BTC/EUR-Quelle manuell prüfen').click()`);
           for (let attempt = 0; attempt < 150 && pairedReads < 2; attempt++) {
             await new Promise(resolve => setTimeout(resolve, 10));
           }
