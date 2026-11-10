@@ -149,7 +149,14 @@ function renderCheckpoint(root, checkpoint, document) {
       'Checkpoint-Metriken haben für denselben Lauf und Bewertungszeitpunkt Vorrang; Abschlussnachweis bleibt separat.' :
       checkpoint.sourceRelation === 'SEPARATE_VALUATIONS' ?
         'Abweichende Bewertungszeitpunkte bleiben getrennte Snapshots; keine Werte werden vermischt.' :
-        'Kein Abschlussbericht geladen; nur der beobachtete Checkpoint ist dargestellt.');
+      checkpoint.sourceRelation === 'SEPARATE_RUNS' ?
+      'Der Abschlussbericht gehört zu einem anderen, historischen Lauf und bleibt separat; es werden keine Werte oder Nachweise übertragen.' :
+      'Kein Abschlussbericht geladen; nur der beobachtete Checkpoint ist dargestellt.');
+  if (checkpoint.separateHistoricalReport) {
+    const historical = checkpoint.separateHistoricalReport;
+    field(document, section, 'Separater historischer Abschlussbericht',
+      `${historical.runId} · ${historical.valuationAtLabel || 'Bewertungszeitpunkt unbekannt'} · ${historical.evidenceStatus}`);
+  }
   field(document, section, 'Gebühren/Slippage',
     'Bereits in Netto-Eigenkapital und Netto-PnL enthalten; nicht erneut abgezogen.');
   const cards = document.createElement('div');

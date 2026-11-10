@@ -73,7 +73,10 @@ claim. When the pinned run identity and valuation timestamp match, checkpoint
 metrics have deterministic precedence for that observation while report
 evidence remains separately labelled. A matching run with a different
 valuation timestamp is shown as two separate snapshots without merging values.
-Identity disagreement rejects checkpoint projection. Missing USD and LowVol
+A different-run report remains labelled as a separate historical snapshot and
+does not suppress the independently pinned checkpoint or lend it terminal
+evidence. Same-run identity disagreement rejects checkpoint projection; progress
+is also rejected when it fails its own pinned identity. Missing USD and LowVol
 values remain unknown; checkpoint costs already included in net equity/PnL are
 not deducted again. Old valuations remain visible and are marked stale without
 replacing their original valuation time.

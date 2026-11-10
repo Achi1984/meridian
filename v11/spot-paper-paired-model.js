@@ -201,7 +201,8 @@ function checkpointView(snapshot, expectedIdentity, dto) {
   if (!['AVAILABLE', 'STALE'].includes(snapshot.status)) return empty;
   const progress = validateProgress(snapshot.progress, expectedIdentity);
   if (!progress) return {...empty, status: 'REJECTED'};
-  if (dto && !identityMatches(dto.identity, expectedIdentity)) {
+  const sameRun = dto?.identity?.runId === progress.identity.runId;
+  if (sameRun && !identityMatches(dto.identity, expectedIdentity)) {
     return {...empty, status: 'IDENTITY_MISMATCH'};
   }
   const arms = progress.arms.map(arm => armView({
@@ -220,11 +221,18 @@ function checkpointView(snapshot, expectedIdentity, dto) {
     ageMs: snapshot.ageMs,
     terminalStatus: progress.terminal.status,
     arms,
-    sourceRelation: dto ?
+    sourceRelation: !dto ? 'CHECKPOINT_ONLY' : !sameRun ? 'SEPARATE_RUNS' :
       dto.timing.valuationAt === progress.valuationAt ?
-        'CHECKPOINT_PRECEDENCE' : 'SEPARATE_VALUATIONS' : 'CHECKPOINT_ONLY',
-    terminalEvidence: dto?.evidenceStatus || 'NO_TERMINAL_REPORT',
-    independentAuthentication: dto?.independentAuthentication || 'NO_FINAL_REPORT'
+        'CHECKPOINT_PRECEDENCE' : 'SEPARATE_VALUATIONS',
+    terminalEvidence: sameRun ? dto.evidenceStatus : 'NO_TERMINAL_REPORT',
+    independentAuthentication: sameRun ?
+      dto.independentAuthentication : 'NO_FINAL_REPORT',
+    separateHistoricalReport: dto && !sameRun ? {
+      runId: dto.identity.runId,
+      valuationAt: dto.timing.valuationAt,
+      valuationAtLabel: timestamp(dto.timing.valuationAt),
+      evidenceStatus: dto.evidenceStatus
+    } : null
   };
 }
 

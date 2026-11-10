@@ -418,7 +418,8 @@ function pairedProgressBot(snapshot, expectedIdentity, pairedReport) {
     return null;
   }
   const report = pairedReport ? projectSpotPaperPairedDashboard(pairedReport) : null;
-  if (report && !reportMatchesProgressIdentity(report, expectedIdentity)) {
+  if (report?.identity?.runId === progress.identity.runId &&
+      !reportMatchesProgressIdentity(report, expectedIdentity)) {
     return unknownBot(definition, 'PAIRED_PROGRESS_IDENTITY_MISMATCH');
   }
 
