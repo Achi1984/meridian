@@ -353,6 +353,43 @@ test("abort or deadline expiry during awaited reservation cannot dispatch transp
   });
 });
 
+test("post-response validation or decision failure stops the campaign without refund", async t => {
+  for (const causal of [false, true]) await t.test(String(causal), async st => {
+    const { store, directory } = await setup(st);
+    let calls = 0;
+    const feed = provider(store, { fetchImpl: async url => {
+      calls++;
+      const response = fixture(url);
+      if (!causal && url.pathname.endsWith("/Ticker")) {
+        const data = await response.json();
+        data.result.XXBTZEUR = data.result.XXBTZUSD;
+        delete data.result.XXBTZUSD;
+        return new Response(JSON.stringify(data), { headers: { "content-type": "application/json" } });
+      }
+      return response;
+    } });
+    await assert.rejects(causal ?
+      feed.fetchCausalSample({ decide() { throw new Error("FIXTURE_DECISION_FAILURE"); } }) :
+      feed.fetchObservation(), causal ? /DECISION_FAILURE/ : /UNEXPECTED_TICKER_PAIR/);
+    const state = store.snapshot();
+    assert.equal(calls, causal ? 1 : 2);
+    assert.equal(state.requests, calls);
+    assert.equal(state.pendingSample.requests, calls);
+    assert.equal(state.pendingSample.activeRequest, null);
+    assert.equal(state.terminal, true);
+    assert.equal(state.usedBytes + state.reservedBytes, calls * LIMITS.maxResponseBytes);
+    assert.equal(state.chargedBytes, calls * LIMITS.maxResponseBytes);
+    const expectedTip = structuredClone(store.tip);
+    await store.close();
+    const reopened = await UsdCampaignBudget.reopenExisting(directory, {
+      configuration: CONFIG, expectedTip
+    });
+    assert.equal(reopened.snapshot().writable, false);
+    assert.throws(() => provider(reopened), /INSPECTION_ONLY/);
+    await reopened.close();
+  });
+});
+
 test("failed durable writes or tip handoff cause zero subsequent transport, including new adapters", async t => {
   for (const sequence of [1, 2, 3, 4, 5, 6]) for (const phase of ["before-pending", "after-rename"]) {
     await t.test(`${sequence}:${phase}`, async st => {
@@ -372,16 +409,33 @@ test("failed durable writes or tip handoff cause zero subsequent transport, incl
       }
     });
   }
-  await t.test("tip-handoff", async st => {
-    const { store } = await setup(st);
+  for (let sequence = 1; sequence <= 6; sequence++) await t.test(`tip-handoff:${sequence}`, async st => {
+    const { store, directory } = await setup(st);
     let calls = 0;
     const feed = provider(store, {
       campaignBudget: { store, configuration: CONFIG,
-        retainRestartTip() { throw new Error("TIP_HANDOFF_FAILED"); } },
+        retainRestartTip(tip) {
+          if (tip.revision === sequence) throw new Error("TIP_HANDOFF_FAILED");
+        } },
       fetchImpl: async url => { calls++; return fixture(url); }
     });
     await assert.rejects(feed.fetchObservation(), /BLOCKED|TIP_HANDOFF/);
-    assert.equal(calls, 0);
+    assert.equal(calls, Math.floor((sequence - 1) / 2));
+    const state = store.snapshot();
+    assert.equal(state.requests, Math.min(2, Math.floor(sequence / 2)));
+    assert.equal(state.usedBytes + state.reservedBytes, state.chargedBytes);
+    assert.equal(state.writable, false);
+    assert.equal(state.tip.revision, sequence);
+    if (sequence === 2 || sequence === 4) {
+      assert.equal(state.pendingSample.activeRequest, sequence / 2);
+    }
+    if (sequence === 6) assert.equal(state.pendingSample, null);
+    else assert.notEqual(state.pendingSample, null);
+    const inspected = await inspectUsdCampaignBudget(directory, { configuration: CONFIG });
+    assert.equal(inspected.status, "OK");
+    assert.equal(inspected.reservedBytes, state.reservedBytes);
+    assert.deepEqual(inspected.tip, state.tip);
+    await assert.rejects(feed.fetchObservation(), /TERMINAL/);
     assert.throws(() => provider(store), /BLOCKED/);
   });
 });
