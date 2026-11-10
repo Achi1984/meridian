@@ -1,37 +1,22 @@
 import { createHash } from "node:crypto";
 import { validateUsdQuote } from "../paper-capital-challenge/account-contract.mjs";
-import { PAPER_CAPITAL_CHALLENGE_POLICY as POLICY } from "../paper-capital-challenge/policy.mjs";
+import { USD_PAPER_FEED_LIMITS } from "./limits.mjs";
+import { UsdCampaignBudget } from "./campaign-budget.mjs";
+
+export { USD_PAPER_FEED_LIMITS } from "./limits.mjs";
 
 const API_ORIGIN = "https://api.kraken.com";
 const PAIR = "BTC/USD";
 const KRAKEN_PAIR = "XBTUSD";
 const RESULT_PAIR = "XXBTZUSD";
 const SOURCE_ID = "kraken-public-btc-usd";
-const QUOTE_MAX_AGE_MS = POLICY.maxValuationAgeMs;
-const MAX_EVENTS = POLICY.maxJournalObservations;
-const MAX_REQUESTS = MAX_EVENTS * 2;
-const MAX_RESPONSE_BYTES = 128 * 1024;
-const MAX_TOTAL_BYTES = 32 * 1024 * 1024;
-const MAX_SPAN_MS = 24 * 60 * 60 * 1000;
-const MAX_CLOSED_MINUTE_AGE_MS = 120_000;
-const MIN_SAMPLE_INTERVAL_MS = 60_000;
-const MAX_REQUEST_TIMEOUT_MS = 5_000;
+const {
+  maxQuoteAgeMs: QUOTE_MAX_AGE_MS, maxEvents: MAX_EVENTS, maxRequests: MAX_REQUESTS,
+  maxResponseBytes: MAX_RESPONSE_BYTES, maxBytes: MAX_TOTAL_BYTES,
+  maxSpanMs: MAX_SPAN_MS, maxClosedMinuteAgeMs: MAX_CLOSED_MINUTE_AGE_MS,
+  minSampleIntervalMs: MIN_SAMPLE_INTERVAL_MS, requestTimeoutMs: MAX_REQUEST_TIMEOUT_MS
+} = USD_PAPER_FEED_LIMITS;
 const DECIMAL = /^(?:0|[1-9]\d{0,15})(?:\.\d{1,8})?$/;
-
-export const USD_PAPER_FEED_LIMITS = Object.freeze({
-  pair: PAIR,
-  krakenPair: KRAKEN_PAIR,
-  intervalMinutes: 1,
-  maxEvents: MAX_EVENTS,
-  maxRequests: MAX_REQUESTS,
-  maxResponseBytes: MAX_RESPONSE_BYTES,
-  maxBytes: MAX_TOTAL_BYTES,
-  maxSpanMs: MAX_SPAN_MS,
-  maxClosedMinuteAgeMs: MAX_CLOSED_MINUTE_AGE_MS,
-  minSampleIntervalMs: MIN_SAMPLE_INTERVAL_MS,
-  requestTimeoutMs: MAX_REQUEST_TIMEOUT_MS,
-  maxQuoteAgeMs: QUOTE_MAX_AGE_MS
-});
 
 function safeTime(value, name) {
   if (!Number.isSafeInteger(value) || value < 0) throw new Error(`INVALID_${name}`);
@@ -153,6 +138,7 @@ async function readBoundedBody(response, counters, readerRef, assertActive) {
   for (;;) {
     assertActive();
     const { done, value } = await reader.read();
+    if (!done && !readerRef.settled) readerRef.rawBodyBytes += value.byteLength;
     assertActive();
     if (done) break;
     length += value.byteLength;
@@ -181,13 +167,29 @@ export function createKrakenUsdPublicFeed({
   now = Date.now,
   monotonicNow = () => performance.now(),
   signal,
-  requestTimeoutMs = MAX_REQUEST_TIMEOUT_MS
+  requestTimeoutMs = MAX_REQUEST_TIMEOUT_MS,
+  campaignBudget
 } = {}) {
   if (typeof fetchImpl !== "function" || typeof now !== "function" ||
       typeof monotonicNow !== "function" || !Number.isSafeInteger(requestTimeoutMs) ||
       requestTimeoutMs < 1 || requestTimeoutMs > MAX_REQUEST_TIMEOUT_MS ||
       (signal !== undefined && typeof signal?.addEventListener !== "function")) {
     throw new TypeError("INVALID_PUBLIC_FEED_CONFIGURATION");
+  }
+  const budget = campaignBudget?.store;
+  const budgetConfiguration = campaignBudget && structuredClone(campaignBudget.configuration);
+  const retainBudgetTip = campaignBudget?.retainRestartTip;
+  if (campaignBudget !== undefined) {
+    if (!(budget instanceof UsdCampaignBudget) || typeof retainBudgetTip !== "function") {
+      throw new TypeError("INVALID_DURABLE_CAMPAIGN_BUDGET");
+    }
+    budget.assertConfiguration(budgetConfiguration);
+  }
+  async function retainTip() {
+    try { await retainBudgetTip(budget.tip); } catch (error) {
+      budget.block();
+      throw error;
+    }
   }
 
   const counters = { requests: 0, bytes: 0, events: 0 };
@@ -196,6 +198,7 @@ export function createKrakenUsdPublicFeed({
   let previousQuoteAtMs = null;
   let inFlight = false;
   let terminalError = null;
+  let sampleId = null;
 
   async function get(endpoint, params, runtime = {}) {
     if (counters.requests >= MAX_REQUESTS) throw new Error("REQUEST_BUDGET_EXHAUSTED");
@@ -212,6 +215,13 @@ export function createKrakenUsdPublicFeed({
     }
     if (parentSignals.some(parent => parent.aborted)) throw responseAbortError();
 
+    let reservationId = null;
+    if (budget) {
+      reservationId = await budget.reserveRequest(sampleId, endpoint, requestStartedAt);
+      await retainTip();
+      budget.assertConfiguration(budgetConfiguration);
+    }
+    if (parentSignals.some(parent => parent.aborted)) throw responseAbortError();
     const controller = new AbortController();
     const cancelFromParent = () => controller.abort(responseAbortError());
     for (const parent of parentSignals) parent.addEventListener("abort", cancelFromParent, { once: true });
@@ -219,7 +229,7 @@ export function createKrakenUsdPublicFeed({
     const url = new URL(`/0/public/${endpoint}`, API_ORIGIN);
     for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
     const effectiveDeadline = startedMono + requestTimeoutMs;
-    const readerRef = { reader: null };
+    const readerRef = { reader: null, rawBodyBytes: 0, settled: false };
     let response = null;
     let completed = false;
     let timer;
@@ -260,10 +270,13 @@ export function createKrakenUsdPublicFeed({
         if (response.body) await readBoundedBody(response, counters, readerRef, assertActive);
         throw new Error(response.status === 429 ? "HTTP_429" : `HTTP_${response.status}`);
       }
-      if (!/^application\/json(?:\s*;|$)/i.test(response.headers.get("content-type") ?? "")) {
+      const jsonContent = /^application\/json(?:\s*;|$)/i.test(
+        response.headers.get("content-type") ?? "");
+      if (!jsonContent && !budget) {
         throw new Error("INVALID_CONTENT_TYPE");
       }
       const body = await readBoundedBody(response, counters, readerRef, assertActive);
+      if (!jsonContent) throw new Error("INVALID_CONTENT_TYPE");
       const receivedAt = safeTime(now(), "RECEIVED_AT");
       if (receivedAt < requestStartedAt) throw new Error("CLOCK_MOVED_BACKWARDS");
       assertActive();
@@ -314,6 +327,12 @@ export function createKrakenUsdPublicFeed({
       if (abortListener) controller.signal.removeEventListener("abort", abortListener);
       for (const parent of parentSignals) parent.removeEventListener("abort", cancelFromParent);
       if (!completed) cleanupResponse(response);
+      readerRef.settled = true;
+      if (budget && reservationId !== null) {
+        await budget.finalizeRequest(reservationId, readerRef.rawBodyBytes,
+          completed ? "SUCCESS" : "FAILED");
+        await retainTip();
+      }
     }
   }
 
@@ -341,6 +360,10 @@ export function createKrakenUsdPublicFeed({
 
       lastAttemptAtMs = startedAt;
       attemptStarted = true;
+      if (budget) {
+        sampleId = await budget.beginSample(startedAt);
+        await retainTip();
+      }
       let ticker;
       let ohlc;
       let candles;
@@ -422,6 +445,11 @@ export function createKrakenUsdPublicFeed({
             ticker.receivedAt > observedAtMs) {
           throw new Error("NONCAUSAL_SAMPLE_TIMING");
         }
+        if (budget) {
+          await budget.completeSample(sampleId);
+          await retainTip();
+          sampleId = null;
+        }
         if (firstObservedAtMs === null) firstObservedAtMs = observedAtMs;
         previousQuoteAtMs = ticker.receivedAt;
         counters.events++;
@@ -435,6 +463,11 @@ export function createKrakenUsdPublicFeed({
           observation
         });
       }
+      if (budget) {
+        await budget.completeSample(sampleId);
+        await retainTip();
+        sampleId = null;
+      }
       if (firstObservedAtMs === null) firstObservedAtMs = observedAtMs;
       previousQuoteAtMs = ticker.receivedAt;
       counters.events++;
@@ -446,8 +479,17 @@ export function createKrakenUsdPublicFeed({
       if (attemptStarted || exhausted) {
         terminalError = error;
       }
+      if (budget && sampleId !== null) {
+        try {
+          await budget.stopSample(sampleId);
+          await retainTip();
+        } catch {
+          budget.block();
+        }
+      }
       throw error;
     } finally {
+      sampleId = null;
       inFlight = false;
     }
   }
