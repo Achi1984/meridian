@@ -100,6 +100,8 @@ class Element {
     this.children = [];
     this.attrs = {};
     this.text = '';
+    this.open = false;
+    this.listeners = {};
   }
   set textContent(value) { this.text = String(value); this.children = []; }
   get textContent() { return this.text + this.children.map(child => child.textContent).join(''); }
@@ -107,6 +109,12 @@ class Element {
   append(...nodes) { this.children.push(...nodes); }
   replaceChildren(...nodes) { this.text = ''; this.children = nodes; }
   setAttribute(key, value) { this.attrs[key] = String(value); }
+  addEventListener(type, listener) {
+    this.listeners[type] = [...(this.listeners[type] || []), listener];
+  }
+  click() {
+    for (const listener of this.listeners.click || []) listener();
+  }
 }
 
 function harness() {
@@ -212,6 +220,29 @@ test('missing, rejected, unvalidated, stale, and mixed-currency reports fail clo
   assert.equal(mixed.bots[0].state, 'UNKNOWN');
   assert.equal(mixed.bots[0].metrics.netPnl.reason, 'BOT_IDENTITY_OR_CURRENCY_MISMATCH');
   assert.equal(mixed.bots[0].currency.available, false);
+});
+
+test('FRESH status requires both a valid source timestamp and nonnegative age', () => {
+  for (const freshness of [
+    {status: 'FRESH', at: null, ageMs: 2000, reason: 'FRESHNESS_METADATA_INCOMPLETE'},
+    {status: 'FRESH', at: freshAt, ageMs: null, reason: 'FRESHNESS_METADATA_INCOMPLETE'}
+  ]) {
+    const {root, document} = harness();
+    const mounted = mountSpotPaperBotOverview(root, {
+      adapters: [adapter('btc-eur-trend', sourceReport('btc-eur-trend', {freshness}))],
+      document
+    });
+    const model = mounted.render();
+    const summary = visit(root).find(item =>
+      item.className?.includes('spot-paper-bot-status'));
+    assert.equal(model.bots[0].state, 'RUNNING');
+    assert.equal(model.bots[0].freshness.status, 'FRESH');
+    assert.equal(model.bots[0].metrics.netPnl.available, false);
+    assert.equal(summary.textContent, 'Läuft · Datenfrische unbekannt');
+    assert.match(root.textContent,
+      /Gemeldeter LaufstatusLäuft · Datenfrische unbekannt/);
+    assert.doesNotMatch(summary.textContent, /Aktuell/);
+  }
 });
 
 test('validated Lives risk is arithmetically consistent and preserves latched drawdown overshoot', () => {
@@ -434,7 +465,7 @@ test('normalized curves compare eligible subsets and reject invalid coverage or 
   assert.equal(mismatchedPair.curve.reason, 'CURVE_HORIZONS_NOT_ALIGNED');
 });
 
-test('mount is host-controlled, accessible, collapsible, and renders signed PnL text', () => {
+test('mount is host-controlled, compact, accessible, and renders signed PnL text', () => {
   const {root, document} = harness();
   const mounted = mountSpotPaperBotOverview(root, {
     adapters: [
@@ -458,15 +489,44 @@ test('mount is host-controlled, accessible, collapsible, and renders signed PnL 
   assert.match(root.textContent, /Verlust/);
   assert.match(root.textContent, /88,00\s+\$/);
   assert.match(root.textContent, /Handelsdetails \(1\)/);
+  assert.match(root.textContent, /Quelle: 09\.11\.2026/);
+  assert.match(root.textContent, /Kapital & Ergebnis/);
+  assert.match(root.textContent, /Kosten & Handel/);
+  assert.match(root.textContent, /Status & Details/);
   assert.match(root.textContent, /LowVol V2 bleibt in Vorbereitung/);
   assert.match(root.textContent, /<b>Loss limit reached<\/b>/);
   const nodes = visit(root);
   assert.equal(nodes.some(item => item.tagName === 'B'), false);
-  assert.equal(nodes.some(item => item.tagName === 'BUTTON'), false);
+  const buttons = nodes.filter(item => item.tagName === 'BUTTON');
+  assert.deepEqual(buttons.map(item => item.textContent),
+    ['Alle Details öffnen', 'Alle Details schließen']);
+  assert.ok(buttons.every(item => item.attrs['aria-controls']));
+  const disclosures = nodes.filter(item => item.tagName === 'DETAILS');
+  assert.ok(disclosures.some(item => item.open === false));
+  buttons[0].click();
+  assert.ok(disclosures.every(item => item.open === true));
+  buttons[1].click();
+  assert.ok(disclosures.every(item => item.open === false));
+  const summaries = nodes.filter(item => item.tagName === 'SUMMARY');
+  assert.ok(summaries.some(item => /Läuft · Aktuell/.test(item.textContent)));
+  assert.ok(summaries.some(item => /Pausiert · Aktuell/.test(item.textContent)));
+  assert.ok(summaries.some(item => /In Vorbereitung/.test(item.textContent)));
+  assert.ok(!summaries.some(item => /REPORT_ADAPTER|SOURCE_FRESH/.test(item.textContent)));
   const positivePnl = nodes.find(item => item.textContent === '+25,00 € Gewinn');
   const negativePnl = nodes.find(item => item.textContent === '−12,00 $ Verlust');
   assert.equal(positivePnl.className, 'tone-safe');
   assert.equal(negativePnl.className, 'tone-danger');
+  const {root: zeroRoot, document: zeroDocument} = harness();
+  mountSpotPaperBotOverview(zeroRoot, {
+    adapters: [adapter('btc-eur-trend', sourceReport('btc-eur-trend', {
+      netPnl: {amount: 0, currency: 'EUR'}
+    }))],
+    document: zeroDocument
+  });
+  const zeroPnl = visit(zeroRoot).find(item =>
+    item.tagName === 'STRONG' && item.textContent.startsWith('Netto-PnL '));
+  assert.equal(zeroPnl.textContent, 'Netto-PnL 0,00 €');
+  assert.equal(zeroPnl.className, 'tone-muted');
   assert.doesNotMatch(root.textContent, /Summe EUR|Gesamtkapital|Rang 1/i);
   assert.equal(mounted.update([]).bots[2].state, 'PREPARED');
   mounted.dispose();
@@ -484,11 +544,11 @@ test('overview modules do not add network, timers, storage, HTML parsing, or tra
   assert.doesNotMatch(sources, /createElement\(['"](?:button|input|select|form)['"]\)/);
 });
 
-test('mobile Chrome renders separate responsive cards without horizontal overflow', {
+test('Chrome renders compact responsive cards and supports keyboard disclosure controls', {
   timeout: 180_000
 }, async () => {
   if (typeof WebSocket !== 'function') {
-    const name = 'mobile Chrome renders separate responsive cards without horizontal overflow';
+    const name = 'Chrome renders compact responsive cards and supports keyboard disclosure controls';
     const env = {...process.env};
     delete env.NODE_TEST_CONTEXT;
     const child = spawnSync(process.execPath, ['--experimental-websocket', '--test',
@@ -499,6 +559,7 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
       `${String(child.stdout).slice(-2500)}${String(child.stderr).slice(-1000)}`);
     assert.match(child.stdout, /V11_SPOT_PAPER_BOT_OVERVIEW_SIZE .*"width":320/);
     assert.match(child.stdout, /V11_SPOT_PAPER_BOT_OVERVIEW_SIZE .*"width":390/);
+    assert.match(child.stdout, /V11_SPOT_PAPER_BOT_OVERVIEW_SIZE .*"width":1280/);
     return;
   }
   const chrome = [process.env.CHROME_BIN, '/usr/bin/google-chrome',
@@ -512,7 +573,9 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
   const negativeSource = JSON.stringify(sourceReport('btc-eur-trend', {
     equity: {amount: -25, currency: 'EUR'}
   }));
-  const lives = JSON.stringify(sourceReport('btc-usd-lives'));
+  const lives = JSON.stringify(sourceReport('btc-usd-lives', {
+    lifecycle:'PAUSED',pauseReason:'Synthetische Pause'
+  }));
   const curve = {
     coverageStart: '2026-11-09T11:00:00.000Z',
     coverageEnd: '2026-11-09T12:00:00.000Z',
@@ -525,7 +588,7 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
   const trendCurve = JSON.stringify(sourceReport('btc-eur-trend', {curve}));
   const livesCurve = JSON.stringify(sourceReport('btc-usd-lives', {curve}));
   try {
-    for (const width of [320, 390]) {
+    for (const width of [320, 390, 1280]) {
       const metrics = await withMobileChrome(chrome, width, hosted.url, async call => {
         const pageErrors = [];
         call.onEvent('Runtime.exceptionThrown', () => pageErrors.push('exception'));
@@ -538,6 +601,11 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
           }
         });
         await call('Log.enable');
+        await call('Emulation.setDeviceMetricsOverride', {
+          width, height: width === 320 ? 568 : 844, deviceScaleFactor: 1,
+          mobile: width < 600, screenWidth: width,
+          screenHeight: width === 320 ? 568 : 844
+        });
         const expression = `(async()=>{
           const project=report=>({
             state:report.lifecycle,runtimeEvidence:report.runtimeEvidence,
@@ -553,33 +621,66 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
           const {mountSpotPaperBotOverview}=await import(
             './spot-paper-bot-overview-controller.js?v=B16-M11-FIX14');
           const root=document.createElement('section');
+          root.id='paper-bot-overview-root';
           document.body.replaceChildren(root);
-          mountSpotPaperBotOverview(root,{adapters:[]});
+          const missingMount=mountSpotPaperBotOverview(root,{adapters:[]});
+          const missingModel=missingMount.render();
           const emptyRendered=root.textContent.includes('Unbekannt')&&
             root.textContent.includes('In Vorbereitung');
+          const missingSummary=[...root.querySelectorAll('.spot-paper-bot-card>summary')]
+            .map(summary=>summary.textContent);
+          const missingSummaryCompact=missingSummary.every(summary=>
+            !summary.includes('REPORT_ADAPTER')&&!summary.includes('METRIC_NOT_REPORTED')&&
+            !summary.includes('BTC/EUR Trend-KandidatBTC/EUR Trend-Kandidat')&&
+            !summary.includes('LowVol V2LowVol V2'));
           mountSpotPaperBotOverview(root,{adapters:[
             {id:'btc-eur-trend',report:${source},project},
             {id:'btc-usd-lives',report:${lives},project}
           ]});
           const validRendered=root.textContent.includes('BTC/EUR Trend-Kandidat')&&
-            root.textContent.includes('+25,00')&&root.textContent.includes('Pausiert')===false;
+            root.textContent.includes('+25,00')&&root.textContent.includes('Pausiert');
+          const validSummaries=[...root.querySelectorAll('.spot-paper-bot-card>summary')]
+            .map(summary=>summary.textContent);
+          const statusBadge=root.querySelector('.spot-paper-bot-status');
+          const statusBadgeReadable=Boolean(statusBadge)&&
+            getComputedStyle(statusBadge).fontSize==='11px'&&
+            getComputedStyle(statusBadge).transform==='none';
+          const controlButtons=[...root.querySelectorAll('button')];
+          const allOpenButton=controlButtons.find(button=>button.textContent==='Alle Details öffnen');
+          const allCloseButton=controlButtons.find(button=>button.textContent==='Alle Details schließen');
+          allOpenButton.focus();
+          const focusedControl=allOpenButton===document.activeElement;
           mountSpotPaperBotOverview(root,{adapters:[
             {id:'btc-eur-trend',report:${negativeSource},project}
           ]});
           const negativeRendered=root.textContent.includes('Eigenkapital-25,00');
+          const staleSource={...${source},freshness:{status:'STALE',at:'${freshAt}',
+            ageMs:99000,reason:'SOURCE_STALE'}};
+          const completedLives={...${lives},lifecycle:'COMPLETED'};
+          mountSpotPaperBotOverview(root,{adapters:[
+            {id:'btc-eur-trend',report:staleSource,project},
+            {id:'btc-usd-lives',report:completedLives,project}
+          ]});
+          const staleAndCompleted=[...root.querySelectorAll('.spot-paper-bot-card>summary')]
+            .map(summary=>summary.textContent);
+          const staleDetails=root.textContent.includes(
+            'Gemeldeter LaufstatusLäuft · Daten veraltet');
           const curveMount=mountSpotPaperBotOverview(root,{adapters:[
             {id:'btc-eur-trend',report:${trendCurve},project},
             {id:'btc-usd-lives',report:${livesCurve},project}
           ]});
           const curveModel=curveMount.render();
-          for (const disclosure of root.querySelectorAll('details')) disclosure.open=true;
           return {
             width:innerWidth,viewport:document.documentElement.clientWidth,
             documentWidth:document.documentElement.scrollWidth,
             bodyWidth:document.body.scrollWidth,rootWidth:root.clientWidth,
             rootScrollWidth:root.scrollWidth,
             details:root.querySelectorAll('details').length,
-            emptyRendered,validRendered,negativeRendered,
+            emptyRendered,missingModelPrepared:missingModel.bots[2].state==='PREPARED',
+            missingSummaryCompact,missingSummary,validRendered,negativeRendered,
+            validSummaries,staleAndCompleted,statusBadgeReadable,focusedControl,
+            staleDetails,
+            allOpenButton: Boolean(allOpenButton),allCloseButton:Boolean(allCloseButton),
             alignedCurve:curveModel.curve.available,
             curveBotIds:curveModel.curve.botIds,
             curveRendered:root.textContent.includes('Auf Startkapital normiert')&&
@@ -597,15 +698,132 @@ test('mobile Chrome renders separate responsive cards without horizontal overflo
         });
         assert.ok(!response.exceptionDetails, JSON.stringify(response.exceptionDetails));
         const result = response.result.value;
+        const key = async (type, keyName, code, value) => call('Input.dispatchKeyEvent', {
+         type, key: keyName, code, windowsVirtualKeyCode: value,
+         nativeVirtualKeyCode: value,
+         ...(type === 'keyDown' ? {
+           text: keyName === 'Enter' ? '\r' : ' ',
+           unmodifiedText: keyName === 'Enter' ? '\r' : ' '
+         } : {})
+        });
+        const allOpenFocus = await call('Runtime.evaluate', {
+         expression: `(()=>{const b=[...document.querySelectorAll('button')].find(
+           item=>item.textContent==='Alle Details öffnen');b.focus();return document.activeElement===b})()`,
+         returnByValue: true
+        });
+        await key('keyDown', 'Enter', 'Enter', 13);
+        await key('keyUp', 'Enter', 'Enter', 13);
+        const opened = await call('Runtime.evaluate', {
+         expression: `(()=>{
+           const root=document.querySelector('#paper-bot-overview-root');
+           const buttons=[...root.querySelectorAll('button')];
+           const bounds=root.getBoundingClientRect();
+           return {
+             all:[...root.querySelectorAll('details')].every(item=>item.open),
+             badge:getComputedStyle(root.querySelector('.spot-paper-bot-status')).transform,
+             viewport:document.documentElement.clientWidth,
+             documentWidth:document.documentElement.scrollWidth,
+             bodyWidth:document.body.scrollWidth,
+             rootWidth:root.clientWidth,
+             rootScrollWidth:root.scrollWidth,
+             rootLeft:bounds.left,
+             rootRight:bounds.right,
+             cards:[...root.querySelectorAll('.spot-paper-bot-card')].map(card=>{
+               const cardBounds=card.getBoundingClientRect();
+               return {left:cardBounds.left,right:cardBounds.right,
+                 width:card.clientWidth,scrollWidth:card.scrollWidth};
+             }),
+             cardOverflow:[...root.querySelectorAll('.spot-paper-bot-card')].some(card=>{
+               const cardBounds=card.getBoundingClientRect();
+               return card.scrollWidth>card.clientWidth+1||
+                 cardBounds.left<0||cardBounds.right>innerWidth+1;
+             }),
+             buttonOverflow:buttons.some(button=>!root.contains(button)||
+               button.scrollWidth>button.clientWidth+1||
+               button.getBoundingClientRect().left<0||
+               button.getBoundingClientRect().right>innerWidth+1)
+           };
+         })()`,
+         returnByValue: true
+        });
+        const expandedLayout = opened.result.value;
+        result.expandedLayout = expandedLayout;
+        assert.equal(expandedLayout.all, true);
+        assert.ok(expandedLayout.documentWidth <= expandedLayout.viewport + 1,
+          JSON.stringify(expandedLayout));
+        assert.ok(expandedLayout.bodyWidth <= expandedLayout.viewport + 1,
+          JSON.stringify(expandedLayout));
+        assert.ok(expandedLayout.rootScrollWidth <= expandedLayout.rootWidth + 1,
+          JSON.stringify(expandedLayout));
+        assert.ok(expandedLayout.rootLeft >= -1 &&
+          expandedLayout.rootRight <= expandedLayout.viewport + 1,
+        JSON.stringify(expandedLayout));
+        assert.equal(expandedLayout.cards.length, 3, JSON.stringify(expandedLayout));
+        assert.equal(expandedLayout.cardOverflow, false, JSON.stringify(expandedLayout));
+        assert.equal(expandedLayout.buttonOverflow, false, JSON.stringify(expandedLayout));
+        const expandedImage = await call('Page.captureScreenshot', {
+          format: 'png', captureBeyondViewport: true
+        });
+        writeFileSync(join(evidence, `bot-overview-${width}-expanded.png`),
+          Buffer.from(expandedImage.data, 'base64'));
+        const allCloseFocus = await call('Runtime.evaluate', {
+         expression: `(()=>{const b=[...document.querySelectorAll('button')].find(
+           item=>item.textContent==='Alle Details schließen');b.focus();return document.activeElement===b})()`,
+         returnByValue: true
+        });
+        await key('keyDown', ' ', 'Space', 32);
+        await key('keyUp', ' ', 'Space', 32);
+        const closed = await call('Runtime.evaluate', {
+         expression: `[...document.querySelectorAll('#paper-bot-overview-root details')]
+           .every(item=>!item.open)`,
+         returnByValue: true
+        });
+        result.disclosureEvidence = {
+         allOpenFocus: allOpenFocus.result.value,
+         opened: opened.result.value.all,
+         badgeTransform: opened.result.value.badge,
+         allCloseFocus: allCloseFocus.result.value,
+         closed: closed.result.value
+        };
+        result.disclosuresComplete = result.disclosureEvidence.allOpenFocus &&
+         result.disclosureEvidence.opened && result.disclosureEvidence.badgeTransform === 'none' &&
+         result.disclosureEvidence.allCloseFocus && result.disclosureEvidence.closed;
+        const connectedLayout = await call('Runtime.evaluate', {
+          expression: `(()=>{
+            const root=document.querySelector('#paper-bot-overview-root');
+            const buttons=[...root.querySelectorAll('button')];
+            return {
+              rootWidth:root.clientWidth,
+              rootScrollWidth:root.scrollWidth,
+              buttonOverflow:buttons.some(button=>!root.contains(button)||
+                button.scrollWidth>button.clientWidth+1)
+            };
+          })()`,
+          returnByValue: true
+        });
+        result.buttonOverflow = connectedLayout.result.value.buttonOverflow;
         await new Promise(resolve => setTimeout(resolve, 50));
         assert.deepEqual(pageErrors, []);
         assert.equal(result.width, width);
         assert.ok(result.documentWidth <= result.viewport + 1, JSON.stringify(result));
         assert.ok(result.bodyWidth <= result.viewport + 1, JSON.stringify(result));
         assert.ok(result.rootScrollWidth <= result.rootWidth + 1, JSON.stringify(result));
+        assert.equal(result.buttonOverflow, false);
         assert.ok(result.details >= 4);
         assert.equal(result.emptyRendered, true);
+        assert.equal(result.missingModelPrepared, true);
+        assert.equal(result.missingSummaryCompact, true);
         assert.equal(result.validRendered, true);
+        assert.equal(result.validSummaries.length, 3);
+        assert.ok(result.validSummaries.some(summary=>summary.includes('Läuft · Aktuell')));
+        assert.ok(result.validSummaries.some(summary=>summary.includes('Pausiert · Aktuell')));
+        assert.ok(result.validSummaries.some(summary=>summary.includes('In Vorbereitung')));
+        assert.ok(result.staleAndCompleted.some(summary=>
+          summary.includes('Läuft · Daten veraltet')));
+        assert.ok(result.staleAndCompleted.some(summary=>summary.includes('Abgeschlossen · Aktuell')));
+        assert.equal(result.staleDetails, true);
+        assert.equal(result.statusBadgeReadable, true);
+        assert.equal(result.disclosuresComplete, true, JSON.stringify(result.disclosureEvidence));
         assert.equal(result.negativeRendered, true);
         assert.equal(result.alignedCurve, true);
         assert.deepEqual(result.curveBotIds, ['btc-eur-trend', 'btc-usd-lives']);
