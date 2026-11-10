@@ -86,13 +86,77 @@ verified retention. The evidence digest binds campaign, currency, candidate
 strategy/source versions, cost version, and the explicit USD-cent notional.
 Before acquisition the composition validates the store's campaign/currency/
 strategy/cost binding and pins the notional for that in-process store session;
-a changed value fails before the next feed request. The account journal still does not retain campaign-wide
-feed request/byte counters or strategy state/evidence. Reopened account handles
-therefore remain blocked before provider acquisition, including when strategy
-evidence is supplied. Missing or tampered strategy evidence cannot authorize
-resume, and even valid evidence does not remove the feed-budget review gate.
-Do not claim restartability until candle/strategy evidence and campaign
-request/byte budgets survive verified restart.
+a changed value fails before the next feed request. The account journal still
+does not retain campaign-wide feed counters or strategy state/evidence. The
+separate durable budget below now retains acquisition allowance, but it does
+not admit strategy/account restart. Reopened account handles remain blocked
+before provider acquisition, including with a verified budget and supplied
+strategy evidence. Missing or tampered strategy evidence cannot authorize
+resume, and even valid evidence does not remove the existing review gate.
+Do not claim candidate restartability or host readiness.
+
+## Durable acquisition budget: resolved implementation scope
+
+`scripts/usd-paper-feed/campaign-budget.mjs` provides the separate
+`USD_CAMPAIGN_ACQUISITION_BUDGET_V2` sidecar. It reuses `CheckpointStore`'s
+exclusive never-stolen lock, canonical checkpoint, predecessor hash, synced
+pending marker, atomic rename, directory fsync, and exact readback. The USD
+account schema is unchanged. Storage is bounded to 512 KiB and at most 1,537
+records, including creation, sample attempts/completions, reservations and
+body outcomes. The checkpoint binds the explicit candidate configuration
+(campaign, USD currency, source/strategy/cost versions, notional cents), native
+BTC/USD source identity, and all unchanged feed limits.
+V2 completion records bind validated observation and completion timestamps to
+the persisted first campaign attempt. V1 sidecars/tips are rejected, not migrated
+or reset: timestamp-free completion evidence cannot authorize continuation.
+
+The optional feed argument is
+`campaignBudget: { store, configuration, retainRestartTip }`. `store` must be a
+`UsdCampaignBudget`; `configuration` is the explicit
+`createUsdSmaCandidateConfiguration(notionalCents)` value. Construction validates
+the binding without acquisition. Before each transport, the feed awaits a
+durable reservation and the caller's tip-retention callback. Callback failure
+latches the budget object, including through a new adapter. The callback must
+independently retain every returned tip; this interface cannot prove its
+storage is durable, trusted, or separate from the sidecar.
+
+Each externally attempted request permanently charges 128 KiB and one request.
+`usedBytes` records raw body chunk bytes actually observed before settlement,
+including failed/non-2xx, malformed, truncated and oversized bodies.
+`reservedBytes` retains the unused or unknown part of every charged allowance,
+**including after successful finalization**; it is not refundable. `chargedBytes`
+is requests times 128 KiB and is the admission ceiling, not the small actual
+payload total. A chunk crossing the response ceiling is counted in full and
+stops the campaign; thus known-used bytes can exceed that request's reservation.
+After a crash, unread or unfinalized body bytes are unknown, not zero-consumption
+evidence: their entire precharged reservation remains. Timeout/abort freezes the
+known byte count; late completion cannot authorize another request, alter the
+settled count, refund bytes, or finish a sample. There are no retries.
+
+The original campaign's 24-hour horizon is checked again at actual dispatch,
+after awaiting reservation and tip retention, not just at reservation time.
+Completion validates both observation and completion times against that persisted
+origin, including after adapter replacement or verified budget reopen. A final
+response or durable handoff crossing the horizon cannot return an observation;
+all request charges and known body bytes remain accounted. The return path
+rechecks the clock after completion publication and tip retention as well.
+The existing inclusive boundary is unchanged: exactly 24 hours is allowed,
+later times are rejected. This is a maximum horizon, not a capacity/readiness
+claim; the conservative 128-sample byte ceiling still applies.
+
+`createNew` requires a new dedicated directory; it cannot overwrite an existing
+campaign sidecar. A fresh adapter using that sidecar cannot renew its allowance.
+This assumes the caller preserves the campaign-to-sidecar location and trusted
+tip channel; the module cannot detect a caller deleting all state or creating a
+different directory. Deployment/path admission remains unimplemented.
+`reopenExisting` without an independently supplied exact `expectedTip` is
+inspection-only. A verified healthy tip permits budget-only continuation;
+it never authorizes candidate/account acquisition. A pending sample or terminal
+failure remains inspection-only even with its matching tip. A stale/rollback
+tip, changed config/limits, corrupt state, or ambiguous pending publication is
+rejected. `inspectUsdCampaignBudget` is read-only and can report UNKNOWN while a
+crashed writer's lock remains. No automatic lock stealing, pending reconciliation,
+refund, recovery, or reset is provided.
 
 ## Preserved account and campaign limits
 
@@ -115,12 +179,14 @@ request/byte budgets survive verified restart.
   5-second request timeout, a 10-second quote age, and one sample per minute.
   Its byte, request, time, or event budget may stop the campaign earlier than
   the journal bound.
-  The adapter keeps request and raw-response byte counters only in that instance;
-  those counters are not persisted in the account journal. A newly constructed
-  adapter resets its counters. That reset is not renewed campaign allowance:
-  no campaign-wide request/byte accounting exists here, so after a process
-  restart do not acquire another sample until separately reviewed durable
-  campaign-wide accounting is implemented. Within a process, the composition
+  Legacy mode keeps counters only in the adapter instance and is not
+  restart-safe campaign accounting. Explicit durable mode adds the separate
+  irreversible reservation ceiling: at most 256 requests / 128 two-request
+  sample attempts fit 32 MiB, even with tiny successful responses. Failures,
+  unknown outcomes, timing or storage bounds can stop earlier. This is roughly
+  2 hours 8 minutes at minute sampling, not 24-hour readiness; neither the
+  256-observation ceiling nor the 512-request ceiling is increased.
+  Within a process, the composition
   pins one feed object per store session and rejects replacement; the account
   store exposes whether a handle came from `createNew` or `reopenExisting`, so
   feed acquisition is also blocked through reopened handles, even if the journal
@@ -168,6 +234,7 @@ Run the focused composition, feed, and durable-account suites:
 ```sh
 node --test test/usd-paper-composition.test.js \
   test/usd-paper-feed-kraken-public.test.js \
+  test/usd-paper-campaign-budget.test.js \
   test/usd-paper-causal-candidate.test.js \
   test/paper-capital-challenge-account-store.test.js
 ```
@@ -180,6 +247,52 @@ full-prefix continuation without redecision, causal candle timing, 21-bar
 warm-up/crossover, missed bars, evidence tamper rejection, and finite
 acceptance output. Provider fixtures use injected responses. None of these
 checks reports profitability or production readiness.
+
+### Finite durable-budget acceptance
+
+The budget suite above prints this additional bounded fixture summary. It uses
+four injected responses across a closed/reopened sidecar, independently supplied
+in-memory expected tips, and a fresh adapter. It does not start the host, acquire
+provider data, or claim a durable strategy-evidence channel:
+
+```json
+{
+  "schemaVersion": "USD_CAMPAIGN_BUDGET_OFFLINE_ACCEPTANCE_V1",
+  "status": "PASS",
+  "evidenceKind": "SYNTHETIC_FIXTURE_ONLY",
+  "strategyStatus": "PROPOSED_UNAPPROVED",
+  "hostEnabled": false,
+  "executionEnabled": false,
+  "networkRequests": 0,
+  "fixtureRequests": 4,
+  "samplesAcrossVerifiedReopen": 2,
+  "chargedBytes": 524288,
+  "usedBytes": 497,
+  "reservedBytes": 523791,
+  "refundedBytes": 0,
+  "maximumTwoRequestSamples": 128,
+  "restartTipsRetainedInMemoryForAcceptanceOnly": true,
+  "productionReadiness": "NOT_ASSESSED"
+}
+```
+
+Additional fault fixtures cover process exit after reservation and during body
+read/finalization, pending writes before/after rename, failures at every sample
+write boundary, timeout and late completion, cancellation/deadline expiry while
+awaiting reservation, overflow, non-2xx/partial bodies, mismatched tips/config,
+rollback, concurrent ownership/reservations, and exhaustion across adapter
+replacement and reopen. They also verify that a durable budget cannot remove
+the reopened-account acquisition block or redecide persisted account events.
+The tests replace global fetch with a rejecting sentinel and inject local
+responses only. No EUR, active-host, account-schema, capital, drawdown or fee
+configuration changes are part of this scope.
+Injected-clock fixtures cover horizon crossings during either reservation
+handoff, final body consumption, body-result retention, completion publication
+and completion retention,
+for both causal/noncausal paths after adapter replacement and verified reopen.
+They check no late dispatch or returned observation, unchanged irreversible
+charges, exact-boundary acceptance, timestamp validation on append/replay, and
+rejection of the timestamp-free V1 format.
 
 ## Start blockers and checklist
 
@@ -204,11 +317,13 @@ synthetic PASS does not satisfy any of them.
 - [ ] Review a bounded continuation/stop plan that preserves complete history.
   The current 256-event minute-sampling ceiling is about 4 hours 16 minutes;
   there is no 24-hour readiness or reset/adapter-recreation escape.
-- [ ] Implement and independently review a durable campaign-wide request and
-  raw-response-byte budget that survives restart. Current Kraken counters are
-  adapter-instance scoped, and current account checkpoints do not retain them;
-  the composition fail-closes feed acquisition through any reopened account
-  handle until this is resolved.
+- [ ] Independently review and admit the implemented durable campaign-wide
+  budget, its irreversible reservations, location binding, trusted tip retention,
+  crash stop/recovery policy, and finite offline evidence. Implementation and
+  fixture acceptance are resolved here; operational admission is not. Legacy
+  counters remain instance-scoped. The composition still fail-closes acquisition
+  through every reopened account handle; removing that block is a separate
+  strategy-evidence/restart admission review gate.
 - [ ] Independently qualify and retain the actual closed-candle values and
   strategy evidence, bind the exact strategy/version to those inputs, and
   verify the adapter-to-decision evidence through restart. The staged source

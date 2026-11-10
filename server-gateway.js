@@ -43,6 +43,12 @@ import {
   spotPaperPairedReportGatewayConfig,
   writeSpotPaperPairedReportRouteResponse
 } from "./spot-paper-paired-report-gateway.mjs";
+import {createPrivatePairedProgressStore} from "./private-paired-progress-store.mjs";
+import {
+  handleSpotPaperPairedProgressGatewayRequest,
+  spotPaperPairedProgressGatewayConfig,
+  writeSpotPaperPairedProgressRouteResponse
+} from "./spot-paper-paired-progress-gateway.mjs";
 
 const { Pool } = pg;
 const RELEASE=JSON.parse(await fs.readFile(new URL("./version.json",import.meta.url),"utf8"));
@@ -63,6 +69,7 @@ const PAPER_REPORT_CONFIG = reportTransferGatewayConfig();
 const SPOT_PAPER_REPORT_CONFIG = spotPaperReportGatewayConfig();
 const SPOT_PAPER_HOST8H_REPORT_CONFIG = spotPaperHost8hReportGatewayConfig();
 const SPOT_PAPER_PAIRED_REPORT_CONFIG = spotPaperPairedReportGatewayConfig();
+const SPOT_PAPER_PAIRED_PROGRESS_CONFIG = spotPaperPairedProgressGatewayConfig();
 const PIONEX_BOT_READ_CONFIGURED=!!(
   String(process.env.PIONEX_BOT_READ_API_KEY||process.env.PIONEX_API_KEY||'').trim() &&
   String(process.env.PIONEX_BOT_READ_API_SECRET||process.env.PIONEX_API_SECRET||'').trim()
@@ -151,6 +158,7 @@ let privatePaperReportStore=null;
 let privateSpotPaperReportStore=null;
 let privateSpotPaperHost8hReportStore=null;
 let privateSpotPaperPairedReportStore=null;
+let privateSpotPaperPairedProgressStore=null;
 function pool(){
   if(!DATABASE_URL)return null;
   if(!privatePool)privatePool=new Pool({connectionString:DATABASE_URL,ssl:{rejectUnauthorized:false}});
@@ -198,6 +206,13 @@ function spotPaperPairedReportStore(){
     });
   }
   return privateSpotPaperPairedReportStore;
+}
+function spotPaperPairedProgressStore(){
+  if(!DATABASE_URL)return null;
+  if(!privateSpotPaperPairedProgressStore){
+    privateSpotPaperPairedProgressStore=createPrivatePairedProgressStore(paperReportPool());
+  }
+  return privateSpotPaperPairedProgressStore;
 }
 async function stateGet(key){
   const p=pool(); if(!p)return null;
@@ -377,6 +392,7 @@ const server=http.createServer(async(req,res)=>{
     let spotPaperReportRoute;
     let spotPaperHost8hReportRoute;
     let spotPaperPairedReportRoute;
+    let spotPaperPairedProgressRoute;
     try{
       reportRoute=await handleReportGatewayRequest(req,{
         config:PAPER_REPORT_CONFIG,
@@ -408,6 +424,14 @@ const server=http.createServer(async(req,res)=>{
           signal:reportController.signal
         });
       }
+      if(!reportRoute&&!spotPaperReportRoute&&!spotPaperHost8hReportRoute&&!spotPaperPairedReportRoute){
+        spotPaperPairedProgressRoute=await handleSpotPaperPairedProgressGatewayRequest(req,{
+          config:SPOT_PAPER_PAIRED_PROGRESS_CONFIG,
+          getStore:spotPaperPairedProgressStore,
+          authorizedRead,
+          signal:reportController.signal
+        });
+      }
     }finally{
       req.removeListener("aborted",abortReport);
       res.removeListener("close",abortReportOnClose);
@@ -426,6 +450,11 @@ const server=http.createServer(async(req,res)=>{
     if(spotPaperPairedReportRoute){
       return writeSpotPaperPairedReportRouteResponse(
         req,res,spotPaperPairedReportRoute,origin,writeJson
+      );
+    }
+    if(spotPaperPairedProgressRoute){
+      return writeSpotPaperPairedProgressRouteResponse(
+        req,res,spotPaperPairedProgressRoute,origin,writeJson
       );
     }
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
