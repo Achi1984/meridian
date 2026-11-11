@@ -81,6 +81,10 @@ const DESCRIPTORS = (() => {
     {kind:'CASH',variantId:'cash-zero',scenarioId:'scenario-independent',segmentId:'diagnostic'}
   ];
 })();
+export const HISTORICAL_EXPORT_PATH_DESCRIPTORS = Object.freeze(
+  DESCRIPTORS.map(descriptor=>Object.freeze({...descriptor}))
+);
+export const HISTORICAL_EXPORT_COMPUTATION_ORDER = Object.freeze([...COMPUTATION_ORDER]);
 const BINDINGS = [
   {
     profile:'MERIDIAN-B1-7-GENERATED-FIXTURE-BRIDGE-R1',
