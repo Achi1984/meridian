@@ -50,6 +50,9 @@ function projectJournal(envelope, expectedIdentity, exportedAt, check) {
     manifest.mode === 'paper' &&
     integer(manifest.startedAt) && payload.createdAt === manifest.startedAt);
   const conflict = !matchesIdentity(manifest, expectedIdentity);
+  // Identity mismatch is a stop condition. Do not validate foreign-run
+  // accounting assumptions under the expected-run contract.
+  if (conflict) return {status: 'IDENTITY_CONFLICT', progress: null};
   const assumptions = manifest.assumptions;
   assert(assumptions?.feeBpsPerSide === 20 && assumptions.slippageBpsPerSide === 10 &&
     assumptions.ratesVerified === false &&
