@@ -118,7 +118,7 @@ async function request({transport, signal, id, method, params, events, counters,
     url: SOLANA_RPC_ORIGIN, method:"POST",
     headers: Object.freeze({"content-type":"application/json","accept":"application/json"}),
     body, redirect:"error", credentials:"omit", signal:controller.signal
-  })).then(async response => ({response, text: await response.text()}));
+  })).then(async response => ({response, text: await readBoundedResponse(response, limits.maxBytesPerResponse)}));
   operation.catch(() => {});
   try {
     const timeout = new Promise((_, reject) => {
