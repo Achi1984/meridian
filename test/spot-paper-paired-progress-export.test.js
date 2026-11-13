@@ -140,9 +140,7 @@ test('rejects wrong identity, sequence, role, fee/fill accounting and unknown cu
   identity.models[0].accountId = [identity.models[0].accountId];
   assert.equal(validIdentity(identity), false);
   const mutations = [
-    j => { j.manifest.models[1].modelId = 'wrong'; },
     j => { j.manifest.runId = 'other-run'; },
-    j => { j.manifest.pair = 'BTC/USD'; },
     j => { j.sequence++; },
     j => { j.events[1].valuations[1].role = 'cash'; },
     j => { j.events[2].valuations[0].feesCents = 0; },
@@ -169,6 +167,50 @@ test('rejects wrong identity, sequence, role, fee/fill accounting and unknown cu
     mutate(p);
     assert.equal(validateProgress(p, f.expectedIdentity), null);
   }
+});
+
+test('only structurally valid, complete identity differences produce sanitized conflict', async t => {
+  const f = await fixture(t);
+  const mutations = [
+    j => { j.runId = j.manifest.runId = 'different-run'; },
+    ...['sourceSha256', 'configSha256', 'researchSourceSha256'].map(key =>
+      j => { j.manifest[key] = 'a'.repeat(64); }),
+    ...['feedSourceId', 'comparisonEngineId', 'modelPairId'].map(key =>
+      j => { j.manifest[key] = 'different'; }),
+    j => { j.manifest.models[1].modelId = 'different'; },
+    j => { j.manifest.models[1].accountId = 'different'; },
+    j => { j.manifest.pair = 'BTC/USD'; }
+  ];
+  for (const mutate of mutations) {
+    const journal = structuredClone(f.journal);
+    mutate(journal);
+    await writeFile(f.path, journalEnvelope(journal));
+    assert.deepEqual(await exportProgress(f.options), {status: 'IDENTITY_CONFLICT', progress: null});
+    journal.events[2].valuations[0].feesCents = 0;
+    await writeFile(f.path, journalEnvelope(journal));
+    assert.deepEqual(await exportProgress(f.options), {status: 'IDENTITY_CONFLICT', progress: null});
+  }
+  const foreignWithDifferentAccounting = structuredClone(f.journal);
+  foreignWithDifferentAccounting.runId = foreignWithDifferentAccounting.manifest.runId = 'different-run';
+  foreignWithDifferentAccounting.manifest.assumptions.feeBpsPerSide = 99;
+  await writeFile(f.path, journalEnvelope(foreignWithDifferentAccounting));
+  assert.deepEqual(await exportProgress(f.options), {status: 'IDENTITY_CONFLICT', progress: null});
+
+  for (const mutate of [
+    j => { delete j.manifest.models[0].modelId; },
+    j => { j.manifest.sourceSha256 = 'invalid'; },
+    j => { j.manifest.runId = 'different'; },
+    j => { j.manifest.models[0].modelId = ['different']; }
+  ]) {
+    const journal = structuredClone(f.journal);
+    mutate(journal);
+    await writeFile(f.path, journalEnvelope(journal));
+    assert.equal((await exportProgress(f.options)).status, 'UNKNOWN');
+  }
+  const corrupt = JSON.parse(journalEnvelope(f.journal));
+  corrupt.payload.manifest.feedSourceId = 'different';
+  await writeFile(f.path, JSON.stringify(corrupt));
+  assert.equal((await exportProgress(f.options)).status, 'UNKNOWN');
 });
 
 test('concurrent snapshot replacement and pending rewrite are BUSY', async t => {
