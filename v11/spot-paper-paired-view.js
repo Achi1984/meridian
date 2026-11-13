@@ -173,7 +173,11 @@ function renderCheckpoint(root, checkpoint, document) {
 
 function renderModel(root, model, document, {loading = false} = {}) {
   const isError = model.state === 'error';
-  const isLoading = loading && !isError;
+  // The report and checkpoint reads are independent. A report read may still
+  // be settling after the checkpoint has deterministically answered NOT_FOUND;
+  // do not let that older loading flag hide the terminal checkpoint state.
+  const checkpointNotFound = model.checkpoint?.status === 'NOT_FOUND';
+  const isLoading = loading && !isError && !checkpointNotFound;
   root.replaceChildren();
   root.setAttribute('style',
     'box-sizing:border-box;display:grid;gap:12px;min-width:0;max-width:100%;padding:12px;overflow-wrap:anywhere');
@@ -201,7 +205,8 @@ function renderModel(root, model, document, {loading = false} = {}) {
   status.setAttribute('role', 'status');
   status.setAttribute('aria-live', 'polite');
   status.setAttribute('aria-atomic', 'true');
-  root.setAttribute('data-state', isLoading ? 'loading' : model.state);
+  root.setAttribute('data-state', isLoading ? 'loading' :
+    checkpointNotFound ? 'empty' : model.state);
 
   renderCheckpoint(root, model.checkpoint, document);
   if (!model.available) {

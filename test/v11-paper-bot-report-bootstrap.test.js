@@ -168,6 +168,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
 function harness({
   fetchImpl = async () => new Response(null, {status: 404}),
+  createProgressConnector,
   progressEnabled = false,
   progressExpectedIdentity,
   progressStaleAfterMs,
@@ -207,6 +208,7 @@ function harness({
     access,
     fetchImpl,
     progressEnabled,
+    ...(createProgressConnector ? {createProgressConnector} : {}),
     ...(progressExpectedIdentity ? {progressExpectedIdentity} : {}),
     ...(progressStaleAfterMs === undefined ? {} : {progressStaleAfterMs}),
     ...(now ? {now} : {})
@@ -422,6 +424,70 @@ test('paired transport, missing publication, identity and schema failures remain
     /Authentifizierung fehlgeschlagen/);
   assert.doesNotMatch(unauthorized.pairedRoot.textContent, /SYNTHETIC FIXTURE/);
   unauthorized.workspace.dispose();
+});
+
+test('missing paired report wins over an in-flight checkpoint read', async () => {
+  let releaseProgress;
+  const progressPending = new Promise(resolve => { releaseProgress = resolve; });
+  const h = harness({
+    progressEnabled: true,
+    fetchImpl: async url => {
+      if (url === SPOT_PAPER_PAIRED_REPORT_ENDPOINT) {
+        return new Response(JSON.stringify({error: 'spot_paper_paired_report_not_found'}), {
+          status: 404, headers: {'content-type': 'application/json'}
+        });
+      }
+      assert.equal(url, SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT);
+      return progressPending;
+    }
+  });
+  h.workspace.setActive(true);
+  h.access.unlock();
+  await tick();
+  await tick();
+  assert.match(h.pairedRoot.parentNode.textContent, /Kein gepaarter Bericht veröffentlicht/);
+  assert.equal(h.pairedRoot.attrs['data-state'], 'empty');
+  assert.match(h.pairedRoot.textContent, /Checkpoint nicht verfügbar — NOT_FOUND/);
+  assert.doesNotMatch(h.pairedRoot.textContent, /Checkpoint wird geladen/);
+  releaseProgress(new Response(JSON.stringify({status: 'NOT_FOUND'}), {
+    status: 404, headers: {'content-type': 'application/json'}
+  }));
+  await tick();
+  h.workspace.dispose();
+});
+
+test('paired NOT_FOUND fallback never masks an authoritative checkpoint state', async () => {
+  const {source, progress} = await exportedProgress();
+  for (const result of [
+    {status: 'IDENTITY_MISMATCH', progress: null},
+    {status: 'AVAILABLE', progress},
+    {status: 'STALE', progress}
+  ]) {
+    const h = harness({
+      progressEnabled: true,
+      progressExpectedIdentity: source.expectedIdentity,
+      createProgressConnector: () => ({
+        read: async () => result,
+        isBusy: () => false,
+        isDisposed: () => false,
+        dispose() {}
+      }),
+      fetchImpl: async url => {
+        assert.equal(url, SPOT_PAPER_PAIRED_REPORT_ENDPOINT);
+        return new Response(JSON.stringify({error: 'spot_paper_paired_report_not_found'}), {
+          status: 404, headers: {'content-type': 'application/json'}
+        });
+      }
+    });
+    h.workspace.setActive(true);
+    h.access.unlock();
+    await tick();
+    await tick();
+    assert.equal(h.pairedRoot.attrs['data-state'], 'empty');
+    assert.match(h.pairedRoot.textContent, new RegExp(result.status));
+    assert.doesNotMatch(h.pairedRoot.textContent, /Checkpoint nicht verfügbar — NOT_FOUND/);
+    h.workspace.dispose();
+  }
 });
 
 test('paired source loads once on active unlock; inactive navigation never fetches', async () => {
