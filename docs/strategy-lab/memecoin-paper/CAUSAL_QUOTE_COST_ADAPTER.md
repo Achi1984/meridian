@@ -13,3 +13,5 @@ Fee, slippage, impact and network components require explicit non-negative decim
 The transport is injected only, GET-only, fixed-origin, credentials-omitted, redirect-rejected, byte- and time-bounded, cancellable and non-retrying. No default network request is made. Every result hardcodes `executionAuthorized:false`; `READY` means structurally complete evidence only, never permission to trade.
 
 Runner, ledger, UI and provider integration are intentionally out of scope for this packet. Solana-history transport is not activated by this source-only adapter; any Solana-specific byte-limit work is a separate follow-up.
+
+CI is expected to run on the reviewable pull request head; this packet remains source-only and inert.
