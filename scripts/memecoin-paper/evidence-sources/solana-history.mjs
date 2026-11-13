@@ -62,10 +62,13 @@ function decodeSwap(result, {mint, pool, selectedMintVault}) {
   const post = extractDelta(result.meta.postTokenBalances, mint, {selectedMintVault});
   if (!pre || !post) return null;
   const owners = new Set([...pre.keys(), ...post.keys()]);
-  let net = 0n;
-  for (const owner of owners) net += (post.get(owner) ?? 0n) - (pre.get(owner) ?? 0n);
-  if (net === 0n) return null;
   const vaultOwner = selectedMintVault ?? null;
+  // Pool and trader deltas cancel globally; measure the non-vault trader delta.
+  let net = 0n;
+  for (const owner of owners) {
+    if (owner !== vaultOwner) net += (post.get(owner) ?? 0n) - (pre.get(owner) ?? 0n);
+  }
+  if (net === 0n) return null;
   const vaultDelta = vaultOwner ? (post.get(vaultOwner) ?? 0n) - (pre.get(vaultOwner) ?? 0n) : null;
   const direction = vaultDelta !== null && vaultDelta < 0n ? "BUY"
     : vaultDelta !== null && vaultDelta > 0n ? "SELL" : null;
