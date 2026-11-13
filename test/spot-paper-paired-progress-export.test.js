@@ -188,7 +188,7 @@ test('only structurally valid, complete identity differences produce sanitized c
     assert.deepEqual(await exportProgress(f.options), {status: 'IDENTITY_CONFLICT', progress: null});
     journal.events[2].valuations[0].feesCents = 0;
     await writeFile(f.path, journalEnvelope(journal));
-    assert.deepEqual(await exportProgress(f.options), {status: 'UNKNOWN', progress: null});
+    assert.deepEqual(await exportProgress(f.options), {status: 'IDENTITY_CONFLICT', progress: null});
   }
   const foreignWithDifferentAccounting = structuredClone(f.journal);
   foreignWithDifferentAccounting.runId = foreignWithDifferentAccounting.manifest.runId = 'different-run';
