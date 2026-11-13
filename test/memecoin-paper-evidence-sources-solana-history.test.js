@@ -2,10 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {collectSolanaSwapHistory,SOLANA_HISTORY_SCHEMA,SOLANA_RPC_ORIGIN} from "../scripts/memecoin-paper/evidence-sources/solana-history.mjs";
 
-const mint="So11111111111111111111111111111111111111112";
-const pool="Pool11111111111111111111111111111111111111111";
-const vault="Vault1111111111111111111111111111111111111111";
-const user="User11111111111111111111111111111111111111111";
+const mint="A11111111111111111111111111111111";
+const pool="B11111111111111111111111111111111";
+const vault="C11111111111111111111111111111111";
+const user="D11111111111111111111111111111111";
 
 function response(id,result){return {jsonrpc:"2.0",id,result};}
 function transportFixture(t,tx={}) {
