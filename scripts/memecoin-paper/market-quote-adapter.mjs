@@ -2256,7 +2256,7 @@ function causalLeg(x,label){
 }
 export function evaluateCausalQuoteChain({entry,exit,fx,now,staleAfterMs=CAUSAL_QUOTE_STALE_AFTER_MS}={}){
   const e=causalLeg(entry,"entry"),q=causalLeg(exit,"exit"); if(e.error)return causalUnknown(e.error);if(q.error)return causalUnknown(q.error);
-  if(!causalSame(e.id,q.id)||q.sourceMs<e.sourceMs)return causalUnknown("MIXED_PROVENANCE");
+  if(!causalSame(e.id,q.id)||q.sourceMs<e.sourceMs||q.sourceMs<e.receiptMs)return causalUnknown("MIXED_PROVENANCE");
   const nowMs=causalTime(now);if(nowMs===null)return causalUnknown("MALFORMED_EVIDENCE");
   for(const t of [e.sourceMs,e.receiptMs,q.sourceMs,q.receiptMs]){if(t>nowMs)return causalUnknown("FUTURE_SOURCE_TIME");if(nowMs-t>staleAfterMs)return causalUnknown("STALE_QUOTE");}
   if(!fx||typeof fx.rate!=="string"||causalScaled(fx.rate)===null||causalScaled(fx.rate)<=0n||fx.pair!==e.id.quoteCurrency+"/USD"||!causalProv(fx.provenance,e.id))return causalUnknown("MISSING_PROVENANCE");
@@ -2267,7 +2267,7 @@ export function evaluateCausalQuoteChain({entry,exit,fx,now,staleAfterMs=CAUSAL_
   return {status:"READY",evidenceComplete:true,executionAuthorized:false,identity:e.id,netQuote:causalFormat(netQuote),netUsd:causalFormat(netUsd),breakevenQuote:causalFormat(e.input),provenance:{entry:entry.receiptTime,exit:exit.receiptTime,fx:fx.provenance.receiptTime}};
 }
 async function causalReadBounded(response,maxBytes){
-  if(!response||!response.body?.getReader){if(typeof response?.text!=="function")throw new Error("MALFORMED_RESPONSE");const t=await response.text();if(Buffer.byteLength(t,"utf8")>maxBytes)throw new Error("RESPONSE_TOO_LARGE");return t;}
+  if(!response||!response.body?.getReader)throw new Error("RESPONSE_BODY_UNAVAILABLE");
   const reader=response.body.getReader(),chunks=[],decoder=new TextDecoder(),parts=[];let total=0;
   try{for(;;){const x=await reader.read();if(x.done)break;const b=x.value;total+=b.byteLength;if(total>maxBytes){await reader.cancel();throw new Error("RESPONSE_TOO_LARGE");}chunks.push(b);}for(const b of chunks)parts.push(decoder.decode(b,{stream:true}));parts.push(decoder.decode());return parts.join("");}finally{reader.releaseLock?.();}
 }
