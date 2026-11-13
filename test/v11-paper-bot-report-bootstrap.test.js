@@ -424,6 +424,36 @@ test('paired transport, missing publication, identity and schema failures remain
   unauthorized.workspace.dispose();
 });
 
+test('missing paired report wins over an in-flight checkpoint read', async () => {
+  let releaseProgress;
+  const progressPending = new Promise(resolve => { releaseProgress = resolve; });
+  const h = harness({
+    progressEnabled: true,
+    fetchImpl: async url => {
+      if (url === SPOT_PAPER_PAIRED_REPORT_ENDPOINT) {
+        return new Response(JSON.stringify({error: 'spot_paper_paired_report_not_found'}), {
+          status: 404, headers: {'content-type': 'application/json'}
+        });
+      }
+      assert.equal(url, SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT);
+      return progressPending;
+    }
+  });
+  h.workspace.setActive(true);
+  h.access.unlock();
+  await tick();
+  await tick();
+  assert.match(h.pairedRoot.parentNode.textContent, /Kein gepaarter Bericht veröffentlicht/);
+  assert.equal(h.pairedRoot.attrs['data-state'], 'empty');
+  assert.match(h.pairedRoot.textContent, /Checkpoint nicht verfügbar — NOT_FOUND/);
+  assert.doesNotMatch(h.pairedRoot.textContent, /Checkpoint wird geladen/);
+  releaseProgress(new Response(JSON.stringify({status: 'NOT_FOUND'}), {
+    status: 404, headers: {'content-type': 'application/json'}
+  }));
+  await tick();
+  h.workspace.dispose();
+});
+
 test('paired source loads once on active unlock; inactive navigation never fetches', async () => {
   const calls = [];
   const h = harness({fetchImpl: async url => {
