@@ -31,3 +31,12 @@ test("transport is bounded, fixed-origin and aborts",async()=>{
  assert.equal((await a.fetchJson("/quote")).reason,"TIMEOUT");assert.equal(aborted,true);
  assert.equal((await a.fetchJson("https://evil.example/quote")).reason,"ORIGIN_NOT_ALLOWED");
 });
+
+test("exit cannot begin before entry receipt",()=>{
+ const r=evaluateCausalQuoteChain({entry:leg(),exit:leg({sourceTime:"2026-11-13T20:00:00.500Z"}),fx:{rate:"1",pair:"USD/USD",provenance:prov("fx")},now:"2026-11-13T20:02:00.000Z"});
+ assert.equal(r.status,"UNKNOWN");assert.equal(r.reason,"MIXED_PROVENANCE");
+});
+test("causal transport rejects response without a readable bounded body",async()=>{
+ const a=createCausalQuoteCostAdapter({transport:async()=>({text:async()=>"{\"ok\":true}"})});
+ const r=await a.fetchJson("/quote");assert.equal(r.status,"UNKNOWN");assert.equal(r.reason,"TRANSPORT_FAILED");
+});
