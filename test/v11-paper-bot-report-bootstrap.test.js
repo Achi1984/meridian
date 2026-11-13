@@ -168,6 +168,7 @@ const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
 function harness({
   fetchImpl = async () => new Response(null, {status: 404}),
+  createProgressConnector,
   progressEnabled = false,
   progressExpectedIdentity,
   progressStaleAfterMs,
@@ -207,6 +208,7 @@ function harness({
     access,
     fetchImpl,
     progressEnabled,
+    ...(createProgressConnector ? {createProgressConnector} : {}),
     ...(progressExpectedIdentity ? {progressExpectedIdentity} : {}),
     ...(progressStaleAfterMs === undefined ? {} : {progressStaleAfterMs}),
     ...(now ? {now} : {})
@@ -452,6 +454,40 @@ test('missing paired report wins over an in-flight checkpoint read', async () =>
   }));
   await tick();
   h.workspace.dispose();
+});
+
+test('paired NOT_FOUND fallback never masks an authoritative checkpoint state', async () => {
+  const {source, progress} = await exportedProgress();
+  for (const result of [
+    {status: 'IDENTITY_MISMATCH', progress: null},
+    {status: 'AVAILABLE', progress},
+    {status: 'STALE', progress}
+  ]) {
+    const h = harness({
+      progressEnabled: true,
+      progressExpectedIdentity: source.expectedIdentity,
+      createProgressConnector: () => ({
+        read: async () => result,
+        isBusy: () => false,
+        isDisposed: () => false,
+        dispose() {}
+      }),
+      fetchImpl: async url => {
+        assert.equal(url, SPOT_PAPER_PAIRED_REPORT_ENDPOINT);
+        return new Response(JSON.stringify({error: 'spot_paper_paired_report_not_found'}), {
+          status: 404, headers: {'content-type': 'application/json'}
+        });
+      }
+    });
+    h.workspace.setActive(true);
+    h.access.unlock();
+    await tick();
+    await tick();
+    assert.equal(h.pairedRoot.attrs['data-state'], 'empty');
+    assert.match(h.pairedRoot.textContent, new RegExp(result.status));
+    assert.doesNotMatch(h.pairedRoot.textContent, /Checkpoint nicht verfügbar — NOT_FOUND/);
+    h.workspace.dispose();
+  }
 });
 
 test('paired source loads once on active unlock; inactive navigation never fetches', async () => {
