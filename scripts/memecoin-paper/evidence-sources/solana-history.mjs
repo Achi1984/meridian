@@ -34,16 +34,17 @@ function checkResponse(response) {
   if (Object.hasOwn(response, "error")) throw new Error("RPC_ERROR");
   return response.result;
 }
-function extractDelta(balances, mint, vaults) {
-  if (!Array.isArray(balances)) return null;
+function extractDelta(balances, mint, accountKeys) {
+  if (!Array.isArray(balances) || !Array.isArray(accountKeys)) return null;
   const sums = new Map();
   for (const row of balances) {
     if (!isRecord(row) || row.mint !== mint || !Number.isSafeInteger(row.accountIndex) ||
+        row.accountIndex < 0 || row.accountIndex >= accountKeys.length ||
         !isRecord(row.uiTokenAmount) || typeof row.uiTokenAmount.amount !== "string" ||
         !/^\d+$/.test(row.uiTokenAmount.amount) || !Number.isSafeInteger(row.uiTokenAmount.decimals)) return null;
-    const owner = typeof row.owner === "string" ? row.owner : null;
-    if (!owner) return null;
-    sums.set(owner, (sums.get(owner) ?? 0n) + BigInt(row.uiTokenAmount.amount));
+    const account = accountAddress(accountKeys[row.accountIndex]);
+    if (!validAddress(account)) return null;
+    sums.set(account, (sums.get(account) ?? 0n) + BigInt(row.uiTokenAmount.amount));
   }
   return sums;
 }
@@ -58,8 +59,8 @@ function decodeSwap(result, {mint, pool, selectedMintVault}) {
   if (!Array.isArray(keys) || !keys.some(row => accountAddress(row) === pool)) return null;
   const logs = result.meta.logMessages;
   if (!Array.isArray(logs) || !logs.some(line => typeof line === "string" && /raydium.*swap|swap.*raydium/i.test(line))) return null;
-  const pre = extractDelta(result.meta.preTokenBalances, mint, {selectedMintVault});
-  const post = extractDelta(result.meta.postTokenBalances, mint, {selectedMintVault});
+  const pre = extractDelta(result.meta.preTokenBalances, mint, keys);
+  const post = extractDelta(result.meta.postTokenBalances, mint, keys);
   if (!pre || !post) return null;
   const owners = new Set([...pre.keys(), ...post.keys()]);
   const vaultOwner = selectedMintVault ?? null;
@@ -85,24 +86,43 @@ function decodeSwap(result, {mint, pool, selectedMintVault}) {
 }
 async function request({transport, signal, id, method, params, events, counters, limits, clock, started}) {
   if (counters.requests >= limits.maxRequests || performance.now() - started > limits.maxDurationMs) throw new Error("WORK_LIMIT");
+  if (signal?.aborted) throw new Error("CANCELLED");
   const requestedAt = clock();
   const body = JSON.stringify({jsonrpc:"2.0",id,method,params});
-  const response = await transport({
+  const remainingMs = limits.maxDurationMs - (performance.now() - started);
+  if (remainingMs <= 0) throw new Error("WORK_LIMIT");
+  const controller = new AbortController();
+  const forwardAbort = () => controller.abort();
+  signal?.addEventListener("abort", forwardAbort, {once:true});
+  let timer;
+  const operation = Promise.resolve().then(() => transport({
     url: SOLANA_RPC_ORIGIN, method:"POST",
     headers: Object.freeze({"content-type":"application/json","accept":"application/json"}),
-    body, redirect:"error", credentials:"omit", signal
-  });
-  if (response?.url && response.url !== SOLANA_RPC_ORIGIN) throw new Error("ORIGIN_MISMATCH");
-  const text = await response.text();
-  counters.requests += 1;
-  counters.bytes += Buffer.byteLength(text);
-  if (counters.bytes > limits.maxBytesPerResponse * limits.maxRequests ||
-      Buffer.byteLength(text) > limits.maxBytesPerResponse) throw new Error("BYTE_LIMIT");
-  let payload; try { payload = JSON.parse(text); } catch { throw new Error("INVALID_JSON"); }
-  const result = checkResponse(payload);
-  events.push({requestId:id,method,requestedAt,receivedAt:clock(),responseBytes:Buffer.byteLength(text),responseSha256:sha256(text),slot:result?.context?.slot ?? result?.slot ?? null});
-  if (signal?.aborted) throw new Error("CANCELLED");
-  return result;
+    body, redirect:"error", credentials:"omit", signal:controller.signal
+  })).then(async response => ({response, text: await response.text()}));
+  operation.catch(() => {});
+  try {
+    const timeout = new Promise((_, reject) => {
+      timer = setTimeout(() => {
+        controller.abort();
+        reject(new Error("TIMEOUT"));
+      }, remainingMs);
+    });
+    const {response, text} = await Promise.race([operation, timeout]);
+    if (response?.url && response.url !== SOLANA_RPC_ORIGIN) throw new Error("ORIGIN_MISMATCH");
+    counters.requests += 1;
+    counters.bytes += Buffer.byteLength(text);
+    if (counters.bytes > limits.maxBytesPerResponse * limits.maxRequests ||
+        Buffer.byteLength(text) > limits.maxBytesPerResponse) throw new Error("BYTE_LIMIT");
+    let payload; try { payload = JSON.parse(text); } catch { throw new Error("INVALID_JSON"); }
+    const result = checkResponse(payload);
+    events.push({requestId:id,method,requestedAt,receivedAt:clock(),responseBytes:Buffer.byteLength(text),responseSha256:sha256(text),slot:result?.context?.slot ?? result?.slot ?? null});
+    if (signal?.aborted) throw new Error("CANCELLED");
+    return result;
+  } finally {
+    clearTimeout(timer);
+    signal?.removeEventListener("abort", forwardAbort);
+  }
 }
 export async function collectSolanaSwapHistory({
   enabled=false, transport, clock=Date.now, signal=new AbortController().signal,
