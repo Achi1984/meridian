@@ -8,16 +8,12 @@ const vault="C11111111111111111111111111111111";
 const user="D11111111111111111111111111111111";
 
 function response(id,result){return {jsonrpc:"2.0",id,result};}
+function streamResponse(payload){const bytes=new TextEncoder().encode(JSON.stringify(payload));let done=false;return {body:{getReader(){return {async read(){if(done)return {done:true};done=true;return {done:false,value:bytes};},async cancel(){},releaseLock(){}};}}};}
 function transportFixture(t,tx={}) {
-  let calls=0;
-  t.calls=()=>calls;
-  return async request => {
-    calls++;
-    assert.equal(request.url,SOLANA_RPC_ORIGIN);
-    assert.equal(request.method,"POST");
-    const body=JSON.parse(request.body);
-    if(body.method==="getSignaturesForAddress") return {url:SOLANA_RPC_ORIGIN,text:async()=>JSON.stringify(response(body.id,[{signature:"sig1",slot:10,err:null}]))};
-    return {url:SOLANA_RPC_ORIGIN,text:async()=>JSON.stringify(response(body.id,{slot:10,blockTime:1_700_000_000,transaction:{message:{accountKeys:[{pubkey:pool},{pubkey:vault},{pubkey:user}] }},meta:{err:null,logMessages:["Program log: raydium swap"],preTokenBalances:[{accountIndex:1,mint,uiTokenAmount:{amount:"100",decimals:6}},{accountIndex:2,mint,uiTokenAmount:{amount:"0",decimals:6}}],postTokenBalances:[{accountIndex:1,mint,uiTokenAmount:{amount:"90",decimals:6}},{accountIndex:2,mint,uiTokenAmount:{amount:"10",decimals:6}}]},...tx}))};
+  let calls=0;t.calls=()=>calls;
+  return async request => {calls++;assert.equal(request.url,SOLANA_RPC_ORIGIN);assert.equal(request.method,"POST");const body=JSON.parse(request.body);
+    if(body.method==="getSignaturesForAddress")return {url:SOLANA_RPC_ORIGIN,...streamResponse(response(body.id,[{signature:"sig1",slot:10,err:null}]))};
+    return {url:SOLANA_RPC_ORIGIN,...streamResponse(response(body.id,{slot:10,blockTime:1_700_000_000,transaction:{message:{accountKeys:[{pubkey:pool},{pubkey:vault},{pubkey:user}]}},meta:{err:null,logMessages:["Program log: raydium swap"],preTokenBalances:[{accountIndex:1,mint,uiTokenAmount:{amount:"100",decimals:6}},{accountIndex:2,mint,uiTokenAmount:{amount:"0",decimals:6}}],postTokenBalances:[{accountIndex:1,mint,uiTokenAmount:{amount:"90",decimals:6}},{accountIndex:2,mint,uiTokenAmount:{amount:"10",decimals:6}}]},...tx}))};
   };
 }
 test("disabled by default and never accesses network",async()=>{let called=false; const r=await collectSolanaSwapHistory({transport:()=>{called=true}}); assert.equal(r.status,"DISABLED"); assert.equal(called,false);});
