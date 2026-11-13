@@ -2226,3 +2226,100 @@ export function verifyPaperExplicitNetProjection(projection, {expectedDigest} = 
   }
   return {valid: reasons.length === 0, reasons};
 }
+
+
+// MERIDIAN causal quote/cost extension. Additive and inert: existing Paper quote API remains unchanged.
+const CAUSAL_QUOTE_ORIGIN = "https://api.dexscreener.com";
+const CAUSAL_QUOTE_MAX_DURATION_MS = 5000;
+const CAUSAL_QUOTE_MAX_BYTES = 512 * 1024;
+const CAUSAL_QUOTE_STALE_AFTER_MS = 15 * 60 * 1000;
+
+function causalProvenance(value) {
+  return value && typeof value === "object" &&
+    typeof value.source === "string" && value.source.trim() !== "" &&
+    typeof value.receiptTime === "string" && Number.isFinite(Date.parse(value.receiptTime));
+}
+function causalAmount(value) {
+  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+}
+function causalLeg(leg, label) {
+  if (!leg || typeof leg !== "object") return {status:"UNKNOWN", reason:"MISSING_"+label.toUpperCase()+"_LEG", executionAuthorized:false};
+  for (const key of ["asset","quoteCurrency","poolId","routeId","sourceTime","receiptTime"]) {
+    if (typeof leg[key] !== "string" || leg[key].trim() === "") {
+      return {status:"UNKNOWN", reason:"MALFORMED_"+label.toUpperCase()+"_IDENTITY", executionAuthorized:false};
+    }
+  }
+  const sourceMs=Date.parse(leg.sourceTime), receiptMs=Date.parse(leg.receiptTime);
+  if (!Number.isFinite(sourceMs)||!Number.isFinite(receiptMs)||receiptMs<sourceMs) {
+    return {status:"UNKNOWN", reason:"MALFORMED_"+label.toUpperCase()+"_CHRONOLOGY", executionAuthorized:false};
+  }
+  if (!causalAmount(leg.grossInput)||!causalAmount(leg.grossOutput)) {
+    return {status:"UNKNOWN", reason:"MALFORMED_"+label.toUpperCase()+"_GROSS", executionAuthorized:false};
+  }
+  const components={};
+  for (const key of ["fees","slippage","impact","network"]) {
+    if (!leg[key] || !causalAmount(leg[key].amount) || !causalProvenance(leg[key].provenance)) {
+      return {status:"UNKNOWN", reason:"MISSING_OR_UNPROVEN_"+key.toUpperCase(), executionAuthorized:false};
+    }
+    components[key]=leg[key].amount;
+  }
+  return {leg,sourceMs,receiptMs,components};
+}
+
+export function evaluateCausalQuoteChain({entry,exit,fx,now=new Date().toISOString(),staleAfterMs=CAUSAL_QUOTE_STALE_AFTER_MS}={}) {
+  const a=causalLeg(entry,"entry"); if (a.status==="UNKNOWN") return a;
+  const b=causalLeg(exit,"exit"); if (b.status==="UNKNOWN") return b;
+  const nowMs=Date.parse(now);
+  if (!Number.isFinite(nowMs)||!Number.isSafeInteger(staleAfterMs)||staleAfterMs<0) return {status:"UNKNOWN",reason:"MALFORMED_CLOCK",executionAuthorized:false};
+  if (b.sourceMs<a.sourceMs) return {status:"UNKNOWN",reason:"EXIT_BEFORE_ENTRY",executionAuthorized:false};
+  for (const key of ["asset","quoteCurrency","poolId","routeId"]) {
+    if (a.leg[key]!==b.leg[key]) return {status:"UNKNOWN",reason:"MIXED_QUOTE_IDENTITY",executionAuthorized:false};
+  }
+  if (nowMs<a.sourceMs||nowMs<b.sourceMs) return {status:"UNKNOWN",reason:"FUTURE_SOURCE_TIME",executionAuthorized:false};
+  if (nowMs-a.sourceMs>staleAfterMs||nowMs-b.sourceMs>staleAfterMs) return {status:"UNKNOWN",reason:"STALE_QUOTE",executionAuthorized:false};
+  if (!fx||typeof fx!=="object"||!causalAmount(fx.rate)||fx.rate<=0||typeof fx.pair!=="string"||fx.pair.trim()===""||!causalProvenance(fx.provenance)) {
+    return {status:"UNKNOWN",reason:"MISSING_OR_UNPROVEN_FX",executionAuthorized:false};
+  }
+  const entryCosts=Object.values(a.components).reduce((s,v)=>s+v,0);
+  const exitCosts=Object.values(b.components).reduce((s,v)=>s+v,0);
+  const entryCost=a.leg.grossInput+entryCosts;
+  const exitProceeds=b.leg.grossOutput-exitCosts;
+  if (exitProceeds<0) return {status:"UNKNOWN",reason:"NEGATIVE_EXIT_PROCEEDS",executionAuthorized:false};
+  const netQuote=exitProceeds-entryCost;
+  return Object.freeze({status:"READY",evidenceComplete:true,executionAuthorized:false,
+    asset:a.leg.asset,quoteCurrency:a.leg.quoteCurrency,poolId:a.leg.poolId,routeId:a.leg.routeId,
+    entry:Object.freeze({sourceTime:a.leg.sourceTime,grossInput:a.leg.grossInput,totalCosts:entryCosts}),
+    exit:Object.freeze({sourceTime:b.leg.sourceTime,grossOutput:b.leg.grossOutput,totalCosts:exitCosts}),
+    fx:Object.freeze({rate:fx.rate,pair:fx.pair,provenance:fx.provenance}),
+    netQuote,netUsd:netQuote*fx.rate,breakevenQuote:entryCost,
+    provenance:Object.freeze({entrySourceTime:a.leg.sourceTime,exitSourceTime:b.leg.sourceTime,fxSource:fx.provenance.source})});
+}
+
+export function createCausalQuoteCostAdapter({transport=null,origin=CAUSAL_QUOTE_ORIGIN,maxDurationMs=CAUSAL_QUOTE_MAX_DURATION_MS,maxBytes=CAUSAL_QUOTE_MAX_BYTES}={}) {
+  if (!Number.isSafeInteger(maxDurationMs)||maxDurationMs<1||maxDurationMs>CAUSAL_QUOTE_MAX_DURATION_MS) throw new TypeError("invalid causal quote timeout");
+  if (!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>CAUSAL_QUOTE_MAX_BYTES) throw new TypeError("invalid causal quote byte limit");
+  const expectedOrigin=String(origin).replace(/\/$/,"");
+  return Object.freeze({
+    async request({path="/",signal}={}) {
+      if (typeof transport!=="function") return {status:"UNKNOWN",reason:"TRANSPORT_UNAVAILABLE",executionAuthorized:false,evidenceComplete:false};
+      let url; try { url=new URL(path,expectedOrigin+"/"); } catch { return {status:"UNKNOWN",reason:"MALFORMED_URL",executionAuthorized:false,evidenceComplete:false}; }
+      if (url.origin!==expectedOrigin||url.username||url.password) return {status:"UNKNOWN",reason:"ORIGIN_MISMATCH",executionAuthorized:false,evidenceComplete:false};
+      const controller=new AbortController(); const forward=()=>controller.abort(); signal?.addEventListener("abort",forward,{once:true});
+      let timer; let timedOut=false;
+      const operation=Promise.resolve().then(()=>transport(url.toString(),{method:"GET",redirect:"error",credentials:"omit",signal:controller.signal})).then(async response=>{
+        if (!response||typeof response.text!=="function") throw new Error("MALFORMED_RESPONSE");
+        const text=await response.text(); if (Buffer.byteLength(text,"utf8")>maxBytes) throw new Error("RESPONSE_TOO_LARGE");
+        try { return JSON.parse(text); } catch { throw new Error("MALFORMED_RESPONSE"); }
+      });
+      operation.catch(()=>{});
+      try {
+        const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{timedOut=true;controller.abort();reject(new Error("TIMEOUT"));},maxDurationMs);});
+        const body=await Promise.race([operation,timeout]);
+        return {status:"RECEIVED",body,evidenceComplete:false,executionAuthorized:false};
+      } catch (error) {
+        return {status:"UNKNOWN",reason:timedOut?"TIMEOUT":signal?.aborted?"CANCELLED":"TRANSPORT_FAILED",evidenceComplete:false,executionAuthorized:false};
+      } finally { clearTimeout(timer); signal?.removeEventListener("abort",forward); if (signal?.aborted) controller.abort(); }
+    },
+    evaluate:evaluateCausalQuoteChain
+  });
+}
