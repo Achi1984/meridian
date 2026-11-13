@@ -26,14 +26,33 @@ function projectJournal(envelope, expectedIdentity, exportedAt, check) {
   assert(exactKeys(envelope, ['payload', 'sha256']));
   const {payload, sha256} = envelope;
   assert(payload?.schemaVersion === 'SPOT_PAPER_PILOT_JOURNAL_V1' &&
-    payload.runId === expectedIdentity.runId &&
     Array.isArray(payload.events) && payload.events.length <= MAX_JOURNAL_EVENTS &&
     payload.sequence === payload.events.length &&
     hash(JSON.stringify(payload)) === sha256);
   const manifest = payload.manifest;
+  const identity = Object.fromEntries(Object.keys(expectedIdentity).map(key =>
+    [key, key === 'schemaVersion' ? expectedIdentity.schemaVersion : manifest?.[key]]));
+  const id = value => typeof value === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/.test(value);
+  assert(typeof identity.runId === 'string' &&
+    /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(identity.runId) &&
+    payload.runId === identity.runId &&
+    typeof identity.pair === 'string' && /^[A-Z0-9]{2,12}\/[A-Z0-9]{2,12}$/.test(identity.pair) &&
+    id(identity.modelPairId) && Array.isArray(identity.models) &&
+    identity.models.length === 3 && identity.models.every((model, index) =>
+      exactKeys(model, ['role', 'modelId', 'accountId']) &&
+      model.role === ROLES[index] && id(model.modelId)) &&
+    validIdentity({...identity, runId: expectedIdentity.runId, pair: expectedIdentity.pair,
+      modelPairId: expectedIdentity.modelPairId,
+      models: identity.models.map((model, index) =>
+        ({...model, modelId: expectedIdentity.models[index].modelId}))}));
   assert(manifest?.schemaVersion === 'SPOT_PAPER_PAIRED_MANIFEST_V1' &&
-    manifest.mode === 'paper' && matchesIdentity(manifest, expectedIdentity) &&
+    manifest.mode === 'paper' &&
     integer(manifest.startedAt) && payload.createdAt === manifest.startedAt);
+  const conflict = !matchesIdentity(manifest, expectedIdentity);
+  // Identity mismatch is a stop condition. Do not validate foreign-run
+  // accounting assumptions under the expected-run contract.
+  if (conflict) return {status: 'IDENTITY_CONFLICT', progress: null};
   const assumptions = manifest.assumptions;
   assert(assumptions?.feeBpsPerSide === 20 && assumptions.slippageBpsPerSide === 10 &&
     assumptions.ratesVerified === false &&
@@ -112,7 +131,7 @@ function projectJournal(envelope, expectedIdentity, exportedAt, check) {
       assert(index === payload.events.length - 1 && event.id === 'paired-terminal' &&
         integer(event.at) && event.at >= latestAt && event.at <= exportedAt &&
         report?.schemaVersion === 'SPOT_PAPER_PAIRED_REPORT_V1' &&
-        matchesIdentity(report, expectedIdentity) &&
+        matchesIdentity(report, identity) &&
         report.endedAt === event.at && report.startedAt === manifest.startedAt &&
         report.liveTrading === false && report.executionImpact === false &&
         report.autoPromotion === false &&
@@ -157,7 +176,7 @@ function projectJournal(envelope, expectedIdentity, exportedAt, check) {
       recentFills: roleFills.slice(-MAX_RECENT_FILLS)
     };
   });
-  return validateProgress({
+  const progress = validateProgress({
     schemaVersion: PROGRESS_SCHEMA, identity: expectedIdentity,
     journalSequence: payload.sequence, journalSha256: sha256,
     classification: 'OBSERVED_CHECKPOINT',
@@ -169,6 +188,9 @@ function projectJournal(envelope, expectedIdentity, exportedAt, check) {
       netEquityIncludesCosts: true},
     arms
   }, expectedIdentity);
+  assert(progress);
+  return conflict ? {status: 'IDENTITY_CONFLICT', progress: null} :
+    {status: 'EXPORTED', progress};
 }
 
 export async function exportProgress({
@@ -248,10 +270,9 @@ export async function exportProgress({
       throw new Error('BUSY');
     }
     const text = new TextDecoder('utf-8', {fatal: true}).decode(first.bytes);
-    const progress = projectJournal(JSON.parse(text), expectedIdentity, now(), check);
+    const result = projectJournal(JSON.parse(text), expectedIdentity, now(), check);
     check();
-    assert(progress);
-    return {status: 'EXPORTED', progress};
+    return result;
   })();
   let timer;
   let abort;
