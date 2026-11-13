@@ -2228,98 +2228,54 @@ export function verifyPaperExplicitNetProjection(projection, {expectedDigest} = 
 }
 
 
-// MERIDIAN causal quote/cost extension. Additive and inert: existing Paper quote API remains unchanged.
-const CAUSAL_QUOTE_ORIGIN = "https://api.dexscreener.com";
-const CAUSAL_QUOTE_MAX_DURATION_MS = 5000;
-const CAUSAL_QUOTE_MAX_BYTES = 512 * 1024;
-const CAUSAL_QUOTE_STALE_AFTER_MS = 15 * 60 * 1000;
 
-function causalProvenance(value) {
-  return value && typeof value === "object" &&
-    typeof value.source === "string" && value.source.trim() !== "" &&
-    typeof value.receiptTime === "string" && Number.isFinite(Date.parse(value.receiptTime));
+// MERIDIAN causal quote/cost extension.
+const CAUSAL_QUOTE_ORIGIN="https://api.dexscreener.com";
+const CAUSAL_QUOTE_MAX_DURATION_MS=5000;
+const CAUSAL_QUOTE_MAX_BYTES=512*1024;
+const CAUSAL_QUOTE_STALE_AFTER_MS=15*60*1000;
+const CAUSAL_SCALE=1000000n;
+const CAUSAL_DECIMAL=/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
+const causalUnknown=(reason)=>({status:"UNKNOWN",reason,evidenceComplete:false,executionAuthorized:false});
+const causalScaled=(v)=>{if(typeof v!=="string"||!CAUSAL_DECIMAL.test(v))return null;const p=v.split("."),f=(p[1]||"")+"000000";return BigInt(p[0])*CAUSAL_SCALE+BigInt(f.slice(0,6));};
+const causalFormat=(v)=>{const n=v<0n,a=n?-v:v,w=a/CAUSAL_SCALE,f=(a%CAUSAL_SCALE).toString().padStart(6,"0").replace(/0+$/,"");return(n?"-":"")+w.toString()+(f?"."+f:"");};
+const causalTime=(v)=>typeof v==="string"&&Number.isFinite(Date.parse(v))?Date.parse(v):null;
+const causalIdentity=(x)=>x&&["asset","quoteCurrency","poolId","routeId"].every(k=>typeof x[k]==="string"&&x[k].length>0)?{asset:x.asset,quoteCurrency:x.quoteCurrency,poolId:x.poolId,routeId:x.routeId}:null;
+const causalSame=(a,b)=>a&&b&&["asset","quoteCurrency","poolId","routeId"].every(k=>a[k]===b[k]);
+const causalProv=(p,id)=>p&&typeof p.source==="string"&&p.source.length>0&&causalTime(p.receiptTime)!==null&&causalSame(p,id);
+function causalLeg(x,label){
+  const id=causalIdentity(x); if(!id)return {error:"MIXED_PROVENANCE"};
+  const sourceMs=causalTime(x.sourceTime),receiptMs=causalTime(x.receiptTime);
+  if(sourceMs===null||receiptMs===null)return {error:"MALFORMED_EVIDENCE"}; if(receiptMs<sourceMs)return {error:"MIXED_PROVENANCE"};
+  const input=causalScaled(x.grossInput),output=causalScaled(x.grossOutput);
+  if(input===null||output===null||input<=0n||output<0n)return {error:"MALFORMED_EVIDENCE"};
+  const keys=["fee","slippage","impact","network"];
+  const parts={};
+  for(const k of keys){const v=x[k];if(!v||causalScaled(v.amount)===null||causalScaled(v.amount)<0n||!causalProv(v.provenance,id))return {error:"MISSING_PROVENANCE"};const pm=causalTime(v.provenance.receiptTime);if(pm<sourceMs||pm>receiptMs)return {error:"MIXED_PROVENANCE"};parts[k]=causalScaled(v.amount);}
+  return {id,sourceMs,receiptMs,input,output,parts};
 }
-function causalAmount(value) {
-  return typeof value === "number" && Number.isFinite(value) && value >= 0;
+export function evaluateCausalQuoteChain({entry,exit,fx,now,staleAfterMs=CAUSAL_QUOTE_STALE_AFTER_MS}={}){
+  const e=causalLeg(entry,"entry"),q=causalLeg(exit,"exit"); if(e.error)return causalUnknown(e.error);if(q.error)return causalUnknown(q.error);
+  if(!causalSame(e.id,q.id)||q.sourceMs<e.sourceMs)return causalUnknown("MIXED_PROVENANCE");
+  const nowMs=causalTime(now);if(nowMs===null)return causalUnknown("MALFORMED_EVIDENCE");
+  for(const t of [e.sourceMs,e.receiptMs,q.sourceMs,q.receiptMs]){if(t>nowMs)return causalUnknown("FUTURE_SOURCE_TIME");if(nowMs-t>staleAfterMs)return causalUnknown("STALE_QUOTE");}
+  if(!fx||typeof fx.rate!=="string"||causalScaled(fx.rate)===null||causalScaled(fx.rate)<=0n||fx.pair!==e.id.quoteCurrency+"/USD"||!causalProv(fx.provenance,e.id))return causalUnknown("MISSING_PROVENANCE");
+  const fm=causalTime(fx.provenance.receiptTime);if(fm>nowMs)return causalUnknown("FUTURE_SOURCE_TIME");if(fm<e.sourceMs||nowMs-fm>staleAfterMs)return causalUnknown(nowMs-fm>staleAfterMs?"STALE_QUOTE":"MIXED_PROVENANCE");
+  const deductions=e.parts.fee+e.parts.slippage+e.parts.impact+e.parts.network;
+  const proceeds=q.output>deductions?q.output-deductions:0n, netQuote=proceeds;
+  const rate=causalScaled(fx.rate),netUsd=netQuote*rate/CAUSAL_SCALE;
+  return {status:"READY",evidenceComplete:true,executionAuthorized:false,identity:e.id,netQuote:causalFormat(netQuote),netUsd:causalFormat(netUsd),breakevenQuote:causalFormat(e.input),provenance:{entry:entry.receiptTime,exit:exit.receiptTime,fx:fx.provenance.receiptTime}};
 }
-function causalLeg(leg, label) {
-  if (!leg || typeof leg !== "object") return {status:"UNKNOWN", reason:"MISSING_"+label.toUpperCase()+"_LEG", executionAuthorized:false};
-  for (const key of ["asset","quoteCurrency","poolId","routeId","sourceTime","receiptTime"]) {
-    if (typeof leg[key] !== "string" || leg[key].trim() === "") {
-      return {status:"UNKNOWN", reason:"MALFORMED_"+label.toUpperCase()+"_IDENTITY", executionAuthorized:false};
-    }
-  }
-  const sourceMs=Date.parse(leg.sourceTime), receiptMs=Date.parse(leg.receiptTime);
-  if (!Number.isFinite(sourceMs)||!Number.isFinite(receiptMs)||receiptMs<sourceMs) {
-    return {status:"UNKNOWN", reason:"MALFORMED_"+label.toUpperCase()+"_CHRONOLOGY", executionAuthorized:false};
-  }
-  if (!causalAmount(leg.grossInput)||!causalAmount(leg.grossOutput)) {
-    return {status:"UNKNOWN", reason:"MALFORMED_"+label.toUpperCase()+"_GROSS", executionAuthorized:false};
-  }
-  const components={};
-  for (const key of ["fees","slippage","impact","network"]) {
-    if (!leg[key] || !causalAmount(leg[key].amount) || !causalProvenance(leg[key].provenance)) {
-      return {status:"UNKNOWN", reason:"MISSING_OR_UNPROVEN_"+key.toUpperCase(), executionAuthorized:false};
-    }
-    components[key]=leg[key].amount;
-  }
-  return {leg,sourceMs,receiptMs,components};
+async function causalReadBounded(response,maxBytes){
+  if(!response||!response.body?.getReader){if(typeof response?.text!=="function")throw new Error("MALFORMED_RESPONSE");const t=await response.text();if(Buffer.byteLength(t,"utf8")>maxBytes)throw new Error("RESPONSE_TOO_LARGE");return t;}
+  const reader=response.body.getReader(),chunks=[],decoder=new TextDecoder(),parts=[];let total=0;
+  try{for(;;){const x=await reader.read();if(x.done)break;const b=x.value;total+=b.byteLength;if(total>maxBytes){await reader.cancel();throw new Error("RESPONSE_TOO_LARGE");}chunks.push(b);}for(const b of chunks)parts.push(decoder.decode(b,{stream:true}));parts.push(decoder.decode());return parts.join("");}finally{reader.releaseLock?.();}
 }
-
-export function evaluateCausalQuoteChain({entry,exit,fx,now=new Date().toISOString(),staleAfterMs=CAUSAL_QUOTE_STALE_AFTER_MS}={}) {
-  const a=causalLeg(entry,"entry"); if (a.status==="UNKNOWN") return a;
-  const b=causalLeg(exit,"exit"); if (b.status==="UNKNOWN") return b;
-  const nowMs=Date.parse(now);
-  if (!Number.isFinite(nowMs)||!Number.isSafeInteger(staleAfterMs)||staleAfterMs<0) return {status:"UNKNOWN",reason:"MALFORMED_CLOCK",executionAuthorized:false};
-  if (b.sourceMs<a.sourceMs) return {status:"UNKNOWN",reason:"EXIT_BEFORE_ENTRY",executionAuthorized:false};
-  for (const key of ["asset","quoteCurrency","poolId","routeId"]) {
-    if (a.leg[key]!==b.leg[key]) return {status:"UNKNOWN",reason:"MIXED_QUOTE_IDENTITY",executionAuthorized:false};
-  }
-  if (nowMs<a.sourceMs||nowMs<b.sourceMs) return {status:"UNKNOWN",reason:"FUTURE_SOURCE_TIME",executionAuthorized:false};
-  if (nowMs-a.sourceMs>staleAfterMs||nowMs-b.sourceMs>staleAfterMs) return {status:"UNKNOWN",reason:"STALE_QUOTE",executionAuthorized:false};
-  if (!fx||typeof fx!=="object"||!causalAmount(fx.rate)||fx.rate<=0||typeof fx.pair!=="string"||fx.pair.trim()===""||!causalProvenance(fx.provenance)) {
-    return {status:"UNKNOWN",reason:"MISSING_OR_UNPROVEN_FX",executionAuthorized:false};
-  }
-  const entryCosts=Object.values(a.components).reduce((s,v)=>s+v,0);
-  const exitCosts=Object.values(b.components).reduce((s,v)=>s+v,0);
-  const entryCost=a.leg.grossInput+entryCosts;
-  const exitProceeds=b.leg.grossOutput-exitCosts;
-  if (exitProceeds<0) return {status:"UNKNOWN",reason:"NEGATIVE_EXIT_PROCEEDS",executionAuthorized:false};
-  const netQuote=exitProceeds-entryCost;
-  return Object.freeze({status:"READY",evidenceComplete:true,executionAuthorized:false,
-    asset:a.leg.asset,quoteCurrency:a.leg.quoteCurrency,poolId:a.leg.poolId,routeId:a.leg.routeId,
-    entry:Object.freeze({sourceTime:a.leg.sourceTime,grossInput:a.leg.grossInput,totalCosts:entryCosts}),
-    exit:Object.freeze({sourceTime:b.leg.sourceTime,grossOutput:b.leg.grossOutput,totalCosts:exitCosts}),
-    fx:Object.freeze({rate:fx.rate,pair:fx.pair,provenance:fx.provenance}),
-    netQuote,netUsd:netQuote*fx.rate,breakevenQuote:entryCost,
-    provenance:Object.freeze({entrySourceTime:a.leg.sourceTime,exitSourceTime:b.leg.sourceTime,fxSource:fx.provenance.source})});
-}
-
-export function createCausalQuoteCostAdapter({transport=null,origin=CAUSAL_QUOTE_ORIGIN,maxDurationMs=CAUSAL_QUOTE_MAX_DURATION_MS,maxBytes=CAUSAL_QUOTE_MAX_BYTES}={}) {
-  if (!Number.isSafeInteger(maxDurationMs)||maxDurationMs<1||maxDurationMs>CAUSAL_QUOTE_MAX_DURATION_MS) throw new TypeError("invalid causal quote timeout");
-  if (!Number.isSafeInteger(maxBytes)||maxBytes<1||maxBytes>CAUSAL_QUOTE_MAX_BYTES) throw new TypeError("invalid causal quote byte limit");
-  const expectedOrigin=String(origin).replace(/\/$/,"");
-  return Object.freeze({
-    async request({path="/",signal}={}) {
-      if (typeof transport!=="function") return {status:"UNKNOWN",reason:"TRANSPORT_UNAVAILABLE",executionAuthorized:false,evidenceComplete:false};
-      let url; try { url=new URL(path,expectedOrigin+"/"); } catch { return {status:"UNKNOWN",reason:"MALFORMED_URL",executionAuthorized:false,evidenceComplete:false}; }
-      if (url.origin!==expectedOrigin||url.username||url.password) return {status:"UNKNOWN",reason:"ORIGIN_MISMATCH",executionAuthorized:false,evidenceComplete:false};
-      const controller=new AbortController(); const forward=()=>controller.abort(); signal?.addEventListener("abort",forward,{once:true});
-      let timer; let timedOut=false;
-      const operation=Promise.resolve().then(()=>transport(url.toString(),{method:"GET",redirect:"error",credentials:"omit",signal:controller.signal})).then(async response=>{
-        if (!response||typeof response.text!=="function") throw new Error("MALFORMED_RESPONSE");
-        const text=await response.text(); if (Buffer.byteLength(text,"utf8")>maxBytes) throw new Error("RESPONSE_TOO_LARGE");
-        try { return JSON.parse(text); } catch { throw new Error("MALFORMED_RESPONSE"); }
-      });
-      operation.catch(()=>{});
-      try {
-        const timeout=new Promise((_,reject)=>{timer=setTimeout(()=>{timedOut=true;controller.abort();reject(new Error("TIMEOUT"));},maxDurationMs);});
-        const body=await Promise.race([operation,timeout]);
-        return {status:"RECEIVED",body,evidenceComplete:false,executionAuthorized:false};
-      } catch (error) {
-        return {status:"UNKNOWN",reason:timedOut?"TIMEOUT":signal?.aborted?"CANCELLED":"TRANSPORT_FAILED",evidenceComplete:false,executionAuthorized:false};
-      } finally { clearTimeout(timer); signal?.removeEventListener("abort",forward); if (signal?.aborted) controller.abort(); }
-    },
-    evaluate:evaluateCausalQuoteChain
-  });
+export function createCausalQuoteCostAdapter({fetchImpl=globalThis.fetch,transport,now=()=>new Date().toISOString(),maxDurationMs=CAUSAL_QUOTE_MAX_DURATION_MS,maxBytes=CAUSAL_QUOTE_MAX_BYTES}={}){
+  const send=transport||fetchImpl;if(typeof send!=="function")throw new TypeError("transport required");
+  return {async fetchJson(path,{signal}={}){let u;try{u=new URL(path,CAUSAL_QUOTE_ORIGIN);}catch{return causalUnknown("MALFORMED_EVIDENCE");}if(u.origin!==CAUSAL_QUOTE_ORIGIN)return causalUnknown("ORIGIN_NOT_ALLOWED");
+    const c=new AbortController(),forward=()=>c.abort();signal?.addEventListener("abort",forward,{once:true});let timer,timeout=false;
+    const op=Promise.resolve().then(()=>send(u.toString(),{method:"GET",redirect:"error",credentials:"omit",signal:c.signal})).then(async r=>JSON.parse(await causalReadBounded(r,maxBytes)));
+    op.catch(()=>{});try{const body=await Promise.race([op,new Promise((_,rej)=>{timer=setTimeout(()=>{timeout=true;c.abort();rej(new Error("TIMEOUT"));},maxDurationMs);})]);return {status:"RECEIVED",body,evidenceComplete:false,executionAuthorized:false};}catch(e){return causalUnknown(timeout?"TIMEOUT":signal?.aborted?"CANCELLED":e.message==="RESPONSE_TOO_LARGE"?"RESPONSE_TOO_LARGE":"TRANSPORT_FAILED");}finally{clearTimeout(timer);signal?.removeEventListener("abort",forward);}}
+  ,evaluate:evaluateCausalQuoteChain};
 }
