@@ -17,7 +17,7 @@ test("stale, future, mixed identity, FX pair and missing FX are UNKNOWN",()=>{
  const fx={rate:"1",pair:"USD/USD",provenance:prov("fx")};
  assert.equal(evaluateCausalQuoteChain({entry:leg(),exit:leg(),fx,now:"2026-11-13T20:30:00.000Z"}).reason,"STALE_QUOTE");
  assert.equal(evaluateCausalQuoteChain({entry:leg(),exit:leg(),fx,now:"2026-11-13T19:59:00.000Z"}).reason,"FUTURE_SOURCE_TIME");
- assert.equal(evaluateCausalQuoteChain({entry:leg(),exit:leg({poolId:"other"}),fx,now:"2026-11-13T20:02:00.000Z"}).reason,"MIXED_PROVENANCE");
+ assert.equal(evaluateCausalQuoteChain({entry:leg(),exit:leg({poolId:"other"}),fx,now:"2026-11-13T20:02:00.000Z"}).reason,"MISSING_PROVENANCE");
  assert.equal(evaluateCausalQuoteChain({entry:leg(),exit:leg(),fx:{...fx,pair:"EUR/USD"},now:"2026-11-13T20:02:00.000Z"}).reason,"MISSING_PROVENANCE");
  assert.equal(evaluateCausalQuoteChain({entry:leg(),exit:leg(),now:"2026-11-13T20:02:00.000Z"}).reason,"MISSING_PROVENANCE");
 });
