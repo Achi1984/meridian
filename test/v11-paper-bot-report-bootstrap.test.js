@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
+import {constants} from 'node:fs';
+import {createHash} from 'node:crypto';
+import {Readable} from 'node:stream';
 import {mountPaperBotReportWorkspace} from '../v11/paper-bot-report-bootstrap.js';
+import {presentSpotPaperPairedReport} from '../v11/spot-paper-paired-model.js';
+import {presentSpotPaperBotOverview} from '../v11/spot-paper-bot-overview-model.js';
 import {
   getAcceptedSpotPaperIdentity,
   SPOT_PAPER_DASHBOARD_SCHEMA,
@@ -13,9 +18,29 @@ import {
   SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA
 } from '../v11/spot-paper-paired-report-connector.js';
 import {
+  SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT
+} from '../v11/spot-paper-paired-progress-connector.js';
+import {
+  SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY,
+  SPOT_PAPER_PAIRED_PROGRESS_STALE_AFTER_MS
+} from '../v11/spot-paper-paired-progress-config.js';
+import {validIdentity} from '../scripts/spot-paper-paired-progress/contract.mjs';
+import {
+  exportProgress
+} from '../scripts/spot-paper-paired-progress/export.mjs';
+import {
+  handleSpotPaperPairedProgressGatewayRequest,
+  spotPaperPairedProgressGatewayConfig
+} from '../spot-paper-paired-progress-gateway.mjs';
+import {progressJournalFixture, journalEnvelope} from './helpers/spot-paper-paired-progress-fixture.mjs';
+import {
   syntheticExpectedPairedIdentity,
   syntheticPairedDashboard
 } from './helpers/spot-paper-paired-dashboard-fixture.mjs';
+import {syntheticPairedEvaluatorFixture} from
+  './helpers/spot-paper-paired-evaluator-fixture.mjs';
+import {evaluatePairedPaperEvidence} from
+  '../scripts/spot-paper-paired-report/evaluate.mjs';
 
 const TOKEN = 'synthetic-paper-workspace-token';
 const TARGET_MODEL = 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1';
@@ -141,7 +166,13 @@ function syntheticPairedReport() {
 
 const tick = () => new Promise(resolve => setTimeout(resolve, 0));
 
-function harness({fetchImpl = async () => new Response(null, {status: 404})} = {}) {
+function harness({
+  fetchImpl = async () => new Response(null, {status: 404}),
+  progressEnabled = false,
+  progressExpectedIdentity,
+  progressStaleAfterMs,
+  now
+} = {}) {
   const document = {createElement: tag => new Element(document, tag)};
   const parent = new Element(document, 'section');
   const overviewRoot = new Element(document, 'section');
@@ -174,10 +205,60 @@ function harness({fetchImpl = async () => new Response(null, {status: 404})} = {
   };
   const workspace = mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document, {
     access,
-    fetchImpl
+    fetchImpl,
+    progressEnabled,
+    ...(progressExpectedIdentity ? {progressExpectedIdentity} : {}),
+    ...(progressStaleAfterMs === undefined ? {} : {progressStaleAfterMs}),
+    ...(now ? {now} : {})
   });
   return {access, document, overviewRoot, pairedRoot, workspace};
 }
+
+function memoryFile(bytes, regular = true) {
+  let cursor = 0;
+  return {
+    fd: 99,
+    stat: async ({bigint = false} = {}) => ({
+      isFile: () => regular,
+      size: bigint ? BigInt(bytes.length) : bytes.length,
+      dev: 1n, ino: regular ? 2n : 3n, mtimeNs: 1n, ctimeNs: 1n, nlink: 1n
+    }),
+    read: async (target, offset, length) => {
+      const bytesRead = bytes.copy(target, offset, cursor, cursor + length);
+      cursor += bytesRead;
+      return {bytesRead};
+    },
+    close: async () => {}
+  };
+}
+
+async function exportedProgress() {
+  const source = progressJournalFixture();
+  const bytes = Buffer.from(journalEnvelope(source.journal));
+  const result = await exportProgress({
+    runDirectory: '/offline-progress-fixture',
+    expectedIdentity: source.expectedIdentity,
+    now: () => source.now,
+    io: {
+      open: async (_path, flags) => memoryFile(
+        flags & constants.O_DIRECTORY ? Buffer.alloc(0) : bytes,
+        !(flags & constants.O_DIRECTORY)),
+      lstat: async () => { throw Object.assign(new Error('absent'), {code: 'ENOENT'}); }
+    }
+  });
+  assert.equal(result.status, 'EXPORTED');
+  return {source, progress: result.progress};
+}
+
+test('progress connector configuration pins the reviewed identity and finite valuation age', () => {
+  const identity = JSON.parse(readFileSync(new URL(
+    '../docs/operations/receipts/btc-eur-paired-diag-20261110-001.expected-identity.json',
+    import.meta.url), 'utf8'));
+  assert.deepEqual(SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY, identity);
+  assert.equal(validIdentity(SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY), true);
+  assert.equal(SPOT_PAPER_PAIRED_PROGRESS_STALE_AFTER_MS, 5 * 60 * 1000);
+  assert.ok(Number.isSafeInteger(SPOT_PAPER_PAIRED_PROGRESS_STALE_AFTER_MS));
+});
 
 test('workspace requires unlock and explicit refresh; lock clears read DTO and unmount cleans controls', async () => {
   const paired = syntheticPairedReport();
@@ -427,6 +508,211 @@ test('successful paired read clears a prior missing-publication message', async 
   assert.doesNotMatch(h.pairedRoot.parentNode.textContent,
     /Kein gepaarter Bericht veröffentlicht/);
   h.workspace.dispose();
+});
+
+test('producer checkpoint crosses the authenticated gateway into the challenger card and three-arm DOM', async () => {
+  const {source, progress} = await exportedProgress();
+  const sameRunReport = syntheticPairedDashboard(source.expectedIdentity);
+  sameRunReport.timing.valuationAt = progress.valuationAt;
+  const sameTime = presentSpotPaperPairedReport(sameRunReport, {
+    progressSnapshot: {status: 'AVAILABLE', progress, ageMs: 0},
+    expectedIdentity: source.expectedIdentity
+  });
+  assert.equal(sameTime.checkpoint.sourceRelation, 'CHECKPOINT_PRECEDENCE');
+  assert.equal(sameTime.checkpoint.terminalEvidence, 'RUNNING_SNAPSHOT');
+  assert.equal(sameTime.checkpoint.independentAuthentication, 'NOT_ESTABLISHED');
+  const separateTimeReport = structuredClone(sameRunReport);
+  separateTimeReport.timing.valuationAt++;
+  assert.equal(presentSpotPaperPairedReport(separateTimeReport, {
+    progressSnapshot: {status: 'AVAILABLE', progress, ageMs: 0},
+    expectedIdentity: source.expectedIdentity
+  }).checkpoint.sourceRelation, 'SEPARATE_VALUATIONS');
+  const mismatchedReport = structuredClone(sameRunReport);
+  mismatchedReport.identity.configSha256 = 'f'.repeat(64);
+  assert.equal(presentSpotPaperPairedReport(mismatchedReport, {
+    progressSnapshot: {status: 'AVAILABLE', progress, ageMs: 0},
+    expectedIdentity: source.expectedIdentity
+  }).checkpoint.status, 'IDENTITY_MISMATCH');
+  assert.equal(presentSpotPaperBotOverview([], {
+    pairedProgress: {status: 'AVAILABLE', progress, ageMs: 0},
+    pairedReport: mismatchedReport,
+    expectedIdentity: source.expectedIdentity
+  }).bots[0].stateReason, 'PAIRED_PROGRESS_IDENTITY_MISMATCH');
+  const reader = TOKEN;
+  const uploader = 'separate-progress-uploader';
+  const config = spotPaperPairedProgressGatewayConfig({
+    MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_ENABLED: 'true',
+    MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_DEPLOYMENT_VERIFIED: 'true',
+    MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY_JSON:
+      JSON.stringify(source.expectedIdentity),
+    MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_UPLOAD_TOKEN_SHA256:
+      createHash('sha256').update(uploader).digest('hex'),
+    MERIDIAN_READ_TOKEN_SHA256: createHash('sha256').update(reader).digest('hex')
+  });
+  const progressReads = [];
+  const fetchImpl = async (url, options) => {
+    if (url !== SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT) {
+      return new Response(null, {status: 404});
+    }
+    progressReads.push(options);
+    const request = Readable.from([]);
+    Object.assign(request, {url: new URL(url).pathname, method: options.method,
+      headers: options.headers});
+    const result = await handleSpotPaperPairedProgressGatewayRequest(request, {
+      config,
+      getStore: () => ({get: async identity => {
+        assert.deepEqual(identity, source.expectedIdentity);
+        return progress;
+      }}),
+      authorizedRead: req => req.headers.authorization === 'Bearer ' + reader,
+      signal: options.signal
+    });
+    return new Response(JSON.stringify(result.body), {status: result.status,
+      headers: {'content-type': 'application/json'}});
+  };
+  const h = harness({
+    fetchImpl,
+    progressEnabled: true,
+    progressExpectedIdentity: source.expectedIdentity,
+    progressStaleAfterMs: 30_000,
+    now: () => progress.exportedAt + 1
+  });
+  h.workspace.setActive(true);
+  h.access.unlock();
+  await tick();
+  await tick();
+
+  assert.equal(progressReads.length, 1, 'one authenticated progress GET on entry');
+  assert.equal(progressReads[0].method, 'GET');
+  assert.equal(progressReads[0].headers.authorization, 'Bearer ' + TOKEN);
+  assert.equal(progressReads[0].cache, 'no-store');
+  assert.equal(progressReads[0].credentials, 'omit');
+  assert.equal(progressReads[0].redirect, 'error');
+  assert.equal(progressReads[0].referrerPolicy, 'no-referrer');
+  assert.match(h.overviewRoot.textContent, /Checkpoint · beobachtet/);
+  assert.match(h.overviewRoot.textContent, /−5,00\s+€ Verlust/);
+  assert.match(h.overviewRoot.textContent, /0,00\s+€/);
+  assert.match(h.overviewRoot.textContent, /Bewertung:/);
+  assert.match(h.overviewRoot.textContent, /01\.01\.1970, 01:02:01/);
+  assert.match(h.overviewRoot.textContent, /Gemeldeter LaufstatusUnbekannt/);
+  assert.doesNotMatch(h.overviewRoot.textContent,
+    /BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1|CASH_CONTROL_V1/,
+    'the overview adapter projects only the trend challenger');
+  assert.match(h.pairedRoot.textContent, /Beobachteter Checkpoint/);
+  assert.match(h.pairedRoot.textContent, /STALE/);
+  assert.match(h.pairedRoot.textContent, /Aufgezeichneter EndstatusUNKNOWN/);
+  assert.match(h.pairedRoot.textContent, /Unabhängige AbschlussauthentifizierungNO_FINAL_REPORT/);
+  assert.match(h.pairedRoot.textContent, /−5,00\s+€ Verlust/);
+  assert.match(h.pairedRoot.textContent, /0,00\s+€/);
+  assert.match(h.pairedRoot.textContent, /Gebuchte Gebühren/);
+  assert.match(h.pairedRoot.textContent, /Modellierter Slippage/);
+  assert.match(h.pairedRoot.textContent, /Fills/);
+  assert.match(h.pairedRoot.textContent, /Position offen|Keine offene Position/);
+  assert.doesNotMatch(h.pairedRoot.textContent, /Laufstatus: Läuft|RUNNING/);
+  assert.match(h.pairedRoot.textContent, /BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1/);
+  assert.match(h.pairedRoot.textContent, /BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1/);
+  assert.match(h.pairedRoot.textContent, /CASH_CONTROL_V1/);
+
+  await h.workspace.refreshProgress();
+  await tick();
+  assert.equal(progressReads.length, 2, 'manual refresh performs one further bounded read');
+  h.access.lock();
+  assert.doesNotMatch(h.overviewRoot.textContent, /btc-eur-paired-diag/);
+  assert.doesNotMatch(h.pairedRoot.textContent, /btc-eur-paired-diag/);
+  h.workspace.dispose();
+});
+
+test('historical final report and current progress remain separate in either response order', async () => {
+  const {source, progress} = await exportedProgress();
+  const oldFinal = evaluatePairedPaperEvidence(
+    syntheticPairedEvaluatorFixture({modelPair: true}));
+  assert.equal(oldFinal.evidenceStatus, 'VERIFIED_COMPLETE');
+  oldFinal.identity.runId = 'btc-eur-trend-host-8h-002';
+  const oldFinalResponse = () => new Response(JSON.stringify({
+    schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+    runId: oldFinal.identity.runId,
+    report: oldFinal
+  }), {status: 200, headers: {'content-type': 'application/json'}});
+  const progressResponse = () => new Response(JSON.stringify(progress), {
+    status: 200, headers: {'content-type': 'application/json'}
+  });
+
+  for (const first of ['progress', 'final']) {
+    const pending = new Map();
+    const h = harness({
+      progressEnabled: true,
+      progressExpectedIdentity: source.expectedIdentity,
+      progressStaleAfterMs: 30_000,
+      now: () => progress.exportedAt + 1,
+      fetchImpl: async url => {
+        if (url === SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT ||
+            url === SPOT_PAPER_PAIRED_REPORT_ENDPOINT) {
+          return new Promise(resolve => pending.set(url, resolve));
+        }
+        return new Response(null, {status: 404});
+      }
+    });
+    h.workspace.setActive(true);
+    h.access.unlock();
+    for (let attempt = 0; attempt < 20 && pending.size < 2; attempt++) await tick();
+    assert.equal(pending.size, 2, 'both independent reads start on workspace entry');
+    const firstUrl = first === 'progress' ?
+      SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT : SPOT_PAPER_PAIRED_REPORT_ENDPOINT;
+    const secondUrl = first === 'progress' ?
+      SPOT_PAPER_PAIRED_REPORT_ENDPOINT : SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT;
+    pending.get(firstUrl)(first === 'progress' ? progressResponse() : oldFinalResponse());
+    for (let attempt = 0; attempt < 10; attempt++) await tick();
+    pending.get(secondUrl)(secondUrl === SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT ?
+      progressResponse() : oldFinalResponse());
+    for (let attempt = 0; attempt < 10; attempt++) await tick();
+
+    assert.match(h.overviewRoot.textContent, /Checkpoint · beobachtet/);
+    assert.match(h.overviewRoot.textContent, /−5,00\s+€ Verlust/);
+    assert.match(h.pairedRoot.textContent, /Beobachteter Checkpoint/);
+    assert.match(h.pairedRoot.textContent,
+      /QuellprioritätDer Abschlussbericht gehört zu einem anderen, historischen Lauf/);
+    assert.match(h.pairedRoot.textContent,
+      /Separater historischer Abschlussberichtbtc-eur-trend-host-8h-002/);
+    assert.match(h.pairedRoot.textContent, /Unabhängige AbschlussauthentifizierungNO_FINAL_REPORT/);
+    assert.match(h.pairedRoot.textContent, /Terminal-BerichtevidenzNO_TERMINAL_REPORT/);
+    assert.match(h.pairedRoot.textContent, /Run-IDbtc-eur-trend-host-8h-002/);
+    assert.match(h.pairedRoot.textContent, /VERIFIED_COMPLETE/);
+    h.workspace.dispose();
+  }
+});
+
+test('progress read is aborted and cannot repaint after lock or navigation', async () => {
+  const {source, progress} = await exportedProgress();
+  for (const exit of ['lock', 'navigation']) {
+    let signal;
+    let resolveResponse;
+    const responsePending = new Promise(resolve => { resolveResponse = resolve; });
+    const h = harness({
+      progressEnabled: true,
+      progressExpectedIdentity: source.expectedIdentity,
+      fetchImpl: async (url, options) => {
+        if (url === SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT) {
+          signal = options.signal;
+          return responsePending;
+        }
+        return new Response(null, {status: 404});
+      }
+    });
+    h.access.unlock();
+    h.workspace.setActive(true);
+    await tick();
+    assert.equal(signal.aborted, false);
+    if (exit === 'lock') h.access.lock();
+    else h.workspace.setActive(false);
+    assert.equal(signal.aborted, true);
+    resolveResponse(new Response(JSON.stringify(progress), {
+      status: 200, headers: {'content-type': 'application/json'}
+    }));
+    await tick();
+    assert.doesNotMatch(h.overviewRoot.textContent, /paired-trend-synthetic-001/);
+    assert.doesNotMatch(h.pairedRoot.textContent, /paired-trend-synthetic-001/);
+    h.workspace.dispose();
+  }
 });
 
 test('M11 strategy bootstrap mounts both reviewed panels under existing navigation and owns the only click path', () => {

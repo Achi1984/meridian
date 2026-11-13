@@ -2,7 +2,8 @@ import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_NEXT_RUN_MODELS,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
-} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX15';
+} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX16';
+import {validateProgress} from '../scripts/spot-paper-paired-progress/contract.mjs?v=B16-M11-FIX16';
 
 const ARM_DEFINITIONS = Object.freeze([
   {id: 'baseline', label: 'Baseline'},
@@ -125,6 +126,13 @@ function armView(arm) {
     tradingStoppedAtLabel: timestamp(arm.tradingStoppedAt),
     stopReason: arm.stopReason,
     inventoryStatus: arm.inventoryStatus,
+    completedRoundTripCount: arm.completedRoundTripCount,
+    recentFills: Array.isArray(arm.recentFills) ? arm.recentFills.map(fill => ({
+      side: fill.side,
+      grossCents: fill.grossCents,
+      feeCents: fill.feeCents,
+      executionAt: fill.executionAt
+    })) : [],
     metrics
   };
 }
@@ -176,20 +184,80 @@ function challengerLabel(modelId) {
   return 'Challenger';
 }
 
-export function presentSpotPaperPairedReport(input, {state = 'idle'} = {}) {
-  if (input === null || input === undefined) return unavailableReport(state);
+function identityMatches(identity, expected) {
+  return identity?.runId === expected.runId && identity.pair === expected.pair &&
+    identity.sourceSha256 === expected.sourceSha256 &&
+    identity.configSha256 === expected.configSha256 &&
+    identity.researchSourceSha256 === expected.researchSourceSha256 &&
+    identity.modelPairId === expected.modelPairId &&
+    expected.models.every((model, index) =>
+      identity.models?.[index]?.role === model.role &&
+      identity.models[index]?.modelId === model.modelId);
+}
+
+function checkpointView(snapshot, expectedIdentity, dto) {
+  if (!snapshot) return null;
+  const empty = {available: false, status: snapshot.status || 'NOT_REQUESTED'};
+  if (!['AVAILABLE', 'STALE'].includes(snapshot.status)) return empty;
+  const progress = validateProgress(snapshot.progress, expectedIdentity);
+  if (!progress) return {...empty, status: 'REJECTED'};
+  const sameRun = dto?.identity?.runId === progress.identity.runId;
+  if (sameRun && !identityMatches(dto.identity, expectedIdentity)) {
+    return {...empty, status: 'IDENTITY_MISMATCH'};
+  }
+  const arms = progress.arms.map(arm => armView({
+    ...arm,
+    metricReasons: Object.fromEntries(MONEY_FIELDS.map(([key]) =>
+      [key, arm[key] === null ? 'METRIC_MISSING' : null]))
+  }));
+  return {
+    available: true,
+    status: snapshot.status,
+    classification: progress.classification,
+    identity: progress.identity,
+    journalSequence: progress.journalSequence,
+    valuationAt: progress.valuationAt,
+    valuationAtLabel: timestamp(progress.valuationAt),
+    ageMs: snapshot.ageMs,
+    terminalStatus: progress.terminal.status,
+    arms,
+    sourceRelation: !dto ? 'CHECKPOINT_ONLY' : !sameRun ? 'SEPARATE_RUNS' :
+      dto.timing.valuationAt === progress.valuationAt ?
+        'CHECKPOINT_PRECEDENCE' : 'SEPARATE_VALUATIONS',
+    terminalEvidence: sameRun ? dto.evidenceStatus : 'NO_TERMINAL_REPORT',
+    independentAuthentication: sameRun ?
+      dto.independentAuthentication : 'NO_FINAL_REPORT',
+    separateHistoricalReport: dto && !sameRun ? {
+      runId: dto.identity.runId,
+      valuationAt: dto.timing.valuationAt,
+      valuationAtLabel: timestamp(dto.timing.valuationAt),
+      evidenceStatus: dto.evidenceStatus
+    } : null
+  };
+}
+
+export function presentSpotPaperPairedReport(input, {
+  state = 'idle', progressSnapshot = null, expectedIdentity = null
+} = {}) {
   let dto;
-  try {
-    dto = projectSpotPaperPairedDashboard(input);
-  } catch {
-    dto = null;
+  if (input !== null && input !== undefined) {
+    try {
+      dto = projectSpotPaperPairedDashboard(input);
+    } catch {
+      dto = null;
+    }
+  }
+  const checkpoint = checkpointView(progressSnapshot, expectedIdentity, dto);
+  if (input === null || input === undefined) {
+    return {...unavailableReport(state), checkpoint};
   }
   if (!isRecord(dto) || dto.schemaVersion !== SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA) {
     return {
       available: false,
       state: 'error',
       status: 'CORRUPT_UNKNOWN',
-      statusLabel: STATUS_LABELS.CORRUPT_UNKNOWN
+      statusLabel: STATUS_LABELS.CORRUPT_UNKNOWN,
+      checkpoint
     };
   }
   const identity = dto.identity;
@@ -247,8 +315,9 @@ export function presentSpotPaperPairedReport(input, {state = 'idle'} = {}) {
     deltas,
     deltaStatus: dto.deltas.status,
     deltaReason: dto.deltas.reason,
-    decision: dto.decision
+    decision: dto.decision,
+    checkpoint
   };
 }
 
-export {ARM_DEFINITIONS, MONEY_FIELDS, COUNT_FIELDS};
+export {ARM_DEFINITIONS, MONEY_FIELDS, COUNT_FIELDS, formatCents};

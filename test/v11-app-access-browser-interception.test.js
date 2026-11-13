@@ -44,6 +44,16 @@ test('gate unlock composes exact report interception and restores it without dis
   assert.equal(h.paperReads(),1);assert.equal(h.listeners.size,1,'only the report owner remains');
   assert.deepEqual(h.patterns(),[PAPER,HOST]);off();
 });
+test('gate unlock can restore exact report routes with a fail-closed external catch-all',async()=>{
+  const h=transport(),off=h.ownReports();
+  await unlockAppThroughGate(h.call,{additionalFetchUrls:[PAPER,HOST],blockOtherRequests:true});
+  assert.deepEqual(h.commands.filter(c=>c.method==='Fetch.enable').map(c=>c.args.patterns.map(p=>p.urlPattern)),
+    [[VERIFY_ENDPOINT,PAPER,HOST],[PAPER,HOST,'*']]);
+  assert.equal(h.patterns().at(-1),'*');
+  assert.equal(h.paperReads(),1);
+  assert.equal(h.commands.some(c=>c.method==='Fetch.disable'),false);
+  off();
+});
 test('standalone gate unlock retains exact verification-only lifecycle',async()=>{
   const h=transport();await unlockAppThroughGate(h.call);
   assert.deepEqual(h.commands.filter(c=>c.method==='Fetch.enable').map(c=>c.args.patterns.map(p=>p.urlPattern)),[[VERIFY_ENDPOINT]]);

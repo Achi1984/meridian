@@ -29,6 +29,9 @@ import {
 import {
   createSpotPaperPairedProgressConnector
 } from '../v11/spot-paper-paired-progress-connector.js';
+import {mountPaperBotReportWorkspace} from '../v11/paper-bot-report-bootstrap.js';
+import {SPOT_PAPER_PAIRED_REPORT_ENDPOINT} from
+  '../v11/spot-paper-paired-report-connector.js';
 import {
   createSpotPaperPairedNextRunConfig, nextRunResearchSourceDigest
 } from '../scripts/spot-paper-paired/next-run-composition.mjs';
@@ -152,6 +155,136 @@ test('publisher posts once only to approved HTTPS endpoint with redirect refusal
   assert.deepEqual(result, {status: 'PUBLISHED'});
   assert.equal(calls, 1);
 });
+
+class TestElement {
+  constructor(document, tag) {
+    this.ownerDocument = document;
+    this.tagName = tag.toUpperCase();
+    this.children = [];
+    this.attrs = {};
+    this.listeners = new Map();
+    this.parentNode = null;
+    this.text = '';
+  }
+  set textContent(value) { this.text = String(value); this.children = []; }
+  get textContent() { return this.text + this.children.map(child => child.textContent).join(''); }
+  set innerHTML(_) { throw Error('Paper workspace must use text nodes'); }
+  append(...nodes) {
+    for (const node of nodes) {
+      node.parentNode = this;
+      this.children.push(node);
+    }
+  }
+  replaceChildren(...nodes) {
+    for (const child of this.children) child.parentNode = null;
+    this.text = '';
+    this.children = [];
+    this.append(...nodes);
+  }
+  insertBefore(node, before) {
+    const index = this.children.indexOf(before);
+    if (index < 0) return this.append(node);
+    node.parentNode = this;
+    this.children.splice(index, 0, node);
+  }
+  remove() {
+    if (!this.parentNode) return;
+    const siblings = this.parentNode.children;
+    const index = siblings.indexOf(this);
+    if (index >= 0) siblings.splice(index, 1);
+    this.parentNode = null;
+  }
+  setAttribute(key, value) { this.attrs[key] = String(value); }
+  addEventListener(type, listener) {
+    if (!this.listeners.has(type)) this.listeners.set(type, new Set());
+    this.listeners.get(type).add(listener);
+  }
+  removeEventListener(type, listener) { this.listeners.get(type)?.delete(listener); }
+}
+
+async function workspaceCheckpoint(payload, identity, pipeline, now) {
+  const document = {createElement: tag => new TestElement(document, tag)};
+  const parent = new TestElement(document, 'section');
+  const overviewRoot = new TestElement(document, 'section');
+  const pairedRoot = new TestElement(document, 'section');
+  parent.append(overviewRoot, pairedRoot);
+  const readers = new Set();
+  const subscribers = new Set();
+  let token = null;
+  const access = {
+    isUnlocked: () => token !== null,
+    getToken: () => token,
+    registerReader(clear) { readers.add(clear); return () => readers.delete(clear); },
+    subscribe(listener) { subscribers.add(listener); listener({status: 'locked'});
+      return () => subscribers.delete(listener); },
+    unlock() { token = pipeline.reader;
+      for (const listener of subscribers) listener({status: 'unlocked'}); },
+    lock() { token = null; for (const clear of readers) clear();
+      for (const listener of subscribers) listener({status: 'locked'}); }
+  };
+  let progressReads = 0;
+  const workspace = mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document, {
+    access,
+    progressEnabled: true,
+    progressExpectedIdentity: identity,
+    progressStaleAfterMs: 61_000,
+    now: () => now,
+    fetchImpl: async (url, options) => {
+      if (url === SPOT_PAPER_PAIRED_REPORT_ENDPOINT) return jsonResponse({}, 404);
+      assert.equal(url, PROGRESS_ENDPOINT);
+      progressReads++;
+      return pipeline.fetchImpl(url, {
+        method: options.method, headers: options.headers, signal: options.signal
+      });
+    }
+  });
+  workspace.setActive(true);
+  access.unlock();
+  await new Promise(resolve => setImmediate(resolve));
+  await new Promise(resolve => setImmediate(resolve));
+  assert.equal(progressReads, 1);
+  assert.match(pairedRoot.textContent, /Beobachteter Checkpoint/);
+  assert.match(pairedRoot.textContent, /STALE/);
+  assert.match(pairedRoot.textContent, new RegExp(payload.terminal.status));
+  assert.match(pairedRoot.textContent, /NO_FINAL_REPORT/);
+  assert.doesNotMatch(pairedRoot.textContent, /RUNNING/);
+  assert.equal(overviewRoot.textContent.includes('Gemeldeter LaufstatusUnbekannt'), true);
+  for (const arm of payload.arms) {
+    assert.ok(pairedRoot.textContent.includes(arm.modelId));
+    assert.ok(pairedRoot.textContent.includes(`Fills${arm.fillCount}`));
+    assert.ok(pairedRoot.textContent.includes(arm.inventoryStatus === 'OPEN' ?
+      'Position offen' : arm.inventoryStatus === 'FLAT' ?
+        'Keine offene Position' : 'Unbekannt'));
+    for (const cents of [arm.netPnlCents, arm.netEquityCents,
+      arm.bookedFeesCents, arm.modeledSlippageCents]) {
+      if (cents !== null) assert.ok(pairedRoot.textContent.includes(
+        new Intl.NumberFormat('de-DE', {minimumFractionDigits: 2,
+          maximumFractionDigits: 2}).format(Math.abs(cents / 100))));
+    }
+    if (arm.recentFills.length > 0) {
+      assert.match(pairedRoot.textContent, /Letzte geprüfte Füllungen/);
+      assert.ok(pairedRoot.textContent.includes(arm.recentFills[0].side));
+    }
+  }
+  assert.ok(pairedRoot.textContent.includes(
+    new Intl.DateTimeFormat('de-AT', {
+      dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Europe/Vienna'
+    }).format(payload.valuationAt)));
+  if (payload.arms.some(arm => arm.completedRoundTripCount > 0)) {
+    assert.match(pairedRoot.textContent, /Abgeschlossene Handelsrunden[1-9]/);
+  }
+  if (payload.terminal.status === 'UNKNOWN' &&
+      payload.arms.some(arm => arm.inventoryStatus === 'OPEN')) {
+    assert.match(pairedRoot.textContent, /BestandPosition offen/);
+  }
+  assert.match(overviewRoot.textContent, /Bewertung:/);
+  assert.match(overviewRoot.textContent, new RegExp(
+    new Intl.NumberFormat('de-DE', {minimumFractionDigits: 2,
+      maximumFractionDigits: 2}).format(Math.abs(payload.arms[1].netPnlCents / 100))));
+  await workspace.refreshProgress();
+  assert.equal(progressReads, 2);
+  workspace.dispose();
+}
 
 function publicationFixture(identity) {
   const token = 'progress-roundtrip-test';
@@ -380,6 +513,7 @@ test('actual next-run producer checkpoints and terminal journal traverse the pri
         assert.equal(read.ageMs, browserNow - last.effectAt);
         assert.equal(read.ageMs, terminal ? 61_002 : 61_001);
         assert.ok(read.ageMs > browserNow - payload.exportedAt);
+        await workspaceCheckpoint(payload, identity, pipeline, browserNow);
         if (terminal) {
           assert.ok(payload.terminal.at > last.effectAt);
           assert.equal(payload.latestEventAt, payload.terminal.at);

@@ -1,8 +1,9 @@
 import {
   ARM_DEFINITIONS,
   MONEY_FIELDS,
+  formatCents,
   presentSpotPaperPairedReport
-} from './spot-paper-paired-model.js?v=B16-M11-FIX15';
+} from './spot-paper-paired-model.js?v=B16-M11-FIX16';
 
 let panelSequence = 0;
 const MONEY_LABELS = new Map(MONEY_FIELDS.map(([key, label]) => [key, label]));
@@ -81,12 +82,93 @@ function renderArm(document, parent, arm, definition, label = definition.label) 
     const item = arm.metrics[key];
     field(document, metrics, label, item.label, item.tone);
   }
+  if (Number.isSafeInteger(arm.completedRoundTripCount)) {
+    field(document, metrics, 'Abgeschlossene Handelsrunden',
+      String(arm.completedRoundTripCount));
+  }
   card.append(metrics);
+  if (arm.recentFills.length > 0) {
+    const fills = document.createElement('section');
+    fills.setAttribute('aria-label', `${label} geprüfte Füllungen`);
+    node(document, fills, 'h4', `Letzte geprüfte Füllungen (${arm.recentFills.length})`);
+    const list = document.createElement('ol');
+    list.setAttribute('style', 'padding-inline-start:24px;min-width:0;overflow-wrap:anywhere');
+    for (const fill of arm.recentFills) {
+      const gross = formatCents(fill.grossCents, false);
+      const fee = formatCents(fill.feeCents, false);
+      node(document, list, 'li',
+        `${fill.side} · ${timestamp(fill.executionAt) || 'Zeitpunkt unbekannt'} · ` +
+        `Volumen ${gross?.label || 'Unbekannt'} · Gebühr ${fee?.label || 'Unbekannt'}`);
+    }
+    fills.append(list);
+    card.append(fills);
+  }
   field(document, card, 'Bestand', inventoryLabel(arm.inventoryStatus));
   field(document, card, 'Handel gestoppt', arm.tradingStoppedAtLabel ||
     'Unbekannt — Stoppzeit nicht angegeben');
   field(document, card, 'Stopp-Grund', stopReason(arm.stopReason));
   parent.append(card);
+}
+
+function timestamp(ms) {
+  return Number.isSafeInteger(ms) && ms >= 0 &&
+      Number.isFinite(new Date(ms).getTime()) ?
+    new Intl.DateTimeFormat('de-AT', {
+      dateStyle: 'medium',
+      timeStyle: 'medium',
+      timeZone: 'Europe/Vienna'
+    }).format(ms) + ' (Europe/Wien)' : null;
+}
+
+function renderCheckpoint(root, checkpoint, document) {
+  if (!checkpoint) return;
+  const section = document.createElement('section');
+  section.setAttribute('aria-label', 'Beobachteter Paper-Checkpoint');
+  section.setAttribute('style',
+    'display:grid;gap:10px;min-width:0;padding:12px;border:1px solid currentColor;border-radius:12px');
+  node(document, section, 'h3', 'Beobachteter Checkpoint · kein Laufstatus');
+  if (!checkpoint.available) {
+    node(document, section, 'p',
+      `Checkpoint nicht verfügbar — ${checkpoint.status}.`);
+    root.append(section);
+    return;
+  }
+  field(document, section, 'Checkpoint-Evidenz', checkpoint.classification);
+  field(document, section, 'Bewertungszeitpunkt · Europe/Wien',
+    checkpoint.valuationAtLabel || 'Unbekannt — Bewertungszeitpunkt fehlt');
+  field(document, section, 'Aktualität nach Bewertungszeitpunkt',
+    `${checkpoint.status}${Number.isSafeInteger(checkpoint.ageMs) ?
+      ` · ${elapsed(checkpoint.ageMs)} alt` : ''}`);
+  field(document, section, 'Aufgezeichneter Endstatus', checkpoint.terminalStatus);
+  field(document, section, 'Terminal-Berichtevidenz',
+    checkpoint.terminalEvidence);
+  field(document, section, 'Unabhängige Abschlussauthentifizierung',
+    checkpoint.independentAuthentication);
+  field(document, section, 'Quellpriorität',
+    checkpoint.sourceRelation === 'CHECKPOINT_PRECEDENCE' ?
+      'Checkpoint-Metriken haben für denselben Lauf und Bewertungszeitpunkt Vorrang; Abschlussnachweis bleibt separat.' :
+      checkpoint.sourceRelation === 'SEPARATE_VALUATIONS' ?
+        'Abweichende Bewertungszeitpunkte bleiben getrennte Snapshots; keine Werte werden vermischt.' :
+      checkpoint.sourceRelation === 'SEPARATE_RUNS' ?
+      'Der Abschlussbericht gehört zu einem anderen, historischen Lauf und bleibt separat; es werden keine Werte oder Nachweise übertragen.' :
+      'Kein Abschlussbericht geladen; nur der beobachtete Checkpoint ist dargestellt.');
+  if (checkpoint.separateHistoricalReport) {
+    const historical = checkpoint.separateHistoricalReport;
+    field(document, section, 'Separater historischer Abschlussbericht',
+      `${historical.runId} · ${historical.valuationAtLabel || 'Bewertungszeitpunkt unbekannt'} · ${historical.evidenceStatus}`);
+  }
+  field(document, section, 'Gebühren/Slippage',
+    'Bereits in Netto-Eigenkapital und Netto-PnL enthalten; nicht erneut abgezogen.');
+  const cards = document.createElement('div');
+  cards.setAttribute('style',
+    'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,230px),1fr));gap:12px;min-width:0');
+  for (const [index, definition] of ARM_DEFINITIONS.entries()) {
+    renderArm(document, cards, checkpoint.arms[index], definition,
+      definition.id === 'challenger' ?
+        'CONFIRM2_COOLDOWN10 · 5M-SMA20-Trend' : definition.label);
+  }
+  section.append(cards);
+  root.append(section);
 }
 
 function renderModel(root, model, document, {loading = false} = {}) {
@@ -121,6 +203,7 @@ function renderModel(root, model, document, {loading = false} = {}) {
   status.setAttribute('aria-atomic', 'true');
   root.setAttribute('data-state', isLoading ? 'loading' : model.state);
 
+  renderCheckpoint(root, model.checkpoint, document);
   if (!model.available) {
     node(document, root, 'p', model.state === 'error' ?
       'Fehler: gemeinsamer Bericht konnte nicht geprüft werden. Fehlende Werte bleiben unbekannt.' :
@@ -224,7 +307,9 @@ function elapsed(ms) {
 }
 
 export function renderSpotPaperPaired(root, input, document = root?.ownerDocument,
-  {state = 'idle', ...options} = {}) {
+  {state = 'idle', progressSnapshot = null, expectedIdentity = null, ...options} = {}) {
   if (!root || !document) return null;
-  return renderModel(root, presentSpotPaperPairedReport(input, {state}), document, options);
+  return renderModel(root, presentSpotPaperPairedReport(input, {
+    state, progressSnapshot, expectedIdentity
+  }), document, options);
 }

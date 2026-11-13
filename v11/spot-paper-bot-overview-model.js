@@ -2,7 +2,8 @@ import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
   SPOT_PAPER_PAIRED_NEXT_RUN_MODELS
-} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX15';
+} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX16';
+import {validateProgress} from '../scripts/spot-paper-paired-progress/contract.mjs?v=B16-M11-FIX16';
 
 export const SPOT_PAPER_BOT_DEFINITIONS = Object.freeze([
   Object.freeze({
@@ -397,6 +398,94 @@ function pairedSnapshotBot(input) {
   };
 }
 
+function reportMatchesProgressIdentity(report, expectedIdentity) {
+  const identity = report?.identity;
+  return identity?.runId === expectedIdentity.runId &&
+    identity.pair === expectedIdentity.pair &&
+    identity.sourceSha256 === expectedIdentity.sourceSha256 &&
+    identity.configSha256 === expectedIdentity.configSha256 &&
+    identity.researchSourceSha256 === expectedIdentity.researchSourceSha256 &&
+    identity.modelPairId === expectedIdentity.modelPairId &&
+    expectedIdentity.models.every((model, index) =>
+      identity.models?.[index]?.role === model.role &&
+      identity.models[index]?.modelId === model.modelId);
+}
+
+function pairedProgressBot(snapshot, expectedIdentity, pairedReport) {
+  const definition = SPOT_PAPER_BOT_DEFINITIONS[0];
+  const progress = validateProgress(snapshot?.progress, expectedIdentity);
+  if (!progress || !['AVAILABLE', 'STALE'].includes(snapshot.status)) {
+    return null;
+  }
+  const report = pairedReport ? projectSpotPaperPairedDashboard(pairedReport) : null;
+  if (report?.identity?.runId === progress.identity.runId &&
+      !reportMatchesProgressIdentity(report, expectedIdentity)) {
+    return unknownBot(definition, 'PAIRED_PROGRESS_IDENTITY_MISMATCH');
+  }
+
+  const challenger = progress.arms[1];
+  const snapshotMetric = (cents, reason, signed = false) => cents === null ?
+    unknown(reason || 'METRIC_MISSING') :
+      {available: true, value: cents / 100, currency: 'EUR', reason: null, signed};
+  const observedAt = new Date(progress.valuationAt).toISOString();
+  const freshness = {
+    status: snapshot.status === 'STALE' ? 'STALE' : 'FRESH',
+    at: observedAt,
+    ageMs: snapshot.ageMs,
+    reason: snapshot.status === 'STALE' ? 'SOURCE_STALE' : 'SOURCE_FRESH'
+  };
+  const lastFill = challenger.recentFills.at(-1);
+  const unknownHistorical = unknown('CHECKPOINT_METRIC_NOT_REPORTED');
+  return {
+    ...definition,
+    state: 'UNKNOWN',
+    stateReason: 'OBSERVED_CHECKPOINT_NOT_RUNTIME_STATUS',
+    strategy: challenger.modelId,
+    version: unknown('VERSION_NOT_REPORTED'),
+    market: {available: true, value: 'BTC/EUR', reason: null},
+    currency: {available: true, value: 'EUR', reason: null},
+    metrics: {
+      capital: snapshotMetric(challenger.startingCapitalCents, null),
+      netPnl: snapshotMetric(challenger.netPnlCents, 'METRIC_MISSING', true),
+      equity: snapshotMetric(challenger.netEquityCents, 'METRIC_MISSING', true),
+      realizedPnl: unknownHistorical,
+      unrealizedPnl: unknownHistorical,
+      fees: snapshotMetric(challenger.bookedFeesCents, 'METRIC_MISSING'),
+      slippage: snapshotMetric(challenger.modeledSlippageCents, 'METRIC_MISSING'),
+      funding: unknownHistorical
+    },
+    netPnlPercent: unknownHistorical,
+    roundTrips: {available: true, value: challenger.completedRoundTripCount, reason: null},
+    timeInvestedMs: unknownHistorical,
+    lastTradeAt: lastFill ?
+      {available: true, value: new Date(lastFill.executionAt).toISOString(), reason: null} :
+      unknown('NO_FILL_REPORTED'),
+    freshness,
+    reason: 'OBSERVED_CHECKPOINT_NOT_RUNTIME_STATUS',
+    risk: validatedRisk(null, definition.id),
+    trades: [],
+    tradesReason: 'CHECKPOINT_FILL_DETAILS_LIMITED',
+    syntheticFixture: false,
+    reportSnapshot: {
+      runId: progress.identity.runId,
+      valuationAt: progress.valuationAt,
+      evidenceStatus: 'OBSERVED_CHECKPOINT',
+      terminalStatus: progress.terminal.status,
+      fillCount: challenger.fillCount,
+      recentFills: challenger.recentFills.map(fill => ({
+        side: fill.side,
+        grossCents: fill.grossCents,
+        feeCents: fill.feeCents,
+        executionAt: fill.executionAt
+      })),
+      inventoryStatus: challenger.inventoryStatus,
+      feeBpsPerSide: progress.assumptions.feeBpsPerSide,
+      slippageBpsPerSide: progress.assumptions.slippageBpsPerSide,
+      ratesVerified: progress.assumptions.ratesVerified
+    }
+  };
+}
+
 function validCurve(curve) {
   if (!isRecord(curve) || curve.basis !== 'INITIAL_CAPITAL_INDEX_100' ||
       !validTimestamp(curve.coverageStart) || !validTimestamp(curve.coverageEnd) ||
@@ -449,7 +538,9 @@ function alignedCurve(bots) {
   };
 }
 
-export function presentSpotPaperBotOverview(adapters = [], {pairedReport = null} = {}) {
+export function presentSpotPaperBotOverview(adapters = [], {
+  pairedReport = null, pairedProgress = null, expectedIdentity = null
+} = {}) {
   if (!Array.isArray(adapters) || adapters.length > SPOT_PAPER_BOT_DEFINITIONS.length) {
     return {
       bots: SPOT_PAPER_BOT_DEFINITIONS.map(definition =>
@@ -475,6 +566,10 @@ export function presentSpotPaperBotOverview(adapters = [], {pairedReport = null}
     projectBot(definition, byId.get(definition.id)));
   if (pairedReport !== null && pairedReport !== undefined) {
     bots[0] = pairedSnapshotBot(pairedReport);
+  }
+  if (pairedProgress !== null && pairedProgress !== undefined) {
+    const progressBot = pairedProgressBot(pairedProgress, expectedIdentity, pairedReport);
+    if (progressBot) bots[0] = progressBot;
   }
   return {bots, curve: alignedCurve(bots)};
 }

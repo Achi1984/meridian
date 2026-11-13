@@ -16,6 +16,7 @@ import {
 } from '../scripts/research-supervisor/test_b1_generated_fixture.mjs';
 import {withMobileChrome} from './helpers/v11-cdp.mjs';
 import {SPOT_PAPER_PAIRED_REPORT_ENDPOINT} from '../v11/spot-paper-paired-report-connector.js';
+import {SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT} from '../v11/spot-paper-paired-progress-connector.js';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const repository=fileURLToPath(new URL('../',import.meta.url));
@@ -256,11 +257,25 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
     for(const size of sizes){
       const previousSourceRequests=hosted.requests.filter(request=>request.path==='/docs/strategy-lab/campaign-20261013.json').length;
       const metrics=await withMobileChrome(chrome,size.width,hosted.url,async call=>{
-        let pairedReads=0;
+        let pairedReads=0,pairedSettled=0,progressReads=0,progressSettled=0;
+        let pairedPreflights=0,progressPreflights=0;
         let fetchFailure=null;
         const stopPairedIntercept=call.onEvent('Fetch.requestPaused',event=>{
           void (async()=>{
+            const url=new URL(event.request.url);
+            if(url.origin===new URL(hosted.url).origin){
+              await call('Fetch.continueRequest',{requestId:event.requestId});
+              return;
+            }
+            if(![SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
+              SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(event.request.url)){
+              fetchFailure=new Error('Unexpected external request blocked by browser fixture');
+              await call('Fetch.failRequest',{requestId:event.requestId,errorReason:'BlockedByClient'});
+              return;
+            }
             if(event.request.method==='OPTIONS'){
+              if(event.request.url===SPOT_PAPER_PAIRED_REPORT_ENDPOINT)pairedPreflights++;
+              else progressPreflights++;
               await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,
                 responseHeaders:[
                   {name:'Access-Control-Allow-Origin',value:'*'},
@@ -270,12 +285,13 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
                 ]});
               return;
             }
-            assert.equal(event.request.url,SPOT_PAPER_PAIRED_REPORT_ENDPOINT);
             assert.equal(event.request.method,'GET');
             const authorization=Object.entries(event.request.headers||{})
               .find(([name])=>name.toLowerCase()==='authorization')?.[1];
-            assert.ok(authorization?.startsWith('Bearer '));
-            pairedReads++;
+            assert.ok(typeof authorization==='string'&&authorization.startsWith('Bearer '));
+            const isProgress=event.request.url===SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT;
+            if(isProgress)progressReads++;
+            else pairedReads++;
             await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:404,
               responseHeaders:[
                 {name:'Access-Control-Allow-Origin',value:'*'},
@@ -283,12 +299,15 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
                 {name:'Cache-Control',value:'no-store'}
               ],
               body:Buffer.from(JSON.stringify({
-                error:'spot_paper_paired_report_not_found'
+                error:isProgress?'spot_paper_paired_progress_not_found':
+                  'spot_paper_paired_report_not_found'
               })).toString('base64')});
+            if(isProgress)progressSettled++;
+            else pairedSettled++;
           })().catch(error=>{fetchFailure=error;});
         });
         await call('Fetch.enable',{patterns:[
-          {urlPattern:SPOT_PAPER_PAIRED_REPORT_ENDPOINT,requestStage:'Request'}
+          {urlPattern:'*',requestStage:'Request'}
         ]});
         const evaluate=async expression=>{
           const result=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise:true});
@@ -358,9 +377,19 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').focus()`);
         await key('Enter','Enter',13);
         for(let attempt=0;attempt<100;attempt++){
-          if(await evaluate(`document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]').length===12`))break;
+          if(await evaluate(`document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]').length===12`) &&
+            pairedSettled===1&&progressSettled===1)break;
           await new Promise(resolve=>setTimeout(resolve,25));
         }
+        assert.equal(fetchFailure,null,fetchFailure?.message);
+        assert.equal(pairedReads,1,'active Strategies entry performs exactly one authorized paired read');
+        assert.equal(progressReads,1,'active Strategies entry performs exactly one authorized progress read');
+        assert.equal(pairedSettled,1,'initial paired report response settles through its fixture');
+        assert.equal(progressSettled,1,'initial progress response settles through its fixture');
+        assert.ok(pairedPreflights>=1,'paired report preflight is intercepted');
+        assert.ok(progressPreflights>=1,'progress preflight is intercepted');
+        assert.match(await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
+          /Checkpoint nicht verfügbar — NOT_FOUND/);
         const paperLayout=await evaluate(`(()=>{
           const host=document.getElementById('spot-paper-host8h-root');
           const history=document.getElementById('paper-history-section');
@@ -569,7 +598,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(resetHistory.entries,5);
         assert.equal(resetHistory.overflow,false);
         const pairedPath=new URL(SPOT_PAPER_PAIRED_REPORT_ENDPOINT).pathname;
-        assert.ok(catalog.resources.every(path=>path===pairedPath||
+        const progressPath=new URL(SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT).pathname;
+        assert.ok(catalog.resources.every(path=>path===pairedPath||path===progressPath||
           !/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
         assert.ok(catalog.resources.includes('/docs/strategy-lab/campaign-20261013.json'));
         await evaluate(`(()=>{
@@ -1139,7 +1169,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         const hostilePresentation=await evaluate(`(async()=>{
-          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B16-M11-FIX15');
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B16-M11-FIX16');
           const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
           const root=document.createElement('div');
           root.style.cssText='max-width:100%;min-width:0';
@@ -1164,7 +1194,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B16-M11-FIX15');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B16-M11-FIX16');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});
@@ -1265,9 +1295,10 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(arena.cards,5);assert.equal(arena.h9,true);assert.equal(arena.overflow,false);assert.equal(arena.bottom,true);
         assert.equal(fetchFailure,null,fetchFailure?.message);
         assert.equal(pairedReads,1,'active Strategies entry performs exactly one authorized paired read');
+        assert.equal(progressReads,1,'active Strategies entry performs exactly one authorized progress read');
         assert.ok(arena.network.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
-          url===SPOT_PAPER_PAIRED_REPORT_ENDPOINT),
-        'no external or market requests beyond the bounded paired report read');
+          [SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
+        'all external requests are blocked except the exact bounded report/progress endpoints');
         if(evidence){
           await evaluate(`document.querySelector('#strategy-arena-root .arena-model-card').scrollIntoView({block:'start'})`);
           const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
@@ -1276,20 +1307,34 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
 
         await evaluate(`document.querySelector('#nav button[data-v="command"]').click()`);
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
-        for(let attempt=0;attempt<100&&pairedReads<2;attempt++){
+        for(let attempt=0;attempt<100&&(pairedReads<2||progressReads<2);attempt++){
           await new Promise(resolve=>setTimeout(resolve,10));
         }
         assert.equal(fetchFailure,null,fetchFailure?.message);
         assert.equal(pairedReads,2,'returning to active Strategies reads the paired report once');
+        assert.equal(progressReads,2,'returning to active Strategies reads progress once');
+        for(let attempt=0;attempt<100&&(pairedSettled<2||progressSettled<2);attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(pairedSettled,2,'return-entry paired report response settles');
+        assert.equal(progressSettled,2,'return-entry progress response settles');
+        assert.match(await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
+          /Checkpoint nicht verfügbar — NOT_FOUND/);
         assert.equal(await evaluate(`document.querySelector('.view.active').id`),'view-strategies',
           'the consolidated navigation opens strategies from Command');
         assert.equal(await evaluate(`document.documentElement.scrollWidth<=innerWidth+1`),true);
+        await evaluate(`document.querySelector('#nav button[data-v="command"]').click()`);
+        await new Promise(resolve=>setTimeout(resolve,50));
+        assert.equal(pairedReads,2,'inactive navigation performs no paired reads');
+        assert.equal(progressReads,2,'inactive navigation performs no progress reads');
         const requestPaths=hosted.requests.map(request=>request.path);
         assert.ok(!requestPaths.some(path=>/\/v10\/|\/api\/|\/klines|\/ticker|\/market/i.test(path)));
         const host8hReads=hosted.requests.filter(request=>request.path==='/host8h-summary');
         assert.ok(host8hReads.length>0,'host8h uses only the local unavailable transport fixture');
         assert.ok(host8hReads.every(request=>request.method==='GET'&&request.authorized),
            'the local host8h fixture requires the authenticated read-only request');
+        assert.equal(pairedReads,pairedSettled,'no paired response is left pending at teardown');
+        assert.equal(progressReads,progressSettled,'no progress response is left pending at teardown');
         stopPairedIntercept();
         await call('Fetch.disable');
         return {width:size.width,sourceFetches:requestPaths.filter(path=>path==='/docs/strategy-lab/campaign-20261013.json').length,

@@ -13,6 +13,7 @@ import {PAPER_REPORT_ENVELOPE_SCHEMA} from '../scripts/memecoin-paper-report-bri
 import {PAPER_REPORT_ENDPOINT} from '../v11/paper-cockpit-controller.js';
 import {SPOT_PAPER_HOST8H_REPORT_ENDPOINT} from '../v11/spot-paper-host8h-controller.js';
 import {SPOT_PAPER_PAIRED_REPORT_ENDPOINT} from '../v11/spot-paper-paired-report-connector.js';
+import {SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT} from '../v11/spot-paper-paired-progress-connector.js';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const sizes=[
@@ -42,17 +43,26 @@ function assertNamedTestPassed(output,name){
     'the named browser regression must execute rather than skip');
 }
 
-async function interceptGeneratedPaperReport(call,report){
+async function interceptGeneratedPaperReport(call,report,localOrigin){
   const body=Buffer.from(JSON.stringify({
     schema:PAPER_REPORT_ENVELOPE_SCHEMA,runId:report.experiment.id,report
   })).toString('base64');
-  let reads=0,host8hReads=0,pairedReads=0,failure=null,verificationOwned=false;
+  let reads=0,host8hReads=0,pairedReads=0,pairedSettled=0;
+  let progressReads=0,progressSettled=0,failure=null,verificationOwned=false;
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
+      if(new URL(event.request.url).origin===localOrigin){
+        await call('Fetch.continueRequest',{requestId:event.requestId});
+        return;
+      }
       if(verificationOwned&&event.request.url===VERIFY_ENDPOINT)return;
-      assert.ok([PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,
-        SPOT_PAPER_PAIRED_REPORT_ENDPOINT].includes(event.request.url),
-        'only the exact approved Paper endpoints are intercepted');
+      if(![VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,
+        SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]
+        .includes(event.request.url)){
+        failure=new Error('Unexpected external request blocked by Paper cockpit fixture');
+        await call('Fetch.failRequest',{requestId:event.requestId,errorReason:'BlockedByClient'});
+        return;
+      }
       if(event.request.method==='OPTIONS'){
         await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,responseHeaders:[
           {name:'Access-Control-Allow-Origin',value:'*'},
@@ -84,6 +94,20 @@ async function interceptGeneratedPaperReport(call,report){
           {name:'Content-Type',value:'application/json; charset=utf-8'},
           {name:'Cache-Control',value:'no-store'}],
         body:Buffer.from(JSON.stringify({error:'spot_paper_paired_report_not_found'})).toString('base64')});
+        pairedSettled++;
+        return;
+      }
+      if(event.request.url===SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT){
+        const authorization=Object.entries(event.request.headers||{})
+          .find(([name])=>name.toLowerCase()==='authorization')?.[1];
+        assert.equal(authorization,'Bearer '+PAPER_PASSWORD);
+        progressReads++;
+        await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:404,responseHeaders:[
+          {name:'Access-Control-Allow-Origin',value:'*'},
+          {name:'Content-Type',value:'application/json; charset=utf-8'},
+          {name:'Cache-Control',value:'no-store'}],
+        body:Buffer.from(JSON.stringify({error:'spot_paper_paired_progress_not_found'})).toString('base64')});
+        progressSettled++;
         return;
       }
       const authorization=Object.entries(event.request.headers||{})
@@ -99,18 +123,24 @@ async function interceptGeneratedPaperReport(call,report){
   await call('Fetch.enable',{patterns:[
     {urlPattern:PAPER_REPORT_ENDPOINT+'*',requestStage:'Request'},
     {urlPattern:SPOT_PAPER_HOST8H_REPORT_ENDPOINT+'*',requestStage:'Request'},
-    {urlPattern:SPOT_PAPER_PAIRED_REPORT_ENDPOINT+'*',requestStage:'Request'}
+    {urlPattern:SPOT_PAPER_PAIRED_REPORT_ENDPOINT,requestStage:'Request'},
+    {urlPattern:SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT,requestStage:'Request'},
+    {urlPattern:'*',requestStage:'Request'}
   ]});
   return {
     count:()=>reads,
     pairedCount:()=>pairedReads,
+    pairedSettled:()=>pairedSettled,
+    progressCount:()=>progressReads,
+    progressSettled:()=>progressSettled,
     host8hCount:()=>host8hReads,
     assertHealthy(){if(failure)throw failure;},
     async unlockApp(){
       verificationOwned=true;
       try{await unlockAppThroughGate(call,{additionalFetchUrls:[
-        PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT
-      ]});}
+        PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,
+        SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT
+      ],blockOtherRequests:true});}
       finally{verificationOwned=false;}
     },
     async close(){off();await call('Fetch.disable');}
@@ -149,7 +179,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
         report.evidence.observedThrough=new Date(Date.now()-298000).toISOString();
         report.valuation.cashCents='90071992547409931234';
-        const intercepted=await interceptGeneratedPaperReport(call,report);
+        const intercepted=await interceptGeneratedPaperReport(call,report,
+          new URL(hosted.url).origin);
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
         assert.equal(intercepted.count(),0,'unlock and navigation do not read a Paper report');
         for(let attempt=0;attempt<150&&intercepted.pairedCount()===0;attempt++){
@@ -158,6 +189,16 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         intercepted.assertHealthy();
         assert.equal(intercepted.pairedCount(),1,
           'authenticated active Strategies entry performs exactly one paired read');
+        for(let attempt=0;attempt<150&&intercepted.progressSettled()<1;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        intercepted.assertHealthy();
+        assert.equal(intercepted.progressCount(),1,
+          'authenticated active Strategies entry performs exactly one progress read');
+        assert.equal(intercepted.progressSettled(),1,
+          'the initial bounded progress response settles through its exact-route fixture');
+        assert.match(await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
+          /Checkpoint nicht verfügbar — NOT_FOUND/);
         for(let attempt=0;attempt<150;attempt++){
           if(await evaluate(`document.querySelector('#paper-cockpit-root.paper-cockpit') !== null`))break;
           await new Promise(resolve=>setTimeout(resolve,10));
@@ -174,6 +215,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.count(),0,'opening previous reports does not fetch a report');
         assert.equal(intercepted.pairedCount(),1,
           'opening history does not add paired reads');
+        assert.equal(intercepted.progressCount(),1,
+          'opening history does not add progress reads');
         const liveRead=await evaluate(`(()=>{
           const button=document.querySelector('#paper-cockpit-root button');
           return button?{text:button.textContent,height:button.getBoundingClientRect().height,
@@ -184,6 +227,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.count(),0,'controller mount remains a no-read operation');
         assert.equal(intercepted.pairedCount(),1,
           'mounting the legacy report controller does not add paired reads');
+        assert.equal(intercepted.progressCount(),1,
+          'mounting report controllers does not add progress reads');
         assert.equal(await evaluate(`(()=>{
           const button=document.querySelector('#paper-cockpit-root button');
           button.focus();
@@ -254,6 +299,13 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         intercepted.assertHealthy();
         assert.equal(intercepted.pairedCount(),2,
           'returning to active Strategies serves one additional mocked paired read');
+        for(let attempt=0;attempt<150&&intercepted.progressSettled()<2;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(intercepted.progressCount(),2,
+          'returning to active Strategies performs one additional progress read');
+        assert.equal(intercepted.progressSettled(),2,
+          'the return-entry progress response settles before the next lifecycle step');
         await evaluate(`document.querySelector('#paper-cockpit-root button').focus()`);
         await key('Enter','Enter',13);
         for(let attempt=0;attempt<150;attempt++){
@@ -290,6 +342,15 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         intercepted.assertHealthy();
         assert.equal(intercepted.pairedCount(),3,
           're-unlock while Strategies is active serves one mocked paired read');
+        for(let attempt=0;attempt<150&&intercepted.progressSettled()<3;attempt++){
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        assert.equal(intercepted.progressCount(),3,
+          'the restored exact-route fixture intercepts one progress GET after re-unlock');
+        assert.equal(intercepted.progressSettled(),3,
+          'the re-unlock progress response settles before interception closes');
+        assert.match(await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
+          /Checkpoint nicht verfügbar — NOT_FOUND/);
         for(let attempt=0;attempt<150;attempt++){
           const settled=await evaluate(`(()=>{
             const root=document.querySelector('#paired-paper-report-root');
@@ -320,10 +381,21 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.querySelector('#spot-paper-host8h-root')?.dataset.state==='transport-not-provisioned' &&
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
+        const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
+        const approvedExternal=new Set([VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
+          SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
+          SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
+        assert.ok(resources.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
+          approvedExternal.has(url)),
+        'browser resources stay local or use only exact approved report/progress endpoints');
+        assert.equal(intercepted.pairedCount(),3);
+        assert.equal(intercepted.pairedSettled(),3);
+        assert.equal(intercepted.progressCount(),3);
+        assert.equal(intercepted.progressSettled(),3);
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX15');
-          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX15');
+          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX16');
+          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX16');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));

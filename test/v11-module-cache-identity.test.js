@@ -7,7 +7,8 @@ const v11Root=new URL('../v11/',import.meta.url);
 const indexUrl=new URL('index.html',v11Root);
 const bridgeRoot=new URL('../scripts/memecoin-paper-report-bridge/',v11Root);
 const spotBridgeRoot=new URL('../scripts/spot-paper-report-bridge/',v11Root);
-const CACHE_ID='?v=B16-M11-FIX15';
+const pairedProgressRoot=new URL('../scripts/spot-paper-paired-progress/',v11Root);
+const CACHE_ID='?v=B16-M11-FIX16';
 const diskPath=url=>fileURLToPath(new URL(url.pathname,url));
 const readModule=url=>readFileSync(diskPath(url),'utf8');
 const exists=url=>existsSync(diskPath(url));
@@ -24,7 +25,7 @@ const expectedModules=[
   'spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js',
   'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js',
   'spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js',
-  'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js',
+  'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-progress-config.js','spot-paper-paired-progress-connector.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
 ];
 
@@ -47,6 +48,10 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists,impor
       const name=`spot-bridge:${url.pathname.slice(spotBridgeRoot.pathname.length)}`;
       if(!identities.has(name))identities.set(name,new Set());
       identities.get(name).add(href);
+    }else if(url.pathname.startsWith(pairedProgressRoot.pathname)){
+      const name=`paired-progress:${url.pathname.slice(pairedProgressRoot.pathname.length)}`;
+      if(!identities.has(name))identities.set(name,new Set());
+      identities.get(name).add(href);
     }
     for(const specifier of specifiers(read(url))){
       let target=new URL(specifier,url);
@@ -63,6 +68,10 @@ function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists,impor
         }else if(target.pathname.startsWith(spotBridgeRoot.pathname)){
           assert.equal(target.search,CACHE_ID,`spot-paper bridge module must use ${CACHE_ID}`);
           external.add(`../scripts/spot-paper-report-bridge/${target.pathname.slice(spotBridgeRoot.pathname.length)}${target.search}`);
+          visit(target);
+        }else if(target.pathname.startsWith(pairedProgressRoot.pathname)){
+          assert.equal(target.search,CACHE_ID,`paired-progress contract must use ${CACHE_ID}`);
+          external.add(`../scripts/spot-paper-paired-progress/${target.pathname.slice(pairedProgressRoot.pathname.length)}${target.search}`);
           visit(target);
         }else external.add(specifier);
         continue;
@@ -99,10 +108,11 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
   assert.deepEqual([...graph.modules].sort(),expectedModules);
   assert.deepEqual([...graph.external].sort(),[
     '../ledger-manual-snapshot.js','../portfolio-data-contract.js','../public/js/m11-agent-status.js',
-    '../research/strategy-paper-arena.js','../scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX15',
-    '../scripts/memecoin-paper-report-bridge/index.mjs?v=B16-M11-FIX15',
-    '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX15',
-    '../scripts/spot-paper-report-bridge/contract.mjs?v=B16-M11-FIX15',
+    '../research/strategy-paper-arena.js','../scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX16',
+    '../scripts/memecoin-paper-report-bridge/index.mjs?v=B16-M11-FIX16',
+    '../scripts/spot-paper-paired-progress/contract.mjs?v=B16-M11-FIX16',
+    '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX16',
+    '../scripts/spot-paper-report-bridge/contract.mjs?v=B16-M11-FIX16',
     '../v8-clean/live-price-core-r18.js'
   ]);
   assert.ok(graph.references.get('app-access.js')>=4,'status shares the existing central access module');
@@ -111,7 +121,7 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
   assert.ok(graph.references.get('bot-read-client.js')>=2,'shared bot client is reached by both read surfaces');
   for(const [module,identities] of graph.identities){
     assert.equal(identities.size,1,`${module} must resolve to one shared URL identity`);
-    assert.match([...identities][0],/\?v=B16-M11-FIX15$/);
+    assert.match([...identities][0],/\?v=B16-M11-FIX16$/);
   }
 });
 
@@ -121,24 +131,24 @@ test('agent-status browser harness shares the served B17 bootstrap, client and a
   const statusModules=imports.filter(url=>url.pathname.startsWith('/v11/'))
     .map(url=>url.pathname.slice('/v11/'.length)+url.search).sort();
   assert.deepEqual(statusModules,[
-    'agent-status-bootstrap.js?v=B16-M11-FIX15',
-    'agent-status-client.js?v=B16-M11-FIX15',
-    'app-access.js?v=B16-M11-FIX15'
+    'agent-status-bootstrap.js?v=B16-M11-FIX16',
+    'agent-status-client.js?v=B16-M11-FIX16',
+    'app-access.js?v=B16-M11-FIX16'
   ]);
 });
 
-test('nested stale B15 edges fail the same graph assertion',()=>{
+test('nested stale FIX15 edges fail the same graph assertion',()=>{
   const fixtureRoot=new URL('file:///fixture/v11/');
   const fixture=new Map([
-    ['/fixture/v11/entry.js',"import './nested.js?v=B16-M11-FIX15';"],
-    ['/fixture/v11/nested.js',"import './leaf.js?v=B16-M11';"],
+    ['/fixture/v11/entry.js',"import './nested.js?v=B16-M11-FIX16';"],
+    ['/fixture/v11/nested.js',"import './leaf.js?v=B16-M11-FIX15';"],
     ['/fixture/v11/leaf.js','export const ready=true;']
   ]);
-  assert.throws(()=>scanGraph([new URL('entry.js?v=B16-M11-FIX15',fixtureRoot)],{
+  assert.throws(()=>scanGraph([new URL('entry.js?v=B16-M11-FIX16',fixtureRoot)],{
     root:fixtureRoot,
     read:url=>fixture.get(url.pathname),
     fileExists:url=>fixture.has(url.pathname)
-  }),/internal v11 import must use \?v=B16-M11-FIX15/);
+  }),/internal v11 import must use \?v=B16-M11-FIX16/);
 });
 
 test('B17 cache preview remains isolated from terminal, root and PWA release identities',()=>{

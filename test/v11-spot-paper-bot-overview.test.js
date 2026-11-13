@@ -737,7 +737,7 @@ test('Chrome renders compact responsive cards and supports keyboard disclosure c
             risk:report.risk,trades:report.trades,curve:report.curve,syntheticFixture:true
           });
           const {mountSpotPaperBotOverview}=await import(
-            './spot-paper-bot-overview-controller.js?v=B16-M11-FIX15');
+            './spot-paper-bot-overview-controller.js?v=B16-M11-FIX16');
           const root=document.createElement('section');
           root.id='paper-bot-overview-root';
           document.body.replaceChildren(root);

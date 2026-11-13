@@ -1,7 +1,7 @@
 import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
-} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX15';
+} from '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX16';
 
 export const SPOT_PAPER_PAIRED_REPORT_ENDPOINT =
   'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-paired-report';

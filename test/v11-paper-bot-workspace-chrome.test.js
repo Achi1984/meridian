@@ -1,6 +1,8 @@
 import assert from 'node:assert/strict';
 import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
+import {createHash} from 'node:crypto';
+import {Readable} from 'node:stream';
 import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
@@ -13,6 +15,16 @@ import {
   SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
   SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA
 } from '../v11/spot-paper-paired-report-connector.js';
+import {SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT} from
+  '../v11/spot-paper-paired-progress-connector.js';
+import {
+  SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY
+} from '../v11/spot-paper-paired-progress-config.js';
+import {
+  handleSpotPaperPairedProgressGatewayRequest,
+  spotPaperPairedProgressGatewayConfig
+} from '../spot-paper-paired-progress-gateway.mjs';
+import {validateProgress} from '../scripts/spot-paper-paired-progress/contract.mjs';
 import {
   syntheticExpectedPairedIdentity,
   syntheticPairedDashboard
@@ -27,7 +39,117 @@ const pairedLegacyIdentity = syntheticExpectedPairedIdentity();
 pairedLegacyIdentity.models[1].modelId = 'BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1';
 const pairedLegacyFixture = syntheticPairedDashboard(pairedLegacyIdentity);
 const pairedTrendFixture = syntheticPairedDashboard(
-  syntheticExpectedPairedIdentity({modelPair: true}));
+  SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY);
+const progressValuationAt = Date.now() - 10 * 60 * 1000;
+const SPOT_PAPER_PROGRESS_MODEL_IDS =
+  SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY.models.map(model => model.modelId);
+pairedTrendFixture.timing.valuationAt = progressValuationAt;
+const ACCESS_TOKEN = 'synthetic-browser-gate-password';
+const progressPayload = validateProgress({
+  schemaVersion: 'SPOT_PAPER_PAIRED_PROGRESS_V1',
+  identity: SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY,
+  journalSequence: 129,
+  journalSha256: createHash('sha256').update('synthetic browser checkpoint').digest('hex'),
+  classification: 'OBSERVED_CHECKPOINT',
+  observedAt: progressValuationAt,
+  valuationAt: progressValuationAt,
+  exportedAt: progressValuationAt + 1_000,
+  latestEventAt: progressValuationAt,
+  terminal: {status: 'UNKNOWN', at: null},
+  currency: 'EUR',
+  monetaryUnit: 'CENTS',
+  assumptions: {
+    feeBpsPerSide: 20,
+    slippageBpsPerSide: 10,
+    ratesVerified: false,
+    feeBasis: 'EEA_SPOT_ONLY_TAKER_ASSUMPTION',
+    netEquityIncludesCosts: true
+  },
+  arms: [
+    {
+      role: 'baseline',
+      modelId: SPOT_PAPER_PROGRESS_MODEL_IDS[0],
+      startingCapitalCents: 100_000,
+      netEquityCents: 99_940,
+      netPnlCents: -60,
+      cashCents: null,
+      bookedFeesCents: 20,
+      modeledSlippageCents: 10,
+      hypotheticalExitFeeCents: null,
+      hypotheticalExitSlippageCents: null,
+      turnoverCents: 9_980,
+      exposureCents: 9_980,
+      sampledDrawdownCents: 60,
+      unresolvedObservations: 0,
+      inventoryStatus: 'OPEN',
+      stopReason: null,
+      tradingStoppedAt: null,
+      fillCount: 1,
+      completedRoundTripCount: 0,
+      recentFills: [{side: 'BUY', grossCents: 9_980, feeCents: 20,
+        executionAt: progressValuationAt}]
+    },
+    {
+      role: 'challenger',
+      modelId: SPOT_PAPER_PROGRESS_MODEL_IDS[1],
+      startingCapitalCents: 100_000,
+      netEquityCents: 99_500,
+      netPnlCents: -500,
+      cashCents: null,
+      bookedFeesCents: 16,
+      modeledSlippageCents: 10,
+      hypotheticalExitFeeCents: null,
+      hypotheticalExitSlippageCents: null,
+      turnoverCents: 8_000,
+      exposureCents: 0,
+      sampledDrawdownCents: 500,
+      unresolvedObservations: 0,
+      inventoryStatus: 'FLAT',
+      stopReason: null,
+      tradingStoppedAt: null,
+      fillCount: 2,
+      completedRoundTripCount: 1,
+      recentFills: [
+        {side: 'BUY', grossCents: 4_000, feeCents: 8,
+          executionAt: progressValuationAt - 1},
+        {side: 'SELL', grossCents: 4_000, feeCents: 8,
+          executionAt: progressValuationAt}
+      ]
+    },
+    {
+      role: 'cash',
+      modelId: SPOT_PAPER_PROGRESS_MODEL_IDS[2],
+      startingCapitalCents: 100_000,
+      netEquityCents: 100_000,
+      netPnlCents: 0,
+      cashCents: 100_000,
+      bookedFeesCents: 0,
+      modeledSlippageCents: 0,
+      hypotheticalExitFeeCents: null,
+      hypotheticalExitSlippageCents: null,
+      turnoverCents: 0,
+      exposureCents: 0,
+      sampledDrawdownCents: 0,
+      unresolvedObservations: 0,
+      inventoryStatus: 'FLAT',
+      stopReason: null,
+      tradingStoppedAt: null,
+      fillCount: 0,
+      completedRoundTripCount: 0,
+      recentFills: []
+    }
+  ]
+}, SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY);
+assert.ok(progressPayload, 'browser checkpoint fixture satisfies the producer contract');
+const PROGRESS_GATEWAY_CONFIG = spotPaperPairedProgressGatewayConfig({
+  MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_ENABLED: 'true',
+  MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_DEPLOYMENT_VERIFIED: 'true',
+  MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY_JSON:
+    JSON.stringify(SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY),
+  MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_UPLOAD_TOKEN_SHA256:
+    createHash('sha256').update('separate-browser-uploader').digest('hex'),
+  MERIDIAN_READ_TOKEN_SHA256: createHash('sha256').update(ACCESS_TOKEN).digest('hex')
+});
 
 function runFlaggedBrowserTest(name) {
   const env = {...process.env};
@@ -71,14 +193,16 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
       const metrics = await withMobileChrome(chrome, width, hosted.url, async call => {
         let reads = 0;
         let pairedReads = 0;
+        let progressReads = 0;
         let pendingPairedRequestId = null;
         let pairedResponseMode = width === 320 ? 'unprovisioned' :
-          width === 390 ? 'not_found' : 'legacy';
+          width === 390 ? 'not_found' : 'trend';
         let failure = null;
         const off = call.onEvent('Fetch.requestPaused', event => {
           void (async () => {
             if (event.request.url === VERIFY_ENDPOINT) return;
-            if (![SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
+            if (![SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
+              SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]
               .includes(event.request.url)) throw Error('Unexpected report route');
             if (event.request.method === 'OPTIONS') {
               await call('Fetch.fulfillRequest', {
@@ -109,6 +233,34 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
                   {name: 'Cache-Control', value: 'no-store'}
                 ],
                 body: Buffer.from(JSON.stringify({error: 'report_not_found'})).toString('base64')
+              });
+            } else if (event.request.url === SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT) {
+              progressReads++;
+              const request = Readable.from([]);
+              Object.assign(request, {
+                url: new URL(event.request.url).pathname,
+                method: event.request.method,
+                headers: event.request.headers
+              });
+              const gateway = await handleSpotPaperPairedProgressGatewayRequest(request, {
+                config: PROGRESS_GATEWAY_CONFIG,
+                getStore: () => ({get: async identity => {
+                  assert.deepEqual(identity, SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY);
+                  return progressPayload;
+                }}),
+                authorizedRead: req =>
+                  req.headers.authorization === 'Bearer ' + ACCESS_TOKEN
+              });
+              assert.equal(gateway.status, 200);
+              await call('Fetch.fulfillRequest', {
+                requestId: event.requestId,
+                responseCode: gateway.status,
+                responseHeaders: [
+                  {name: 'Access-Control-Allow-Origin', value: '*'},
+                  {name: 'Content-Type', value: 'application/json; charset=utf-8'},
+                  {name: 'Cache-Control', value: 'no-store'}
+                ],
+                body: Buffer.from(JSON.stringify(gateway.body)).toString('base64')
               });
             } else {
               pairedReads++;
@@ -146,7 +298,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
                 ],
                 body: Buffer.from(JSON.stringify({
                   schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
-                  runId: pairedIdentity.runId,
+                  runId: report.identity.runId,
                   report
                 })).toString('base64')
               });
@@ -155,7 +307,8 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
         });
         await call('Fetch.enable', {patterns: [
           {urlPattern: SPOT_PAPER_REPORT_ENDPOINT, requestStage: 'Request'},
-          {urlPattern: SPOT_PAPER_PAIRED_REPORT_ENDPOINT, requestStage: 'Request'}
+          {urlPattern: SPOT_PAPER_PAIRED_REPORT_ENDPOINT, requestStage: 'Request'},
+          {urlPattern: SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT, requestStage: 'Request'}
         ]});
         try {
           await call('Emulation.setDeviceMetricsOverride', {
@@ -164,7 +317,8 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             screenWidth: width, screenHeight: width === 320 ? 568 : width === 390 ? 844 : 900
           });
           await unlockAppThroughGate(call, {
-            additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
+            additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT,
+              SPOT_PAPER_PAIRED_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]
           });
           const evaluate = async expression => {
             const result = await call('Runtime.evaluate', {
@@ -200,6 +354,15 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           }
           assert.equal(pairedReads, 1,
             'authenticated active-tab entry creates exactly one paired GET');
+          const progressUi = await evaluate(`({
+            status:document.querySelector('#paired-paper-report-section').textContent,
+            buttons:[...document.querySelectorAll('#paired-paper-report-section button')]
+              .map(item=>({text:item.textContent,disabled:item.disabled,
+                busy:item.getAttribute('aria-busy')}))
+          })`);
+          assert.equal(progressReads, 1,
+            `authenticated active-tab entry creates exactly one progress GET; ` +
+            `failure=${failure?.message || 'none'}; ui=${JSON.stringify(progressUi)}`);
           const entryState = width === 320 ? 'unprovisioned' :
             width === 390 ? 'empty' : 'running_snapshot';
           let entryPanel = null;
@@ -236,6 +399,28 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.equal(initial.disabled, false);
           assert.match(initial.text, /In Vorbereitung/);
           assert.match(initial.text, /Unbekannt/);
+          assert.match(initial.text, /Checkpoint · beobachtet/);
+          assert.match(initial.text, /−5,00\s+€ Verlust/);
+          assert.ok(initial.text.includes(new Intl.DateTimeFormat('de-AT', {
+            dateStyle: 'medium', timeStyle: 'medium', timeZone: 'Europe/Vienna'
+          }).format(progressValuationAt)));
+          assert.doesNotMatch(initial.text,
+            /BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1|CASH_CONTROL_V1/);
+          assert.match(initial.pairedPanel, /Beobachteter Checkpoint/);
+          assert.match(initial.pairedPanel, /STALE/);
+          assert.match(initial.pairedPanel, /Aufgezeichneter EndstatusUNKNOWN/);
+          assert.match(initial.pairedPanel, /−0,60\s+€ Verlust/);
+          assert.match(initial.pairedPanel, /−5,00\s+€ Verlust/);
+          assert.match(initial.pairedPanel, /Fills1/);
+          assert.match(initial.pairedPanel, /Position offen/);
+          assert.match(initial.pairedPanel, /Abgeschlossene Handelsrunden1/);
+          for (const modelId of SPOT_PAPER_PROGRESS_MODEL_IDS) {
+            assert.ok(initial.pairedPanel.includes(modelId));
+          }
+          if (width === 1440) {
+            assert.match(initial.pairedPanel, /Checkpoint-Metriken haben.*Vorrang/);
+            assert.match(initial.pairedPanel, /Unabhängige AbschlussauthentifizierungNOT_ESTABLISHED/);
+          }
           if (width === 320) {
             assert.match(initial.paired, /Transport ist nicht provisioniert/);
             assert.match(initial.pairedPanel, /Transport nicht provisioniert/);
@@ -284,6 +469,16 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.equal(reads, 0, 'overview disclosure controls do not request the BTC/EUR report');
           assert.equal(pairedReads, 1,
             'overview disclosure controls do not add paired requests');
+          assert.equal(progressReads, 1,
+            'overview disclosure controls do not add progress requests');
+          await evaluate(`[...document.querySelectorAll(
+            '#paired-paper-report-section button')].find(button =>
+              button.textContent.trim()==='Paper-Checkpoint manuell prüfen').click()`);
+          for (let attempt = 0; attempt < 150 && progressReads < 2; attempt++) {
+            await new Promise(resolve => setTimeout(resolve, 10));
+          }
+          assert.equal(progressReads, 2,
+            'manual checkpoint refresh creates exactly one additional authenticated GET');
 
           await evaluate(`[...document.querySelectorAll(
             '#paper-bot-overview-section button')].find(button =>
@@ -355,7 +550,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
               ],
               body: Buffer.from(JSON.stringify({
                 schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
-                runId: pairedIdentity.runId,
+                runId: pairedTrendFixture.identity.runId,
                 report: pairedTrendFixture
               })).toString('base64')
             });
@@ -369,7 +564,8 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             'a response released after lock cannot repaint private paired data');
           pairedResponseMode = 'trend';
           await unlockAppThroughGate(call, {
-            additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT]
+            additionalFetchUrls: [SPOT_PAPER_REPORT_ENDPOINT,
+              SPOT_PAPER_PAIRED_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]
           });
           await evaluate(`document.querySelector('#nav button[data-v="strategies"]').click()`);
           for (let attempt = 0; attempt < 150 && pairedReads < 4; attempt++) {
@@ -378,6 +574,8 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           assert.equal(reads, 1, 're-unlock does not refresh the legacy report');
           assert.equal(pairedReads, 4,
             're-unlock while active creates exactly one new paired read');
+          assert.equal(progressReads, 3,
+            're-unlock while active creates exactly one new progress read');
           for (let attempt = 0; attempt < 150; attempt++) {
             const settled = await evaluate(`(()=>{
               const root=document.querySelector('#paired-paper-report-root');
