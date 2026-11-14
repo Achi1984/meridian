@@ -4,7 +4,7 @@ import {
   advanceStrategy, applyPaperObservation, createLedger, createStrategyState,
   parseKrakenOhlc, parseKrakenTicker, sha256
 } from "../scripts/spot-paper-pilot/core.mjs";
-import { compareSpotPaperStrategies, maximumSampledEquityDrawdown } from
+import { compareSpotPaperStrategies, compareThreeSpotPaperStrategies, maximumSampledEquityDrawdown } from
   "../scripts/spot-paper-research/comparison.mjs";
 import {
   advanceEntryConfirmation, createEntryConfirmationState,
@@ -89,6 +89,18 @@ function fillSummary(fills) {
   return fills.map(({ id, side, grossCents, feeCents, priceNano, reason }) =>
     ({ id, side, grossCents, feeCents, priceNano, reason }));
 }
+
+test("three-way comparison adds range-pullback without changing legacy mode", () => {
+  const observations = stream(Array(72).fill(100));
+  const comparison = compareThreeSpotPaperStrategies(observations);
+  assert.equal(comparison.status, "COMPARISON_AVAILABLE");
+  assert.equal(comparison.schemaVersion, "SPOT_PAPER_THREE_WAY_COMPARISON_V1");
+  assert.deepEqual(Object.keys(comparison.arms),
+    ["baseline", "challenger", "rangePullback", "cash"]);
+  assert.equal(comparison.arms.rangePullback.strategyId,
+    "BTC_EUR_RANGE_PULLBACK_ATR_RSI_V1");
+  assert.equal(comparison.arms.rangePullback.fills.length, 0);
+});
 
 test("three-arm comparison preserves baseline ledger parity on a synthetic trend", () => {
   const observations = stream([...Array(21).fill(100), 120, 130, 140, 150]);
