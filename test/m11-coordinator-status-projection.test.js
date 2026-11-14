@@ -120,7 +120,11 @@ test('every successful source stage remains stored-only, including reviewer sess
     assert.equal(dto.rows[0].agentId, claim.executionKey);
     assert.equal(dto.rows[0].observedAt, iso(NOW - 1000));
     if (done) assert.equal(dto.rows[0].taskLabel, 'Stored receipt cycle completed; not runtime completion');
-    else assert.equal(dto.rows[0].taskLabel, 'Stored operation state; current runtime unknown');
+    else if (transition.kind === 'RECEIPT_PREPARING') {
+      assert.equal(dto.rows[0].taskLabel, 'Stored receipt preparation; publication unconfirmed');
+    } else if (transition.kind === 'RECEIPT_POSTING') {
+      assert.equal(dto.rows[0].taskLabel, 'Stored receipt posting fence; delivery unconfirmed');
+    } else assert.equal(dto.rows[0].taskLabel, 'Stored operation state; current runtime unknown');
     assert.equal(resultContainsRuntimeIdentity(dto), false);
   }
 });
@@ -129,14 +133,15 @@ function resultContainsRuntimeIdentity(dto) {
   return /trusted-runtime|reviewer|GREEN_LIGHT|sessionId/.test(JSON.stringify(dto));
 }
 
-test('stored revision-required review is BLOCKED only while REVIEWED, receipt completion means stored cycle only', async () => {
+test('stored revision-required review is BLOCKED before receipt preparation; receipt completion means stored cycle only', async () => {
   const f = fixture();
   let claim = await claimNext(f);
   for (const transition of path('REVISION_REQUIRED', 'REVISION_REQUIRED')) {
     claim = await commit(f, claim, transition);
     const envelope = await f.backend.exportCanonicalEnvelope();
     const state = envelope.claims[0].status;
-    const expected = state === 'REVIEWED' ? 'BLOCKED' : state === 'COMMITTED' ? 'DONE' : 'UNKNOWN';
+    const expected = state === 'REVIEWED' && envelope.claims[0].lastStage === 'REVIEW_RESULT'
+      ? 'BLOCKED' : state === 'COMMITTED' ? 'DONE' : 'UNKNOWN';
     const dto = checkDTO(await project(envelope), [expected]);
     if (expected === 'BLOCKED') {
       assert.equal(dto.rows[0].taskLabel, 'Stored review requires revision; not a current runtime assessment');
@@ -164,6 +169,45 @@ test('incomplete and UNKNOWN source records never imply review or running agents
   const result = await project(await f.backend.exportCanonicalEnvelope());
   checkDTO(result, ['UNKNOWN']);
   assert.equal(resultContainsRuntimeIdentity(JSON.parse(result.serializedDTO)), false);
+});
+
+test('receipt recovery stages have distinct labels while remaining UNKNOWN', async () => {
+  const cases = [
+    {
+      status: 'REVIEWED', lastStage: 'RECEIPT_PREPARING',
+      taskLabel: 'Stored receipt preparation; publication unconfirmed',
+      transitions: path().slice(0, 5)
+    },
+    {
+      status: 'REVIEWED', lastStage: 'RECEIPT_PREPARING',
+      taskLabel: 'Stored receipt preparation; publication unconfirmed',
+      transitions: path('REVISION_REQUIRED', 'REVISION_REQUIRED').slice(0, 5)
+    },
+    {
+      status: 'RECEIPT_POSTING', lastStage: 'RECEIPT_POSTING',
+      taskLabel: 'Stored receipt posting fence; delivery unconfirmed',
+      transitions: path().slice(0, 6)
+    },
+    {
+      status: 'UNKNOWN', lastStage: 'RECEIPT_DELIVERY_UNKNOWN',
+      taskLabel: 'Stored receipt delivery outcome unknown; no retry authority',
+      unknownStage: 'RECEIPT_DELIVERY_UNKNOWN'
+    }
+  ];
+  for (const expected of cases) {
+    const f = fixture();
+    let claim = await claimNext(f);
+    if (expected.unknownStage) {
+      claim = await commit(f, claim, {kind: 'UNKNOWN', stage: expected.unknownStage});
+    } else {
+      for (const transition of expected.transitions) claim = await commit(f, claim, transition);
+    }
+    const envelope = await f.backend.exportCanonicalEnvelope();
+    assert.equal(envelope.claims[0].status, expected.status);
+    assert.equal(envelope.claims[0].lastStage, expected.lastStage);
+    const dto = checkDTO(await project(envelope), ['UNKNOWN']);
+    assert.equal(dto.rows[0].taskLabel, expected.taskLabel);
+  }
 });
 
 test('EMPTY contains no DTO or stale rows and still validates explicit context and clock', async () => {
