@@ -7,6 +7,9 @@ import {
   advanceEntryConfirmation, createEntryConfirmationState,
   recordEntryConfirmationSell, SPOT_PAPER_ENTRY_CONFIRMATION_ID
 } from "./entry-confirmation.mjs";
+import {
+  advanceRangePullback, createRangePullbackState, SPOT_PAPER_RANGE_PULLBACK_ID
+} from "./range-pullback.mjs";
 
 export const SPOT_PAPER_RESEARCH_LIMITS = Object.freeze({
   maxCycles: Math.min(480, SPOT_PAPER_PILOT_LIMITS.maxCycles),
@@ -319,6 +322,31 @@ function applyCandidateObservation(arm, observation, parsed, quote) {
   arm.equitySamples.push(equityCents(arm.ledger));
 }
 
+function applyRangeObservation(arm, observation, parsed, quote) {
+  if (arm.stopped) return;
+  const { at } = observation;
+  if (arm.previousAt !== null && arm.ledger.position) arm.exposureMs += at - arm.previousAt;
+  const advanced = advanceRangePullback(arm.strategy, parsed.candles, {
+    decisionAt: observation.decisionAt, held: Boolean(arm.ledger.position)
+  });
+  arm.strategy = advanced.state;
+  if (advanced.missedDecisionWindow) arm.dataGaps++;
+  const signal = advanced.signals.at(-1) ?? null;
+  const before = arm.ledger;
+  const result = applyPaperObservation(before, { signal, quote, nowMs: at });
+  const fills = annotateFills(result, arm.strategyId, true, at);
+  for (const fill of fills) { arm.fills.push(fill); arm.grossTurnoverCents += fill.grossCents; }
+  const rejected = entryRejectionReason(signal, before, result, quote);
+  if (rejected) increment(arm.rejectedEntries, rejected);
+  arm.ledger = result.ledger;
+  if (result.stopReason) { arm.stopped = true; arm.stopReason = result.stopReason; arm.terminalAt = at; }
+  arm.previousAt = at; arm.commonValuationAt = at;
+  arm.commonValuationStatus = "MARKED_AT_COMMON_HORIZON";
+  if (arm.firstAt === undefined) arm.firstAt = at;
+  arm.observationCount++; arm.valuationCount++;
+  arm.equitySamples.push(equityCents(arm.ledger));
+}
+
 function applyCashObservation(arm, at) {
   if (arm.previousAt !== null && arm.previousAt === at) return;
   if (arm.firstAt === undefined) arm.firstAt = at;
@@ -358,7 +386,7 @@ function markStoppedArm(arm, observation, quote) {
   arm.equitySamples.push(equityCents(arm.ledger));
 }
 
-export function compareSpotPaperStrategies(observations) {
+export function compareSpotPaperStrategies(observations, { includeRangePullback = false } = {}) {
   if (!Array.isArray(observations) || observations.length < 1 ||
       observations.length > SPOT_PAPER_RESEARCH_LIMITS.maxCycles) {
     throw new Error("OBSERVATION_COUNT_LIMIT");
@@ -420,6 +448,9 @@ export function compareSpotPaperStrategies(observations) {
 
   const baseline = makeArm(BASELINE_ID);
   const challenger = makeArm(SPOT_PAPER_ENTRY_CONFIRMATION_ID, true);
+  const rangePullback = includeRangePullback ?
+    makeArm(SPOT_PAPER_RANGE_PULLBACK_ID, true) : null;
+  if (rangePullback) rangePullback.strategy = createRangePullbackState();
   const cash = makeArm(CASH_ID);
   for (const { cycle, observation, parsed, quote } of prepared) {
     if (!baseline.stopped) {
@@ -441,6 +472,12 @@ export function compareSpotPaperStrategies(observations) {
     } else {
       markStoppedArm(challenger, observation, quote);
     }
+    if (rangePullback) {
+      if (!rangePullback.stopped) {
+        try { applyRangeObservation(rangePullback, observation, parsed, quote); }
+        catch (error) { return unavailable(error.message ?? "RANGE_PULLBACK_REPLAY_GAP", cycle); }
+      } else markStoppedArm(rangePullback, observation, quote);
+    }
     applyCashObservation(cash, observation.at);
   }
 
@@ -448,6 +485,7 @@ export function compareSpotPaperStrategies(observations) {
   const arms = {
     baseline: reportArm(baseline),
     challenger: reportArm(challenger),
+    ...(rangePullback ? { rangePullback: reportArm(rangePullback) } : {}),
     cash: reportArm(cash)
   };
   if (Object.values(arms).some(arm =>
@@ -477,7 +515,8 @@ export function compareSpotPaperStrategies(observations) {
     }
   }
   return {
-    schemaVersion: "SPOT_PAPER_SMA_COMPARISON_V1",
+    schemaVersion: includeRangePullback ? "SPOT_PAPER_THREE_WAY_COMPARISON_V1" :
+      "SPOT_PAPER_SMA_COMPARISON_V1",
     status: "COMPARISON_AVAILABLE",
     commonHorizonAt,
     researchOnly: true,
@@ -498,4 +537,8 @@ export function compareSpotPaperStrategies(observations) {
     },
     arms
   };
+}
+
+export function compareThreeSpotPaperStrategies(observations) {
+  return compareSpotPaperStrategies(observations, { includeRangePullback: true });
 }
