@@ -48,6 +48,25 @@ function extractDelta(balances, mint, accountKeys) {
   }
   return sums;
 }
+async function readBoundedResponse(response, maxBytes) {
+  if (!response?.body?.getReader) throw new Error("RESPONSE_BODY_UNAVAILABLE");
+  const reader=response.body.getReader(), chunks=[], decoder=new TextDecoder();
+  let total=0, text="";
+  try {
+    for (;;) {
+      const part=await reader.read();
+      if (part.done) break;
+      if (!(part.value instanceof Uint8Array)) throw new Error("INVALID_BODY");
+      total+=part.value.byteLength;
+      if (total>maxBytes) { await reader.cancel(); throw new Error("BYTE_LIMIT"); }
+      chunks.push(part.value);
+    }
+    for (const chunk of chunks) text+=decoder.decode(chunk,{stream:true});
+    text+=decoder.decode();
+    return text;
+  } finally { reader.releaseLock?.(); }
+}
+
 function accountAddress(row) {
   return typeof row === "string" ? row : row?.pubkey;
 }
@@ -99,7 +118,7 @@ async function request({transport, signal, id, method, params, events, counters,
     url: SOLANA_RPC_ORIGIN, method:"POST",
     headers: Object.freeze({"content-type":"application/json","accept":"application/json"}),
     body, redirect:"error", credentials:"omit", signal:controller.signal
-  })).then(async response => ({response, text: await response.text()}));
+  })).then(async response => ({response, text: await readBoundedResponse(response, limits.maxBytesPerResponse)}));
   operation.catch(() => {});
   try {
     const timeout = new Promise((_, reject) => {

@@ -2226,3 +2226,56 @@ export function verifyPaperExplicitNetProjection(projection, {expectedDigest} = 
   }
   return {valid: reasons.length === 0, reasons};
 }
+
+
+
+// MERIDIAN causal quote/cost extension.
+const CAUSAL_QUOTE_ORIGIN="https://api.dexscreener.com";
+const CAUSAL_QUOTE_MAX_DURATION_MS=5000;
+const CAUSAL_QUOTE_MAX_BYTES=512*1024;
+const CAUSAL_QUOTE_STALE_AFTER_MS=15*60*1000;
+const CAUSAL_SCALE=1000000n;
+const CAUSAL_DECIMAL=/^(?:0|[1-9]\d*)(?:\.\d{1,6})?$/;
+const causalUnknown=(reason)=>({status:"UNKNOWN",reason,evidenceComplete:false,executionAuthorized:false});
+const causalScaled=(v)=>{if(typeof v!=="string"||!CAUSAL_DECIMAL.test(v))return null;const p=v.split("."),f=(p[1]||"")+"000000";return BigInt(p[0])*CAUSAL_SCALE+BigInt(f.slice(0,6));};
+const causalFormat=(v)=>{const n=v<0n,a=n?-v:v,w=a/CAUSAL_SCALE,f=(a%CAUSAL_SCALE).toString().padStart(6,"0").replace(/0+$/,"");return(n?"-":"")+w.toString()+(f?"."+f:"");};
+const causalTime=(v)=>typeof v==="string"&&Number.isFinite(Date.parse(v))?Date.parse(v):null;
+const causalIdentity=(x)=>x&&["asset","quoteCurrency","poolId","routeId"].every(k=>typeof x[k]==="string"&&x[k].length>0)?{asset:x.asset,quoteCurrency:x.quoteCurrency,poolId:x.poolId,routeId:x.routeId}:null;
+const causalSame=(a,b)=>a&&b&&["asset","quoteCurrency","poolId","routeId"].every(k=>a[k]===b[k]);
+const causalProv=(p,id)=>p&&typeof p.source==="string"&&p.source.length>0&&causalTime(p.receiptTime)!==null&&causalSame(p,id);
+function causalLeg(x,label){
+  const id=causalIdentity(x); if(!id)return {error:"MIXED_PROVENANCE"};
+  const sourceMs=causalTime(x.sourceTime),receiptMs=causalTime(x.receiptTime);
+  if(sourceMs===null||receiptMs===null)return {error:"MALFORMED_EVIDENCE"}; if(receiptMs<sourceMs)return {error:"MIXED_PROVENANCE"};
+  const input=causalScaled(x.grossInput),output=causalScaled(x.grossOutput);
+  if(input===null||output===null||input<=0n||output<0n)return {error:"MALFORMED_EVIDENCE"};
+  const keys=["fee","slippage","impact","network"];
+  const parts={};
+  for(const k of keys){const v=x[k];if(!v||causalScaled(v.amount)===null||causalScaled(v.amount)<0n||!causalProv(v.provenance,id))return {error:"MISSING_PROVENANCE"};const pm=causalTime(v.provenance.receiptTime);if(pm<sourceMs||pm>receiptMs)return {error:"MIXED_PROVENANCE"};parts[k]=causalScaled(v.amount);}
+  return {id,sourceMs,receiptMs,input,output,parts};
+}
+export function evaluateCausalQuoteChain({entry,exit,fx,now,staleAfterMs=CAUSAL_QUOTE_STALE_AFTER_MS}={}){
+  const e=causalLeg(entry,"entry"),q=causalLeg(exit,"exit"); if(e.error)return causalUnknown(e.error);if(q.error)return causalUnknown(q.error);
+  if(!causalSame(e.id,q.id)||q.sourceMs<e.sourceMs||q.sourceMs<e.receiptMs)return causalUnknown("MIXED_PROVENANCE");
+  const nowMs=causalTime(now);if(nowMs===null)return causalUnknown("MALFORMED_EVIDENCE");
+  for(const t of [e.sourceMs,e.receiptMs,q.sourceMs,q.receiptMs]){if(t>nowMs)return causalUnknown("FUTURE_SOURCE_TIME");if(nowMs-t>staleAfterMs)return causalUnknown("STALE_QUOTE");}
+  if(!fx||typeof fx.rate!=="string"||causalScaled(fx.rate)===null||causalScaled(fx.rate)<=0n||fx.pair!==e.id.quoteCurrency+"/USD"||!causalProv(fx.provenance,e.id))return causalUnknown("MISSING_PROVENANCE");
+  const fm=causalTime(fx.provenance.receiptTime);if(fm>nowMs)return causalUnknown("FUTURE_SOURCE_TIME");if(fm<e.sourceMs||nowMs-fm>staleAfterMs)return causalUnknown(nowMs-fm>staleAfterMs?"STALE_QUOTE":"MIXED_PROVENANCE");
+  const deductions=e.parts.fee+e.parts.slippage+e.parts.impact+e.parts.network;
+  const proceeds=q.output>deductions?q.output-deductions:0n, netQuote=proceeds;
+  const rate=causalScaled(fx.rate),netUsd=netQuote*rate/CAUSAL_SCALE;
+  return {status:"READY",evidenceComplete:true,executionAuthorized:false,identity:e.id,netQuote:causalFormat(netQuote),netUsd:causalFormat(netUsd),breakevenQuote:causalFormat(e.input),provenance:{entry:entry.receiptTime,exit:exit.receiptTime,fx:fx.provenance.receiptTime}};
+}
+async function causalReadBounded(response,maxBytes){
+  if(!response||!response.body?.getReader)throw new Error("RESPONSE_BODY_UNAVAILABLE");
+  const reader=response.body.getReader(),chunks=[],decoder=new TextDecoder(),parts=[];let total=0;
+  try{for(;;){const x=await reader.read();if(x.done)break;const b=x.value;total+=b.byteLength;if(total>maxBytes){await reader.cancel();throw new Error("RESPONSE_TOO_LARGE");}chunks.push(b);}for(const b of chunks)parts.push(decoder.decode(b,{stream:true}));parts.push(decoder.decode());return parts.join("");}finally{reader.releaseLock?.();}
+}
+export function createCausalQuoteCostAdapter({fetchImpl=globalThis.fetch,transport,now=()=>new Date().toISOString(),maxDurationMs=CAUSAL_QUOTE_MAX_DURATION_MS,maxBytes=CAUSAL_QUOTE_MAX_BYTES}={}){
+  const send=transport||fetchImpl;if(typeof send!=="function")throw new TypeError("transport required");
+  return {async fetchJson(path,{signal}={}){let u;try{u=new URL(path,CAUSAL_QUOTE_ORIGIN);}catch{return causalUnknown("MALFORMED_EVIDENCE");}if(u.origin!==CAUSAL_QUOTE_ORIGIN)return causalUnknown("ORIGIN_NOT_ALLOWED");
+    const c=new AbortController(),forward=()=>c.abort();signal?.addEventListener("abort",forward,{once:true});let timer,timeout=false;
+    const op=Promise.resolve().then(()=>send(u.toString(),{method:"GET",redirect:"error",credentials:"omit",signal:c.signal})).then(async r=>JSON.parse(await causalReadBounded(r,maxBytes)));
+    op.catch(()=>{});try{const body=await Promise.race([op,new Promise((_,rej)=>{timer=setTimeout(()=>{timeout=true;c.abort();rej(new Error("TIMEOUT"));},maxDurationMs);})]);return {status:"RECEIVED",body,evidenceComplete:false,executionAuthorized:false};}catch(e){return causalUnknown(timeout?"TIMEOUT":signal?.aborted?"CANCELLED":e.message==="RESPONSE_TOO_LARGE"?"RESPONSE_TOO_LARGE":"TRANSPORT_FAILED");}finally{clearTimeout(timer);signal?.removeEventListener("abort",forward);}}
+  ,evaluate:evaluateCausalQuoteChain};
+}
