@@ -60,6 +60,17 @@ test("run binding, timestamps, and evidence identity fields are strict", () => {
   assert.equal(result.claims.hostGlobalExclusivity, "MISSING_EXTERNAL_PROOF");
 });
 
+test("timestamps reject impossible calendar dates and clock ranges", () => {
+  for (const observedAt of ["2026-02-30T00:00:00Z", "2026-11-14T24:00:00Z", "2026-11-14T00:60:00Z"]) {
+    const candidate = structuredClone(receipt);
+    candidate.acceptedImage.registryDigest = "registry.example/meridian/pair@sha256:" + "f".repeat(64);
+    candidate.externalEvidence = validExternalEvidence(candidate);
+    candidate.externalEvidence.registryDigest.observedAt = observedAt;
+    const result = validatePairedPreflight(candidate);
+    assert.equal(result.checks.find(check => check.name === "registry-digest-evidence").status, "BLOCKED");
+  }
+});
+
 function validExternalEvidence(candidate) {
   return {
     registryDigest: {

@@ -12,14 +12,33 @@ import { readFile } from "node:fs/promises";
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const SOURCE_SHA = /^[a-f0-9]{40}$/;
 const REGISTRY_DIGEST = /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*@sha256:[a-f0-9]{64}$/;
-const RFC3339 = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{1,9})?(?:Z|[+-]\d{2}:\d{2})$/;
+const RFC3339 = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
 
 function nonEmptyString(value) {
   return typeof value === "string" && value.trim().length > 0;
 }
 
 function validTimestamp(value) {
-  return nonEmptyString(value) && RFC3339.test(value) && Number.isFinite(Date.parse(value));
+  if (!nonEmptyString(value)) return false;
+  const match = RFC3339.exec(value);
+  if (!match) return false;
+  const [, yearText, monthText, dayText, hourText, minuteText, secondText, zone] = match;
+  const year = Number(yearText);
+  const month = Number(monthText);
+  const day = Number(dayText);
+  const hour = Number(hourText);
+  const minute = Number(minuteText);
+  const second = Number(secondText);
+  if (month < 1 || month > 12 || hour > 23 || minute > 59 || second > 59) return false;
+  if (zone !== "Z") {
+    const offsetHour = Number(zone.slice(1, 3));
+    const offsetMinute = Number(zone.slice(4, 6));
+    if (offsetHour > 23 || offsetMinute > 59) return false;
+  }
+  const calendar = new Date(Date.UTC(year, month - 1, day));
+  if (calendar.getUTCFullYear() !== year || calendar.getUTCMonth() !== month - 1 ||
+      calendar.getUTCDate() !== day) return false;
+  return Number.isFinite(Date.parse(value));
 }
 
 function check(name, ok, detail) {
