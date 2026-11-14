@@ -3,12 +3,16 @@ export const RANGE_PULLBACK_COOLDOWN_MS = 600_000;
 
 const MINUTE = 60_000;
 const MAX_HISTORY = 160;
-const integer = value => Number.isSafeInteger(value);
-const validCandle = candle => candle && integer(candle.timestamp) && candle.timestamp >= 0 &&
-  integer(candle.openNano) && integer(candle.highNano) && integer(candle.lowNano) &&
-  integer(candle.closeNano) && candle.highNano >= candle.lowNano &&
-  candle.highNano >= candle.openNano && candle.highNano >= candle.closeNano &&
-  candle.lowNano <= candle.openNano && candle.lowNano <= candle.closeNano;
+const integer = value => Number.isSafeInteger(value) ||
+  (typeof value === "string" && /^-?\d+$/.test(value));
+const validCandle = candle => candle && Number.isSafeInteger(candle.timestamp) &&
+  candle.timestamp >= 0 && integer(candle.openNano) && integer(candle.highNano) &&
+  integer(candle.lowNano) && integer(candle.closeNano) &&
+  BigInt(candle.highNano) >= BigInt(candle.lowNano) &&
+  BigInt(candle.highNano) >= BigInt(candle.openNano) &&
+  BigInt(candle.highNano) >= BigInt(candle.closeNano) &&
+  BigInt(candle.lowNano) <= BigInt(candle.openNano) &&
+  BigInt(candle.lowNano) <= BigInt(candle.closeNano);
 
 function mean(values) {
   return values.reduce((sum, value) => sum + BigInt(value), 0n) / BigInt(values.length);
