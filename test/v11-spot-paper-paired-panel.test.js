@@ -313,6 +313,14 @@ test('empty paired states stay distinct from invalid non-null DTOs', () => {
   assert.match(root.textContent, /Bericht wird geladen/);
   assert.doesNotMatch(root.textContent, /CORRUPT_UNKNOWN|Report-Projektor/);
 
+  renderSpotPaperPaired(root, null, document, {
+    state: 'ready', loading: true,
+    progressSnapshot: {status: 'NOT_FOUND', progress: null, ageMs: null}
+  });
+  assert.equal(root.attrs['data-state'], 'empty');
+  assert.match(root.textContent, /Checkpoint nicht verfügbar — NOT_FOUND/);
+  assert.doesNotMatch(root.textContent, /Bericht wird geladen/);
+
   renderSpotPaperPaired(root, null, document, {state: 'transport_unavailable'});
   assert.equal(root.attrs['data-state'], 'unprovisioned');
   assert.match(root.textContent, /Transport nicht provisioniert/);

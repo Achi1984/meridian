@@ -196,9 +196,17 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     overview.update(report ? [sourceAdapter(report)] : [], pairedReport,
       progressSnapshot, progressExpectedIdentity);
     paired.setLoading(pairedReading);
+    // A missing paired report is terminal evidence for the shared panel even
+    // while its independent checkpoint request is still in flight. Keep that
+    // state visible instead of briefly presenting a misleading LOADING
+    // checkpoint; a later checkpoint response may still replace it with its
+    // own authoritative status.
+    const checkpointStatus = progressSnapshot?.status ||
+      (pairedState === 'not_found' && ['loading', 'ready'].includes(progressState) ?
+        'NOT_FOUND' : progressState.toUpperCase());
     paired.render(pairedReport, pairedState, progressSnapshot ?
-      {...progressSnapshot, status: progressState.toUpperCase()} :
-      {status: progressState.toUpperCase(), progress: null, ageMs: null},
+      {...progressSnapshot, status: checkpointStatus} :
+      {status: checkpointStatus, progress: null, ageMs: null},
     progressExpectedIdentity);
   }
 
