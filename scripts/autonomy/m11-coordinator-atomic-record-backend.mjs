@@ -49,6 +49,13 @@ function clone(value) {
   return structuredClone(value);
 }
 
+function throwIfAborted(signal) {
+  if (!signal?.aborted) return;
+  const error = new Error('ATOMIC_RECORD_OPERATION_ABORTED');
+  error.name = 'AbortError';
+  throw error;
+}
+
 function bytes(value) {
   return Buffer.byteLength(JSON.stringify(value), 'utf8');
 }
@@ -643,12 +650,20 @@ export function createCoordinatorAtomicRecordBackend({
   const immutableCommits = new Map();
   const transitionCounts = new Map();
 
-  async function readEnvelope() {
-    return normalizeEnvelope(await transport.readCanonicalEnvelope());
+  async function readEnvelope(signal) {
+    throwIfAborted(signal);
+    const raw = signal
+      ? await transport.readCanonicalEnvelope({signal})
+      : await transport.readCanonicalEnvelope();
+    throwIfAborted(signal);
+    return normalizeEnvelope(raw);
   }
 
-  async function replaceEnvelope(expectedStorageVersion, nextEnvelope) {
-    return transport.replaceCanonicalEnvelope({expectedStorageVersion, nextEnvelope});
+  async function replaceEnvelope(expectedStorageVersion, nextEnvelope, signal) {
+    throwIfAborted(signal);
+    return signal
+      ? transport.replaceCanonicalEnvelope({expectedStorageVersion, nextEnvelope, signal})
+      : transport.replaceCanonicalEnvelope({expectedStorageVersion, nextEnvelope});
   }
 
   function appendRecord(nextEnvelope, {kind, claim, transition, publicSnapshot}) {
@@ -687,12 +702,14 @@ export function createCoordinatorAtomicRecordBackend({
     }),
     hostedAtomicityProven: false,
 
-    async readSnapshot() {
-      const envelope = await readEnvelope();
+    async readSnapshot({signal} = {}) {
+      const envelope = await readEnvelope(signal);
       return clone(envelope.snapshot);
     },
 
     async createOnlyClaim(input) {
+      const signal = input?.signal;
+      throwIfAborted(signal);
       if (!input || input.maxActiveClaims !== 1 || input.maxPackets !== 3
         || !validKey(input.actionKey) || !validKey(input.executionKey) || !validKey(input.packetKey)
         || !validOwner(input.owner)
@@ -701,7 +718,8 @@ export function createCoordinatorAtomicRecordBackend({
         return Object.freeze({status: 'INVALID_LIMIT'});
       }
 
-      const envelope = await readEnvelope();
+      const envelope = await readEnvelope(signal);
+      throwIfAborted(signal);
       if (envelope.snapshot.revision !== input.expectedRevision || envelope.snapshot.oid !== input.expectedOid) {
         return Object.freeze({status: 'STALE_EXPECTATION'});
       }
@@ -762,20 +780,22 @@ export function createCoordinatorAtomicRecordBackend({
 
       let replaced;
       try {
-        replaced = await replaceEnvelope(envelope.storageVersion, nextEnvelope);
+        replaced = await replaceEnvelope(envelope.storageVersion, nextEnvelope, signal);
       } catch {
         return Object.freeze({status: 'UNKNOWN'});
       }
+      if (signal?.aborted) return Object.freeze({status: 'UNKNOWN'});
       if (replaced?.status !== 'REPLACED') {
         return Object.freeze({status: 'UNKNOWN'});
       }
 
       let readback;
       try {
-        readback = await readEnvelope();
+        readback = await readEnvelope(signal);
       } catch {
         return Object.freeze({status: 'UNKNOWN'});
       }
+      if (signal?.aborted) return Object.freeze({status: 'UNKNOWN'});
       const durable = findClaim(readback.claims, claim.executionKey);
       const applied = durable && durable.claimId === claim.claimId
         && durable.storageVersion === nextEnvelope.storageVersion
@@ -788,6 +808,8 @@ export function createCoordinatorAtomicRecordBackend({
     },
 
     async createImmutableCommit(input) {
+      const signal = input?.signal;
+      throwIfAborted(signal);
       if (!input || !validKey(input.actionKey) || !validKey(input.executionKey)
         || typeof input.claimId !== 'string' || input.claimId.length === 0
         || typeof input.parentOid !== 'string' || input.parentOid.length === 0
@@ -798,7 +820,9 @@ export function createCoordinatorAtomicRecordBackend({
         throw new Error('INVALID_IMMUTABLE_COMMIT');
       }
       const oid = `commit-${randomBytes(8).toString('hex')}`;
-      immutableCommits.set(oid, clone(input));
+      const commitInput = {...input};
+      delete commitInput.signal;
+      immutableCommits.set(oid, clone(commitInput));
       return Object.freeze({
         oid,
         parentOid: input.parentOid,
@@ -808,6 +832,8 @@ export function createCoordinatorAtomicRecordBackend({
     },
 
     async compareAndSwapRef(input) {
+      const signal = input?.signal;
+      throwIfAborted(signal);
       if (!input || typeof input !== 'object') return Object.freeze({status: 'CONFLICT'});
       const commit = immutableCommits.get(input.newOid);
       if (!commit || commit.claimId !== input.claimId || commit.actionKey !== input.actionKey
@@ -816,7 +842,8 @@ export function createCoordinatorAtomicRecordBackend({
         return Object.freeze({status: 'CONFLICT'});
       }
 
-      const envelope = await readEnvelope();
+      const envelope = await readEnvelope(signal);
+      throwIfAborted(signal);
       if (envelope.snapshot.oid !== input.expectedOid || envelope.snapshot.revision !== input.expectedRevision) {
         return Object.freeze({status: 'CONFLICT'});
       }
@@ -863,11 +890,13 @@ export function createCoordinatorAtomicRecordBackend({
       }
       if (!validateCandidateEnvelope(nextEnvelope)) return Object.freeze({status: 'CONFLICT'});
 
-      const replaced = await replaceEnvelope(envelope.storageVersion, nextEnvelope);
+      const replaced = await replaceEnvelope(envelope.storageVersion, nextEnvelope, signal);
+      throwIfAborted(signal);
       if (replaced?.status === 'CONFLICT') return Object.freeze({status: 'CONFLICT'});
       if (replaced?.status !== 'REPLACED') throw new Error('UNCERTAIN_WRITE_ACK');
 
-      const readback = await readEnvelope();
+      const readback = await readEnvelope(signal);
+      throwIfAborted(signal);
       const durable = findClaim(readback.claims, nextClaim.executionKey);
       const durableApplied = durable && durable.claimId === nextClaim.claimId
         && durable.storageVersion === nextEnvelope.storageVersion
@@ -880,9 +909,10 @@ export function createCoordinatorAtomicRecordBackend({
       return Object.freeze({status: 'COMMITTED', oid: input.newOid});
     },
 
-    async readClaim(executionKey) {
+    async readClaim(executionKey, {signal} = {}) {
+      throwIfAborted(signal);
       if (!validKey(executionKey)) return null;
-      const envelope = await readEnvelope();
+      const envelope = await readEnvelope(signal);
       const claim = findClaim(envelope.claims, executionKey);
       return claim ? clone(claim) : null;
     },
