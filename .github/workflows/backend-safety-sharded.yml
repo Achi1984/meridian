@@ -22,9 +22,27 @@ jobs:
         run: |
           node --check server.js
           node --check server-gateway.js
+          node --check portfolio-authority-update.js
+          node --check okx-portfolio-authority-sync.js
+          node --check cloud-backtest.js
+          node --check scripts/read-token-auth.mjs
+          node --check scripts/start-gateway.mjs
+          node --check scripts/runtime-smoke.mjs
           node --check scripts/frozen-research-guard.mjs
           node --check scripts/continuity-audit.mjs
           node --check scripts/v10-ui-regression-check.mjs
+          node --check app-v6.06.js
+          node --check app-v7.32-legacy.js
+          node --check app-v7.33-hardening.js
+          node --check app-runtime-monitor.js
+          node --check app-v7.37-ui-polish.js
+          node --check v9/v9.js
+          node --check v10/v10.js
+          node --check v10/fib-core.js
+          node --check research/sk-paperbot-v1.js
+          node --check research/sk-research-v2.js
+          node --check research/documented-edge-v1.js
+          node --check research/tsmom-holdout-v1.js
       - name: Frozen research lineage
         run: node scripts/frozen-research-guard.mjs
       - name: Partition guard
@@ -58,7 +76,7 @@ jobs:
         with:
           name: meridian-v11-visual-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
           path: artifacts/v11-visual-qa-${{ matrix.shard }}/*.png
-          if-no-files-found: warn
+          if-no-files-found: error
           retention-days: 7
 
   safety-aggregate:
