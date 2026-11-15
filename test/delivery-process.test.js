@@ -11,14 +11,12 @@ test('release safety has one PR trigger, main-only pushes, and cancellation isol
   assert.match(triggers,/format\('pr-\{0\}', github\.event\.pull_request\.number\)/);
   assert.match(triggers,/format\('run-\{0\}', github\.run_id\)/);
   assert.match(triggers,/cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
-  const regressionStep=workflow.split('      - name: Research and auth regression tests\n')[1]?.split('      - name: ')[0];
-  assert.ok(regressionStep,'the regression hard gate remains present');
-  assert.match(regressionStep,/shell: bash\n\s+run: \|/);
-  assert.match(regressionStep,/for test_file in test\/\*\.test\.js; do/);
-  assert.match(regressionStep,/mapfile -t test_files < <\\(node scripts\\/release-safety-partition\\.mjs --shard/);
-  assert.match(regressionStep,/case "\\$\\{\\{ matrix\\.shard \\}\\}" in/);
-  assert.match(regressionStep,/timeout --signal=TERM --kill-after=60s 8m node --test/);
-  assert.match(regressionStep,/timeout --signal=TERM --kill-after=60s 35m node --test/);
+  const shardStep=workflow.split('      - name: Run ${{ matrix.shard }} shard\n')[1]?.split('      - name: Upload shard evidence')[0];
+  assert.ok(shardStep,'the sharded regression hard gate remains present');
+  assert.match(shardStep,/mapfile -t test_files < <\\(node scripts\\/release-safety-partition\\.mjs --shard/);
+  assert.match(shardStep,/case "\\$\\{\\{ matrix\\.shard \\}\\}" in/);
+  assert.match(shardStep,/timeout --signal=TERM --kill-after=60s 8m node --test/);
+  assert.match(shardStep,/timeout --signal=TERM --kill-after=60s 35m node --test/);
   assert.match(workflow,/safety-tests:/);
   // release-safety-test-partition.test.js executes this block and verifies
   // exact discovery coverage, no duplicate execution and failure propagation.
