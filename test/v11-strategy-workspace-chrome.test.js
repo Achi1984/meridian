@@ -377,7 +377,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').focus()`);
         await key('Enter','Enter',13);
         for(let attempt=0;attempt<100;attempt++){
-          if(await evaluate(`document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]').length===12`) &&
+          if(await evaluate(`document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]').length===12 &&
+            !!document.querySelector('.strategy-comparison')`) &&
             pairedSettled===1&&progressSettled===1)break;
           await new Promise(resolve=>setTimeout(resolve,25));
         }
