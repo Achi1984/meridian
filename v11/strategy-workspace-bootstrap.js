@@ -123,9 +123,17 @@ if(!mountedInitially){
 let loaded = false;
 let loading = false;
 let loadedCampaign = null;
+let recoveringComparison = false;
 function ensureComparisonMounted(){
-  if(loadedCampaign && !catalogRoot?.querySelector('.strategy-comparison'))
-    renderStrategyCatalog(catalogRoot,loadedCampaign);
+  const root=document.getElementById('strategy-catalog');
+  if(!root || !loadedCampaign || recoveringComparison || root.querySelector('.strategy-comparison'))return;
+  recoveringComparison = true;
+  try{
+    catalogRoot = root;
+    renderStrategyCatalog(root,loadedCampaign);
+  }finally{
+    recoveringComparison = false;
+  }
 }
 
 async function loadWorkspace() {
