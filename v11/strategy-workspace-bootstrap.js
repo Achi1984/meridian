@@ -17,7 +17,9 @@ let spotPaperHost8hDashboard = null;
 let paperBotReportWorkspace = null;
 let spotPaperThreeWayResearch = null;
 let comparisonRoot = null;
-let loadedCampaign = null;
+let workspaceMounted = false;
+let loaded = false;
+let loading = false;
 function collapsedSection(id,label,before=catalogRoot){
   const section=document.createElement('details');
   section.id=id;
@@ -72,17 +74,6 @@ function mountWorkspace(){
   comparisonRoot=document.createElement('section');
   comparisonRoot.id='strategy-comparison-mount';
   research.append(comparisonRoot);
-  research.querySelector(':scope > summary')?.addEventListener('click',()=>{
-    const root=document.getElementById('strategy-catalog');
-    if(!loadedCampaign || !root || root.querySelector('.strategy-comparison'))return;
-    try{
-      renderStrategyCatalog(root,loadedCampaign,document,undefined,
-        document.getElementById('strategy-comparison-mount'));
-    }catch(error){
-      if(typeof window!=='undefined')window.__strategyRecoveryError=String(error?.stack||error);
-      throw error;
-    }
-  });
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
   research.append(threeWayRoot);
@@ -99,17 +90,18 @@ function mountWorkspace(){
 let workspaceObserver = null;
 let pendingWorkspaceLoad = false;
 function mountWhenReady(){
-  if(mountWorkspace()){
+  if(!workspaceMounted){
+    if(!mountWorkspace())return false;
+    workspaceMounted = true;
     workspaceObserver?.disconnect();
     workspaceObserver = null;
     document.removeEventListener('DOMContentLoaded', mountWhenReady);
-    if(pendingWorkspaceLoad){
-      pendingWorkspaceLoad = false;
-      loadWorkspace();
-    }
-    return true;
   }
-  return false;
+  if(pendingWorkspaceLoad){
+    pendingWorkspaceLoad = false;
+    loadWorkspace();
+  }
+  return true;
 }
 function requestWorkspaceLoad(){
   pendingWorkspaceLoad = true;
@@ -120,10 +112,7 @@ function requestWorkspaceLoad(){
     spotPaperHost8hDashboard?.setActive(true);
     paperBotReportWorkspace?.setActive(true);
   }
-  if(mountWhenReady()){
-    pendingWorkspaceLoad = false;
-    loadWorkspace();
-  }
+  mountWhenReady();
 }
 function ensureStrategyWorkspace(options={}){
   const mounted = mountWhenReady();
@@ -140,8 +129,6 @@ if(!mountedInitially){
   workspaceObserver.observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded',mountWhenReady,{once:true});
 }
-let loaded = false;
-let loading = false;
 
 async function loadWorkspace() {
   if (loaded || loading) return;
@@ -152,14 +139,12 @@ async function loadWorkspace() {
     const response = await fetch(new URL(CAMPAIGN_SOURCE,import.meta.url).href,{cache:'no-store'});
     if (!response.ok) throw Error('Das Quellregister ist nicht verfügbar.');
     const campaign = await response.json();
-    const host=document.getElementById('strategy-comparison-mount');
-    const catalog = renderStrategyCatalog(catalogRoot,campaign,document,undefined,host);
+    const catalog = renderStrategyCatalog(catalogRoot,campaign,document,undefined,comparisonRoot);
     if (catalog.status !== 'PRESENT_UNVERIFIED') throw Error(catalog.reason);
-    loadedCampaign = campaign;
     loaded = true;
     catalogStatus.textContent = 'Zwölf Hypothesen aus dem lokalen Entwurfsregister; Entwicklungsstufen bleiben quellengebunden.';
   } catch (error) {
-    renderStrategyCatalog(catalogRoot,null,document,undefined,document.getElementById('strategy-comparison-mount'));
+    renderStrategyCatalog(catalogRoot,null,document,undefined,comparisonRoot);
     catalogStatus.textContent = String(error?.message || 'Das Strategieregister ist unbekannt.').slice(0,220);
     catalogStatus.setAttribute('role','alert');
   } finally {
