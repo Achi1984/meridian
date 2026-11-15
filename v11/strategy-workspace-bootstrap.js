@@ -31,7 +31,8 @@ function mountWorkspace(){
   catalogRoot = document.getElementById('strategy-catalog');
   catalogStatus = document.getElementById('strategy-load-status');
   arenaRoot = document.getElementById('strategy-arena-root');
-  if(!catalogRoot?.parentNode || document.getElementById('paper-research-section')) return false;
+  if(!catalogRoot?.parentNode) return false;
+  if(document.getElementById('paper-research-section')) return true;
   arena = createStrategyArenaView(arenaRoot);
   const workspace=catalogRoot.parentNode;
   const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
