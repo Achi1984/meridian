@@ -74,8 +74,14 @@ function mountWorkspace(){
   research.append(comparisonRoot);
   research.querySelector(':scope > summary')?.addEventListener('click',()=>{
     const root=document.getElementById('strategy-catalog');
-    if(loadedCampaign && root && !root.querySelector('.strategy-comparison'))
-      renderStrategyCatalog(root,loadedCampaign,document,undefined,comparisonRoot);
+    if(!loadedCampaign || !root || root.querySelector('.strategy-comparison'))return;
+    try{
+      renderStrategyCatalog(root,loadedCampaign,document,undefined,
+        document.getElementById('strategy-comparison-mount'));
+    }catch(error){
+      if(typeof window!=='undefined')window.__strategyRecoveryError=String(error?.stack||error);
+      throw error;
+    }
   });
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
