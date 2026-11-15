@@ -1,6 +1,3 @@
-Warning: truncated output (original token count: 44172)
-Total output lines: 1569
-
 import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {createServer} from 'node:http';
@@ -460,7 +457,458 @@ const botReadControls=`        <div class="bot-access-controls">
 const compactBotsMarkupWithAccess=compactBotsMarkup.replace('        <div id="bot-read-root"></div>',botReadControls+'        <div id="bot-read-root"></div>');
 const botPresentationMarkupBeforeWithAccess=botPresentationMarkupBefore.replace('        <div id="bot-read-root"></div>',botReadControls+'        <div id="bot-read-root"></div>');
 const botPresentationDeltas=[[botPresentationCssBefore,botPresentationCssAfter]];
-const b9Deltas=[["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>\n", "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B9<small>Versionsverlauf ▾</small></button>\n"], ["          <p><b>Diese Vors…14172 tokens truncated…close baseline and stays outside version history',()=>{
+const b9Deltas=[["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>\n", "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B9<small>Versionsverlauf ▾</small></button>\n"], ["          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/764\">B8-Umfang #764</a>.</p>\n", "          <p><b>Diese Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/766\">B9-Umfang #766</a>.</p>\n"], ["", "        <li><strong>Meridian 11 · B9</strong><span class=\"version-status\">Testvorschau</span><p>Command übernimmt die manuell geladene Depotbewertung und deren Sperre. Verlauf mit Zeitachse und vorhandenem Messzeitraum.</p></li>\n"], ["        <div><div class=\"eyebrow\">COMMAND CENTER</div><h1 id=\"command-heading\">Alles Wesentliche.<br>Ein Blick.</h1><p class=\"sub\">Deine zentrale Übersicht – derzeit als reine Designvorschau.</p></div>\n", "        <div><div class=\"eyebrow\">COMMAND CENTER</div><h1 id=\"command-heading\">Alles Wesentliche.<br>Ein Blick.</h1><p class=\"sub\">Deine zentrale Übersicht mit manuell geladener Depotbewertung.</p></div>\n"], ["        <h2>Datenanbindung steht noch aus</h2>\n        <p>Diese Übersicht verarbeitet keine Depot- oder Marktdaten. Bot-Snapshots können ausschließlich im Bots-Tab manuell gelesen werden. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>\n", "        <h2>Depot im Überblick · Risiko ungeklärt</h2>\n        <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen. Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen.</p>\n"], ["      <section class=\"card\" aria-label=\"Portfolio\">\n", "      <section id=\"command-portfolio\" class=\"card\" aria-label=\"Portfolio\">\n"], ["          <div class=\"trust-cell\"><strong>DEPOT</strong><span>Unbekannt</span></div>\n", "          <div class=\"trust-cell\"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>\n"], ["          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Bot-Lesezugang.</p>\n", "          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>\n"], ["            <p>Nur Ansichtsmuster ohne Kontozugriff. Depotwert und Risikostatus bleiben unbekannt.</p>\n", "            <p>Nur Ansichtsmuster ohne Kontozugriff. Sie verändern weder die geladene Depotbewertung noch den Risikostatus.</p>\n"], ["<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B8\"></script>\n", "<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B9\"></script>\n"]];
+const b8Deltas=[["    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}\n", "    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}\n    .depot-history{margin-top:24px;border-top:1px solid #334155;padding-top:16px}\n    .depot-history svg{display:block;width:100%;height:auto;color:#93c5fd;margin:16px 0}\n    .depot-range{display:flex;flex-wrap:wrap;gap:8px}\n    .depot-range button[aria-pressed=\"true\"]{background:#1e3a5f;border-color:#93c5fd}\n    .depot-history p{overflow-wrap:anywhere;font-size:14px}\n"], ["      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B7<small>Versionsverlauf ▾</small></button>\n", "      <button id=\"version-toggle\" type=\"button\" class=\"preview-pill version-toggle\" aria-expanded=\"false\" aria-controls=\"version-panel\">11 · Vorschau B8<small>Versionsverlauf ▾</small></button>\n"], ["          <p><b>Diese Vorschau · B7:</b> Depotbewertung manuell lesen: Gesamtwert, Spot und Pionex mit Zeitnachweis. Gespeicherte Bewertung, keine Live-Kurse. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/762\">B7-Umfang #762</a>.</p>\n", "          <p><b>Diese Vorschau · B8:</b> Depotbewertung und Verlauf getrennt laden. Zeiträume 1h, 1 Tag und 1 Woche; Datenlücken bleiben sichtbar. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/764\">B8-Umfang #764</a>.</p>\n"], ["      <ul class=\"version-history-list\">\n", "      <ul class=\"version-history-list\">\n        <li><strong>Meridian 11 · B8</strong><span class=\"version-status\">Testvorschau</span><p>Depotbewertung unabhängig von der Historie. Verlauf für 1h, 1 Tag und 1 Woche mit sichtbaren Datenlücken; keine Renditeberechnung.</p></li>\n"], ["        <p class=\"caption\">Letzte vollständige gespeicherte Bewertung. Keine Live-Kurse oder aktuelle Bestandsübersicht.</p>\n", "        <p class=\"caption\">Depotbewertung aus serverseitigen Quellen. Der gespeicherte Verlauf wird getrennt geprüft.</p>\n"], ["<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B7\"></script>\n", "<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B8\"></script>\n"]];
+const b7Deltas=[
+  [
+    "11 · Vorschau B6<small>",
+    "11 · Vorschau B7<small>"
+  ],
+  [
+    "          <p><b>Diese Vorschau · B6:</b> P/L-Werte farblich hervorgehoben: Verlust rot, Gewinn grün. Unbestätigte Werte bleiben neutral. Kontrollierte Testvorschau · Geräteabnahme ausstehend. Aufbauend auf <a href=\"https://github.com/Achi1984/meridian/pull/740\">Botanbindung #740</a>.</p>\n",
+    "          <p><b>Diese Vorschau · B7:</b> Depotbewertung manuell lesen: Gesamtwert, Spot und Pionex mit Zeitnachweis. Gespeicherte Bewertung, keine Live-Kurse. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href=\"https://github.com/Achi1984/meridian/issues/762\">B7-Umfang #762</a>.</p>\n"
+  ],
+  [
+    "        <li><strong>Meridian 11 · B6</strong><span class=\"version-status\">Testvorschau</span><p>P/L-Farben: Verluste rot, Gewinne grün. Nicht bestätigte Werte bleiben neutral; Vorzeichen und Zahlen bleiben lesbar.</p></li>\n",
+    "        <li><strong>Meridian 11 · B7</strong><span class=\"version-status\">Testvorschau</span><p>Manueller Depot-Lesezugang mit getrennter Sperre, Zeitprüfung und gespeicherter Gesamtbewertung. Kein automatisches Laden, keine Bestands- oder Renditebehauptung.</p></li>\n        <li><strong>Meridian 11 · B6</strong><span class=\"version-status\">Testvorschau</span><p>P/L-Farben: Verluste rot, Gewinne grün. Nicht bestätigte Werte bleiben neutral; Vorzeichen und Zahlen bleiben lesbar.</p></li>\n"
+  ],
+  [
+    "data-preview-mode=\"manual-bot-read-only\"",
+    "data-preview-mode=\"manual-bot-depot-read-only\""
+  ],
+  [
+    "    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}",
+    "    .bot-read-view .bot-card .bot-pnl-positive{color:#6ee7b7}\n    .depot-read-view .depot-total{font-size:28px;font-weight:750;line-height:1.3}\n    .depot-read-view dl{display:grid;grid-template-columns:minmax(0,1fr);gap:6px}\n    .depot-read-view dd{margin:0 0 12px;font-weight:650;overflow-wrap:anywhere}"
+  ],
+  [
+    "      <section class=\"card\" aria-labelledby=\"depot-summary-heading\">\n        <div class=\"card-head\"><h2 id=\"depot-summary-heading\">Depotübersicht</h2><span class=\"limited\">Statische Vorschau</span></div>\n        <div class=\"portfolio-row\"><div><p class=\"caption\">Gesamtwert</p><div class=\"portfolio-value\" aria-label=\"Gesamtwert unbekannt\">—</div><p class=\"portfolio-description\">Unbekannt</p></div></div>\n        <p class=\"caption\">Keine Depotdaten verbunden. Der Wert ist unbekannt – nicht null.</p>\n        <div class=\"trust-grid\" aria-label=\"Datenstatus des Depots\">\n          <div class=\"trust-cell\"><strong>Quelle</strong><span>Nicht verbunden</span></div>\n          <div class=\"trust-cell\"><strong>Aktualität</strong><span>Keine bestätigten Daten</span></div>\n          <div class=\"trust-cell\"><strong>Verlauf</strong><span>Nicht verfügbar</span></div>\n        </div>\n      </section>\n      <section class=\"card card-muted\" aria-labelledby=\"depot-holdings-heading\">\n        <h2 id=\"depot-holdings-heading\">Deine Bestände</h2>\n        <p class=\"caption\">Ohne bestätigte Daten lassen sich Bestände und Verteilung nicht anzeigen.</p>\n      </section>\n      <p class=\"caption\">Diese Depotansicht ist nicht angebunden. „Terminal öffnen“ führt zum separaten Terminal.</p>\n",
+    "      <section class=\"card\" aria-labelledby=\"depot-summary-heading\">\n        <div class=\"card-head\"><h2 id=\"depot-summary-heading\">Depotbewertung</h2><span class=\"limited\">Nur lesend</span></div>\n        <p class=\"caption\">Letzte vollständige gespeicherte Bewertung. Keine Live-Kurse oder aktuelle Bestandsübersicht.</p>\n        <div class=\"bot-access-controls\">\n          <label for=\"depot-read-token\">Meridian-Lesepasswort für das Depot</label>\n          <input id=\"depot-read-token\" type=\"password\" autocomplete=\"off\" autocapitalize=\"none\" spellcheck=\"false\" maxlength=\"4096\" aria-describedby=\"depot-read-access-help\">\n          <p id=\"depot-read-access-help\">Asset-Watch-Links gelten nur für Bots. Passwort nur vorübergehend im Arbeitsspeicher; Sperren, Ausblenden oder Verlassen der Seite löscht den Zugang.</p>\n          <button id=\"depot-read-provide\" type=\"button\">Depot-Lesezugang übernehmen</button>\n          <p id=\"depot-read-access-status\" role=\"status\" aria-live=\"polite\"></p>\n        </div>\n        <div id=\"depot-read-root\"></div>\n      </section>\n      <section class=\"card card-muted\" aria-labelledby=\"depot-holdings-heading\">\n        <h2 id=\"depot-holdings-heading\">Deine Bestände</h2>\n        <p class=\"caption\">Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.</p>\n      </section>\n"
+  ],
+  [
+    "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>",
+    "<script type=\"module\" src=\"./bot-read-bootstrap.js?v=B6\"></script>\n<script type=\"module\" src=\"./depot-read-bootstrap.js?v=B7\"></script>"
+  ]
+];
+const b12Deltas=[
+  [
+    '    .terminal-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}\n    .terminal-entry-link:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}\n',
+    '    .terminal-entry-link,.strategy-entry-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;min-width:44px;max-width:100%;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}\n    .terminal-entry-link:focus-visible,.strategy-entry-link:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}\n'
+  ],
+  [
+    '',
+    '    .command-open-strategies{display:inline-flex;align-items:center;justify-content:center;min-height:44px;max-width:100%;margin-top:12px;padding:10px 14px;border:1px solid #44607b;border-radius:10px;background:#142235;color:#d7e6f6;font-size:13px;line-height:1.5;font-weight:650;text-underline-offset:3px;overflow-wrap:anywhere}\n    .command-open-strategies:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}\n'
+  ],
+  [
+    '    #view-research .view-placeholder{border-top:3px solid #d49aff}\n',
+    '    #view-strategies .view-placeholder{border-top:3px solid #d49aff}\n'
+  ],
+  [
+    '    #nav button[data-v="research"].active{color:#d49aff}\n',
+    '    #nav button[data-v="strategies"].active{color:#d49aff}\n'
+  ],
+  [
+    '',
+    '    .arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"]{min-width:0;overflow-wrap:anywhere}\n    .arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] section,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dl,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dt,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] dd,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] p,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] h4,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] h5,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] ul,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] li,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] summary,.arena-historical-metadata[aria-label^="Separates historisches Arena-Ergebnis"] pre{min-width:0;overflow-wrap:anywhere}\n'
+  ],
+  [
+    '    @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}\n    .strategy-load-status{min-height:44px;padding:12px 0;color:var(--state-unknown);overflow-wrap:anywhere}\n    .strategy-source-notice{border-top:3px solid var(--research)}\n    .strategy-card-head{display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:8px}\n    .strategy-id{font-size:12px;font-weight:800;letter-spacing:.08em;color:#d8c8ff}\n    .strategy-family h2,.strategy-candidate h2{margin-bottom:8px}\n    .strategy-family>p,.strategy-candidate>p{font-size:13px;line-height:1.65;overflow-wrap:anywhere}\n    .strategy-summary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:13px 0}\n    .strategy-summary>div{min-width:0;padding:9px;border:1px solid #344356;border-radius:10px;background:#101824}\n    .strategy-summary dt{font-size:10px;color:var(--muted)}\n    .strategy-summary dd{margin:3px 0 0;font-size:12px;font-weight:650;overflow-wrap:anywhere}\n    .strategy-progression{list-style:none;padding:0;margin:12px 0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:5px}\n    .strategy-progression li{min-width:0;padding:8px 6px;border:1px solid #344356;border-radius:9px;background:#101824}\n    .strategy-progression strong,.strategy-progression span{display:block;font-size:10px;line-height:1.4;overflow-wrap:anywhere}\n    .strategy-progression span{margin-top:4px;color:var(--state-unknown)}\n    .strategy-family details{margin:10px 0 0}\n    .strategy-family details summary,.arena-evidence summary,.arena-evidence-details summary{min-height:48px;letter-spacing:0;text-transform:none}\n    .strategy-candidate{border-color:#776346;background:linear-gradient(160deg,#28251d,#111923 70%)}\n    .strategy-arena{margin-top:20px;padding-top:10px;border-top:1px solid var(--line)}\n    .strategy-arena>p{font-size:13px;line-height:1.65;overflow-wrap:anywhere}\n    .arena-toolbar{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin:14px 0}\n    .arena-toolbar button,.arena-import{min-width:0;min-height:48px;padding:10px;border:1px solid #567a9f;border-radius:10px;background:#142235;color:var(--text);font-size:12px;line-height:1.4;font-weight:650;overflow-wrap:anywhere}\n    .arena-toolbar button{cursor:pointer}\n    .arena-import{display:flex;align-items:center;justify-content:center;text-align:center;cursor:pointer}\n    .arena-import input{width:100%;min-width:0;min-height:44px;font-size:11px}\n    .arena-toolbar button:focus-visible,.arena-import:focus-within{outline:3px solid #9bc9ff;outline-offset:2px}\n    .arena-toolbar button:disabled{opacity:.55;cursor:not-allowed}\n    .arena-evidence{color:var(--state-unknown);font-size:12px;font-weight:750;overflow-wrap:anywhere}\n    .arena-models{display:grid;gap:10px;margin:12px 0}\n    .arena-model-card{min-width:0;padding:14px;border:1px solid #344356;border-radius:14px;background:#101824;overflow-wrap:anywhere}\n    .arena-model-card header{display:flex;justify-content:space-between;align-items:flex-start;gap:8px}\n    .arena-model-card header>div{min-width:0}\n    .arena-model-card header strong,.arena-model-card header span{display:block}\n    .arena-model-card header span{margin-top:4px;font-size:10px;color:var(--state-unknown)}\n    .arena-model-card header>b{font-size:13px;white-space:nowrap}\n    .arena-model-card p{font-size:11px;line-height:1.6;margin-top:8px;overflow-wrap:anywhere}\n    .arena-model-card dl{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;margin:12px 0}\n    .arena-model-card dl>div{min-width:0;padding:7px;border-radius:8px;background:#172336}\n    .arena-model-card dt{font-size:9px;color:var(--muted)}\n    .arena-model-card dd{margin:3px 0 0;font-size:11px;font-weight:700;overflow-wrap:anywhere}\n    .arena-blocked,.arena-unknown{padding:10px;border:1px solid #776346;border-radius:9px;color:var(--state-unknown)}\n    .arena-evidence{margin:10px 0}\n    .arena-evidence summary{font-size:10px}\n    .arena-evidence-details{margin-top:8px}\n    .arena-evidence-details ul{padding-left:18px;overflow-wrap:anywhere}\n    .arena-control{padding:10px;border:1px solid var(--line);border-radius:9px;font-size:11px;overflow-wrap:anywhere}\n    .tone-safe{color:#6ee7b7}.tone-danger{color:#ff9b9b}.tone-muted{color:var(--muted)}\n    @media(max-width:560px){.strategy-summary{grid-template-columns:1fr}.strategy-progression{grid-template-columns:1fr 1fr}.arena-toolbar{grid-template-columns:1fr}.arena-model-card{padding:11px}}\n    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{font-size:9px;letter-spacing:-.03em}}\n    @media(forced-colors:active){.strategy-family,.strategy-candidate,.arena-model-card,.strategy-progression li{border-color:CanvasText}}\n',
+    '    @media(max-width:350px){.card{padding:14px}.container{padding-top:12px}.autonomy-strip>summary{padding-left:9px;padding-right:9px}}\n'
+  ],
+  [
+    '      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B11<small>Versionsverlauf ▾</small></button>\n',
+    '      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B12<small>Versionsverlauf ▾</small></button>\n'
+  ],
+  [
+    '        <p><b>Diese Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>\n',
+    '        <p><b>Diese Vorschau · B12:</b> Native Strategien-Ansicht mit zwölf Hypothesen, fünf Arena-Modellen und einem getrennten Entwicklungs-Kandidaten. Nur lokale Forschungsquellen und manuelle Diagnose; keine laufenden Paper- oder Live-Aktivitäten.</p>\n        <p><b>Vorige Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>\n'
+  ],
+  [
+    '        <li><strong>Meridian 11 · B11</strong><span class="version-status">Entwurf</span><p>Bot-Cockpit mit Suche, Richtung/Kontraktart-Filtern und deterministischer Sortierung. Command zeigt denselben validierten Snapshot und verlinkt bestätigte Quellverluste zur Karte. Reine Testvorschau; keine Risikorangfolge, neue Datenanbindung oder Funktionsfreigabe.</p></li>\n',
+    '        <li><strong>Meridian 11 · B12</strong><span class="version-status">Entwurf</span><p>Strategien-Arbeitsbereich mit dem Quellregister, einer manuell bedienbaren M11-Arena und einem getrennten B1-7-Entwicklungskandidaten. Keine automatische Marktdatenbeschaffung, kein Paperbetrieb und keine Live-Freigabe.</p></li>\n        <li><strong>Meridian 11 · B11</strong><span class="version-status">Testvorschau</span><p>Bot-Cockpit mit Suche, Richtung/Kontraktart-Filtern und deterministischer Sortierung. Command zeigt denselben validierten Snapshot und verlinkt bestätigte Quellverluste zur Karte. Reine Testvorschau; keine Risikorangfolge, neue Datenanbindung oder Funktionsfreigabe.</p></li>\n'
+  ],
+  [
+    '    <nav class="terminal-entry" aria-label="Terminal-Zugang">\n      <a class="terminal-entry-link" href="../v10/">Terminal öffnen</a>\n    </nav>\n',
+    '    <nav class="terminal-entry" aria-label="M11-Strategien">\n      <a class="strategy-entry-link" href="#view-strategies" data-open-strategies>Strategien öffnen</a>\n    </nav>\n'
+  ],
+  [
+    '      </section>\n      <details class="command-context-details">\n',
+    '      </section>\n      <section class="card command-strategies" aria-labelledby="command-strategies-heading">\n        <div class="card-head"><h2 id="command-strategies-heading">Strategieforschung</h2><span class="limited">Keine Handelsaktivität</span></div>\n        <p>12 Hypothesen im Entwurfsregister, vier Arena-Modelle mit historischen Diagnosen sowie H9 mit BLOCKED_DATA und B1-7 als getrennter Entwicklungskandidat ohne Ergebnisse. Kein laufendes Paper.</p>\n        <a class="command-open-strategies" href="#view-strategies" data-open-strategies>Strategien in M11 öffnen</a>\n      </section>\n      <details class="command-context-details">\n'
+  ],
+  [
+    '      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. „Terminal öffnen“ führt zum separaten Terminal.</p>\n',
+    '      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>\n'
+  ],
+  [
+    '    <section id="view-research" class="view" aria-labelledby="scanner-heading" hidden>\n      <div class="eyebrow">RESEARCH &amp; CHANCEN</div><h1 id="scanner-heading">Scanner</h1>\n      <div class="card view-placeholder"><span class="limited module-availability">In Vorbereitung</span><h2>Research-Chancen erst nach Evidenz</h2><p>Der Scanner soll nachvollziehbare Research-Kandidaten zeigen. Aktuell sind keine Research-Ausgaben oder freigegebenen Signale verfügbar; es entstehen keine Handelsaufträge oder Paper-Bots.</p></div>\n    </section>\n',
+    '    <section id="view-strategies" class="view" aria-labelledby="strategies-heading" hidden>\n      <div class="eyebrow">HYPOTHESEN · EVIDENZ · BLOCKER</div><h1 id="strategies-heading">Strategien</h1>\n      <p class="sub">Strategieforschung in M11 ist getrennt von den Exchange-Bots im Bots-Tab. Keine automatische Promotion, Paper-Ausführung oder Handelsfreigabe.</p>\n      <p id="strategy-load-status" class="strategy-load-status" role="status" aria-live="polite">Das lokale Register wird erst beim Öffnen dieser Ansicht gelesen.</p>\n      <div id="strategy-catalog" aria-busy="false"></div>\n      <div id="strategy-arena-root"></div>\n    </section>\n'
+  ],
+  [
+    '    <button type="button" data-v="research" aria-controls="view-research"><span class="nav-icon" aria-hidden="true">◇</span><span>SCANNER</span></button>\n',
+    '    <button type="button" data-v="strategies" aria-controls="view-strategies"><span class="nav-icon" aria-hidden="true">◇</span><span>STRATEGIEN</span></button>\n'
+  ],
+  [
+    '<script type="module" src="./bot-read-bootstrap.js?v=B11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B9"></script>\n',
+    '<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B12"></script>\n'
+  ],
+  [
+    '',
+    '  <style id="m11-compact-nav">\n    @media(max-width:430px){#nav{grid-template-columns:repeat(4,minmax(44px,1fr)) minmax(44px,1.3fr)}}\n    @media(max-width:350px){#nav{grid-template-columns:minmax(44px,1.2fr) minmax(44px,.8fr) minmax(44px,.75fr) minmax(44px,1.15fr) minmax(44px,1.35fr)}}\n  </style>\n'
+  ]
+];
+const mobileNavDelta=[
+  '    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{font-size:9px;letter-spacing:-.03em}}\n',
+  '    @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{letter-spacing:-.03em}}\n'
+];
+const b13Deltas=[
+ [
+   '      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B12<small>Versionsverlauf ▾</small></button>\n',
+   '      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B13<small>Versionsverlauf ▾</small></button>\n'
+ ],
+ [
+   '        <p><b>Diese Vorschau · B12:</b> Native Strategien-Ansicht mit zwölf Hypothesen, fünf Arena-Modellen und einem getrennten Entwicklungs-Kandidaten. Nur lokale Forschungsquellen und manuelle Diagnose; keine laufenden Paper- oder Live-Aktivitäten.</p>\n',
+   '        <p><b>Diese Vorschau · B13:</b> Einheitliche Cache-Identitäten für das lokale M11-Modulnetz nach Auslieferung der Research-Oberfläche. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>\n'
+ ],
+ [
+   '        <li><strong>Meridian 11 · B12</strong><span class="version-status">Entwurf</span><p>Strategien-Arbeitsbereich mit dem Quellregister, einer manuell bedienbaren M11-Arena und einem getrennten B1-7-Entwicklungskandidaten. Keine automatische Marktdatenbeschaffung, kein Paperbetrieb und keine Live-Freigabe.</p></li>\n',
+   '        <li><strong>Meridian 11 · B13</strong><span class="version-status">Entwurf</span><p>Einheitliche Cache-Identitäten für das lokale M11-Modulnetz nach Auslieferung der Research-Oberfläche. <a href="https://github.com/Achi1984/meridian/issues/953">Umfang #953</a> · <a href="https://github.com/Achi1984/meridian/pull/956">Research-Oberfläche #956</a>. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p></li>\n        <li><strong>Meridian 11 · B12</strong><span class="version-status">Entwurf</span><p>Strategien-Arbeitsbereich mit dem Quellregister, einer manuell bedienbaren M11-Arena und einem getrennten B1-7-Entwicklungskandidaten. Keine automatische Marktdatenbeschaffung, kein Paperbetrieb und keine Live-Freigabe.</p></li>\n'
+ ],
+ [
+   '<script type="module" src="./bot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B12"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B12"></script>\n',
+   '<script type="module" src="./bot-read-bootstrap.js?v=B13"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B13"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B13"></script>\n'
+ ]
+];
+const appAccessDeltas=[
+  ['',`    #app[hidden],#app-access-gate[hidden]{display:none!important}
+    .app-access-gate{min-height:100vh;min-height:100dvh;display:grid;place-items:center;padding:24px max(16px,env(safe-area-inset-left,0px))}
+    .app-access-card{width:min(100%,440px);padding:24px;border:1px solid #39516b;border-radius:18px;background:linear-gradient(160deg,#172337,#111b29);box-shadow:0 12px 30px #00000025}
+    .app-access-card h1{font-size:clamp(25px,7vw,34px);margin:0 0 8px}
+    .app-access-card p{font-size:13px;line-height:1.6;margin:8px 0}
+    .app-access-card label{display:block;margin:18px 0 6px;font-size:13px;font-weight:650}
+    .app-access-card input,.app-access-card button,.app-access-lock{min-width:44px;min-height:44px}
+    .app-access-card input{width:100%;padding:10px;border:1px solid #567a9f;border-radius:8px;background:#101b28;color:var(--text);font-size:16px}
+    .app-access-card button,.app-access-lock{padding:10px 14px;border:1px solid #567a9f;border-radius:8px;background:#142235;color:var(--text);cursor:pointer}
+    .app-access-card button{width:100%;margin-top:12px;font-weight:700}
+    .app-access-card :focus-visible,.app-access-lock:focus-visible{outline:3px solid #9bc9ff;outline-offset:3px}
+    .header-actions{display:flex;align-items:center;gap:8px;flex:none}
+    @media(max-width:350px){.header-inner{flex-wrap:wrap}.header-actions{margin-left:auto}.app-access-card{padding:18px}}
+`],
+  [`<body>
+<a class="skip-link" href="#app-main">Zum Inhalt</a>
+<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="manual-bot-depot-read-only" data-execution-impact="false">
+  <header class="topbar">`,`<body>
+<section id="app-access-gate" class="app-access-gate" aria-labelledby="app-access-heading">
+  <div class="app-access-card">
+    <div class="eyebrow">MERIDIAN · LESEZUGANG</div>
+    <h1 id="app-access-heading">Meridian öffnen</h1>
+    <p>Gib dein Meridian-Passwort ein. Der Zugang wird vorübergehend im Arbeitsspeicher gehalten und nach 15 Minuten gesperrt.</p>
+    <form id="app-access-form">
+      <label for="app-access-password">Meridian-Passwort</label>
+      <input id="app-access-password" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" required aria-describedby="app-access-help">
+      <p id="app-access-help">Asset-Watch-Freigabelinks gelten nur für Bots und können die App nicht öffnen.</p>
+      <button type="submit">Öffnen</button>
+      <p id="app-access-status" role="status" aria-live="polite" aria-atomic="true">Gesperrt. Das Meridian-Passwort wird nicht gespeichert.</p>
+    </form>
+  </div>
+</section>
+<div id="app" class="app-shell v11-shell" data-ui-generation="11" data-preview-mode="manual-bot-depot-read-only" data-execution-impact="false" hidden>
+  <a class="skip-link" href="#app-main">Zum Inhalt</a>
+  <header class="topbar">`],
+  [`      <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B14<small>Versionsverlauf ▾</small></button>`,
+   `      <div class="header-actions">
+        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B14<small>Versionsverlauf ▾</small></button>
+        <button id="app-access-lock" class="app-access-lock" type="button" aria-label="App sperren">Sperren</button>
+      </div>`],
+  [`        <div class="bot-access-controls">
+          <label for="depot-read-token">Meridian-Lesepasswort für das Depot</label>
+          <input id="depot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="depot-read-access-help">
+          <p id="depot-read-access-help">Asset-Watch-Links gelten nur für Bots. Passwort nur vorübergehend im Arbeitsspeicher; Sperren, Ausblenden oder Verlassen der Seite löscht den Zugang.</p>
+          <button id="depot-read-provide" type="button">Depot-Lesezugang übernehmen</button>
+          <p id="depot-read-access-status" role="status" aria-live="polite"></p>
+        </div>
+        <div id="depot-read-root"></div>`,
+   `        <div id="depot-read-root"></div>`],
+  [`        <div class="bot-access-controls">
+          <label for="bot-read-token">Asset-Watch-Link oder Meridian-Lesepasswort</label>
+          <input id="bot-read-token" type="password" autocomplete="off" autocapitalize="none" spellcheck="false" maxlength="4096" aria-describedby="bot-read-access-help">
+          <p id="bot-read-access-help">Bestehenden Asset-Watch-Freigabelink aus Meridian 10 oder Meridian-Lesepasswort einfügen. Kein Börsen-API-Schlüssel. Der Zugang bleibt nur bis zum Sperren, Verlassen oder Ausblenden dieser Seite im Arbeitsspeicher.</p>
+          <button id="bot-read-provide" type="button">Lesezugang übernehmen</button>
+          <p id="bot-read-access-status" role="status" aria-live="polite"></p>
+        </div>
+        <div id="bot-read-root"></div>`,
+   `        <div id="bot-read-root"></div>`],
+  [`<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B14"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>`,
+   `<script type="module" src="./app-access-bootstrap.js?v=B14-M11-DEPOT976"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B14-M11-DEPOT976"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B14-M11-DEPOT976"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B14-M11-DEPOT976"></script>`],
+  ['', '    @media(max-width:350px){.header-inner{flex-wrap:nowrap}.identity{gap:6px}.mark{width:32px;height:32px}.brand{font-size:12px}.brand small{display:none}.header-actions{gap:4px}.version-toggle{padding:4px;font-size:10px;letter-spacing:0}.version-toggle small{display:none}}\n']
+];
+const b14Deltas=[
+ [
+   '11 · Vorschau B13<small>Versionsverlauf ▾</small>',
+   '11 · Vorschau B14<small>Versionsverlauf ▾</small>'
+ ],
+ [
+   '        <p><b>Diese Vorschau · B13:</b> Einheitliche Cache-Identitäten für das lokale M11-Modulnetz nach Auslieferung der Research-Oberfläche. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>\n',
+   '        <p><b>Diese Vorschau · B14:</b> Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich und gelieferten Quartalsrenditen. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>\n'
+ ],
+ [
+   '',
+   '        <li><strong>Meridian 11 · B14</strong><span class="version-status">Entwurf</span><p>Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich, Pfaddetails und gelieferten Quartalsrenditen. <a href="https://github.com/Achi1984/meridian/issues/961">Umfang #961</a>. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p></li>\n'
+ ],
+ [
+   '<script type="module" src="./bot-read-bootstrap.js?v=B13"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B13"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B13"></script>\n',
+   '<script type="module" src="./bot-read-bootstrap.js?v=B14"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B14"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B14"></script>\n'
+ ]
+];
+const b15Deltas=[
+  [
+    '11 · Vorschau B14<small>Versionsverlauf ▾</small>',
+    '11 · Vorschau B15<small>Versionsverlauf ▾</small>'
+  ],
+  [
+    '        <li><strong>Meridian 11 · B14</strong><span class="version-status">Entwurf</span><p>Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich, Pfaddetails und gelieferten Quartalsrenditen. <a href="https://github.com/Achi1984/meridian/issues/961">Umfang #961</a>. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p></li>\n',
+    '        <li><strong>Meridian 11 · B15</strong><span class="version-status">Entwurf</span><p>Kompakte Bot-Karten und Command-Zeilen mit lesbaren Beträgen, erweiterten Details und responsiven synthetischen Prüfungen. Keine neue Datenanbindung oder Betriebsfreigabe.</p></li>\n        <li><strong>Meridian 11 · B14</strong><span class="version-status">Entwurf</span><p>Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich, Pfaddetails und gelieferten Quartalsrenditen. <a href="https://github.com/Achi1984/meridian/issues/961">Umfang #961</a>. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p></li>\n'
+  ],
+  [
+    '        <p><b>Diese Vorschau · B14:</b> Research-Ausgaben unverifiziert. <b>Vorige Vorschau · B11:</b> Manuelle Bot-Snapshots; Testvorschau · Geräteabnahme ausstehend.</p>\n',
+    '        <p><b>Diese Vorschau · B15:</b> Kompakte Bot-Karten und Command-Zeilen; synthetische Darstellungstests, keine Betriebsfreigabe. <b>Vorige Vorschau · B14:</b> Research-Ausgaben unverifiziert. <b>Vorige Vorschau · B11:</b> Manuelle Bot-Snapshots; Testvorschau · Geräteabnahme ausstehend.</p>\n'
+  ],
+  [
+    '<script type="module" src="./app-access-bootstrap.js?v=B14-M11-DEPOT976"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B14-M11-DEPOT976"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B14-M11-DEPOT976"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B14-M11-DEPOT976"></script>',
+    '<script type="module" src="./app-access-bootstrap.js?v=B15-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B15-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B15-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B15-M11"></script>'
+  ]
+];
+const b16CacheDelta=[
+  [
+    '<script type="module" src="./app-access-bootstrap.js?v=B15-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B15-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B15-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B15-M11"></script>',
+    '<script type="module" src="./app-access-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11"></script>'
+  ]
+];
+const b17CacheDelta=[
+  [
+    '<script type="module" src="./app-access-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11"></script>',
+    '<script type="module" src="./app-access-bootstrap.js?v=B17-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B17-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B17-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B17-M11"></script>'
+  ]
+];
+const commandPresentationDeltas=[
+  [
+    `      <div class="details-body">
+        <p>Kein aktuelles Betriebssignal verbunden. Ob ein Agent arbeitet oder warum er wartet, ist hier nicht feststellbar.</p>
+        <p><b>Aktuelle Aufgabe:</b> Nicht verifiziert.</p>
+        <p><b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb noch nicht.</p>
+        <p><b>Diese Vorschau · B14:</b> Research Results Explorer für 44 Producerpfade mit Filtern, Zweipfadvergleich und gelieferten Quartalsrenditen. UNVERIFIED · Herkunft nicht bestätigt. Keine neuen Research-Ergebnisse oder Paper-/Live-Aktivitäten.</p>
+        <p><b>Vorige Vorschau · B11:</b> Manuell geladene Bot-Snapshots filtern, ordnen und mit Command teilen. Nur bestätigte Quellwerte; Sprung zur passenden Karte. Draft, Geräteabnahme ausstehend.</p>
+        <p><b>Vorige Vorschau · B10:</b> Kompakter Header und klarere Command-Hierarchie. Layout-Entwurf ohne neue Datenanbindung; Integration und Geräteabnahme ausstehend.</p>
+        <p><b>Vorige Vorschau · B9:</b> Geladene Depotbewertung auch in Command. Verlauf mit Zeitachse und ausgewiesenem Messzeitraum. Kontrollierte Testvorschau · Geräteabnahme ausstehend. <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>.</p>
+        <p><b>Zuletzt belegte UI-Änderung · B1:</b> Botübersicht mit Quellen- und Risikostatus. Integriert am <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Änderungsnachweis #702</a>.</p>
+        <p>Der Versionsstand ist kein Lebenszeichen eines Entwicklungsagenten.</p>
+      </div>`,
+    `      <div class="details-body">
+        <p>Kein aktuelles Betriebssignal. <b>Aktuelle Aufgabe:</b> Nicht verifiziert. <b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb nicht.</p>
+        <p><b>Diese Vorschau · B14:</b> Research-Ausgaben unverifiziert. <b>Vorige Vorschau · B11:</b> Manuelle Bot-Snapshots; Testvorschau · Geräteabnahme ausstehend.</p>
+        <p><b>Vorige Vorschau · B10:</b> Kompaktes Layout. <b>Vorige Vorschau · B9:</b> Depotbewertung und Verlauf · <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>. Kontrollierte Testvorschau · Geräteabnahme ausstehend.</p>
+        <p><b>Zuletzt belegte UI-Änderung · B1:</b> <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Nachweis #702</a>. Der Versionsstand ist kein Lebenszeichen.</p>
+      </div>`
+  ],
+  [
+    `      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
+        <div class="card-head"><span class="card-kicker">JETZT WICHTIG</span><span class="limited">UNGEKLÄRT</span></div>
+        <h2>Risiko ungeklärt</h2>
+        <p>Es wird keine Aussage über Liquidationsgefahr oder Handelsschutz getroffen. Fehlende Daten sind keine Entwarnung.</p>
+      </section>`,
+    `      <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
+        <div class="card-head"><span class="card-kicker">RISIKOSTATUS</span><span class="limited">UNBEKANNT</span></div>
+        <h2>Keine bestätigte Risikoprüfung</h2>
+        <p>Fehlende Daten sind keine Entwarnung.</p>
+      </section>`
+  ],
+  [
+    `        <p>12 Hypothesen im Entwurfsregister, vier Arena-Modelle mit historischen Diagnosen sowie H9 mit BLOCKED_DATA und B1-7 als getrennter Entwicklungskandidat ohne Ergebnisse. Kein laufendes Paper.</p>
+        <a class="command-open-strategies" href="#view-strategies" data-open-strategies>Strategien in M11 öffnen</a>`,
+    `        <p>12 Hypothesen · 4 Arena-Modelle · H9 blockiert · B1-7 ohne Ergebnisse. Kein laufender Paper-Betrieb, keine Handelsaktivität.</p>`
+  ],
+  [
+    `        <summary><span>Einordnung &amp; Datenlage</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p>Die im Depot manuell geladene Bewertung erscheint auch hier. Bot-Snapshots werden separat im Bots-Tab geladen.</p>
+          <p>Keine Handlungsempfehlung · Keine automatische Order · Manueller Bot-Lesezugang separat.</p>
+        </div>
+      </details>
+      <div class="section-title"><h2>Risikomonitor</h2><small>KEINE VERIFIZIERTE ABDECKUNG</small></div>
+      <section class="card card-muted" aria-label="Risikostatus unbekannt">
+        <div class="empty-state"><div class="empty-symbol" aria-hidden="true">—</div><div><b>Risikostatus nicht bestimmbar</b><p>Risikoprüfungen werden erst nach der sicheren Anbindung gültiger Daten sichtbar. Fehlende Daten sind keine Entwarnung.</p></div></div>
+      </section>`,
+    `        <summary><span>Einordnung &amp; Grenzen</span><span aria-hidden="true">+</span></summary>
+        <div class="details-body">
+          <p>Depot- und Botdaten werden getrennt manuell geladen. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
+        </div>
+      </details>`
+  ]
+];
+const b16ReleaseDeltas=[[">11 · Vorschau B15<small>", ">11 · Vorschau B16<small>"], ["Diese Vorschau · B15:</b> Kompakte Bot-Karten und Command-Zeilen; synthetische Darstellungstests, keine Betriebsfreigabe.", "Diese Vorschau · B16:</b> Wallet-Abdeckung und bestätigte Futures-Grid-Daten getrennt; TP-Status mit oberer Grid-Grenze verglichen. Rein lesend, keine Handelsfreigabe."]];
+const b16ReleaseHistoryRow="        <li><strong>Meridian 11 · B16</strong><span class=\"version-status\">Vorschau</span><p>Wallet-Abdeckung und bestätigte Futures-Grid-Daten werden getrennt erklärt. Bot-Karten zeigen den prüfbaren TP-Status und Abweichungen zur oberen Grid-Grenze. Ohne zuverlässige Quelldaten erscheint „TP nicht prüfbar“. Rein lesend: keine TP-Änderung oder Handelsfreigabe.</p></li>\n";
+const b16HeaderLayoutDeltas=[
+  [
+    "    @media(max-width:350px){.header-inner{gap:8px}.version-toggle{padding:6px 8px}}\n    .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}\n",
+    "    .container{max-width:var(--container);margin:0 auto;padding:18px 16px calc(100px + var(--safe-bottom))}\n"
+  ],
+  [
+    "    .bot-read-view .bot-card[open] summary .bot-card-disclosure span{transform:rotate(45deg)}\n",
+    "    .bot-read-view .bot-card[open] summary .bot-card-disclosure span:last-child{transform:rotate(45deg)}\n"
+  ],
+  [
+    "    .bot-card-disclosure span{font-size:18px;line-height:1;transition:transform .18s ease}\n",
+    "    .bot-card-disclosure span:last-child{font-size:18px;line-height:1;transition:transform .18s ease}\n"
+  ],
+  [
+    "    @media(max-width:350px){.header-inner{flex-wrap:wrap}.header-actions{margin-left:auto}.app-access-card{padding:18px}}\n    @media(max-width:350px){.header-inner{flex-wrap:nowrap}.identity{gap:6px}.mark{width:32px;height:32px}.brand{font-size:12px}.brand small{display:none}.header-actions{gap:4px}.version-toggle{padding:4px;font-size:10px;letter-spacing:0}.version-toggle small{display:none}}\n",
+    "    @media(max-width:350px){.app-access-card{padding:18px}}\n"
+  ],
+  [
+    "    /* B10: compact preview chrome and keep the validated portfolio first. */\n    .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px}\n    .topbar{padding-left:max(16px,calc((100% - var(--container))/2));padding-right:max(16px,calc((100% - var(--container))/2))}\n    .header-inner{gap:8px}\n    .identity{gap:8px}\n    .mark{width:32px;height:32px;border-radius:10px;font-size:20px}\n    .brand{font-size:16px}\n    .terminal-entry{margin-top:8px}\n",
+    "    .bot-disclosure-controls{display:flex;flex-wrap:wrap;gap:8px}\n    .bot-disclosure-controls>p{flex-basis:100%;margin:0}\n    /* B16: separate identity, actions and status with room for mobile safe areas. */\n    .topbar{padding-top:calc(20px + env(safe-area-inset-top,0px));padding-bottom:16px;padding-left:max(16px,env(safe-area-inset-left,0px),calc((100% - var(--container))/2));padding-right:max(16px,env(safe-area-inset-right,0px),calc((100% - var(--container))/2))}\n    .header-inner{gap:16px}\n    .header-actions{gap:12px}\n    .version-toggle{padding:8px 12px}\n    .terminal-entry{margin-top:12px}\n    @media(max-width:600px){\n      .header-inner{flex-direction:column;align-items:stretch;gap:16px}\n      .identity{gap:11px}\n      .header-actions{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px}\n      .version-toggle{white-space:normal;font-size:12px}\n      .version-toggle small{display:block;font-size:11px;margin-top:3px}\n      .app-access-lock{padding:10px 16px}\n      .strategy-entry-link{width:100%;min-height:48px}\n      .topbar .autonomy-strip{margin-top:12px}\n      .topbar .autonomy-strip>summary{padding:12px;min-height:48px}\n    }\n"
+  ]
+];
+const b16CorrectionMarkupDeltas=[
+  ["","    @media(max-width:600px){.bot-card summary{grid-template-columns:minmax(0,1fr);grid-template-areas:\"top\" \"capital\" \"disclosure\"}.bot-card-disclosure{justify-self:end}}\n"],
+  ['<strong>BOTS</strong><span>Unbekannt</span>','<strong>BOTS</strong><span id="command-bots-status">Unbekannt</span>'],
+  ['Diese Datenquelle enthält keine einzelnen Positionen. Bestände und Verteilung bleiben nicht verfügbar.',
+   'Einzelne Bestände und ihre Verteilung werden in dieser Ansicht noch nicht angezeigt.']
+];
+function restoreB16Corrections(source){
+  for(const [before,after] of [...b16HeaderLayoutDeltas,...b16CorrectionMarkupDeltas]){
+    assert.equal(source.split(after).length-1,1,'one exact B16 header layout delta');
+    source=source.replace(after,before);
+  }
+  return source;
+}
+function restoreBotOverviewCss(source){
+  const botSummaryCss="    .bot-data-summary{display:flex;flex-wrap:wrap;gap:6px 12px;margin:10px 0;padding:10px 12px;border:1px solid #34465c;border-radius:10px}\n    .bot-data-summary>p{margin:0;min-width:0;overflow-wrap:anywhere;font-size:13px}\n    .bot-data-summary>p:last-child{flex-basis:100%;color:var(--muted);font-size:12px}\n";
+  assert.equal(source.split(botSummaryCss).length-1,1,'one exact FIX9 Bot overview summary CSS addition');
+  return source.replace(botSummaryCss,'');
+}
+const dashboardClarityDeltas=[
+  [
+    "<h2 id=\"command-strategies-heading\">Strategieforschung</h2><span class=\"limited\">Keine Handelsaktivität</span>",
+    "<h2 id=\"command-strategies-heading\">Paper &amp; Forschung</h2><span class=\"limited\">Nur lesend</span>"
+  ],
+  [
+    "12 Hypothesen · 4 Arena-Modelle · H9 blockiert · B1-7 ohne Ergebnisse. Kein laufender Paper-Betrieb, keine Handelsaktivität.",
+    "Paper-Status und Kennzahlen findest du unter Strategien. Die Forschungsmodelle werden dort getrennt vom Paper-Test angezeigt; ihr Entwicklungsstand beschreibt nicht den aktuellen Bot-Betrieb."
+  ],
+  [
+    "MERIDIAN 11 · DESIGN-SCAFFOLD · NICHT PRODUKTIV",
+    "MERIDIAN 11 · LESEANSICHT · KEINE HANDELSSTEUERUNG"
+  ],
+  [
+    "Strategieforschung in M11 ist getrennt von den Exchange-Bots im Bots-Tab. Keine automatische Promotion, Paper-Ausführung oder Handelsfreigabe.",
+    "Paper-Test und Forschungsmodelle sind getrennte Bereiche. Hier siehst du Berichte; deine Pionex-Bots findest du unter Bots. Diese Ansicht startet oder stoppt keinen Handel."
+  ]
+];
+function restoreDashboardClarity(source){
+  for(const [before,after] of dashboardClarityDeltas){
+    assert.equal(source.split(after).length-1,1,'one exact dashboard clarity delta');
+    source=source.replace(after,before);
+  }
+  return source;
+}
+function restoreB2(source){
+  source=restoreDashboardClarity(source);
+  const ledgerManualCss='    .ledger-manual{margin-top:24px;overflow-wrap:anywhere}\n    .ledger-manual label{display:block;margin:12px 0}\n    .ledger-manual input,.ledger-manual textarea{display:block;box-sizing:border-box;width:100%;max-width:100%;padding:10px;color:inherit;background:#111e2d;border:1px solid #54799a;border-radius:8px}\n    .ledger-manual button{max-width:100%;white-space:normal}\n    .ledger-manual li{margin:8px 0}\n';
+  assert.equal(source.split(ledgerManualCss).length-1,1,'one exact FIX11 manual Ledger CSS addition');
+  source=source.replace(ledgerManualCss,'');
+  const spotPaperStatusCss='    #paper-bot-overview-root summary .spot-paper-bot-status{display:inline-flex;align-items:center;max-width:100%;font-size:11px;line-height:1.4;white-space:nowrap;transform:none;transition:none}\n    #paper-bot-overview-root details[open] summary .spot-paper-bot-status{transform:none}\n';
+  assert.equal(source.split(spotPaperStatusCss).length-1,1,'one exact scoped M11 Paper status CSS addition');
+  source=source.replace(spotPaperStatusCss,'');
+  source=restoreBotOverviewCss(source);
+  const ledgerReviewCss="    .ledger-review{margin-top:24px;border-top:1px solid #334155;padding-top:16px;overflow-wrap:anywhere}\n    .ledger-review button{max-width:100%;text-align:left}\n    .ledger-review li{margin-bottom:8px;overflow-wrap:anywhere}\n";
+  assert.equal(source.split(ledgerReviewCss).length-1,1,'one exact FIX3 Ledger review CSS addition');
+  source=source.replace(ledgerReviewCss,'');
+  source=restoreB16Corrections(source);
+  assert.equal(source.split(b16ReleaseHistoryRow).length-1,1,'one B16 release history row');
+  source=source.replace(b16ReleaseHistoryRow,'');
+  for(const [before,after] of b16ReleaseDeltas){
+    assert.equal(source.split(after).length-1,1,'one exact B16 release metadata delta');
+    source=source.replace(after,before);
+  }
+  source=restorePaperModuleIdentity(source);
+  assert.equal(source.split('?v=B16-M11-FIX11').length-1,5,'five restored B16 M11 entrypoints');
+  source=source.replaceAll('?v=B16-M11-FIX11','?v=B17-M11');
+  for(const addition of [
+    '  <link rel="stylesheet" href="../public/css/m11-agent-status.css">\n',
+    '        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>\n',
+    '<script type="module" src="./agent-status-bootstrap.js?v=B17-M11"></script>\n'
+  ]){
+    assert.equal(source.split(addition).length-1,1,'one exact agent-status mount addition');
+    source=source.replace(addition,'');
+  }
+  for(const [before,after] of b17CacheDelta){
+    assert.equal(source.split(after).length-1,1,'one exact B17 cache identity delta');
+    source=source.replace(after,before);
+  }
+  for(const [before,after] of b16CacheDelta){
+    assert.equal(source.split(after).length-1,1,'one exact B16 cache identity delta');
+    source=source.replace(after,before);
+  }
+  for(const [before,after] of b15Deltas){
+    assert.equal(source.split(after).length-1,1,'one exact B15 cache/version delta');
+    source=source.replace(after,before);
+  }
+  for(const [before,after] of commandPresentationDeltas){
+    assert.equal(source.split(after).length-1,1,'one exact concise Command presentation delta');
+    source=source.replace(after,before);
+  }
+ for(const [before,after] of botPresentationDeltas){
+   assert.equal(source.split(after).length-1,1,'one exact compact Bots CSS delta');
+   source=source.replace(after,before);
+ }
+ for(const [index,[before,after]] of appAccessDeltas.entries()){
+   assert.equal(source.split(after).length-1,1,`one exact shared app-access source delta ${index}`);
+   source=source.replace(after,before);
+ }
+ assert.equal(source.split(compactBotsMarkupWithAccess).length-1,1,'one exact compact Bots markup delta');
+ source=source.replace(compactBotsMarkupWithAccess,botPresentationMarkupBeforeWithAccess);
+ assert.equal(gitBlob(source),'c41b13457aa33d6b3d50c5d2b401bdf647522bd3','M11 access deltas restore the exact B14 source');
+ for(const [before,after] of b14Deltas){
+   assert.equal(source.split(after).length-1,1,'one exact B14 source delta');
+   source=source.replace(after,before);
+ }
+ for(const [before,after] of b13Deltas){
+   assert.equal(source.split(after).length-1,1,'one exact B13 source delta');
+   source=source.replace(after,before);
+ }
+ assert.equal(source.split(mobileNavDelta[1]).length-1,1,'one exact compact-nav B12 delta');
+ source=source.replace(mobileNavDelta[1],mobileNavDelta[0]);
+ for(const [index,delta] of b12Deltas.entries()){
+   const [before,after]=index===5?[delta[1],delta[0]]:delta;
+   assert.equal(source.split(after).length-1,1,`one exact B12 delta ${index}`);
+   source=source.replace(after,before);
+ }
+ assert.equal(gitBlob(source),'908efe5629835c57b908e8bfb245728b4b757c19','B12 deltas restore the exact B11 shell');
+ for(const [before,after] of b11Deltas){assert.equal(source.split(after).length-1,1,"one exact B11 delta");source=source.replace(after,before);}
+ for(const [before,after] of b10Deltas){assert.equal(source.split(after).length-1,1,"one exact B10 delta");source=source.replace(after,before);}
+ for(const [before,after] of b9Deltas){assert.equal(source.split(after).length-1,1,"one exact B9 delta");source=source.replace(after,before);}
+ for(const [before,after] of b8Deltas){assert.equal(source.split(after).length-1,1,"one exact B8 delta");source=source.replace(after,before);}
+ for(const [before,after] of b7Deltas){assert.equal(source.split(after).length-1,1,"one exact B7 delta");source=source.replace(after,before);}
+ for(const [before,after] of r130Deltas){assert.equal(source.split(after).length-1,1,'one exact r130 version disclosure delta');source=source.replace(after,before);}
+ for(const [before,after] of r129Deltas){assert.equal(source.split(after).length-1,1,'one exact r129 version disclosure delta');source=source.replace(after,before);}
+ for(const [before,after] of r128Deltas){assert.equal(source.split(after).length-1,1,'one exact r128 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'41611512b49cf8fba39545de147d6a458293c62c','exact reviewed B6 bytes restored');
+ for(const [before,after] of b6Deltas){assert.equal(source.split(after).length-1,1,'one exact B6 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'0d6e678613100cfe68d67665964b7b3d079193a3','exact reviewed B5 bytes restored');
+ for(const [before,after] of b5Deltas){assert.equal(source.split(after).length-1,1,'one exact B5 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'af699030738545b6f22886155abd3b8dddd4756d','exact reviewed B4 bytes restored');
+ for(const [before,after] of b4Deltas){assert.equal(source.split(after).length-1,1,'one exact B4 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'94e8407bf9068eeff6bc8af75c6972749d804b26','exact reviewed B3 bytes restored');
+ for(const [before,after] of b3Deltas){assert.equal(source.split(after).length-1,1,'one exact B3 delta');source=source.replace(after,before);}
+ assert.equal(gitBlob(source),'9000de331c75c9a72e9578512da9673a130076d2','exact main78c694 B2 bytes restored');
+ return source;
+}
+
+test('Terminal öffnen preserves the reviewed history-close baseline and stays outside version history',()=>{
   const html=restoreB2(globalHtml);
   assert.equal(globalHtml.split(compactBotsMarkup).length-1,1,'one compact Bots section');
   assert.equal(restoreB16Corrections(restoreBotOverviewCss(globalHtml)).split(botPresentationCssAfter).length-1,1,'one exact compact-card CSS block before explicit B16 deltas');
