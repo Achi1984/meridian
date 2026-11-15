@@ -982,6 +982,8 @@ function deploymentServer(){
     readFileSync(new URL('../scripts/spot-paper-paired-report/contract.mjs',import.meta.url),'utf8'));
   modules.set('/meridian/scripts/spot-paper-paired-progress/contract.mjs',
     readFileSync(new URL('../scripts/spot-paper-paired-progress/contract.mjs',import.meta.url),'utf8'));
+  modules.set('/meridian/scripts/spot-paper-research/three-way-dashboard-contract.mjs',
+    readFileSync(new URL('../scripts/spot-paper-research/three-way-dashboard-contract.mjs',import.meta.url),'utf8'));
   modules.set('/meridian/docs/strategy-lab/campaign-20261013.json',readFileSync(new URL('../docs/strategy-lab/campaign-20261013.json',import.meta.url),'utf8'));
   modules.set('/meridian/public/js/m11-agent-status.js',readFileSync(new URL('../public/js/m11-agent-status.js',import.meta.url),'utf8'));
   const server=createServer((request,response)=>{
@@ -991,7 +993,8 @@ function deploymentServer(){
       path.startsWith('/meridian/scripts/memecoin-paper-report-bridge/')||
       path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
       path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
-      path.startsWith('/meridian/scripts/spot-paper-paired-progress/'))&&url.search==='?v=B16-M11-FIX16';
+      path.startsWith('/meridian/scripts/spot-paper-paired-progress/')||
+      path.startsWith('/meridian/scripts/spot-paper-research/'))&&url.search==='?v=B16-M11-FIX16';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -1060,7 +1063,8 @@ function deploymentServer(){
         path.startsWith('/meridian/scripts/memecoin-paper-report-bridge/')||
         path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
         path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
-        path.startsWith('/meridian/scripts/spot-paper-paired-progress/')?'?v=B16-M11-FIX16':'')).join(' '):"'none'";
+        path.startsWith('/meridian/scripts/spot-paper-paired-progress/')||
+        path.startsWith('/meridian/scripts/spot-paper-research/')?'?v=B16-M11-FIX16':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+host8hEndpoint+' '+origin+'/meridian/v11/index.html '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
