@@ -1,6 +1,7 @@
 #!/usr/bin/env node
-import {readFile, writeFile} from "node:fs/promises";
-import {compareThreeSpotPaperStrategies} from "./three-way-comparison.mjs";
+import {readFile, stat, writeFile} from "node:fs/promises";
+import {compareThreeSpotPaperStrategies, SPOT_PAPER_RESEARCH_LIMITS} from
+  "./three-way-comparison.mjs";
 
 function usage() {
   throw new Error("USAGE: three-way-cli.mjs --input <observations.json> --output <report.json>");
@@ -18,6 +19,17 @@ function args(argv) {
 }
 
 const options = args(process.argv.slice(2));
+let inputStat;
+try {
+  inputStat = await stat(options.input);
+} catch (error) {
+  throw new Error(`INPUT_READ_FAILED:${error.code ?? "STAT_FAILED"}`);
+}
+if (!Number.isSafeInteger(inputStat.size) ||
+    inputStat.size > SPOT_PAPER_RESEARCH_LIMITS.maxInputBytes) {
+  throw new Error("INPUT_BYTE_LIMIT");
+}
+
 let observations;
 try {
   observations = JSON.parse(await readFile(options.input, "utf8"));
