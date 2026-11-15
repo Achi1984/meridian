@@ -16,7 +16,8 @@ permissions:
   pull-requests: read
 
 jobs:
-  syntax:
+  safety-preflight:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,21 +61,61 @@ jobs:
           node --check research/tsmom-holdout-v1.js
       - name: Frozen research lineage
         run: node scripts/frozen-research-guard.mjs
-      - name: Research and auth regression tests
+      - name: Partition guard
+        run: node --test test/release-safety-sharding.test.js
+
+  safety-tests:
+    needs: safety-preflight
+    timeout-minutes: 45
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [browser, core-auth, supervisor]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Run ${{ matrix.shard }} shard
         env:
-          V11_A2_EVIDENCE_DIR: artifacts/v11-visual-qa
+          V11_A2_EVIDENCE_DIR: artifacts/v11-visual-qa-${{ matrix.shard }}
         shell: bash
         run: |
-          # Keep deadline-sensitive subprocess supervision out of the broad
-          # test runner's parallel workload; every discovered file runs once.
-          other_tests=()
-          for test_file in test/*.test.js; do
-            if [[ "$test_file" != "test/research-supervisor.test.js" ]]; then
-              other_tests+=("$test_file")
-            fi
-          done
-          node --test "${other_tests[@]}"
-          node --test test/research-supervisor.test.js
+          mapfile -t test_files < <(node scripts/release-safety-partition.mjs --shard "${{ matrix.shard }}")
+          case "${{ matrix.shard }}" in
+            supervisor) timeout --signal=TERM --kill-after=60s 8m node --test "${test_files[@]}" ;;
+            browser|core-auth) timeout --signal=TERM --kill-after=60s 35m node --test "${test_files[@]}" ;;
+            *) echo "unknown shard" >&2; exit 2 ;;
+          esac
+      - name: Upload shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-v11-visual-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/v11-visual-qa-${{ matrix.shard }}/*.png
+          if-no-files-found: error
+          retention-days: 7
+
+  syntax:
+    if: always()
+    needs: [safety-preflight, safety-tests]
+    timeout-minutes: 20
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all safety shards
+        if: ${{ needs.safety-preflight.result != 'success' || needs.safety-tests.result != 'success' }}
+        run: exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
       - name: Release authority consistency
         run: |
           node scripts/release-sync.mjs --check
@@ -90,13 +131,3 @@ jobs:
       - name: Assert paper-only invariant
         run: |
           grep -F 'if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");' server.js
-
-      - name: Upload V11 visual evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: meridian-v11-visual-${{ github.sha }}-${{ github.run_attempt }}
-          path: artifacts/v11-visual-qa/*.png
-          if-no-files-found: error
-          retention-days: 7
-
