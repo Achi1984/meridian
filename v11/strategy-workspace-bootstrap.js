@@ -111,7 +111,7 @@ function ensureStrategyWorkspace(options={}){
   return mounted;
 }
 if(typeof window!=='undefined') window.ensureStrategyWorkspace = ensureStrategyWorkspace;
-document.addEventListener('meridian:app-access-unlocked',()=>ensureStrategyWorkspace({load:true}));
+document.addEventListener('meridian:app-access-unlocked',()=>ensureStrategyWorkspace());
 const mountedInitially = mountWhenReady();
 if(!mountedInitially){
   workspaceObserver = new MutationObserver(mountWhenReady);
