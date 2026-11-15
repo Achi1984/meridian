@@ -25,7 +25,7 @@ const expectedModules=[
   'spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js',
   'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js',
   'spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js',
-  'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-progress-config.js','spot-paper-paired-progress-connector.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js',
+  'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-progress-config.js','spot-paper-paired-progress-connector.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js','spot-paper-three-way-controller.js','spot-paper-three-way-model.js','spot-paper-three-way-view.js',
   'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
 ];
 
@@ -112,7 +112,7 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
     '../scripts/memecoin-paper-report-bridge/index.mjs?v=B16-M11-FIX16',
     '../scripts/spot-paper-paired-progress/contract.mjs?v=B16-M11-FIX16',
     '../scripts/spot-paper-paired-report/contract.mjs?v=B16-M11-FIX16',
-    '../scripts/spot-paper-report-bridge/contract.mjs?v=B16-M11-FIX16',
+    '../scripts/spot-paper-report-bridge/contract.mjs?v=B16-M11-FIX16','../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B16-M11-FIX16',
     '../v8-clean/live-price-core-r18.js'
   ]);
   assert.ok(graph.references.get('app-access.js')>=4,'status shares the existing central access module');

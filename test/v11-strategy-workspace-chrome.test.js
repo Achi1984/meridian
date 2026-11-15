@@ -377,7 +377,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         await evaluate(`document.querySelector('#nav button[data-v="strategies"]').focus()`);
         await key('Enter','Enter',13);
         for(let attempt=0;attempt<100;attempt++){
-          if(await evaluate(`document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]').length===12`) &&
+          if(await evaluate(`document.querySelectorAll('#strategy-catalog [data-strategy-id^="H"]').length===12 &&
+            !!document.querySelector('.strategy-comparison')`) &&
             pairedSettled===1&&progressSettled===1)break;
           await new Promise(resolve=>setTimeout(resolve,25));
         }
@@ -402,6 +403,16 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         })()`);
         assert.deepEqual(paperLayout,{hostVisible:true,hostFirst:true,historyClosed:true,researchClosed:true,legacyGrouped:true,researchGrouped:true});
         await evaluate(`document.querySelector('#paper-research-section > summary').click()`);
+        const comparisonMounted=await evaluate(`new Promise(resolve=>{
+          const deadline=performance.now()+2500;
+          const check=()=>{
+            if(document.querySelector('.strategy-comparison'))return resolve(true);
+            if(performance.now()>=deadline)return resolve(false);
+            setTimeout(check,25);
+          };
+          check();
+        })`);
+        assert.equal(comparisonMounted,true,'strategy comparison remains mounted after research disclosure');
         // Measure settled layout, not the active view's translateY appearance animation.
         // With reduced motion getAnimations() is empty and this resolves immediately.
         await evaluate(`(async()=>{

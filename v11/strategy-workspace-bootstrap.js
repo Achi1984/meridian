@@ -5,16 +5,37 @@ import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B16-M1
 import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B16-M11-FIX16';
 import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX16';
 import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B16-M11-FIX16';
+import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B16-M11-FIX16';
 
-const catalogRoot = document.getElementById('strategy-catalog');
-const catalogStatus = document.getElementById('strategy-load-status');
-const arenaRoot = document.getElementById('strategy-arena-root');
-const arena = createStrategyArenaView(arenaRoot);
+let catalogRoot = document.getElementById('strategy-catalog');
+let catalogStatus = document.getElementById('strategy-load-status');
+let arenaRoot = document.getElementById('strategy-arena-root');
+let arena = null;
 let paperCockpit = null;
 let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
 let paperBotReportWorkspace = null;
-if(catalogRoot?.parentNode){
+let spotPaperThreeWayResearch = null;
+let workspaceMounted = false;
+let loaded = false;
+let loading = false;
+function collapsedSection(id,label,before=catalogRoot){
+  const section=document.createElement('details');
+  section.id=id;
+  section.className='card';
+  const summary=document.createElement('summary');
+  summary.textContent=label;
+  summary.setAttribute('style','min-height:44px;padding:10px 0;box-sizing:border-box;cursor:pointer');
+  section.append(summary);
+  (catalogRoot?.parentNode || document.body).insertBefore(section,before || null);
+  return section;
+}
+function mountWorkspace(){
+  catalogRoot = document.getElementById('strategy-catalog');
+  catalogStatus = document.getElementById('strategy-load-status');
+  arenaRoot = document.getElementById('strategy-arena-root');
+  if(!catalogRoot?.parentNode || document.getElementById('paper-research-section')) return false;
+  arena = createStrategyArenaView(arenaRoot);
   const workspace=catalogRoot.parentNode;
   const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
   botReports.open=true;
@@ -38,17 +59,6 @@ if(catalogRoot?.parentNode){
   workspace.insertBefore(host8hRoot,catalogStatus || catalogRoot);
   spotPaperHost8hDashboard=mountSpotPaperHost8hDashboard(host8hRoot,document,window);
 
-  function collapsedSection(id,label,before=catalogRoot){
-    const section=document.createElement('details');
-    section.id=id;
-    section.className='card';
-    const summary=document.createElement('summary');
-    summary.textContent=label;
-    summary.setAttribute('style','min-height:44px;padding:10px 0;box-sizing:border-box;cursor:pointer');
-    section.append(summary);
-    workspace.insertBefore(section,before);
-    return section;
-  }
   const history=collapsedSection('paper-history-section','Frühere Paper-Berichte');
   const spotPaperRoot=document.createElement('section');
   spotPaperRoot.id='spot-paper-cockpit-root';
@@ -60,6 +70,10 @@ if(catalogRoot?.parentNode){
   paperCockpit=mountPaperCockpit(paperRoot,document,window);
 
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
+  const threeWayRoot=document.createElement('section');
+  threeWayRoot.id='spot-paper-three-way-root';
+  research.append(threeWayRoot);
+  spotPaperThreeWayResearch=mountSpotPaperThreeWayResearch(threeWayRoot,document);
   const readinessRoot=document.createElement('section');
   readinessRoot.id='paper-readiness-root';
   research.append(readinessRoot);
@@ -67,9 +81,49 @@ if(catalogRoot?.parentNode){
   if(catalogStatus)research.append(catalogStatus);
   research.append(catalogRoot);
   if(arenaRoot)research.append(arenaRoot);
+  return true;
 }
-let loaded = false;
-let loading = false;
+let workspaceObserver = null;
+let pendingWorkspaceLoad = false;
+function mountWhenReady(){
+  if(!workspaceMounted){
+    if(!mountWorkspace())return false;
+    workspaceMounted = true;
+    workspaceObserver?.disconnect();
+    workspaceObserver = null;
+    document.removeEventListener('DOMContentLoaded', mountWhenReady);
+  }
+  if(pendingWorkspaceLoad){
+    pendingWorkspaceLoad = false;
+    loadWorkspace();
+  }
+  return true;
+}
+function requestWorkspaceLoad(){
+  pendingWorkspaceLoad = true;
+  const active=document.querySelector('#nav button[data-v="strategies"][aria-current="page"]');
+  if(active){
+    paperCockpit?.setActive(true);
+    spotPaperCockpit?.setActive(true);
+    spotPaperHost8hDashboard?.setActive(true);
+    paperBotReportWorkspace?.setActive(true);
+  }
+  mountWhenReady();
+}
+function ensureStrategyWorkspace(){
+  const mounted = mountWhenReady();
+  if(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')){
+    requestWorkspaceLoad();
+  }
+  return mounted;
+}
+if(typeof window!=='undefined') window.ensureStrategyWorkspace = ensureStrategyWorkspace;
+const mountedInitially = mountWhenReady();
+if(!mountedInitially){
+  workspaceObserver = new MutationObserver(mountWhenReady);
+  workspaceObserver.observe(document.documentElement,{childList:true,subtree:true});
+  document.addEventListener('DOMContentLoaded',mountWhenReady,{once:true});
+}
 
 async function loadWorkspace() {
   if (loaded || loading) return;
@@ -94,27 +148,41 @@ async function loadWorkspace() {
   }
 }
 
-document.getElementById('nav')?.addEventListener('click',event=>{
-  const button=event.target.closest?.('button[data-v]');
-  if(button) paperCockpit?.setActive(button.dataset.v==='strategies');
-  if(button) spotPaperCockpit?.setActive(button.dataset.v==='strategies');
-  if(button) spotPaperHost8hDashboard?.setActive(button.dataset.v==='strategies');
-  if(button) paperBotReportWorkspace?.setActive(button.dataset.v==='strategies');
-  if (button?.dataset.v==='strategies') loadWorkspace();
-});
-
+let boundNav = null;
+let navObserver = null;
+function bindNavWhenReady(){
+  const nav = document.getElementById('nav');
+  if(!nav || boundNav === nav) return false;
+  boundNav = nav;
+  nav.addEventListener('click',event=>{
+    const button=event.target.closest?.('button[data-v]');
+    if(!button || !nav.contains(button)) return;
+    paperCockpit?.setActive(button.dataset.v==='strategies');
+    spotPaperCockpit?.setActive(button.dataset.v==='strategies');
+    spotPaperHost8hDashboard?.setActive(button.dataset.v==='strategies');
+    paperBotReportWorkspace?.setActive(button.dataset.v==='strategies');
+    if(button.dataset.v==='strategies') requestWorkspaceLoad();
+  });
+  navObserver?.disconnect();
+  navObserver = null;
+  if(nav.querySelector('button[data-v="strategies"][aria-current="page"]')){
+    paperCockpit?.setActive(true);
+    spotPaperCockpit?.setActive(true);
+    spotPaperHost8hDashboard?.setActive(true);
+    paperBotReportWorkspace?.setActive(true);
+    requestWorkspaceLoad();
+  }
+  return true;
+}
+if(!bindNavWhenReady()){
+  navObserver = new MutationObserver(bindNavWhenReady);
+  navObserver.observe(document.documentElement,{childList:true,subtree:true});
+}
 document.addEventListener('click',event=>{
   const link = event.target.closest?.('[data-open-strategies]');
   if (!link) return;
   event.preventDefault();
   document.querySelector('#nav button[data-v="strategies"]')?.click();
-  loadWorkspace();
+  requestWorkspaceLoad();
 });
 
-if (document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')) {
-  paperCockpit?.setActive(true);
-  spotPaperCockpit?.setActive(true);
-  spotPaperHost8hDashboard?.setActive(true);
-  paperBotReportWorkspace?.setActive(true);
-  loadWorkspace();
-}
