@@ -240,7 +240,7 @@ test("isolated bind-mount repair is idempotent and preserves paper data", {timeo
   ]), "helper image inspection"), "helper image config");
   assert.equal(imageConfig.User, "0:1000");
   assert.deepEqual(imageConfig.Entrypoint, ["node", "/helper/volume-protection.mjs"]);
-  // Docker may omit a null Cmd field; both representations mean no default command.\n  assert.equal(imageConfig.Cmd ?? null, null);
+  assert.equal(imageConfig.Cmd ?? null, null);
 
   let nextContainer = 0;
   async function createContainer(source, commandArgs, {entrypoint, user} = {}) {
