@@ -14,9 +14,13 @@ test('release safety sharding is disjoint and complete', () => {
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim() ? result.stdout.trim().split('\n') : [];
   });
-  const expected = fs.readdirSync(new URL('../test/', import.meta.url)).filter(name => name.endsWith('.test.js')).map(name => path.posix.join('test', name)).sort();
+  const controlTests = new Set(['release-safety-sharding.test.js', 'release-safety-test-partition.test.js']);
+  const expected = fs.readdirSync(new URL('../test/', import.meta.url))
+    .filter(name => name.endsWith('.test.js') && !controlTests.has(name))
+    .map(name => path.posix.join('test', name)).sort();
   assert.equal(new Set(selected).size, selected.length, 'no test is assigned twice');
-  assert.deepEqual(selected.sort(), expected, 'all tests are assigned exactly once');
+  assert.deepEqual(selected.sort(), expected, 'all runtime tests are assigned exactly once');
+  for (const control of controlTests) assert.equal(selected.includes(path.posix.join('test', control)), false, `control test stays in preflight: ${control}`);
 });
 
 test('unknown shard fails closed', () => {
