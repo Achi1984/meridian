@@ -1,9 +1,10 @@
-import {SPOT_PAPER_RESEARCH_LIMITS} from '../scripts/spot-paper-research/three-way-comparison.mjs';
-import {isSpotPaperThreeWayDashboardEnvelope} from '../scripts/spot-paper-research/three-way-dashboard-contract.mjs';
+import {isSpotPaperThreeWayDashboardEnvelope} from '../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B16-M11-FIX16';
 
-export function createOfflineThreeWayReportReader({readText, maxBytes = SPOT_PAPER_RESEARCH_LIMITS.maxInputBytes} = {}) {
+const MAX_REPORT_BYTES = 64 * 1024 * 1024;
+
+export function createOfflineThreeWayReportReader({readText, maxBytes = MAX_REPORT_BYTES} = {}) {
   if (typeof readText !== 'function') throw new TypeError('readText must be an injected local reader');
-  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > SPOT_PAPER_RESEARCH_LIMITS.maxInputBytes) {
+  if (!Number.isSafeInteger(maxBytes) || maxBytes < 1 || maxBytes > MAX_REPORT_BYTES) {
     throw new RangeError('maxBytes must be a bounded offline input limit');
   }
   return Object.freeze({

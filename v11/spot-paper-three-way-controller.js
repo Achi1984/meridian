@@ -1,9 +1,15 @@
 import {createSpotPaperThreeWayAdapter, presentSpotPaperThreeWayReport} from './spot-paper-three-way-model.js?v=B16-M11-FIX16';
+import {createOfflineThreeWayReportReader} from './spot-paper-three-way-reader.js?v=B16-M11-FIX16';
 import {renderSpotPaperThreeWay} from './spot-paper-three-way-view.js?v=B16-M11-FIX16';
 
 export function mountSpotPaperThreeWayResearch(root, document = root?.ownerDocument,
-  {readReport, now = () => Date.now(), staleAfterMs = 15 * 60 * 1000} = {}) {
-  const adapter = createSpotPaperThreeWayAdapter({readReport});
+  {readReport, readText, now = () => Date.now(), staleAfterMs = 15 * 60 * 1000} = {}) {
+  let injectedReader = readReport;
+  if (!injectedReader && readText) {
+    const reader = createOfflineThreeWayReportReader({readText});
+    injectedReader = () => reader.readReport();
+  }
+  const adapter = createSpotPaperThreeWayAdapter({readReport: injectedReader});
   let active = true;
   let current = presentSpotPaperThreeWayReport(null);
   const render = () => renderSpotPaperThreeWay(root, current, document);
