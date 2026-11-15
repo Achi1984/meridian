@@ -31,8 +31,7 @@ function mountWorkspace(){
   catalogRoot = document.getElementById('strategy-catalog');
   catalogStatus = document.getElementById('strategy-load-status');
   arenaRoot = document.getElementById('strategy-arena-root');
-  if(!catalogRoot?.parentNode) return false;
-  if(document.getElementById('paper-research-section')) return true;
+  if(!catalogRoot?.parentNode || document.getElementById('paper-research-section')) return false;
   arena = createStrategyArenaView(arenaRoot);
   const workspace=catalogRoot.parentNode;
   const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
@@ -101,16 +100,7 @@ function requestWorkspaceLoad(){
   if(mountWhenReady()){
     pendingWorkspaceLoad = false;
     loadWorkspace();
-    return;
   }
-  // Navigation can arrive in the same task as the shell mount. Retry once
-  // after DOM mutations so the research panel exists before loading its source.
-  queueMicrotask(()=>{
-    if(pendingWorkspaceLoad && mountWhenReady()){
-      pendingWorkspaceLoad = false;
-      loadWorkspace();
-    }
-  });
 }
 function ensureStrategyWorkspace(options={}){
   const mounted = mountWhenReady();
@@ -120,7 +110,7 @@ function ensureStrategyWorkspace(options={}){
   return mounted;
 }
 if(typeof window!=='undefined') window.ensureStrategyWorkspace = ensureStrategyWorkspace;
-document.addEventListener('meridian:app-access-unlocked',()=>ensureStrategyWorkspace());
+document.addEventListener('meridian:app-access-unlocked',()=>ensureStrategyWorkspace({load:true}));
 const mountedInitially = mountWhenReady();
 if(!mountedInitially){
   workspaceObserver = new MutationObserver(mountWhenReady);
@@ -183,13 +173,6 @@ if(!bindNavWhenReady()){
   navObserver = new MutationObserver(bindNavWhenReady);
   navObserver.observe(document.documentElement,{childList:true,subtree:true});
 }
-document.addEventListener('click',event=>{
-  const button=event.target.closest?.('#nav button[data-v]');
-  if(!button) return;
-  mountWhenReady();
-  if(button.dataset.v==='strategies') requestWorkspaceLoad();
-},true);
-
 document.addEventListener('click',event=>{
   const link = event.target.closest?.('[data-open-strategies]');
   if (!link) return;
