@@ -403,6 +403,16 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         })()`);
         assert.deepEqual(paperLayout,{hostVisible:true,hostFirst:true,historyClosed:true,researchClosed:true,legacyGrouped:true,researchGrouped:true});
         await evaluate(`document.querySelector('#paper-research-section > summary').click()`);
+        const comparisonMounted=await evaluate(`new Promise(resolve=>{
+          const deadline=performance.now()+2500;
+          const check=()=>{
+            if(document.querySelector('.strategy-comparison'))return resolve(true);
+            if(performance.now()>=deadline)return resolve(false);
+            setTimeout(check,25);
+          };
+          check();
+        })`);
+        assert.equal(comparisonMounted,true,'strategy comparison remains mounted after research disclosure');
         // Measure settled layout, not the active view's translateY appearance animation.
         // With reduced motion getAnimations() is empty and this resolves immediately.
         await evaluate(`(async()=>{
