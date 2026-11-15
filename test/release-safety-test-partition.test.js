@@ -28,7 +28,7 @@ test('partition control tests stay in preflight and runtime shards remain comple
     assert.equal(result.status, 0, result.stderr);
     return result.stdout.trim() ? result.stdout.trim().split('\n') : [];
   });
-  const expected = fs.readdirSync(new URL('../test/', root))
+  const expected = fs.readdirSync(new URL('test/', root))
     .filter(name => name.endsWith('.test.js') && !controlTests.has(name))
     .map(name => path.posix.join('test', name)).sort();
   assert.equal(new Set(selected).size, selected.length, 'no runtime test executes twice');
