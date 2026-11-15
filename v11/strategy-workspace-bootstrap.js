@@ -140,7 +140,8 @@ async function loadWorkspace() {
     const response = await fetch(new URL(CAMPAIGN_SOURCE,import.meta.url).href,{cache:'no-store'});
     if (!response.ok) throw Error('Das Quellregister ist nicht verfügbar.');
     const campaign = await response.json();
-    const catalog = renderStrategyCatalog(catalogRoot,campaign,document,undefined,comparisonRoot);
+    const host=document.getElementById('strategy-comparison-mount');
+    const catalog = renderStrategyCatalog(catalogRoot,campaign,document,undefined,host);
     if (catalog.status !== 'PRESENT_UNVERIFIED') throw Error(catalog.reason);
     loaded = true;
     catalogStatus.textContent = 'Zwölf Hypothesen aus dem lokalen Entwurfsregister; Entwicklungsstufen bleiben quellengebunden.';
