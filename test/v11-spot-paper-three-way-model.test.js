@@ -16,6 +16,18 @@ test('validates and presents a read-only four-arm report', () => {
   assert.equal(model.arms.baseline.finalNetEquityCents.value, 100_000);
   assert.equal(model.researchOnly, true);
 });
+test('exposes metric units and copies report input defensively', () => {
+  const source = report();
+  source.input = {nested: {label: 'offline'}};
+  const envelope = threeWayDashboardEnvelope(source, '2026-11-15T11:59:30.000Z');
+  const model = presentSpotPaperThreeWayReport(envelope, {now: NOW, staleAfterMs: 120_000});
+  assert.equal(model.arms.baseline.finalNetEquityCents.unit, 'cents');
+  assert.equal(model.arms.baseline.fillCount.unit, 'count');
+  assert.equal(model.arms.baseline.maxSampledEquityRelativeDrawdownBps.unit, 'bps');
+  assert.notStrictEqual(model.input, source.input);
+  model.input.nested.label = 'changed';
+  assert.equal(source.input.nested.label, 'offline');
+});
 test('rejects malformed or unavailable reports and never invents zeroes', () => {
   const envelope = threeWayDashboardEnvelope(report(), '2026-11-15T11:59:30.000Z');
   envelope.report.arms.cash.strategyId = 'WRONG';
