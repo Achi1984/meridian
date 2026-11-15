@@ -72,9 +72,9 @@ function mountWorkspace(){
   comparisonRoot=document.createElement('section');
   comparisonRoot.id='strategy-comparison-mount';
   research.append(comparisonRoot);
-  research.addEventListener('toggle',()=>{
+  research.querySelector(':scope > summary')?.addEventListener('click',()=>{
     const root=document.getElementById('strategy-catalog');
-    if(research.open && loadedCampaign && root && !root.querySelector('.strategy-comparison'))
+    if(loadedCampaign && root && !root.querySelector('.strategy-comparison'))
       renderStrategyCatalog(root,loadedCampaign,document,undefined,comparisonRoot);
   });
   const threeWayRoot=document.createElement('section');
