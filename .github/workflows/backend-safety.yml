@@ -92,7 +92,7 @@ jobs:
             *) echo "unknown shard" >&2; exit 2 ;;
           esac
       - name: Upload shard evidence
-        if: always()
+        if: ${{ always() && matrix.shard != 'supervisor' }}
         uses: actions/upload-artifact@v4
         with:
           name: meridian-v11-visual-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
