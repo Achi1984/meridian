@@ -67,6 +67,10 @@ function mountWorkspace(){
   paperCockpit=mountPaperCockpit(paperRoot,document,window);
 
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
+  research.addEventListener('toggle',()=>{
+    if(research.open && loadedCampaign && !catalogRoot?.querySelector('.strategy-comparison'))
+      renderStrategyCatalog(catalogRoot,loadedCampaign);
+  });
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
   research.append(threeWayRoot);
