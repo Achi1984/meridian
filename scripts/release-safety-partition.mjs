@@ -14,7 +14,13 @@ if (!valid.has(shard)) {
   process.exit(2);
 }
 
-const files = fs.readdirSync(testDir).filter(name => name.endsWith('.test.js')).sort();
+const controlTests = new Set([
+  'release-safety-sharding.test.js',
+  'release-safety-test-partition.test.js'
+]);
+const files = fs.readdirSync(testDir)
+  .filter(name => name.endsWith('.test.js') && !controlTests.has(name))
+  .sort();
 const classify = name => {
   if (name === 'research-supervisor.test.js') return 'supervisor';
   const source = fs.readFileSync(path.join(testDir, name), 'utf8');
