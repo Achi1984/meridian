@@ -68,8 +68,7 @@ function mountWorkspace(){
 
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
   research.addEventListener('toggle',()=>{
-    if(research.open && loadedCampaign && !catalogRoot?.querySelector('.strategy-comparison'))
-      renderStrategyCatalog(catalogRoot,loadedCampaign);
+    if(research.open)setTimeout(ensureComparisonMounted,0);
   });
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
@@ -124,6 +123,10 @@ if(!mountedInitially){
 let loaded = false;
 let loading = false;
 let loadedCampaign = null;
+function ensureComparisonMounted(){
+  if(loadedCampaign && !catalogRoot?.querySelector('.strategy-comparison'))
+    renderStrategyCatalog(catalogRoot,loadedCampaign);
+}
 
 async function loadWorkspace() {
   if (loaded || loading) return;
@@ -181,8 +184,7 @@ if(!bindNavWhenReady()){
 }
 document.addEventListener('click',event=>{
   const researchSummary = event.target.closest?.('#paper-research-section > summary');
-  if(researchSummary && loadedCampaign && !catalogRoot?.querySelector('.strategy-comparison'))
-    renderStrategyCatalog(catalogRoot,loadedCampaign);
+  if(researchSummary)setTimeout(ensureComparisonMounted,0);
   const link = event.target.closest?.('[data-open-strategies]');
   if (!link) return;
   event.preventDefault();
