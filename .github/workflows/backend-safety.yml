@@ -62,7 +62,7 @@ jobs:
       - name: Frozen research lineage
         run: node scripts/frozen-research-guard.mjs
       - name: Partition guard
-        run: node --test test/release-safety-sharding.test.js
+        run: node --test test/release-safety-sharding.test.js test/release-safety-test-partition.test.js
 
   safety-tests:
     needs: safety-preflight
