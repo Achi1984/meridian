@@ -7,10 +7,10 @@ import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX16';
 import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B16-M11-FIX16';
 import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B16-M11-FIX16';
 
-const catalogRoot = document.getElementById('strategy-catalog');
-const catalogStatus = document.getElementById('strategy-load-status');
-const arenaRoot = document.getElementById('strategy-arena-root');
-const arena = createStrategyArenaView(arenaRoot);
+let catalogRoot = document.getElementById('strategy-catalog');
+let catalogStatus = document.getElementById('strategy-load-status');
+let arenaRoot = document.getElementById('strategy-arena-root');
+let arena = null;
 let paperCockpit = null;
 let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
@@ -28,7 +28,11 @@ function collapsedSection(id,label,before=catalogRoot){
   return section;
 }
 function mountWorkspace(){
-  if(!catalogRoot?.parentNode || document.getElementById('paper-research-section')) return;
+  catalogRoot = document.getElementById('strategy-catalog');
+  catalogStatus = document.getElementById('strategy-load-status');
+  arenaRoot = document.getElementById('strategy-arena-root');
+  if(!catalogRoot?.parentNode || document.getElementById('paper-research-section')) return false;
+  arena = createStrategyArenaView(arenaRoot);
   const workspace=catalogRoot.parentNode;
   const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
   botReports.open=true;
@@ -74,11 +78,22 @@ function mountWorkspace(){
   if(catalogStatus)research.append(catalogStatus);
   research.append(catalogRoot);
   if(arenaRoot)research.append(arenaRoot);
+  return true;
 }
-if (document.readyState === 'loading') {
-  document.addEventListener('DOMContentLoaded', mountWorkspace, {once:true});
-} else {
-  mountWorkspace();
+let workspaceObserver = null;
+function mountWhenReady(){
+  if(mountWorkspace()){
+    workspaceObserver?.disconnect();
+    workspaceObserver = null;
+    document.removeEventListener('DOMContentLoaded', mountWhenReady);
+    return true;
+  }
+  return false;
+}
+if(!mountWhenReady()){
+  workspaceObserver = new MutationObserver(mountWhenReady);
+  workspaceObserver.observe(document.documentElement,{childList:true,subtree:true});
+  document.addEventListener('DOMContentLoaded',mountWhenReady,{once:true});
 }
 let loaded = false;
 let loading = false;
