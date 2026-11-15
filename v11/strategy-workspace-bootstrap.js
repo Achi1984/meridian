@@ -119,6 +119,7 @@ if(!mountedInitially){
 }
 let loaded = false;
 let loading = false;
+let loadedCampaign = null;
 
 async function loadWorkspace() {
   if (loaded || loading) return;
@@ -131,6 +132,7 @@ async function loadWorkspace() {
     const campaign = await response.json();
     const catalog = renderStrategyCatalog(catalogRoot,campaign);
     if (catalog.status !== 'PRESENT_UNVERIFIED') throw Error(catalog.reason);
+    loadedCampaign = campaign;
     loaded = true;
     catalogStatus.textContent = 'Zwölf Hypothesen aus dem lokalen Entwurfsregister; Entwicklungsstufen bleiben quellengebunden.';
   } catch (error) {
@@ -174,6 +176,9 @@ if(!bindNavWhenReady()){
   navObserver.observe(document.documentElement,{childList:true,subtree:true});
 }
 document.addEventListener('click',event=>{
+  const researchSummary = event.target.closest?.('#paper-research-section > summary');
+  if(researchSummary && loadedCampaign && !catalogRoot?.querySelector('.strategy-comparison'))
+    renderStrategyCatalog(catalogRoot,loadedCampaign);
   const link = event.target.closest?.('[data-open-strategies]');
   if (!link) return;
   event.preventDefault();
