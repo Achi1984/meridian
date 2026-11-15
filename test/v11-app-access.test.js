@@ -175,6 +175,7 @@ class Target{
   constructor(){this.listeners=new Map();this.hidden=false;this.value='';this.textContent='';this.focused=false;}
   addEventListener(name,fn){if(!this.listeners.has(name))this.listeners.set(name,new Set());this.listeners.get(name).add(fn);}
   removeEventListener(name,fn){this.listeners.get(name)?.delete(fn);}
+  dispatchEvent(event){this.fire(event?.type,event);return true;}
   fire(name,event={}){for(const fn of this.listeners.get(name)||[])fn({preventDefault(){},...event});}
   focus(){this.focused=true;}
 }
