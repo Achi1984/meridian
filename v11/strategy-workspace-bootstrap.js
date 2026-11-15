@@ -101,7 +101,16 @@ function requestWorkspaceLoad(){
   if(mountWhenReady()){
     pendingWorkspaceLoad = false;
     loadWorkspace();
+    return;
   }
+  // Navigation can arrive in the same task as the shell mount. Retry once
+  // after DOM mutations so the research panel exists before loading its source.
+  queueMicrotask(()=>{
+    if(pendingWorkspaceLoad && mountWhenReady()){
+      pendingWorkspaceLoad = false;
+      loadWorkspace();
+    }
+  });
 }
 function ensureStrategyWorkspace(options={}){
   const mounted = mountWhenReady();
