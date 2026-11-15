@@ -124,7 +124,13 @@ let loaded = false;
 let loading = false;
 let loadedCampaign = null;
 let recoveringComparison = false;
+let comparisonObserver = null;
 function ensureComparisonMounted(){
+  const research=document.getElementById('paper-research-section');
+  if(research && !comparisonObserver){
+    comparisonObserver = new MutationObserver(()=>ensureComparisonMounted());
+    comparisonObserver.observe(research,{childList:true,subtree:true});
+  }
   const root=document.getElementById('strategy-catalog');
   if(!root || !loadedCampaign || recoveringComparison || root.querySelector('.strategy-comparison'))return;
   recoveringComparison = true;
