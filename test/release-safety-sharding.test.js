@@ -1,0 +1,29 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import fs from 'node:fs';
+import path from 'node:path';
+import {spawnSync} from 'node:child_process';
+
+const root = new URL('../', import.meta.url);
+const script = new URL('../scripts/release-safety-partition.mjs', import.meta.url);
+
+test('release safety sharding is disjoint and complete', () => {
+  const shards = ['browser', 'core-auth', 'supervisor'];
+  const selected = shards.flatMap(shard => {
+    const result = spawnSync(process.execPath, [script.pathname, '--shard', shard], {cwd: root, encoding: 'utf8'});
+    assert.equal(result.status, 0, result.stderr);
+    return result.stdout.trim() ? result.stdout.trim().split('\n') : [];
+  });
+  const controlTests = new Set(['release-safety-sharding.test.js', 'release-safety-test-partition.test.js']);
+  const expected = fs.readdirSync(new URL('../test/', import.meta.url))
+    .filter(name => name.endsWith('.test.js') && !controlTests.has(name))
+    .map(name => path.posix.join('test', name)).sort();
+  assert.equal(new Set(selected).size, selected.length, 'no test is assigned twice');
+  assert.deepEqual(selected.sort(), expected, 'all runtime tests are assigned exactly once');
+  for (const control of controlTests) assert.equal(selected.includes(path.posix.join('test', control)), false, `control test stays in preflight: ${control}`);
+});
+
+test('unknown shard fails closed', () => {
+  const result = spawnSync(process.execPath, [script.pathname, '--shard', 'unknown'], {cwd: root, encoding: 'utf8'});
+  assert.equal(result.status, 2);
+});

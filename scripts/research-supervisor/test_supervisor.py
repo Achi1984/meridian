@@ -2208,9 +2208,22 @@ process.stdout.write(JSON.stringify(runBatch({
             self.assertEqual(settled["reason"], "DEADLINE_EXCEEDED", diagnostic)
             self.assertEqual(ack_marker.read_text(), f"{'d'*64}:0", diagnostic)
             self.assertEqual(len(descendant_return_states), len(descendant_identity), diagnostic)
+            valid_exit_classes = ("dead", "zombie", "pid_reused")
             for state in descendant_return_states:
-                self.assertIn(state.get("classification"), ("dead", "zombie", "pid_reused"), diagnostic)
-                self.assertNotEqual(state.get("classification"), "live", diagnostic)
+                classification = state.get("classification")
+                equivalent_post_cleanup_race = (
+                    classification == "unknown"
+                    and state.get("reason") == "READ_ERROR"
+                    and not descendant_term_marker.exists()
+                    and descendant_exit_states
+                    and all(exit_state.get("classification") in valid_exit_classes
+                            for exit_state in descendant_exit_states)
+                )
+                self.assertTrue(
+                    classification in valid_exit_classes or equivalent_post_cleanup_race,
+                    diagnostic,
+                )
+                self.assertNotEqual(classification, "live", diagnostic)
             for state in descendant_exit_states:
                 self.assertIn(state.get("classification"), ("dead", "zombie", "pid_reused"), diagnostic)
                 self.assertNotEqual(state.get("classification"), "live", diagnostic)

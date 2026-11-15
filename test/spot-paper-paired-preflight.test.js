@@ -6,9 +6,10 @@ import { validatePairedPreflight } from "../scripts/spot-paper-paired-acceptance
 test("offline preflight is bounded and reports the current digest blocker", () => {
   const result = validatePairedPreflight(receipt, { expectedSourceSha: receipt.acceptedImage.sourceSha });
   assert.equal(result.status, "BLOCKED");
-  assert.deepEqual(result.blockers, ["registry-digest", "registry-digest-evidence", "host-global-exclusivity"]);
+  assert.deepEqual(result.blockers, ["registry-digest", "registry-digest-evidence", "host-global-exclusivity", "mount-identity-evidence", "sigterm-drill-evidence"]);
   assert.equal(result.claims.hostUniqueness, "SOURCE_BOUND_IDENTITY_ONLY");
   assert.equal(result.claims.hostGlobalExclusivity, "MISSING_EXTERNAL_PROOF");
+  assert.equal(result.claims.mountIdentity, "MISSING_EXTERNAL_PROOF");
   assert.equal(result.claims.activation, false);
   assert.equal(result.checks.find(check => check.name === "host-uniqueness-source-bound").status, "PASS");
 });
@@ -71,6 +72,20 @@ test("timestamps reject impossible calendar dates and clock ranges", () => {
   }
 });
 
+test("mount and SIGTERM evidence are fail-closed and structurally bound", () => {
+  const candidate = structuredClone(receipt);
+  candidate.acceptedImage.registryDigest = "registry.example/meridian/pair@sha256:" + "1".repeat(64);
+  candidate.externalEvidence = validExternalEvidence(candidate);
+  const result = validatePairedPreflight(candidate);
+  assert.equal(result.status, "SOURCE_ONLY_READY_FOR_INDEPENDENT_REVIEW");
+  candidate.externalEvidence.mountIdentity.runtimeUser.uid = 0;
+  assert.equal(validatePairedPreflight(candidate).checks.find(check => check.name === "mount-identity-evidence").status, "BLOCKED");
+  candidate.externalEvidence.mountIdentity.runtimeUser.uid = 1000;
+  candidate.externalEvidence.sigtermDrill.checkpointAfter.sequence = 1;
+  candidate.externalEvidence.sigtermDrill.checkpointBefore.sequence = 1;
+  assert.equal(validatePairedPreflight(candidate).checks.find(check => check.name === "sigterm-drill-evidence").status, "BLOCKED");
+});
+
 function validExternalEvidence(candidate) {
   return {
     registryDigest: {
@@ -86,6 +101,36 @@ function validExternalEvidence(candidate) {
       evidenceRef: "host-check://pending-review",
       verifier: "independent-reviewer",
       observedAt: "2026-11-14T00:00:00Z"
+    },
+    mountIdentity: {
+      schemaVersion: "MERIDIAN_MOUNT_IDENTITY_EVIDENCE_V1",
+      result: "CLEAR",
+      dataRoot: "/evidence-root",
+      runDirectory: `/evidence-root/${candidate.candidateRunId}`,
+      runDirectoryExistedBeforeStart: false,
+      realpath: "/evidence-root",
+      volumeId: "volume-1",
+      instanceId: "instance-1",
+      runtimeUser: {uid: 1000},
+      writable: true,
+      readback: true,
+      evidenceRef: "mount-attestation://pending-review",
+      verifier: "independent-reviewer",
+      observedAt: "2026-11-14T00:00:00Z"
+    },
+    sigtermDrill: {
+      schemaVersion: "MERIDIAN_SIGTERM_DRILL_EVIDENCE_V1",
+      result: "PASS",
+      signal: "SIGTERM",
+      checkpointBefore: {sequence: 12, digest: "sha256:" + "2".repeat(64)},
+      checkpointAfter: {sequence: 13, digest: "sha256:" + "3".repeat(64)},
+      terminalStatus: "STOPPED",
+      graceMs: 60000,
+      evidenceDigestUnchanged: true,
+      evidenceRef: "sigterm-attestation://pending-review",
+      verifier: "independent-reviewer",
+      observedAt: "2026-11-14T00:00:00Z"
     }
   };
 }
+// CI refresh marker: branch reconciled onto current main.

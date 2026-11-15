@@ -16,6 +16,9 @@ let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
 let paperBotReportWorkspace = null;
 let spotPaperThreeWayResearch = null;
+let workspaceMounted = false;
+let loaded = false;
+let loading = false;
 function collapsedSection(id,label,before=catalogRoot){
   const section=document.createElement('details');
   section.id=id;
@@ -81,22 +84,46 @@ function mountWorkspace(){
   return true;
 }
 let workspaceObserver = null;
+let pendingWorkspaceLoad = false;
 function mountWhenReady(){
-  if(mountWorkspace()){
+  if(!workspaceMounted){
+    if(!mountWorkspace())return false;
+    workspaceMounted = true;
     workspaceObserver?.disconnect();
     workspaceObserver = null;
     document.removeEventListener('DOMContentLoaded', mountWhenReady);
-    return true;
   }
-  return false;
+  if(pendingWorkspaceLoad){
+    pendingWorkspaceLoad = false;
+    loadWorkspace();
+  }
+  return true;
 }
-if(!mountWhenReady()){
+function requestWorkspaceLoad(){
+  pendingWorkspaceLoad = true;
+  const active=document.querySelector('#nav button[data-v="strategies"][aria-current="page"]');
+  if(active){
+    paperCockpit?.setActive(true);
+    spotPaperCockpit?.setActive(true);
+    spotPaperHost8hDashboard?.setActive(true);
+    paperBotReportWorkspace?.setActive(true);
+  }
+  mountWhenReady();
+}
+function ensureStrategyWorkspace(){
+  const mounted = mountWhenReady();
+  if(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')){
+    requestWorkspaceLoad();
+  }
+  return mounted;
+}
+if(typeof window!=='undefined') window.ensureStrategyWorkspace = ensureStrategyWorkspace;
+const mountedInitially = mountWhenReady();
+if(!mountedInitially){
   workspaceObserver = new MutationObserver(mountWhenReady);
   workspaceObserver.observe(document.documentElement,{childList:true,subtree:true});
   document.addEventListener('DOMContentLoaded',mountWhenReady,{once:true});
 }
-let loaded = false;
-let loading = false;
 
 async function loadWorkspace() {
   if (loaded || loading) return;
@@ -121,27 +148,41 @@ async function loadWorkspace() {
   }
 }
 
-document.getElementById('nav')?.addEventListener('click',event=>{
-  const button=event.target.closest?.('button[data-v]');
-  if(button) paperCockpit?.setActive(button.dataset.v==='strategies');
-  if(button) spotPaperCockpit?.setActive(button.dataset.v==='strategies');
-  if(button) spotPaperHost8hDashboard?.setActive(button.dataset.v==='strategies');
-  if(button) paperBotReportWorkspace?.setActive(button.dataset.v==='strategies');
-  if (button?.dataset.v==='strategies') loadWorkspace();
-});
-
+let boundNav = null;
+let navObserver = null;
+function bindNavWhenReady(){
+  const nav = document.getElementById('nav');
+  if(!nav || boundNav === nav) return false;
+  boundNav = nav;
+  nav.addEventListener('click',event=>{
+    const button=event.target.closest?.('button[data-v]');
+    if(!button || !nav.contains(button)) return;
+    paperCockpit?.setActive(button.dataset.v==='strategies');
+    spotPaperCockpit?.setActive(button.dataset.v==='strategies');
+    spotPaperHost8hDashboard?.setActive(button.dataset.v==='strategies');
+    paperBotReportWorkspace?.setActive(button.dataset.v==='strategies');
+    if(button.dataset.v==='strategies') requestWorkspaceLoad();
+  });
+  navObserver?.disconnect();
+  navObserver = null;
+  if(nav.querySelector('button[data-v="strategies"][aria-current="page"]')){
+    paperCockpit?.setActive(true);
+    spotPaperCockpit?.setActive(true);
+    spotPaperHost8hDashboard?.setActive(true);
+    paperBotReportWorkspace?.setActive(true);
+    requestWorkspaceLoad();
+  }
+  return true;
+}
+if(!bindNavWhenReady()){
+  navObserver = new MutationObserver(bindNavWhenReady);
+  navObserver.observe(document.documentElement,{childList:true,subtree:true});
+}
 document.addEventListener('click',event=>{
   const link = event.target.closest?.('[data-open-strategies]');
   if (!link) return;
   event.preventDefault();
   document.querySelector('#nav button[data-v="strategies"]')?.click();
-  loadWorkspace();
+  requestWorkspaceLoad();
 });
 
-if (document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')) {
-  paperCockpit?.setActive(true);
-  spotPaperCockpit?.setActive(true);
-  spotPaperHost8hDashboard?.setActive(true);
-  paperBotReportWorkspace?.setActive(true);
-  loadWorkspace();
-}
