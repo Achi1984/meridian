@@ -28,7 +28,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
     if(state.status==='locked')status.textContent='Gesperrt. Das Meridian-Passwort wird nicht gespeichert.';
     else if(state.status==='checking')status.textContent='Zugang wird geprüft.';
     else status.textContent='Zugang geprüft. Manuelle Datenabfragen bleiben getrennt.';
-    if(visible)window.ensureStrategyWorkspace?.({load:true});
+    if(visible)window.ensureStrategyWorkspace?.();
   }
   async function submit(event){
     event.preventDefault();
