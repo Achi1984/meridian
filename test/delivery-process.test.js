@@ -15,7 +15,11 @@ test('release safety has one PR trigger, main-only pushes, and cancellation isol
   assert.ok(regressionStep,'the regression hard gate remains present');
   assert.match(regressionStep,/shell: bash\n\s+run: \|/);
   assert.match(regressionStep,/for test_file in test\/\*\.test\.js; do/);
-  assert.match(regressionStep,/node --test "\$\{other_tests\[@\]\}"\n\s+node --test test\/research-supervisor\.test\.js/);
+  assert.match(regressionStep,/mapfile -t test_files < <\\(node scripts\\/release-safety-partition\\.mjs --shard/);
+  assert.match(regressionStep,/case "\\$\\{\\{ matrix\\.shard \\}\\}" in/);
+  assert.match(regressionStep,/timeout --signal=TERM --kill-after=60s 8m node --test/);
+  assert.match(regressionStep,/timeout --signal=TERM --kill-after=60s 35m node --test/);
+  assert.match(workflow,/safety-tests:/);
   // release-safety-test-partition.test.js executes this block and verifies
   // exact discovery coverage, no duplicate execution and failure propagation.
   for(const gate of ['Frozen research lineage','Meridian continuity audit','Public privacy regression','High-confidence secret scan','Assert paper-only invariant'])assert.ok(workflow.includes(gate));
