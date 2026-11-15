@@ -16,7 +16,6 @@ let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
 let paperBotReportWorkspace = null;
 let spotPaperThreeWayResearch = null;
-let comparisonRoot = null;
 let workspaceMounted = false;
 let loaded = false;
 let loading = false;
@@ -71,9 +70,6 @@ function mountWorkspace(){
   paperCockpit=mountPaperCockpit(paperRoot,document,window);
 
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
-  comparisonRoot=document.createElement('section');
-  comparisonRoot.id='strategy-comparison-mount';
-  research.append(comparisonRoot);
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
   research.append(threeWayRoot);
@@ -138,12 +134,12 @@ async function loadWorkspace() {
     const response = await fetch(new URL(CAMPAIGN_SOURCE,import.meta.url).href,{cache:'no-store'});
     if (!response.ok) throw Error('Das Quellregister ist nicht verfügbar.');
     const campaign = await response.json();
-    const catalog = renderStrategyCatalog(catalogRoot,campaign,document,undefined,comparisonRoot);
+    const catalog = renderStrategyCatalog(catalogRoot,campaign);
     if (catalog.status !== 'PRESENT_UNVERIFIED') throw Error(catalog.reason);
     loaded = true;
     catalogStatus.textContent = 'Zwölf Hypothesen aus dem lokalen Entwurfsregister; Entwicklungsstufen bleiben quellengebunden.';
   } catch (error) {
-    renderStrategyCatalog(catalogRoot,null,document,undefined,comparisonRoot);
+    renderStrategyCatalog(catalogRoot,null);
     catalogStatus.textContent = String(error?.message || 'Das Strategieregister ist unbekannt.').slice(0,220);
     catalogStatus.setAttribute('role','alert');
   } finally {

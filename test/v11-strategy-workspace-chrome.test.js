@@ -412,17 +412,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           };
           check();
         })`);
-        const comparisonDiagnostics = comparisonMounted ? null : await evaluate(`(()=>({
-          host:!!document.getElementById('strategy-comparison-mount'),
-          hostParent:document.getElementById('strategy-comparison-mount')?.parentElement?.id||null,
-          research:!!document.getElementById('paper-research-section'),
-          researchChildren:document.getElementById('paper-research-section')?.children.length||0,
-          catalog:!!document.getElementById('strategy-catalog'),
-          catalogChildren:document.getElementById('strategy-catalog')?.children.length||0,
-          comparison:!!document.querySelector('.strategy-comparison')
-        }))()`);
-        assert.equal(comparisonMounted,true,
-          'strategy comparison remains mounted after research disclosure: '+JSON.stringify(comparisonDiagnostics));
+        assert.equal(comparisonMounted,true,'strategy comparison remains mounted after research disclosure');
         // Measure settled layout, not the active view's translateY appearance animation.
         // With reduced motion getAnimations() is empty and this resolves immediately.
         await evaluate(`(async()=>{
