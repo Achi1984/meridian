@@ -67,9 +67,9 @@ function mountWorkspace(){
   paperCockpit=mountPaperCockpit(paperRoot,document,window);
 
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
-  research.addEventListener('toggle',()=>{
-    if(research.open)setTimeout(ensureComparisonMounted,0);
-  });
+  comparisonRoot=document.createElement('section');
+  comparisonRoot.id='strategy-comparison-mount';
+  research.append(comparisonRoot);
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
   research.append(threeWayRoot);
@@ -122,25 +122,7 @@ if(!mountedInitially){
 }
 let loaded = false;
 let loading = false;
-let loadedCampaign = null;
-let recoveringComparison = false;
-let comparisonObserver = null;
-function ensureComparisonMounted(){
-  const research=document.getElementById('paper-research-section');
-  if(research && !comparisonObserver){
-    comparisonObserver = new MutationObserver(()=>ensureComparisonMounted());
-    comparisonObserver.observe(research,{childList:true,subtree:true});
-  }
-  const root=document.getElementById('strategy-catalog');
-  if(!root || !loadedCampaign || recoveringComparison || root.querySelector('.strategy-comparison'))return;
-  recoveringComparison = true;
-  try{
-    catalogRoot = root;
-    renderStrategyCatalog(root,loadedCampaign);
-  }finally{
-    recoveringComparison = false;
-  }
-}
+let comparisonRoot = null;
 
 async function loadWorkspace() {
   if (loaded || loading) return;
@@ -151,13 +133,13 @@ async function loadWorkspace() {
     const response = await fetch(new URL(CAMPAIGN_SOURCE,import.meta.url).href,{cache:'no-store'});
     if (!response.ok) throw Error('Das Quellregister ist nicht verfügbar.');
     const campaign = await response.json();
-    const catalog = renderStrategyCatalog(catalogRoot,campaign);
+    const catalog = renderStrategyCatalog(catalogRoot,campaign,document,undefined,comparisonRoot);
     if (catalog.status !== 'PRESENT_UNVERIFIED') throw Error(catalog.reason);
     loadedCampaign = campaign;
     loaded = true;
     catalogStatus.textContent = 'Zwölf Hypothesen aus dem lokalen Entwurfsregister; Entwicklungsstufen bleiben quellengebunden.';
   } catch (error) {
-    renderStrategyCatalog(catalogRoot,null);
+    renderStrategyCatalog(catalogRoot,null,document,undefined,comparisonRoot);
     catalogStatus.textContent = String(error?.message || 'Das Strategieregister ist unbekannt.').slice(0,220);
     catalogStatus.setAttribute('role','alert');
   } finally {
