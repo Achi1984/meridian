@@ -16,6 +16,7 @@ let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
 let paperBotReportWorkspace = null;
 let spotPaperThreeWayResearch = null;
+let comparisonRoot = null;
 function collapsedSection(id,label,before=catalogRoot){
   const section=document.createElement('details');
   section.id=id;
@@ -129,7 +130,6 @@ if(!mountedInitially){
 }
 let loaded = false;
 let loading = false;
-let comparisonRoot = null;
 
 async function loadWorkspace() {
   if (loaded || loading) return;
