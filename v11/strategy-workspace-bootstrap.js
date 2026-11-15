@@ -100,6 +100,13 @@ function mountWhenReady(){
 }
 function requestWorkspaceLoad(){
   pendingWorkspaceLoad = true;
+  const active=document.querySelector('#nav button[data-v="strategies"][aria-current="page"]');
+  if(active){
+    paperCockpit?.setActive(true);
+    spotPaperCockpit?.setActive(true);
+    spotPaperHost8hDashboard?.setActive(true);
+    paperBotReportWorkspace?.setActive(true);
+  }
   if(mountWhenReady()){
     pendingWorkspaceLoad = false;
     loadWorkspace();
