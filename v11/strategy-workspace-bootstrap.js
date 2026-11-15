@@ -75,8 +75,11 @@ function mountWorkspace(){
   research.append(catalogRoot);
   if(arenaRoot)research.append(arenaRoot);
 }
-mountWorkspace();
-if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountWorkspace, {once:true});
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', mountWorkspace, {once:true});
+} else {
+  mountWorkspace();
+}
 let loaded = false;
 let loading = false;
 
