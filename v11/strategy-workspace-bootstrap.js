@@ -114,15 +114,14 @@ function requestWorkspaceLoad(){
   }
   mountWhenReady();
 }
-function ensureStrategyWorkspace(options={}){
+function ensureStrategyWorkspace(){
   const mounted = mountWhenReady();
-  if(options.load || document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')){
+  if(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')){
     requestWorkspaceLoad();
   }
   return mounted;
 }
 if(typeof window!=='undefined') window.ensureStrategyWorkspace = ensureStrategyWorkspace;
-document.addEventListener('meridian:app-access-unlocked',()=>ensureStrategyWorkspace({load:true}));
 const mountedInitially = mountWhenReady();
 if(!mountedInitially){
   workspaceObserver = new MutationObserver(mountWhenReady);
