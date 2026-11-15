@@ -114,4 +114,5 @@ jobs:
       - name: High-confidence secret scan
         run: node scripts/secret-check.mjs
       - name: Assert paper-only invariant
-        run: grep -F 'if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");' server.js
+        run: |
+          grep -F 'if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");' server.js
