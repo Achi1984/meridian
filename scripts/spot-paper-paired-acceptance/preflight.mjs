@@ -41,6 +41,14 @@ function validTimestamp(value) {
   return Number.isFinite(Date.parse(value));
 }
 
+function absolutePath(value) {
+  return nonEmptyString(value) && value.startsWith("/") && !value.includes("\0");
+}
+
+function validRuntimeUid(value) {
+  return Number.isInteger(value) && value > 0 && value < 65536;
+}
+
 function check(name, ok, detail) {
   return { name, status: ok ? "PASS" : "BLOCKED", detail };
 }
@@ -92,6 +100,36 @@ export function validatePairedPreflight(receipt, { expectedSourceSha } = {}) {
     validTimestamp(hostEvidence?.observedAt),
     "independent host-side evidence must state a global CLEAR for this run and identify verifier, reference, and observation time"));
 
+  const mount = evidence.mountIdentity;
+  const mountPathBinding = absolutePath(mount?.dataRoot) && absolutePath(mount?.runDirectory) &&
+    absolutePath(mount?.realpath) && mount.realpath === mount.dataRoot &&
+    mount.runDirectory.startsWith(`${mount.dataRoot}/`);
+  checks.push(check("mount-identity-evidence",
+    mount?.schemaVersion === "MERIDIAN_MOUNT_IDENTITY_EVIDENCE_V1" &&
+    mount?.result === "CLEAR" && mountPathBinding &&
+    mount?.runDirectoryExistedBeforeStart === false &&
+    nonEmptyString(mount?.volumeId) && nonEmptyString(mount?.instanceId) &&
+    validRuntimeUid(mount?.runtimeUser?.uid) &&
+    mount?.writable === true && mount?.readback === true &&
+    nonEmptyString(mount?.evidenceRef) && nonEmptyString(mount?.verifier) &&
+    validTimestamp(mount?.observedAt),
+    "independent mount evidence must bind canonical paths, a fresh run directory, runtime-user readback, and volume identity"));
+
+  const drill = evidence.sigtermDrill;
+  const before = drill?.checkpointBefore;
+  const after = drill?.checkpointAfter;
+  const checkpointBinding = Number.isInteger(before?.sequence) && Number.isInteger(after?.sequence) &&
+    before.sequence >= 0 && after.sequence > before.sequence &&
+    SHA256.test(before?.digest ?? "") && SHA256.test(after?.digest ?? "");
+  checks.push(check("sigterm-drill-evidence",
+    drill?.schemaVersion === "MERIDIAN_SIGTERM_DRILL_EVIDENCE_V1" &&
+    drill?.result === "PASS" && drill?.signal === "SIGTERM" && checkpointBinding &&
+    (drill?.terminalStatus === "STOPPED" || drill?.terminalStatus === "SHUTDOWN") &&
+    Number.isInteger(drill?.graceMs) && drill.graceMs >= 0 && drill.graceMs <= 60000 &&
+    drill?.evidenceDigestUnchanged === true && nonEmptyString(drill?.evidenceRef) &&
+    nonEmptyString(drill?.verifier) && validTimestamp(drill?.observedAt),
+    "independent SIGTERM evidence must prove monotone checkpoints, terminal stop, bounded grace, and unchanged evidence"));
+
   checks.push(check("inactive-guardrails", guardrails.activation === false &&
     guardrails.hostPaperRun === false && guardrails.feedStarted === false &&
     guardrails.registryPush === false && guardrails.promotion === false,
@@ -106,6 +144,8 @@ export function validatePairedPreflight(receipt, { expectedSourceSha } = {}) {
     claims: {
       hostUniqueness: "SOURCE_BOUND_IDENTITY_ONLY",
       hostGlobalExclusivity: passed("host-global-exclusivity") ? "EVIDENCE_REPORTED_NOT_RECHECKED" : "MISSING_EXTERNAL_PROOF",
+      mountIdentity: passed("mount-identity-evidence") ? "EVIDENCE_REPORTED_NOT_RECHECKED" : "MISSING_EXTERNAL_PROOF",
+      sigtermDrill: passed("sigterm-drill-evidence") ? "EVIDENCE_REPORTED_NOT_RECHECKED" : "MISSING_EXTERNAL_PROOF",
       registryImmutability: passed("registry-digest-evidence") ? "EVIDENCE_REPORTED_NOT_RECHECKED" : "MISSING_EXTERNAL_PROOF",
       activation: false
     },
