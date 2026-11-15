@@ -5,6 +5,7 @@ import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B16-M1
 import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B16-M11-FIX16';
 import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX16';
 import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B16-M11-FIX16';
+import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B16-M11-FIX16';
 
 const catalogRoot = document.getElementById('strategy-catalog');
 const catalogStatus = document.getElementById('strategy-load-status');
@@ -14,6 +15,18 @@ let paperCockpit = null;
 let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
 let paperBotReportWorkspace = null;
+let spotPaperThreeWayResearch = null;
+function collapsedSection(id,label,before=catalogRoot){
+  const section=document.createElement('details');
+  section.id=id;
+  section.className='card';
+  const summary=document.createElement('summary');
+  summary.textContent=label;
+  summary.setAttribute('style','min-height:44px;padding:10px 0;box-sizing:border-box;cursor:pointer');
+  section.append(summary);
+  (catalogRoot?.parentNode || document.body).insertBefore(section,before || null);
+  return section;
+}
 if(catalogRoot?.parentNode){
   const workspace=catalogRoot.parentNode;
   const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
@@ -38,17 +51,6 @@ if(catalogRoot?.parentNode){
   workspace.insertBefore(host8hRoot,catalogStatus || catalogRoot);
   spotPaperHost8hDashboard=mountSpotPaperHost8hDashboard(host8hRoot,document,window);
 
-  function collapsedSection(id,label,before=catalogRoot){
-    const section=document.createElement('details');
-    section.id=id;
-    section.className='card';
-    const summary=document.createElement('summary');
-    summary.textContent=label;
-    summary.setAttribute('style','min-height:44px;padding:10px 0;box-sizing:border-box;cursor:pointer');
-    section.append(summary);
-    workspace.insertBefore(section,before);
-    return section;
-  }
   const history=collapsedSection('paper-history-section','Frühere Paper-Berichte');
   const spotPaperRoot=document.createElement('section');
   spotPaperRoot.id='spot-paper-cockpit-root';
@@ -60,6 +62,10 @@ if(catalogRoot?.parentNode){
   paperCockpit=mountPaperCockpit(paperRoot,document,window);
 
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
+  const threeWayRoot=document.createElement('section');
+  threeWayRoot.id='spot-paper-three-way-root';
+  research.append(threeWayRoot);
+  spotPaperThreeWayResearch=mountSpotPaperThreeWayResearch(threeWayRoot,document);
   const readinessRoot=document.createElement('section');
   readinessRoot.id='paper-readiness-root';
   research.append(readinessRoot);
