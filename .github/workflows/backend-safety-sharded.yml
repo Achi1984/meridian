@@ -9,6 +9,7 @@ permissions:
 
 jobs:
   preflight:
+    timeout-minutes: 10
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -50,6 +51,7 @@ jobs:
 
   tests:
     needs: preflight
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
@@ -69,7 +71,11 @@ jobs:
         shell: bash
         run: |
           mapfile -t test_files < <(node scripts/release-safety-partition.mjs --shard "${{ matrix.shard }}")
-          node --test "${test_files[@]}"
+          case "${{ matrix.shard }}" in
+            supervisor) timeout --signal=TERM --kill-after=60s 8m node --test "${test_files[@]}" ;;
+            browser|core-auth) timeout --signal=TERM --kill-after=60s 35m node --test "${test_files[@]}" ;;
+            *) echo "unknown shard" >&2; exit 2 ;;
+          esac
       - name: Upload shard evidence
         if: always()
         uses: actions/upload-artifact@v4
@@ -81,6 +87,7 @@ jobs:
 
   safety-aggregate:
     if: always()
+    timeout-minutes: 20
     needs: [preflight, tests]
     runs-on: ubuntu-latest
     steps:
