@@ -133,3 +133,4 @@ function validExternalEvidence(candidate) {
     }
   };
 }
+// CI refresh marker: branch reconciled onto current main.
