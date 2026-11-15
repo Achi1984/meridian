@@ -364,7 +364,7 @@ function renderHistoricalResearch(document, catalog) {
   return section;
 }
 
-export function renderStrategyCatalog(root, campaign, document=root?.ownerDocument || globalThis.document, evidence=B17_EVIDENCE_SNAPSHOT) {
+export function renderStrategyCatalog(root, campaign, document=root?.ownerDocument || globalThis.document, evidence=B17_EVIDENCE_SNAPSHOT, comparisonHost=null) {
   if (!root || !document) return unknownCatalog('Ansicht nicht verfügbar.');
   const catalog = buildStrategyCatalog(campaign, evidence);
   root.replaceChildren();
@@ -378,7 +378,8 @@ export function renderStrategyCatalog(root, campaign, document=root?.ownerDocume
   addText(document,notice,'p','12 Familien aus dem unveränderten Entwurfsregister. Stufen bezeichnen nur vorhandene Quellenbelege; kein automatischer Aufstieg, keine Gewinnerwahl.');
   addText(document,notice,'p',catalog.sharedBlocker);
   root.append(notice);
-  root.append(renderStrategyComparison(document,catalog));
+  const comparison=renderStrategyComparison(document,catalog);
+  (comparisonHost || root).append(comparison);
   root.append(renderHistoricalResearch(document,catalog));
   for (const family of catalog.families) root.append(renderFamily(document,family));
 
