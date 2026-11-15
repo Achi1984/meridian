@@ -13,8 +13,8 @@ test('release safety has one PR trigger, main-only pushes, and cancellation isol
   assert.match(triggers,/cancel-in-progress: \$\{\{ github\.event_name == 'pull_request' \}\}/);
   const shardStep=workflow.split('      - name: Run ${{ matrix.shard }} shard\n')[1]?.split('      - name: Upload shard evidence')[0];
   assert.ok(shardStep,'the sharded regression hard gate remains present');
-  assert.match(shardStep,/mapfile -t test_files < <\\(node scripts\\/release-safety-partition\\.mjs --shard/);
-  assert.match(shardStep,/case "\\$\\{\\{ matrix\\.shard \\}\\}" in/);
+  assert.ok(shardStep.includes('mapfile -t test_files < <(node scripts/release-safety-partition.mjs --shard'));
+  assert.ok(shardStep.includes('case "${{ matrix.shard }}" in'));
   assert.match(shardStep,/timeout --signal=TERM --kill-after=60s 8m node --test/);
   assert.match(shardStep,/timeout --signal=TERM --kill-after=60s 35m node --test/);
   assert.match(workflow,/safety-tests:/);
