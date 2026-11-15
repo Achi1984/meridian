@@ -135,7 +135,6 @@ async function loadWorkspace() {
     const campaign = await response.json();
     const catalog = renderStrategyCatalog(catalogRoot,campaign,document,undefined,comparisonRoot);
     if (catalog.status !== 'PRESENT_UNVERIFIED') throw Error(catalog.reason);
-    loadedCampaign = campaign;
     loaded = true;
     catalogStatus.textContent = 'Zwölf Hypothesen aus dem lokalen Entwurfsregister; Entwicklungsstufen bleiben quellengebunden.';
   } catch (error) {
