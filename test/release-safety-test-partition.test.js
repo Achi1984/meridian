@@ -5,7 +5,7 @@ import path from 'node:path';
 import {spawnSync} from 'node:child_process';
 
 const root = new URL('../', import.meta.url);
-const workflow = fs.readFileSync(new URL('../.github/workflows/backend-safety.yml', root), 'utf8');
+const workflow = fs.readFileSync(new URL('.github/workflows/backend-safety.yml', root), 'utf8');
 const partitionScript = new URL('../scripts/release-safety-partition.mjs', import.meta.url);
 const shards = ['browser', 'core-auth', 'supervisor'];
 const controlTests = new Set(['release-safety-sharding.test.js', 'release-safety-test-partition.test.js']);
