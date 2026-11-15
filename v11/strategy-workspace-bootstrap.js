@@ -17,6 +17,7 @@ let spotPaperHost8hDashboard = null;
 let paperBotReportWorkspace = null;
 let spotPaperThreeWayResearch = null;
 let comparisonRoot = null;
+let loadedCampaign = null;
 function collapsedSection(id,label,before=catalogRoot){
   const section=document.createElement('details');
   section.id=id;
@@ -71,6 +72,11 @@ function mountWorkspace(){
   comparisonRoot=document.createElement('section');
   comparisonRoot.id='strategy-comparison-mount';
   research.append(comparisonRoot);
+  research.addEventListener('toggle',()=>{
+    const root=document.getElementById('strategy-catalog');
+    if(research.open && loadedCampaign && root && !root.querySelector('.strategy-comparison'))
+      renderStrategyCatalog(root,loadedCampaign,document,undefined,comparisonRoot);
+  });
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
   research.append(threeWayRoot);
@@ -143,6 +149,7 @@ async function loadWorkspace() {
     const host=document.getElementById('strategy-comparison-mount');
     const catalog = renderStrategyCatalog(catalogRoot,campaign,document,undefined,host);
     if (catalog.status !== 'PRESENT_UNVERIFIED') throw Error(catalog.reason);
+    loadedCampaign = campaign;
     loaded = true;
     catalogStatus.textContent = 'Zwölf Hypothesen aus dem lokalen Entwurfsregister; Entwicklungsstufen bleiben quellengebunden.';
   } catch (error) {
