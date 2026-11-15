@@ -18,6 +18,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
       state={status:access.isUnlocked()?'unlocked':'locked'};
     }
     const unlocked=state.status==='unlocked';
+    if(unlocked&&lastStatus!=='unlocked')document.dispatchEvent(new Event('meridian:app-access-unlocked'));
     const visible=unlocked&&!document.hidden;
     app.hidden=!visible;
     gate.hidden=visible;
@@ -27,6 +28,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
     if(state.status==='locked')status.textContent='Gesperrt. Das Meridian-Passwort wird nicht gespeichert.';
     else if(state.status==='checking')status.textContent='Zugang wird geprüft.';
     else status.textContent='Zugang geprüft. Manuelle Datenabfragen bleiben getrennt.';
+    if(visible)window.ensureStrategyWorkspace?.({load:true});
   }
   async function submit(event){
     event.preventDefault();
