@@ -146,7 +146,7 @@ async function loadWorkspace() {
     loaded = true;
     catalogStatus.textContent = 'Zwölf Hypothesen aus dem lokalen Entwurfsregister; Entwicklungsstufen bleiben quellengebunden.';
   } catch (error) {
-    renderStrategyCatalog(catalogRoot,null,document,undefined,comparisonRoot);
+    renderStrategyCatalog(catalogRoot,null,document,undefined,document.getElementById('strategy-comparison-mount'));
     catalogStatus.textContent = String(error?.message || 'Das Strategieregister ist unbekannt.').slice(0,220);
     catalogStatus.setAttribute('role','alert');
   } finally {
