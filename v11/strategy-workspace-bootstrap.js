@@ -191,8 +191,6 @@ if(!bindNavWhenReady()){
   navObserver.observe(document.documentElement,{childList:true,subtree:true});
 }
 document.addEventListener('click',event=>{
-  const researchSummary = event.target.closest?.('#paper-research-section > summary');
-  if(researchSummary)setTimeout(ensureComparisonMounted,0);
   const link = event.target.closest?.('[data-open-strategies]');
   if (!link) return;
   event.preventDefault();
