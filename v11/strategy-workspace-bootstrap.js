@@ -27,7 +27,8 @@ function collapsedSection(id,label,before=catalogRoot){
   (catalogRoot?.parentNode || document.body).insertBefore(section,before || null);
   return section;
 }
-if(catalogRoot?.parentNode){
+function mountWorkspace(){
+  if(!catalogRoot?.parentNode || document.getElementById('paper-research-section')) return;
   const workspace=catalogRoot.parentNode;
   const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
   botReports.open=true;
@@ -74,6 +75,8 @@ if(catalogRoot?.parentNode){
   research.append(catalogRoot);
   if(arenaRoot)research.append(arenaRoot);
 }
+mountWorkspace();
+if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', mountWorkspace, {once:true});
 let loaded = false;
 let loading = false;
 
