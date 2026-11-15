@@ -87,8 +87,22 @@ jobs:
         run: |
           mapfile -t test_files < <(node scripts/release-safety-partition.mjs --shard "${{ matrix.shard }}")
           case "${{ matrix.shard }}" in
-            supervisor) timeout --signal=TERM --kill-after=60s 8m node --test "${test_files[@]}" ;;
-            browser|core-auth) timeout --signal=TERM --kill-after=60s 35m node --test "${test_files[@]}" ;;
+            supervisor)
+              timeout --signal=TERM --kill-after=60s 8m node --test "${test_files[@]}"
+              ;;
+            browser)
+              # Browser/CDP startup is process-global on the hosted runner. Run each
+              # browser file in its own bounded process so one startup timeout cannot
+              # contaminate or strand the remaining browser files.
+              for test_file in "${test_files[@]}"; do
+                echo "::group::browser file ${test_file}"
+                timeout --signal=TERM --kill-after=60s 8m node --test "${test_file}"
+                echo "::endgroup::"
+              done
+              ;;
+            core-auth)
+              timeout --signal=TERM --kill-after=60s 35m node --test "${test_files[@]}"
+              ;;
             *) echo "unknown shard" >&2; exit 2 ;;
           esac
       - name: Upload shard evidence
