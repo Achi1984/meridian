@@ -1,0 +1,92 @@
+name: MERIDIAN Release Safety (sharded draft)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pull-requests: read
+
+jobs:
+  preflight:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Backend and frontend syntax
+        run: |
+          node --check server.js
+          node --check server-gateway.js
+          node --check scripts/frozen-research-guard.mjs
+          node --check scripts/continuity-audit.mjs
+          node --check scripts/v10-ui-regression-check.mjs
+      - name: Frozen research lineage
+        run: node scripts/frozen-research-guard.mjs
+      - name: Partition guard
+        run: node --test test/release-safety-sharding.test.js
+
+  tests:
+    needs: preflight
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [browser, core-auth, supervisor]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Run ${{ matrix.shard }} shard
+        env:
+          V11_A2_EVIDENCE_DIR: artifacts/v11-visual-qa-${{ matrix.shard }}
+        shell: bash
+        run: |
+          mapfile -t test_files < <(node scripts/release-safety-partition.mjs --shard "${{ matrix.shard }}")
+          node --test "${test_files[@]}"
+      - name: Upload shard evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meridian-v11-visual-${{ matrix.shard }}-${{ github.sha }}-${{ github.run_attempt }}
+          path: artifacts/v11-visual-qa-${{ matrix.shard }}/*.png
+          if-no-files-found: warn
+          retention-days: 7
+
+  safety-aggregate:
+    if: always()
+    needs: [preflight, tests]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require all safety shards
+        if: ${{ needs.preflight.result != 'success' || needs.tests.result != 'success' }}
+        run: exit 1
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+      - name: Deterministic install
+        run: npm ci --ignore-scripts
+      - name: Release authority consistency
+        run: |
+          node scripts/release-sync.mjs --check
+          node scripts/release-check.mjs
+      - name: Meridian continuity audit
+        run: node scripts/continuity-audit.mjs
+      - name: V10 UI regression gate
+        run: node scripts/v10-ui-regression-check.mjs
+      - name: Public privacy regression
+        run: node scripts/privacy-check.mjs
+      - name: High-confidence secret scan
+        run: node scripts/secret-check.mjs
+      - name: Assert paper-only invariant
+        run: grep -F 'if(!config.paperTrading||config.liveTrading) throw new Error("Unsafe configuration: PAPER only required.");' server.js
