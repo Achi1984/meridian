@@ -491,12 +491,15 @@ function rawBytes(bytes) {
   };
 }
 
-function prospectiveRpc(bytes) {
+function parseCensusRpc(bytes, expectedId) {
   let payload;
   try {
     payload = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
   } catch { fail("INVALID_JSON"); }
-  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || payload.id !== 1 ||
+  const id = payload?.id;
+  const validId = id === null || typeof id === "string" || Number.isFinite(id);
+  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || !validId ||
+      (expectedId !== undefined && id !== expectedId) ||
       Object.hasOwn(payload, "error") || !isRecord(payload.result) ||
       Object.keys(payload.result).some(key => !["context", "value"].includes(key)) ||
       !isRecord(payload.result.context) ||
@@ -504,6 +507,86 @@ function prospectiveRpc(bytes) {
     fail("INVALID_RPC_RESPONSE");
   }
   return payload.result;
+}
+
+function decodeClassicCensusMint(mintRpc, boundIdentity, bounds, work, readTime) {
+  if (!isRecord(mintRpc.value) || mintRpc.value.owner !== LEGACY_TOKEN_PROGRAM) {
+    fail("UNSUPPORTED_TOKEN_PROGRAM");
+  }
+  if (mintRpc.value.executable !== false) fail("MALFORMED_MINT_ACCOUNT");
+  const data = mintRpc.value.data;
+  if (!Array.isArray(data) || data.length !== 2 || data[1] !== "base64" ||
+      typeof data[0] !== "string" || data[0].length !== 112) fail("UNSUPPORTED_MINT_LAYOUT");
+  work.decodeWork += data[0].length + 82 + boundIdentity.mint.length;
+  if (work.decodeWork > bounds.maxDecodeWork) fail("DECODE_WORK_LIMIT");
+  const mintBytes = Buffer.from(data[0], "base64");
+  if (mintBytes.length !== 82 || mintBytes.toString("base64") !== data[0]) {
+    fail("UNSUPPORTED_MINT_LAYOUT");
+  }
+  const mintEvidence = decodeMintSafetyEvidence({
+    chainId: "solana", expectedMint: boundIdentity.mint,
+    requestedMint: boundIdentity.mint, accountPubkey: boundIdentity.mint,
+    observedAt: readTime(), rpcResult: mintRpc
+  });
+  if (mintEvidence.status !== "DECODED_UNVERIFIED") fail("MINT_EVIDENCE_INVALID");
+  return validateMintEvidence(mintEvidence, boundIdentity);
+}
+
+function checkedHistoricalBody(receipt, bounds) {
+  const {bytes, sha256} = receipt ?? {};
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 ||
+      bytes.byteLength > bounds.maxResponseBytes) fail("INVALID_RESPONSE_BYTES");
+  const captured = Buffer.from(bytes);
+  const actual = createHash("sha256").update(captured).digest("hex");
+  if (actual !== sha256) fail("RESPONSE_DIGEST_MISMATCH");
+  return parseCensusRpc(captured);
+}
+
+// Offline diagnostic for exact-slot, standard-shaped RPC responses.
+// Matching supply and response context do not establish source trust or coverage.
+export async function diagnoseHistoricalOwnerCensus({
+  identity, expectedSlot, accounts, mint, signal
+} = {}) {
+  let deadline;
+  try {
+    const boundIdentity = validateIdentity(identity);
+    if (NATIVE_MINTS.has(boundIdentity.mint)) fail("NATIVE_MINT_EXCLUDED");
+    if (!Number.isSafeInteger(expectedSlot) || expectedSlot <= 0) fail("INVALID_EXPECTED_SLOT");
+    deadline = createDeadline(signal, MAX_BOUNDS.maxElapsedMs);
+    deadline.check();
+    if ((accounts?.bytes?.byteLength ?? 0) + (mint?.bytes?.byteLength ?? 0) >
+        MAX_BOUNDS.maxResponseBytes) fail("RESPONSE_BYTE_LIMIT");
+    const census = checkedHistoricalBody(accounts, MAX_BOUNDS);
+    const mintRpc = checkedHistoricalBody(mint, MAX_BOUNDS);
+    if (census.context.slot !== expectedSlot || mintRpc.context.slot !== expectedSlot) {
+      fail("HISTORICAL_SLOT_MISMATCH");
+    }
+    if (!Array.isArray(census.value)) fail("INVALID_RPC_RESPONSE");
+    const work = {decodeWork: 0};
+    const totals = await ownerTotals(census.value, boundIdentity, LEGACY_TOKEN_PROGRAM,
+      MAX_BOUNDS, deadline, {work, rejectNative: true});
+    // The decoder requires a time for its diagnostic binding. This is validation
+    // time only and never returned as a historical observation.
+    const mintEvidence = decodeClassicCensusMint(mintRpc, boundIdentity, MAX_BOUNDS, work, Date.now);
+    if (totals.sum !== mintEvidence.supply) fail("SUPPLY_MISMATCH");
+    deadline.check();
+    return {
+      status: "UNKNOWN", reason: "SOURCE_COMPLETENESS_UNAUTHENTICATED",
+      identity: boundIdentity, slot: expectedSlot, coverage: {complete: false},
+      diagnostic: {
+        supplyReconciled: true, mintSupplyAtoms: mintEvidence.supply.toString(),
+        accountCount: totals.accountCount, zeroBalanceAccountCount: totals.zeroBalanceAccountCount,
+        positiveOwnerCount: [...totals.owners.values()].filter(amount => amount > 0n).length
+      },
+      executionAuthorized: false
+    };
+  } catch (error) {
+    return {status: "UNKNOWN",
+      reason: error instanceof CensusFailure ? error.code : "HISTORICAL_DIAGNOSTIC_FAILED",
+      coverage: {complete: false}, executionAuthorized: false};
+  } finally {
+    deadline?.close();
+  }
 }
 
 export async function captureProspectiveOwnerCensus({
@@ -611,7 +694,7 @@ export async function captureProspectiveOwnerCensus({
         if (!Number.isInteger(response.status) || response.status < 200 || response.status >= 300) {
           fail(response.status === 429 ? "RATE_LIMITED" : "HTTP_ERROR");
         }
-        const rpc = prospectiveRpc(streamed.bytes);
+        const rpc = parseCensusRpc(streamed.bytes, 1);
         deadline.check();
         return rpc;
       } finally {
@@ -637,26 +720,7 @@ export async function captureProspectiveOwnerCensus({
       };
       pairs.push(pair);
       if (!pair.sameSlot) continue;
-      if (!isRecord(mintRpc.value) || mintRpc.value.owner !== LEGACY_TOKEN_PROGRAM) {
-        fail("UNSUPPORTED_TOKEN_PROGRAM");
-      }
-      if (mintRpc.value.executable !== false) fail("MALFORMED_MINT_ACCOUNT");
-      const data = mintRpc.value.data;
-      if (!Array.isArray(data) || data.length !== 2 || data[1] !== "base64" ||
-          typeof data[0] !== "string" || data[0].length !== 112) fail("UNSUPPORTED_MINT_LAYOUT");
-      work.decodeWork += data[0].length + 82 + boundIdentity.mint.length;
-      if (work.decodeWork > bounds.maxDecodeWork) fail("DECODE_WORK_LIMIT");
-      const mintBytes = Buffer.from(data[0], "base64");
-      if (mintBytes.length !== 82 || mintBytes.toString("base64") !== data[0]) {
-        fail("UNSUPPORTED_MINT_LAYOUT");
-      }
-      const mintEvidence = decodeMintSafetyEvidence({
-        chainId: "solana", expectedMint: boundIdentity.mint,
-        requestedMint: boundIdentity.mint, accountPubkey: boundIdentity.mint,
-        observedAt: wallTime(), rpcResult: mintRpc
-      });
-      if (mintEvidence.status !== "DECODED_UNVERIFIED") fail("MINT_EVIDENCE_INVALID");
-      const mint = validateMintEvidence(mintEvidence, boundIdentity);
+      const mint = decodeClassicCensusMint(mintRpc, boundIdentity, bounds, work, wallTime);
       if (totals.sum !== mint.supply) fail("SUPPLY_MISMATCH");
       const owners = sortOwners(totals.owners);
       deadline.check();
