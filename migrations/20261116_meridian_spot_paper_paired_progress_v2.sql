@@ -59,7 +59,7 @@ ALTER TABLE meridian_spot_paper_paired_progress
             AND jsonb_typeof(payload->'valuationAt') = 'number'
             AND jsonb_typeof(payload->'arms') = 'array')
         )
-      ), false)
+      )), false)
   );
 
 COMMIT;
