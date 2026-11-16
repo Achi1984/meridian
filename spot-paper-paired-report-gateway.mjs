@@ -1,3 +1,5 @@
+import {SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY as diagnosticIdentity}
+  from './v11/spot-paper-paired-progress-config.js';
 import {isValidSpotPaperPairedExpectedIdentity} from './scripts/spot-paper-paired-report/evaluate.mjs';
 import {
   projectSpotPaperPairedDashboard,
@@ -20,6 +22,13 @@ export {
 
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_ACTIVE_REQUESTS = 2;
+const INTERRUPTED_RUN_ID = 'btc-eur-trend-host-8h-002';
+const REPORT_LOOKUP_TIMEOUT_MS = 6_500;
+const diagnosticConfig = Object.freeze({
+  expectedIdentity: diagnosticIdentity,
+  expectedRunId: diagnosticIdentity.runId,
+  expectedConfigHash: diagnosticIdentity.configSha256
+});
 let activeRequests = 0;
 
 function exactKeys(value, keys) {
@@ -165,14 +174,33 @@ async function read(req, {config, getStore, authorizedRead, signal}) {
     if (!store || typeof store.get !== 'function') {
       return response(503, {error: 'spot_paper_paired_report_store_unavailable'});
     }
-    let row;
+    const useDiagnosticFallback = config.expectedRunId === INTERRUPTED_RUN_ID;
+    const deadline = useDiagnosticFallback
+      ? AbortSignal.timeout(REPORT_LOOKUP_TIMEOUT_MS) : null;
+    const lookupSignal = deadline && signal ? AbortSignal.any([signal, deadline])
+      : deadline ?? signal;
     try {
-      row = await store.get(config.expectedRunId, {signal});
+      const row = await store.get(config.expectedRunId, {signal: lookupSignal});
+      if (row) return decodeRow(row, config);
+
+      if (useDiagnosticFallback) {
+        lookupSignal.throwIfAborted();
+        // This interrupted run has no final report. Use only the reviewed diagnostic identity.
+        const diagnosticRow = await store.get(diagnosticConfig.expectedRunId, {signal: lookupSignal});
+        if (diagnosticRow) {
+          const result = decodeRow(diagnosticRow, diagnosticConfig);
+          if (result.status === 200 && (result.body.report.evidenceStatus !== 'VERIFIED_COMPLETE' ||
+              result.body.report.syntheticFixture !== false)) {
+            return response(422, {error: 'spot_paper_paired_report_invalid'});
+          }
+          return result;
+        }
+      }
+      return response(404, {error: 'spot_paper_paired_report_not_found'});
     } catch (error) {
+      if (deadline?.aborted) return response(503, {error: 'spot_paper_paired_report_store_timeout'});
       return unavailable(error);
     }
-    if (!row) return response(404, {error: 'spot_paper_paired_report_not_found'});
-    return decodeRow(row, config);
   } finally {
     release();
   }
