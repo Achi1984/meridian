@@ -119,7 +119,25 @@
       "verifier": "Northflank run log and dedicated ReadWriteOnce volume assignment cross-checked by operator",
       "observedAt": "2026-11-16T16:46:51.731Z"
     },
-    "sigtermDrill": null
+    "sigtermDrill": {
+      "schemaVersion": "MERIDIAN_SIGTERM_DRILL_EVIDENCE_V1",
+      "result": "PASS",
+      "signal": "SIGTERM",
+      "checkpointBefore": {
+        "sequence": 1,
+        "digest": "sha256:66419beecc0d77d3fc3c4a6011759bd687e9d8b65c3b21d7384bdec3f82ec320"
+      },
+      "checkpointAfter": {
+        "sequence": 2,
+        "digest": "sha256:8ef859cf3d9cc8f6bdd989fbd96170c149e5fe4d6d3ec2501410bd58e9b8209d"
+      },
+      "terminalStatus": "STOPPED",
+      "graceMs": 1177,
+      "evidenceDigestUnchanged": true,
+      "evidenceRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe/logs?runs=df37bd09-7db7-44c7-9ee9-31d887f55182",
+      "verifier": "Northflank platform logs and independent read-only replacement job cross-checked by operator",
+      "observedAt": "2026-11-16T17:10:55.768Z"
+    }
   },
   "hostedRehearsal": {
     "result": "TERMINAL_CHECKPOINT_NOT_COMMITTED",
@@ -137,6 +155,29 @@
       "lock": true,
       "pending": true,
       "reconciliation": "UNKNOWN_PENDING_PUBLICATION",
+      "candidateDirectoryPresent": false
+    }
+  },
+  "hostedRehearsalR2": {
+    "result": "STOP_AND_DURABLE_READBACK_VERIFIED",
+    "configuredGraceSeconds": 60,
+    "manualRunId": "df37bd09-7db7-44c7-9ee9-31d887f55182",
+    "namespace": "/evidence-root/platform-r2",
+    "stopRequestedAt": "2026-11-16T17:10:13.793Z",
+    "osSigtermAt": "2026-11-16T17:10:14.946Z",
+    "platformProcessExitedAt": "2026-11-16T17:10:14.969Z",
+    "platformProcessExitCode": 0,
+    "observedStopRequestToExitMs": 1177,
+    "applicationStopMs": 13,
+    "priorEvidenceUnchanged": true,
+    "readbackRunId": "d4dade47-7044-4a87-8315-57f6bd25165d",
+    "readbackRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe/logs?runs=d4dade47-7044-4a87-8315-57f6bd25165d",
+    "readback": {
+      "sequence": 2,
+      "terminal": true,
+      "lock": false,
+      "pending": false,
+      "reconciliation": "READ_ONLY_VERIFIED",
       "candidateDirectoryPresent": false
     }
   }
