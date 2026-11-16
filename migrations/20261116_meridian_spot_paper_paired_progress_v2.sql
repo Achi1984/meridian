@@ -5,6 +5,7 @@ BEGIN;
 ALTER TABLE meridian_spot_paper_paired_progress
   DROP CONSTRAINT IF EXISTS meridian_spot_paper_paired_progress_journal_sequence_check,
   DROP CONSTRAINT IF EXISTS meridian_spot_paper_paired_progress_payload_check,
+  DROP CONSTRAINT IF EXISTS meridian_spot_paper_paired_progress_check1,
   DROP CONSTRAINT IF EXISTS meridian_spot_paper_paired_progress_v2_sequence_check,
   DROP CONSTRAINT IF EXISTS meridian_spot_paper_paired_progress_v2_payload_check;
 
