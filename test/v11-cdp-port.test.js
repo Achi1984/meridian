@@ -1,5 +1,6 @@
 // Execute the real helper with isolated VM doubles: no browser or network.
 import assert from 'node:assert/strict';
+import {spawnSync} from 'node:child_process';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
@@ -35,8 +36,8 @@ async function startup(values,options={}){
    if(config.syncSpawnError)throw config.syncSpawnError;
    const pid=Object.hasOwn(config,'pid')?config.pid:123+index;
    const events={},child={pid,exitCode:config.exitCode??null,signalCode:config.signalCode??null,
-    on:(name,fn)=>{events[name]=fn;},
-    stderr:{on:(name,fn)=>{
+    on:(name,fn)=>{events[name]=fn;},unref:()=>{},
+    stderr:{destroy:()=>{},on:(name,fn)=>{
      if(name==='data')for(const text of config.stderr||[])fn(Buffer.from(text));
      if(name==='error'&&config.stderrError)fn(Error('SECRET stderr /private/path'));
     }}};
@@ -227,6 +228,50 @@ test('profile cleanup failure does not re-signal a process group already confirm
  assert.ok(calls.events.includes('group-gone-123'));
  assert.equal(calls.kills.filter(([pid,signal])=>pid===-123&&signal==='SIGKILL').length,1);
  assert.ok(calls.now<=25_000);
+});
+
+test('startup failure exits its subprocess even if a detached child keeps stderr open',()=>{
+ const runnable=source.replace('const sleep=ms=>new Promise(r=>setTimeout(r,ms));',
+  'const sleep=async ms=>advance(ms);');
+ const script=`
+  import {spawn} from 'node:child_process';
+  import {runInNewContext} from 'node:vm';
+  let now=0,launches=0;
+  const context={
+   spawn(_command,args){
+    if(args[0]==='-e')return {on(name,fn){if(name==='exit')queueMicrotask(()=>fn(0));}};
+    launches++;
+    const child=spawn(process.execPath,['-e','setInterval(()=>{},1000)'],
+     {detached:true,stdio:['ignore','ignore','pipe']});
+    console.log('FIXTURE_CHILD '+child.pid);
+    return child;
+   },
+   advance(ms){now+=ms;},
+   performance:{now:()=>now},
+   process:{execPath:process.execPath,kill(){}},
+   mkdtempSync:()=>'/synthetic/profile',tmpdir:()=>'/synthetic',
+   join:(...parts)=>parts.join('/'),existsSync:()=>false,Buffer,Map,console,
+  };
+  const run=runInNewContext(${JSON.stringify(runnable+'\nwithMobileChrome;')},context);
+  try{await run('fake-chrome',320,'about:blank','true');}
+  catch(error){
+   if(launches!==1||now>25000||!error.message.includes('recovery=ABORTED_CLEANUP'))throw error;
+   console.log('STARTUP_FAILED_WITHOUT_RETRY');
+  }
+ `;
+ const result=spawnSync(process.execPath,['--input-type=module','-e',script],
+  {encoding:'utf8',timeout:4000});
+ const pid=Number(/^FIXTURE_CHILD (\d+)$/m.exec(result.stdout??'')?.[1]);
+ try{
+  assert.ok(Number.isInteger(pid)&&pid>0,'fixture launched a real child');
+  assert.equal(result.error,undefined);
+  assert.equal(result.status,0,result.stderr);
+  assert.match(result.stdout,/^STARTUP_FAILED_WITHOUT_RETRY$/m);
+ }finally{
+  if(Number.isInteger(pid)&&pid>0){
+   try{process.kill(pid,'SIGKILL');}catch(error){if(error.code!=='ESRCH')throw error;}
+  }
+ }
 });
 
 test('early child exit still fails immediately and cleans up',async()=>{
