@@ -7,6 +7,7 @@ import test from "node:test";
 import {gzipSync, gunzipSync, brotliCompressSync, brotliDecompressSync} from "node:zlib";
 import {
   captureProspectiveOwnerCensus,
+  diagnoseHistoricalOwnerCensus,
   PROSPECTIVE_CENSUS_BOUNDS
 } from "../scripts/memecoin-paper/owner-census.mjs";
 import {
@@ -588,4 +589,55 @@ test("failed acquisition never publishes; partial storage writes and readback fa
     read: async () => ({status: "UNKNOWN"})
   }, offline());
   assert.equal(failedReadback.reason, "PROSPECTIVE_READBACK_FAILED");
+});
+
+function receipt(value, slot) {
+  const bytes = Buffer.from(JSON.stringify(rpc(value, slot)));
+  return {bytes, sha256: hash(bytes)};
+}
+
+function input() {
+  return {
+    identity: IDENTITY, expectedSlot: 100,
+    accounts: receipt([token({amount: 80n}), token({address: 21, amount: 20n}),
+      token({address: 22, owner: 9, amount: 0n})]),
+    mint: receipt(mint())
+  };
+}
+
+test("exact historical slot reconciles raw supply without admitting data", async () => {
+  const result = await diagnoseHistoricalOwnerCensus(input());
+  assert.equal(result.status, "UNKNOWN");
+  assert.equal(result.reason, "SOURCE_COMPLETENESS_UNAUTHENTICATED");
+  assert.equal(result.slot, 100);
+  assert.deepEqual(result.diagnostic, {
+    supplyReconciled: true, mintSupplyAtoms: "100",
+    accountCount: 3, zeroBalanceAccountCount: 1, positiveOwnerCount: 1
+  });
+  assert.equal(result.coverage.complete, false);
+  assert.equal(result.executionAuthorized, false);
+  assert.equal(Object.hasOwn(result, "observedAt"), false);
+});
+
+test("both responses must match the requested historical slot", async () => {
+  for (const [accountsSlot, mintSlot] of [[100, 101], [101, 101], [99, 100]]) {
+    const result = await diagnoseHistoricalOwnerCensus({
+      ...input(), accounts: receipt([token()], accountsSlot), mint: receipt(mint(), mintSlot)
+    });
+    assert.equal(result.reason, "HISTORICAL_SLOT_MISMATCH");
+    assert.equal(result.diagnostic, undefined);
+  }
+});
+
+test("digest, raw supply, account uniqueness and program are checked", async () => {
+  for (const [overrides, reason] of [
+    [{accounts: {...input().accounts, sha256: "0".repeat(64)}}, "RESPONSE_DIGEST_MISMATCH"],
+    [{mint: receipt(mint({supply: 101n}))}, "SUPPLY_MISMATCH"],
+    [{accounts: receipt([token({amount: 50n}), token({amount: 50n})])}, "DUPLICATE_TOKEN_ACCOUNT"],
+    [{accounts: receipt([token({program: key(99)})])}, "MALFORMED_PROGRAM_ACCOUNT"]
+  ]) {
+    const result = await diagnoseHistoricalOwnerCensus({...input(), ...overrides});
+    assert.equal(result.reason, reason);
+    assert.equal(result.coverage.complete, false);
+  }
 });
