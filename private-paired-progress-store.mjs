@@ -1,12 +1,14 @@
 import {
-  canonicalJson, validIdentity, validateProgress
+  canonicalJson, validIdentity
 } from './scripts/spot-paper-paired-progress/contract.mjs';
+import {validateStoredPairedProgress} from './private-paired-progress-validation.mjs';
 import {PAPER_REPORT_STORE_LIMITS} from './private-report-store.mjs';
 
 const TABLE = 'meridian_spot_paper_paired_progress';
 const failure = code => Object.assign(new Error(code), {code});
 
-// Whole-JSON identity equality includes schema, feed/engine, models and account IDs.
+// V1 may advance to V2 only at a higher sequence; V2 never downgrades.
+// Equal-sequence retries are idempotent only for the same version and checkpoint.
 export const PAIRED_PROGRESS_UPSERT_SQL = `
   INSERT INTO ${TABLE} AS current
     (run_id, identity, journal_sequence, journal_sha256, terminal_status, payload)
@@ -19,10 +21,24 @@ export const PAIRED_PROGRESS_UPSERT_SQL = `
     updated_at = now()
   WHERE current.identity = EXCLUDED.identity
     AND current.journal_sequence < EXCLUDED.journal_sequence
+    AND (current.payload->>'schemaVersion' = 'SPOT_PAPER_PAIRED_PROGRESS_V1'
+      OR EXCLUDED.payload->>'schemaVersion' = 'SPOT_PAPER_PAIRED_PROGRESS_V2')
     AND current.terminal_status = 'UNKNOWN'
-    AND (current.payload->>'observedAt')::bigint <= (EXCLUDED.payload->>'observedAt')::bigint
-    AND (current.payload->>'valuationAt')::bigint <= (EXCLUDED.payload->>'valuationAt')::bigint
+    AND (current.payload->>'observedAt' IS NULL OR
+      (EXCLUDED.payload->>'observedAt' IS NOT NULL AND
+        (current.payload->>'observedAt')::bigint <= (EXCLUDED.payload->>'observedAt')::bigint))
+    AND (current.payload->>'valuationAt' IS NULL OR
+      (EXCLUDED.payload->>'valuationAt' IS NOT NULL AND
+        (current.payload->>'valuationAt')::bigint <= (EXCLUDED.payload->>'valuationAt')::bigint))
     AND (current.payload->>'latestEventAt')::bigint <= (EXCLUDED.payload->>'latestEventAt')::bigint
+    AND (current.payload->>'schemaVersion' <> 'SPOT_PAPER_PAIRED_PROGRESS_V2' OR
+      (current.payload->'runStartedAt' = EXCLUDED.payload->'runStartedAt'
+        AND (current.payload->>'lastSuccessfulPollAt' IS NULL OR
+        (EXCLUDED.payload->>'lastSuccessfulPollAt' IS NOT NULL AND
+          (current.payload->>'lastSuccessfulPollAt')::bigint <=
+            (EXCLUDED.payload->>'lastSuccessfulPollAt')::bigint))
+        AND (current.payload->>'completedCycles')::bigint <=
+          (EXCLUDED.payload->>'completedCycles')::bigint))
   RETURNING payload`;
 
 function checkpoint(value) {
@@ -94,7 +110,7 @@ export function createPrivatePairedProgressStore(db, {
       });
     },
     put(value, {signal} = {}) {
-      const payload = validateProgress(value, value?.identity);
+      const payload = validateStoredPairedProgress(value, value?.identity);
       if (!payload) return Promise.reject(failure('INVALID_PROGRESS'));
       return bounded(true, signal, async assertActive => {
         let result;
@@ -113,7 +129,7 @@ export function createPrivatePairedProgressStore(db, {
         const existing = await db.query(
           `SELECT payload FROM ${TABLE} WHERE run_id = $1 AND identity = $2::jsonb`,
           [payload.identity.runId, canonicalJson(payload.identity)]);
-        const previous = validateProgress(existing.rows[0]?.payload, payload.identity);
+        const previous = validateStoredPairedProgress(existing.rows[0]?.payload, payload.identity);
         return {
           status: previous &&
             previous.journalSequence === payload.journalSequence &&

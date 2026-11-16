@@ -39,6 +39,24 @@ Slippage is an execution-price assumption; fees are the unverified modeled
 20 bps per side EEA taker assumption, slippage 10 bps per side. These are NOT
 actual charged exchange fees or evidence of the account's fee tier.
 
+Versioned receiver boundary
+---------------------------
+V1 remains the exporter/observer default. V2 receiving is independently
+disabled unless MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_V2_ENABLED is exactly
+"true" in addition to the existing gateway gates. While disabled, V2 uploads
+are rejected and GET treats stored V2 rows as NOT_FOUND; it never falls back
+to an older V1 payload. V1 sequence checks remain >=2. Sequence 1 is accepted
+only for a validated V2 NO_OBSERVATION record with null poll/valuation and zero
+cycles; an observed V2 checkpoint requires sequence >=2.
+
+Within one exact run identity, a same-version checkpoint may advance only at a
+higher journal sequence with non-regressing timestamps while the prior record
+is nonterminal. V1 may transition to V2 only at a higher sequence; V2 can never
+downgrade to V1. Equal-sequence content is idempotent only when version,
+journal digest and checkpoint payload match (exportedAt may differ); otherwise
+it is a conflict. Terminal rows remain frozen. No migration or V2 activation is
+performed by this repository change.
+
 Valuations come only from the last committed shared_observation, not a strategy
 replay, a fresh market feed, a later failure, or a terminal report's revaluation.
 observedAt/valuationAt survive export/upload unchanged. exportedAt is NOT a
@@ -99,11 +117,13 @@ working directory is assumed. Keep CHECKOUT quoted in commands.
    $CHECKOUT/docs/operations/receipts/btc-eur-paired-diag-20261110-001.expected-identity.json
    Do not substitute any host8h expected identity or claim that this receipt
    grants read-only access. It does not.
-3. Review/apply, in a separately authorized deployment, the additive migration:
+3. Review/apply, in a separately authorized deployment, the additive V1 migration:
    $CHECKOUT/migrations/20261110_meridian_spot_paper_paired_progress.sql
-   This task does NOT apply it. Provision only the necessary private application
-   database privileges on the dedicated progress table. Existing final tables
-   and report ingest policies remain unchanged.
+   The V2 forward migration may be applied only after it:
+   $CHECKOUT/migrations/20261116_meridian_spot_paper_paired_progress_v2.sql
+   These migrations are not applied by this task. Provision only the necessary
+   private application database privileges on the dedicated progress table.
+   Existing final tables and report ingest policies remain unchanged.
 4. Configure the gateway's database/TLS settings using the existing private
    report-pool policy. Provision a separate high-entropy uploader bearer token;
    never reuse dashboard read, write, or completed-report upload credentials.
@@ -119,6 +139,12 @@ working directory is assumed. Keep CHECKOUT quoted in commands.
      MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY_JSON=<approved JSON>
    Missing/invalid gates or overlapping credentials disable the lane.
    There is one exact run allowlist, not a caller-selectable run/query parameter.
+   Keep MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_V2_ENABLED unset/false unless the
+   V2 exporter contract is on main and the forward migration is separately
+   applied and verified. Enable receiving before any deliberate V2 producer
+   opt-in. For rollback, stop V2 publishing first, then unset the V2 gate.
+   Existing V2 rows are retained but hidden; V1 cannot overwrite/downgrade the
+   same run identity, so use a new run identity for any V1 resumption.
 
 Credential ownership for a future Northflank in-job observer:
 
@@ -160,10 +186,12 @@ First-checkpoint readback:
      journalSequence and journalSha256 with the expected run and the first
      ACCEPTED publish receipt. The GET endpoint has no run-ID query parameter.
   3. Confirm classification OBSERVED_CHECKPOINT and compare observedAt with
-     valuationAt. The API readback is the last published checkpoint, not proof
-     of current writer liveness or feed health. Do not call valuationAt,
-     observedAt, exportedAt, or a publication receipt the last successful feed
-     poll; the current contract does not expose that field.
+     valuationAt. V1 does not expose a successful-poll timestamp. For an
+     explicitly enabled, validated V2 record, runStartedAt comes from the
+     manifest, lastSuccessfulPollAt from the committed ticker receipt, and
+     completedCycles from validated committed observations. The API readback
+     is the last published checkpoint, not proof of current writer liveness or
+     feed health.
 
 One-shot export, inspect and dry-run (no network by default)
 ----------------------------------------------------------

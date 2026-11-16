@@ -1,8 +1,9 @@
 import {createHash, timingSafeEqual} from 'node:crypto';
 import {readBoundedRequestBody} from './report-transfer-gateway.mjs';
 import {
-  PROGRESS_PATH, MAX_PROGRESS_BYTES, validIdentity, validateProgress
+  PROGRESS_PATH, PROGRESS_SCHEMA_V2, MAX_PROGRESS_BYTES, validIdentity
 } from './scripts/spot-paper-paired-progress/contract.mjs';
+import {validateStoredPairedProgress} from './private-paired-progress-validation.mjs';
 
 export {PROGRESS_PATH, MAX_PROGRESS_BYTES};
 export const PROGRESS_BODY_TIMEOUT_MS = 5_000;
@@ -34,10 +35,13 @@ export function spotPaperPairedProgressGatewayConfig(env = process.env) {
     if (env[name]) reservedHashes.push(hash(String(env[name]).trim()));
   }
   const distinct = HASH.test(uploadTokenHash) && !reservedHashes.includes(uploadTokenHash);
+  const enabled = env.MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_ENABLED === 'true' &&
+    env.MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_DEPLOYMENT_VERIFIED === 'true' &&
+    expectedIdentity !== null && distinct;
   return Object.freeze({
-    enabled: env.MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_ENABLED === 'true' &&
-      env.MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_DEPLOYMENT_VERIFIED === 'true' &&
-      expectedIdentity !== null && distinct,
+    enabled,
+    v2Enabled: enabled &&
+      env.MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_V2_ENABLED === 'true',
     expectedIdentity,
     uploadTokenHash: distinct ? uploadTokenHash : null
   });
@@ -140,8 +144,11 @@ export async function handleSpotPaperPairedProgressGatewayRequest(req, {
         return response(400, {error: 'invalid_content_length'});
       }
       try {
-        payload = validateProgress(JSON.parse(
-          new TextDecoder('utf-8', {fatal: true}).decode(bytes)), config.expectedIdentity);
+        const input = JSON.parse(new TextDecoder('utf-8', {fatal: true}).decode(bytes));
+        if (input?.schemaVersion === PROGRESS_SCHEMA_V2 && config.v2Enabled !== true) {
+          return error(503, 'version_disabled');
+        }
+        payload = validateStoredPairedProgress(input, config.expectedIdentity);
       } catch {}
       if (!payload) return error(400, 'invalid');
     }
@@ -152,7 +159,10 @@ export async function handleSpotPaperPairedProgressGatewayRequest(req, {
       write, release, signal, storeTimeoutMs);
     if (!write) {
       if (!result) return error(404, 'not_found');
-      const clean = validateProgress(result, config.expectedIdentity);
+      if (result.schemaVersion === PROGRESS_SCHEMA_V2 && config.v2Enabled !== true) {
+        return error(404, 'not_found');
+      }
+      const clean = validateStoredPairedProgress(result, config.expectedIdentity);
       return clean ? response(200, clean) : error(503, 'corrupt');
     }
     if (result?.status === 'CONFLICT') return error(409, 'conflict');
