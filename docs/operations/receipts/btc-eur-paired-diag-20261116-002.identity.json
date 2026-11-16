@@ -100,7 +100,17 @@
       "verifier": "Northflank BuildKit manifest export and completed registry push, cross-checked against the published Image entry",
       "observedAt": "2026-11-10T18:04:00.329Z"
     },
-    "hostGlobalExclusivity": null,
+    "hostGlobalExclusivity": {
+      "scope": "global",
+      "candidateRunId": "btc-eur-paired-diag-20261116-002",
+      "result": "CLEAR",
+      "observedAt": "2026-11-16T17:31:46.841Z",
+      "verifier": "Meridian launch operator, from Northflank inventory and dedicated-volume readback",
+      "evidenceRef": "https://github.com/Achi1984/meridian/blob/3eb00ebbf5c5cc9ede7fd2bd4190c46a2aaf70dd/docs/operations/BTC_EUR_PAIRED_DIAG_002_REHEARSAL.md#exclusivity-before-run",
+      "operationalScope": "One authorized launch target for this candidate: the manual Northflank job meridian-btc-eur-diag-002-rehearsal in achi1984s-team/meridian. The operator interpreted the user's continuation after the host-scope question as designating this single target. This verification covers the assigned launch scope, its dedicated single-attachment volume, completed prior trials, and the read-only absence of the candidate directory. It does not inventory unrelated accounts.",
+      "jobRunsRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/runs",
+      "readbackRunId": "d4dade47-7044-4a87-8315-57f6bd25165d"
+    },
     "mountIdentity": {
       "schemaVersion": "MERIDIAN_MOUNT_IDENTITY_EVIDENCE_V1",
       "result": "CLEAR",
