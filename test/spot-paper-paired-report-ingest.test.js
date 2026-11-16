@@ -261,6 +261,10 @@ test('selected paired reader rejects a report bound to a different configured ru
   const expected = syntheticExpectedPairedIdentity();
   const report = syntheticPairedDashboard(expected);
   let selectedRunId = null;
+  assert.deepEqual(SPOT_PAPER_PAIRED_REPORT_SELECTIONS.map(({runId}) => runId), [
+    'btc-eur-paired-diag-20261110-001',
+    'btc-eur-paired-diag-20261116-002'
+  ]);
   const connector = createSpotPaperPairedReportConnector({
     enabled: true,
     transport: async ({runId}) => {

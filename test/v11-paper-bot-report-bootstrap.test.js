@@ -451,7 +451,7 @@ test('changing selected run IDs aborts and fences stale comparison responses', a
   assert.match(h.pairedRoot.parentNode.textContent,
     /Auswahl geändert; ältere Antworten werden verworfen/);
   assert.doesNotMatch(h.pairedRoot.textContent,
-    /btc-eur-paired-diag-20261110-001|btc-eur-trend-host-8h-002/);
+    /btc-eur-paired-diag-20261110-001|btc-eur-paired-diag-20261116-002/);
   h.workspace.dispose();
 });
 
@@ -777,7 +777,7 @@ test('historical final report and current progress remain separate in either res
   const oldFinal = evaluatePairedPaperEvidence(
     syntheticPairedEvaluatorFixture({modelPair: true}));
   assert.equal(oldFinal.evidenceStatus, 'VERIFIED_COMPLETE');
-  oldFinal.identity.runId = 'btc-eur-trend-host-8h-002';
+  oldFinal.identity.runId = 'btc-eur-paired-history-synthetic';
   const oldFinalResponse = () => new Response(JSON.stringify({
     schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
     runId: oldFinal.identity.runId,
@@ -822,10 +822,10 @@ test('historical final report and current progress remain separate in either res
     assert.match(h.pairedRoot.textContent,
       /QuellprioritätDer Abschlussbericht gehört zu einem anderen, historischen Lauf/);
     assert.match(h.pairedRoot.textContent,
-      /Separater historischer Abschlussberichtbtc-eur-trend-host-8h-002/);
+      /Separater historischer Abschlussberichtbtc-eur-paired-history-synthetic/);
     assert.match(h.pairedRoot.textContent, /Unabhängige AbschlussauthentifizierungNO_FINAL_REPORT/);
     assert.match(h.pairedRoot.textContent, /Terminal-BerichtevidenzNO_TERMINAL_REPORT/);
-    assert.match(h.pairedRoot.textContent, /Run-IDbtc-eur-trend-host-8h-002/);
+    assert.match(h.pairedRoot.textContent, /Run-IDbtc-eur-paired-history-synthetic/);
     assert.match(h.pairedRoot.textContent, /VERIFIED_COMPLETE/);
     h.workspace.dispose();
   }

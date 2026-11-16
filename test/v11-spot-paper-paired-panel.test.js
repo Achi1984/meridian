@@ -360,7 +360,7 @@ test('challenger identity and validated trend diagnostic survive presentation', 
 
 test('cross-run comparison retains original metrics but requires verified semantic contracts', () => {
   const first = trendDto();
-  first.identity.runId = 'synthetic-paper-001';
+  first.identity.runId = 'btc-eur-paired-diag-20261110-001';
   first.evidenceStatus = 'VERIFIED_COMPLETE';
   first.assumptions = {
     feeBpsPerSide: 20,
@@ -375,7 +375,7 @@ test('cross-run comparison retains original metrics but requires verified semant
     accountingEngine: 'PAIRED_FEE_SCENARIO_LEDGER_V1'
   };
   const second = structuredClone(first);
-  second.identity.runId = 'synthetic-paper-002';
+  second.identity.runId = 'btc-eur-paired-diag-20261116-002';
   second.identity.configSha256 = '9'.repeat(64);
   second.timing.valuationAt += 86_400_000;
   const model = presentSpotPaperPairedComparison(first, second, {
@@ -385,7 +385,7 @@ test('cross-run comparison retains original metrics but requires verified semant
   assert.equal(model.available, true);
   assert.equal(model.reason, null);
   assert.deepEqual(model.runs.map(run => run.runId),
-    ['synthetic-paper-001', 'synthetic-paper-002']);
+    ['btc-eur-paired-diag-20261110-001', 'btc-eur-paired-diag-20261116-002']);
   assert.notEqual(model.runs[0].valuationAt, model.runs[1].valuationAt);
   assert.equal(model.runs[0].arms[0].bookedFeesCents,
     first.arms.baseline.bookedFeesCents);
@@ -397,8 +397,8 @@ test('cross-run comparison retains original metrics but requires verified semant
   assert.match(root.textContent, /Offline-Vergleich ausgewählter Paper-Läufe/);
   assert.match(root.textContent, /Semantische Strategie-, Konto- und Kostenverträge stimmen überein/);
   assert.match(root.textContent, /Kostenraten bleiben unverifizierte Modellannahmen/);
-  assert.match(root.textContent, /Paper 001 · synthetic-paper-001/);
-  assert.match(root.textContent, /Paper 002 · synthetic-paper-002/);
+  assert.match(root.textContent, /Paper 001 · btc-eur-paired-diag-20261110-001/);
+  assert.match(root.textContent, /Paper 002 · btc-eur-paired-diag-20261116-002/);
   assert.match(root.textContent, /SYNTHETIC FIXTURE/);
   assert.match(root.textContent, /Simulierte Fills/);
   assert.match(root.textContent, /Stichproben-Drawdown/);
@@ -409,6 +409,17 @@ test('cross-run comparison retains original metrics but requires verified semant
   const disabled = presentSpotPaperPairedComparison(first, incompatible);
   assert.equal(disabled.available, false);
   assert.equal(disabled.reason, 'STRATEGY_CONTRACT_NOT_VERIFIED');
+
+  for (const [digest, value] of [
+    ['sourceSha256', 'a'],
+    ['researchSourceSha256', 'b']
+  ]) {
+    const changed = structuredClone(second);
+    changed.identity[digest] = value.repeat(64);
+    const mismatch = presentSpotPaperPairedComparison(first, changed);
+    assert.equal(mismatch.available, false, `${digest} mismatch disables comparison`);
+    assert.equal(mismatch.reason, 'SEMANTIC_CONTRACT_MISMATCH');
+  }
 
   const missing = presentSpotPaperPairedComparison(first, null);
   assert.equal(missing.available, false);

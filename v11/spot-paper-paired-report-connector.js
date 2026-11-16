@@ -11,7 +11,7 @@ export const SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA =
   'SPOT_PAPER_PAIRED_REPORT_ENVELOPE_V1';
 export const SPOT_PAPER_PAIRED_REPORT_SELECTIONS = Object.freeze([
   Object.freeze({runId: 'btc-eur-paired-diag-20261110-001', label: 'Paper 001'}),
-  Object.freeze({runId: 'btc-eur-trend-host-8h-002', label: 'Paper 002'})
+  Object.freeze({runId: 'btc-eur-paired-diag-20261116-002', label: 'Paper 002'})
 ]);
 
 const record = value => value !== null && typeof value === 'object' &&

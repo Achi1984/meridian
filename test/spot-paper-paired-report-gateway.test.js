@@ -106,9 +106,9 @@ test('paired read route is bounded, authenticated, read-only and config-gated', 
 
 test('configured run selection is bounded, exact-identity, authenticated and read-only', async () => {
   const firstIdentity = syntheticExpectedPairedIdentity();
-  firstIdentity.runId = 'btc-eur-paired-synthetic-001';
+  firstIdentity.runId = 'btc-eur-paired-diag-20261110-001';
   const secondIdentity = structuredClone(firstIdentity);
-  secondIdentity.runId = 'btc-eur-paired-synthetic-002';
+  secondIdentity.runId = 'btc-eur-paired-diag-20261116-002';
   secondIdentity.configSha256 = '4'.repeat(64);
   const identities = [firstIdentity, secondIdentity];
   const selectionConfig = spotPaperPairedReportGatewayConfig({

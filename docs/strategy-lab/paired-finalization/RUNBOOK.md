@@ -7,18 +7,18 @@ endpoint.
 
 ## Evidence and identity boundary
 
-The target run is `btc-eur-trend-host-8h-002`. Retrieve the independently
-reviewed `SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1` from PR #1321 comment
-6749530509. Do not derive or amend that identity from the host export, report,
-journal, or `host.mjs identity` output.
+The current target run is `btc-eur-paired-diag-20261116-002`. Retrieve its
+independently reviewed `SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1` from the launch
+receipt recorded in commit `87e8cac`. Do not derive or amend that identity from
+the host export, report, journal, or `host.mjs identity` output. The older
+interrupted `btc-eur-trend-host-8h-002` remains a legacy no-query gateway
+fallback only; it is not the selected Paper 002 run.
 
-The operational receipts in the issue record that the migration and gateway
-configuration were applied and that the paired report table was empty. These
-receipts do not prove this run has finished or that it is publishable. The
-recorded run was still active with an expected end around 2026-11-10 03:14 UTC;
-confirm its state through the authorized operator before retrieval. Do not
-access provider credentials, change the host/run/volume/configuration, or write
-a running snapshot to the immutable final-run row.
+The launch receipt does not prove this run has finished or that it is
+publishable. Confirm its state through the authorized operator before
+retrieval. Do not access provider credentials, change the
+host/run/volume/configuration, or write a running snapshot to the immutable
+final-run row.
 
 Use a private working directory outside the host data root. Preserve the host
 export unchanged, and do not publish anything if any identity or evidence
@@ -31,7 +31,7 @@ working directory and place the independently pinned identity file there:
 
 ```sh
 umask 077
-export RUN_ID=btc-eur-trend-host-8h-002
+export RUN_ID=btc-eur-paired-diag-20261116-002
 export WORK_DIR=/absolute/path/to/private-finalization-work
 export PRIVATE_DATA_ROOT=/absolute/path/to/authorized-host-data
 mkdir -p "$WORK_DIR"

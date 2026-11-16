@@ -136,23 +136,27 @@ sets `MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITIES_JSON` to a JSON
 array of one or two complete `SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1` objects.
 The list is bounded to 32 KiB, rejects duplicate or malformed identities, and
 is effective only with the same enabled and deployment-verified gates. The UI
-offers the reviewed Paper 001 and Paper 002 run IDs only; each request reads
-one exact configured ID through the same authenticated route and immutable
-store. Unknown, unconfigured, or unpublished IDs do not trigger store
-discovery. A selection request for Paper 002 does not use the legacy
-interrupted-run diagnostic fallback. A GET without `runId` keeps the original
-single-identity behavior and fallback unchanged.
+offers only `btc-eur-paired-diag-20261110-001` (Paper 001) and
+`btc-eur-paired-diag-20261116-002` (Paper 002); configure the matching complete
+expected identities from their reviewed receipts. Each request reads one exact
+configured ID through the same authenticated route and immutable store.
+Unknown, unconfigured, or unpublished IDs do not trigger store discovery. A
+selection request for Paper 002 does not use the legacy interrupted-run
+diagnostic fallback. A GET without `runId` keeps the original single-identity
+behavior and fallback unchanged.
 
 The explicit two-run comparison keeps each report's own valuation timestamp,
 coverage, cycles, per-arm simulated fills, booked fees, modeled slippage, net
 PnL, and sampled drawdown. It never pools windows, computes a winner, or
 compares run-specific config digests as a semantic contract. Numerical
 side-by-side values are withheld unless both reports are verified complete
-and their canonical strategy/model-pair, account-contract, and documented
-cost-assumption fields match. Missing or legacy semantic contracts remain
-uncomparable; displayed rates are still identified as unverified modeled
-assumptions, not actual exchange fees. Lock, navigation, or changing either
-selection aborts and fences earlier selection reads.
+and their exact source and research-source SHA-256 digests, canonical
+strategy/model-pair, account-contract, and documented cost-assumption fields
+match. Run-specific config hashes are not compared as the compatibility key.
+Missing or legacy semantic contracts remain uncomparable; displayed rates are
+still identified as unverified modeled assumptions, not actual exchange fees.
+Lock, navigation, or changing either selection aborts and fences earlier
+selection reads.
 
 The existing paired DTO is not independent authentication and must retain its
 `STRUCTURALLY_RECONCILED_NOT_INDEPENDENTLY_AUTHENTICATED` qualification. The

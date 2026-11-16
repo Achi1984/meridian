@@ -345,6 +345,8 @@ function comparisonContract(report) {
     compatible: true,
     key: JSON.stringify({
       pair: identity.pair,
+      sourceSha256: identity.sourceSha256,
+      researchSourceSha256: identity.researchSourceSha256,
       modelPairId: identity.modelPairId,
       models: identity.models.map(({role, modelId}) => ({role, modelId})),
       accounts,
