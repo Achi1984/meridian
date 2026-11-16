@@ -104,6 +104,98 @@ test('paired read route is bounded, authenticated, read-only and config-gated', 
   assert.equal(trendMissing.body.error, 'spot_paper_paired_report_not_found');
 });
 
+test('configured run selection is bounded, exact-identity, authenticated and read-only', async () => {
+  const firstIdentity = syntheticExpectedPairedIdentity();
+  firstIdentity.runId = 'btc-eur-paired-diag-20261110-001';
+  const secondIdentity = structuredClone(firstIdentity);
+  secondIdentity.runId = 'btc-eur-paired-diag-20261116-002';
+  secondIdentity.configSha256 = '4'.repeat(64);
+  const identities = [firstIdentity, secondIdentity];
+  const selectionConfig = spotPaperPairedReportGatewayConfig({
+    ...env(),
+    MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITIES_JSON:
+      JSON.stringify(identities)
+  });
+  assert.equal(selectionConfig.selectionEnabled, true);
+
+  const reports = new Map(identities.map(identity => {
+    const report = syntheticPairedDashboard(identity);
+    report.evidenceStatus = 'VERIFIED_COMPLETE';
+    report.syntheticFixture = true;
+    return [identity.runId, row(report, identity)];
+  }));
+  const calls = [];
+  const selectedRead = (url, token = READ_TOKEN, override = {}) =>
+    handleSpotPaperPairedReportGatewayRequest(request('GET', url, token), {
+      config: selectionConfig,
+      authorizedRead: req => req.headers.authorization?.startsWith('Bearer ') === true,
+      getStore: () => ({get: async runId => {
+        calls.push(runId);
+        return reports.get(runId) ?? null;
+      }}),
+      ...override
+    });
+
+  for (const identity of identities) {
+    const result = await selectedRead(
+      `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identity.runId}`);
+    assert.equal(result.status, 200);
+    assert.equal(result.body.runId, identity.runId);
+    assert.equal(result.body.report.evidenceStatus, 'VERIFIED_COMPLETE');
+  }
+  assert.deepEqual(calls, identities.map(identity => identity.runId));
+
+  calls.length = 0;
+  assert.equal((await selectedRead(
+    `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=unpublished-run`)).status, 404);
+  assert.equal((await selectedRead(
+    `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identities[0].runId}&runId=${identities[1].runId}`)).status, 400);
+  assert.equal((await selectedRead(
+    `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identities[0].runId}`, '')).status, 401);
+  assert.deepEqual(calls, [], 'invalid, unknown, and unauthorized IDs never reach the store');
+
+  const mismatchedRow = {...reports.get(identities[0].runId), config_hash: '0'.repeat(64)};
+  assert.equal((await selectedRead(
+    `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identities[0].runId}`, READ_TOKEN, {
+      getStore: () => ({get: async () => mismatchedRow})
+    })).status, 409);
+  const corruptRow = {...reports.get(identities[1].runId), content_sha256: '0'.repeat(64)};
+  assert.equal((await selectedRead(
+    `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identities[1].runId}`, READ_TOKEN, {
+      getStore: () => ({get: async () => corruptRow})
+    })).status, 503);
+
+  const unconfigured = spotPaperPairedReportGatewayConfig(env());
+  assert.equal(unconfigured.selectionEnabled, false);
+  const disabled = await handleSpotPaperPairedReportGatewayRequest(request(
+    'GET', `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identities[0].runId}`), {
+    config: unconfigured,
+    authorizedRead: () => true,
+    getStore() { assert.fail('unconfigured selection must not read the store'); }
+  });
+  assert.equal(disabled.status, 400);
+
+  const oversized = spotPaperPairedReportGatewayConfig({
+    ...env(),
+    MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITIES_JSON:
+      JSON.stringify([...identities, {...identities[1], runId: 'third-run'}])
+  });
+  assert.equal(oversized.selectionEnabled, false);
+  const wrongDigestIdentity = {...identities[0], configSha256: '5'.repeat(64)};
+  const wrongIdentityConfig = spotPaperPairedReportGatewayConfig({
+    ...env(),
+    MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITIES_JSON:
+      JSON.stringify([wrongDigestIdentity])
+  });
+  const wrongIdentityResult = await handleSpotPaperPairedReportGatewayRequest(request(
+    'GET', `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${wrongDigestIdentity.runId}`), {
+    config: wrongIdentityConfig,
+    authorizedRead: () => true,
+    getStore: () => ({get: async () => reports.get(identities[0].runId)})
+  });
+  assert.equal(wrongIdentityResult.status, 409);
+});
+
 test('returns only the identity-bound sanitized canonical paired DTO', async () => {
   const report = syntheticPairedDashboard(identity);
   assert.equal(report.syntheticFixture, true);

@@ -15,7 +15,8 @@ import {
 import {SPOT_PAPER_REPORT_ENDPOINT} from '../v11/spot-paper-cockpit-controller.js';
 import {
   SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
-  SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA
+  SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+  SPOT_PAPER_PAIRED_REPORT_SELECTIONS
 } from '../v11/spot-paper-paired-report-connector.js';
 import {
   SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT
@@ -91,6 +92,12 @@ class Element {
   }
   removeEventListener(type, listener) { this.listeners.get(type)?.delete(listener); }
   click() { for (const listener of this.listeners.get('click') || []) listener({target: this}); }
+  change() { for (const listener of this.listeners.get('change') || []) listener({target: this}); }
+}
+
+function findElements(root, tagName) {
+  return [root, ...root.children.flatMap(child => findElements(child, tagName))]
+    .filter(element => element.tagName === tagName.toUpperCase());
 }
 
 function syntheticDto() {
@@ -368,6 +375,83 @@ test('paired DTO is read through the real workspace mount and remains visibly sy
   h.access.lock();
   assert.doesNotMatch(h.pairedRoot.textContent, /paired-synthetic-test-only/);
   assert.match(h.pairedRoot.parentNode.textContent, /Gesperrt/);
+  h.workspace.dispose();
+});
+
+test('selected runs use configured IDs and unavailable Paper 002 remains explicit', async () => {
+  const {report} = syntheticPairedReport();
+  const selectedIds = [];
+  const h = harness({fetchImpl: async (url, init) => {
+    if (url === SPOT_PAPER_PAIRED_REPORT_ENDPOINT) {
+      return new Response(null, {status: 404});
+    }
+    const runId = new URL(url).searchParams.get('runId');
+    selectedIds.push(runId);
+    assert.equal(init.headers.authorization, 'Bearer ' + TOKEN);
+    if (runId === SPOT_PAPER_PAIRED_REPORT_SELECTIONS[1].runId) {
+      return new Response(JSON.stringify({
+        error: 'spot_paper_paired_report_not_found'
+      }), {status: 404, headers: {'content-type': 'application/json'}});
+    }
+    const selected = structuredClone(report);
+    selected.identity.runId = runId;
+    return new Response(JSON.stringify({
+      schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+      runId,
+      report: selected
+    }), {status: 200, headers: {'content-type': 'application/json'}});
+  }});
+  h.workspace.setActive(true);
+  h.access.unlock();
+  await tick();
+  await h.workspace.comparePairedRuns();
+  assert.deepEqual(selectedIds.sort(),
+    SPOT_PAPER_PAIRED_REPORT_SELECTIONS.map(({runId}) => runId).sort());
+  assert.match(h.pairedRoot.parentNode.textContent,
+    /Ein ausgewählter Bericht ist nicht veröffentlicht oder nicht freigegeben/);
+  assert.match(h.pairedRoot.textContent, /Fenstervergleich nicht verfügbar/);
+  assert.match(h.pairedRoot.textContent, /VERIFIED_REPORTS_REQUIRED/);
+  h.workspace.dispose();
+});
+
+test('changing selected run IDs aborts and fences stale comparison responses', async () => {
+  const pending = [];
+  const signals = [];
+  const h = harness({fetchImpl: async (url, init) => {
+    if (url === SPOT_PAPER_PAIRED_REPORT_ENDPOINT) {
+      return new Response(null, {status: 404});
+    }
+    signals.push(init.signal);
+    return new Promise(resolve => pending.push(resolve));
+  }});
+  h.workspace.setActive(true);
+  h.access.unlock();
+  await tick();
+  const selectors = findElements(h.pairedRoot.parentNode, 'select');
+  assert.equal(selectors.length, 2);
+  const comparison = h.workspace.comparePairedRuns();
+  await tick();
+  assert.equal(pending.length, 2);
+  selectors[0].value = SPOT_PAPER_PAIRED_REPORT_SELECTIONS[1].runId;
+  selectors[1].value = SPOT_PAPER_PAIRED_REPORT_SELECTIONS[0].runId;
+  selectors[0].change();
+  selectors[1].change();
+  assert.ok(signals.every(signal => signal.aborted));
+  await comparison;
+  for (const [index, run] of SPOT_PAPER_PAIRED_REPORT_SELECTIONS.entries()) {
+    const selected = structuredClone(syntheticPairedReport().report);
+    selected.identity.runId = run.runId;
+    pending[index](new Response(JSON.stringify({
+      schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+      runId: run.runId,
+      report: selected
+    }), {status: 200, headers: {'content-type': 'application/json'}}));
+  }
+  await tick();
+  assert.match(h.pairedRoot.parentNode.textContent,
+    /Auswahl geändert; ältere Antworten werden verworfen/);
+  assert.doesNotMatch(h.pairedRoot.textContent,
+    /btc-eur-paired-diag-20261110-001|btc-eur-paired-diag-20261116-002/);
   h.workspace.dispose();
 });
 
@@ -693,7 +777,7 @@ test('historical final report and current progress remain separate in either res
   const oldFinal = evaluatePairedPaperEvidence(
     syntheticPairedEvaluatorFixture({modelPair: true}));
   assert.equal(oldFinal.evidenceStatus, 'VERIFIED_COMPLETE');
-  oldFinal.identity.runId = 'btc-eur-trend-host-8h-002';
+  oldFinal.identity.runId = 'btc-eur-paired-history-synthetic';
   const oldFinalResponse = () => new Response(JSON.stringify({
     schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
     runId: oldFinal.identity.runId,
@@ -738,10 +822,10 @@ test('historical final report and current progress remain separate in either res
     assert.match(h.pairedRoot.textContent,
       /QuellprioritätDer Abschlussbericht gehört zu einem anderen, historischen Lauf/);
     assert.match(h.pairedRoot.textContent,
-      /Separater historischer Abschlussberichtbtc-eur-trend-host-8h-002/);
+      /Separater historischer Abschlussberichtbtc-eur-paired-history-synthetic/);
     assert.match(h.pairedRoot.textContent, /Unabhängige AbschlussauthentifizierungNO_FINAL_REPORT/);
     assert.match(h.pairedRoot.textContent, /Terminal-BerichtevidenzNO_TERMINAL_REPORT/);
-    assert.match(h.pairedRoot.textContent, /Run-IDbtc-eur-trend-host-8h-002/);
+    assert.match(h.pairedRoot.textContent, /Run-IDbtc-eur-paired-history-synthetic/);
     assert.match(h.pairedRoot.textContent, /VERIFIED_COMPLETE/);
     h.workspace.dispose();
   }
