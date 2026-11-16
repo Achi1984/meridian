@@ -3,14 +3,18 @@ import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {readFileSync} from 'node:fs';
 import {runInNewContext} from 'node:vm';
+import {CDP_STARTUP_RECOVERY_DIAGNOSTIC,forwardCdpStartupRecoveryDiagnostic} from './helpers/v11-cdp.mjs';
 
 const source=readFileSync(new URL('./helpers/v11-cdp.mjs',import.meta.url),'utf8')
  .replace(/^import .*;\n/gm,'')
+ .replace('export const CDP_STARTUP_RECOVERY_DIAGNOSTIC','const CDP_STARTUP_RECOVERY_DIAGNOSTIC')
+ .replace('export function forwardCdpStartupRecoveryDiagnostic','function forwardCdpStartupRecoveryDiagnostic')
  .replace('export async function withMobileChrome','async function withMobileChrome');
 
 async function startup(values,options={}){
  const calls={reads:[],exists:0,sleeps:[],fetches:[],kills:[],removed:[],spawnOptions:null,
-  spawnArgs:[],spawned:[],maxRetained:0,now:0,recovered:[],methods:[],profileRemovals:[]};
+  spawnArgs:[],spawned:[],maxRetained:0,now:0,recovered:[],methods:[],profileRemovals:[],events:[],
+  retryWhileGroupAlive:[]};
  const configFor=index=>options.attempts?.[index]||options;
  const sandbox={
   spawn:(_chrome,args,spawnOptions)=>{
@@ -22,6 +26,11 @@ async function startup(values,options={}){
     }};
    }
    const index=calls.spawnArgs.length,config=configFor(index);
+   if(index>0){
+    const prior=calls.spawned[index-1];
+    calls.retryWhileGroupAlive.push(prior.groupAlive);
+    calls.events.push('launch-'+index);
+   }
    calls.spawnOptions=spawnOptions;calls.spawnArgs.push(args);
    if(config.syncSpawnError)throw config.syncSpawnError;
    const pid=Object.hasOwn(config,'pid')?config.pid:123+index;
@@ -31,7 +40,7 @@ async function startup(values,options={}){
      if(name==='data')for(const text of config.stderr||[])fn(Buffer.from(text));
      if(name==='error'&&config.stderrError)fn(Error('SECRET stderr /private/path'));
     }}};
-   calls.spawned.push({pid,events,config,groupAlive:true,child});
+   calls.spawned.push({pid,events,config,groupAlive:true,child,killAt:null});
    return child;
   },
   Buffer:{alloc:Buffer.alloc,isBuffer:Buffer.isBuffer,concat:parts=>{
@@ -46,8 +55,18 @@ async function startup(values,options={}){
   rmSync:(...args)=>calls.removed.push(args),
   process:{execPath:'/synthetic/node',kill:(...args)=>{
    calls.kills.push(args);const group=calls.spawned.find(x=>-x.pid===args[0]);
-   if(args[1]==='SIGKILL'&&group)group.groupAlive=false;
-   if(args[1]===0&&group&&!group.groupAlive)throw Object.assign(Error('gone'),{code:'ESRCH'});
+   if(args[1]==='SIGKILL'&&group){
+    if(group.killAt===null)group.killAt=calls.now;
+    if(!group.config.neverTerminate&&(group.config.terminationDelay??0)===0)group.groupAlive=false;
+   }
+   if(args[1]===0&&group&&group.groupAlive&&group.killAt!==null&&
+     !group.config.neverTerminate&&calls.now>=group.killAt+(group.config.terminationDelay??0)){
+    group.groupAlive=false;
+   }
+   if(args[1]===0&&group&&!group.groupAlive){
+    calls.events.push('group-gone-'+group.pid);
+    throw Object.assign(Error('gone'),{code:'ESRCH'});
+   }
   }},
   setTimeout:()=>({}),clearTimeout:()=>{},
   AbortSignal:{timeout:()=>({})},
@@ -90,6 +109,16 @@ test('startup waits through empty, partial and invalid port writes before fetchi
  assert.deepEqual(calls.reads,[9]);
  assert.deepEqual(calls.sleeps,[...Array(8).fill(50),100]);
  assert.deepEqual(calls.fetches,['http://127.0.0.1:32123/json/list']);
+});
+
+test('subprocess forwarding emits only the exact fixed recovery diagnostic',()=>{
+ const output=['Chrome output /private/profile https://private.invalid',CDP_STARTUP_RECOVERY_DIAGNOSTIC,
+  '# '+CDP_STARTUP_RECOVERY_DIAGNOSTIC,
+  CDP_STARTUP_RECOVERY_DIAGNOSTIC+' ',CDP_STARTUP_RECOVERY_DIAGNOSTIC.replace('ONE_RETRY','ONE_RETRY; url=https://private.invalid'),
+  'Chrome DevTools startup recovered [attempt=2; phase=PORT_DISCOVERY; recovery=ONE_RETRY; path=/private/profile]'].join('\n');
+ const forwarded=[];
+ assert.equal(forwardCdpStartupRecoveryDiagnostic(output,line=>forwarded.push(line)),2);
+ assert.deepEqual(forwarded,[CDP_STARTUP_RECOVERY_DIAGNOSTIC,CDP_STARTUP_RECOVERY_DIAGNOSTIC]);
 });
 
 test('valid inclusive port boundaries are accepted immediately',async()=>{
@@ -160,6 +189,44 @@ test('stalled bounded cleanup prevents a retry and respects the startup deadline
  assert.deepEqual(calls.profileRemovals,['/synthetic/profile-1','/synthetic/profile-1']);
  assert.ok(calls.kills.some(([pid,signal])=>pid===9001&&signal==='SIGKILL'));
  assert.deepEqual(calls.recovered,[]);
+});
+
+test('retry waits for delayed process-group disappearance and shares the startup deadline',async()=>{
+ const {calls,error}=await startup([undefined],{attempts:[
+  {values:[undefined],terminationDelay:75},{values:['32123\n']}
+ ]});
+ assert.match(error.message,/No Chrome page target/);
+ assert.equal(calls.spawnArgs.length,2);
+ assert.deepEqual(calls.retryWhileGroupAlive,[false]);
+ assert.ok(calls.events.indexOf('group-gone-123')<calls.events.indexOf('launch-1'));
+ assert.ok(calls.now>=10_075);
+ assert.ok(calls.now<=25_000);
+ assert.deepEqual(calls.profileRemovals,['/synthetic/profile-1']);
+ assert.deepEqual(calls.removed.map(([path])=>path),['/synthetic/profile-2']);
+});
+
+test('a process group that never disappears prevents retry and stays within the shared deadline',async()=>{
+ const {calls,error}=await startup([undefined],{attempts:[
+  {values:[undefined],neverTerminate:true},{values:['32123\n']}
+ ]});
+ assert.match(error.message,/recovery=ABORTED_CLEANUP/);
+ assert.equal(calls.spawnArgs.length,1);
+ assert.deepEqual(calls.retryWhileGroupAlive,[]);
+ assert.equal(calls.events.some(event=>event==='group-gone-123'),false);
+ assert.ok(calls.spawned[0].groupAlive,'the timed-out process group was not confirmed stopped');
+ assert.ok(calls.now<=25_000);
+ assert.deepEqual(calls.profileRemovals,['/synthetic/profile-1','/synthetic/profile-1']);
+});
+
+test('profile cleanup failure does not re-signal a process group already confirmed absent',async()=>{
+ const {calls,error}=await startup([undefined],{attempts:[
+  {values:[undefined],terminationDelay:50,cleanupStalls:true}
+ ]});
+ assert.match(error.message,/recovery=ABORTED_CLEANUP/);
+ assert.equal(calls.spawnArgs.length,1);
+ assert.ok(calls.events.includes('group-gone-123'));
+ assert.equal(calls.kills.filter(([pid,signal])=>pid===-123&&signal==='SIGKILL').length,1);
+ assert.ok(calls.now<=25_000);
 });
 
 test('early child exit still fails immediately and cleans up',async()=>{

@@ -3,7 +3,7 @@ import {existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {test} from 'node:test';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {SPOT_PAPER_REPORT_ENDPOINT} from '../v11/spot-paper-cockpit-controller.js';
@@ -141,6 +141,7 @@ test(name, {timeout: 180_000}, async () => {
     const child = runFlaggedBrowserTest();
     assert.equal(child.status, 0,
       String(child.stdout).slice(-2000) + String(child.stderr).slice(-1000));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     assertNamedTestPassed(child.stdout);
     return;
   }

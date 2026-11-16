@@ -3,7 +3,7 @@ import {test} from 'node:test';
 import {existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
 
@@ -16,6 +16,7 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
       {env,encoding:'utf8',timeout:115000});
     assert.equal(child.status,0,child.stdout+child.stderr);
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     assert.equal(child.stdout.split('\n').filter(line=>line.includes('V11_AGENT_STATUS_SIZE')).length,2);
     return;
   }

@@ -5,7 +5,7 @@ import {existsSync, mkdirSync, readFileSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath} from 'node:url';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {presentSpotPaperBotOverview} from '../v11/spot-paper-bot-overview-model.js';
 import {mountSpotPaperBotOverview} from '../v11/spot-paper-bot-overview-controller.js';
@@ -675,6 +675,7 @@ test('Chrome renders compact responsive cards and supports keyboard disclosure c
     });
     assert.equal(child.status, 0,
       `${String(child.stdout).slice(-2500)}${String(child.stderr).slice(-1000)}`);
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     assert.match(child.stdout, /V11_SPOT_PAPER_BOT_OVERVIEW_SIZE .*"width":320/);
     assert.match(child.stdout, /V11_SPOT_PAPER_BOT_OVERVIEW_SIZE .*"width":390/);
     assert.match(child.stdout, /V11_SPOT_PAPER_BOT_OVERVIEW_SIZE .*"width":1280/);

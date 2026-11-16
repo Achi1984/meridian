@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
@@ -12,6 +12,7 @@ test('version history: native keyboard, focus and compact viewport at five width
   const env={...process.env};delete env.NODE_TEST_CONTEXT;
   const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],{env,encoding:'utf8',timeout:115000});
   assert.equal(child.status,0,String(child.stdout).slice(-1600)+String(child.stderr).slice(-800));
+  forwardCdpStartupRecoveryDiagnostic(child.stdout);
   const measurements=String(child.stdout).split('\n').filter(l=>l.includes('V11_HISTORY_WIDTH'));
   assert.equal(measurements.length,5);
   for(const line of measurements) console.log(line);

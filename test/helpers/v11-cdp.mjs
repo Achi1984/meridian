@@ -10,6 +10,16 @@ const STARTUP_WINDOW_MS=10_000;
 const STARTUP_BUDGET_MS=25_000;
 const STARTUP_CLEANUP_MS=1_000;
 const PROFILE_REMOVAL_SCRIPT='require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})';
+export const CDP_STARTUP_RECOVERY_DIAGNOSTIC='Chrome DevTools startup recovered [attempt=2; phase=PORT_DISCOVERY; recovery=ONE_RETRY]';
+export function forwardCdpStartupRecoveryDiagnostic(output,log=console.info){
+ let forwarded=0;
+ for(const line of String(output).split(/\r?\n/)){
+  if(line===CDP_STARTUP_RECOVERY_DIAGNOSTIC||line==='# '+CDP_STARTUP_RECOVERY_DIAGNOSTIC){
+   log(CDP_STARTUP_RECOVERY_DIAGNOSTIC);forwarded++;
+  }
+ }
+ return forwarded;
+}
 function spawnCategory(code){
  if(['EAGAIN','ENOMEM','EMFILE','ENFILE'].includes(code))return 'RESOURCE_UNAVAILABLE';
  if(code==='ENOENT')return 'EXECUTABLE_UNAVAILABLE';
@@ -28,7 +38,7 @@ function stderrCategory(bytes){
 export async function withMobileChrome(chrome,width,url,probe,height=844,beforeNavigate){
  const startupDeadline=performance.now()+STARTUP_BUDGET_MS;
  const startupWorkDeadline=startupDeadline-STARTUP_CLEANUP_MS;
- let dir,child,startupReady=false;
+ let dir,child,startupReady=false,childGroupStopped=false;
  let ws;const pending=new Map();let seq=0;
  const removeProfileWithinDeadline=async(profile,deadline)=>{
   if(!profile||performance.now()>=deadline)return false;
@@ -49,22 +59,21 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
  };
  const cleanupStartupAttempt=async(deadline)=>{
   const pid=child?.pid;
-  let stopped=false;
-  if(Number.isInteger(pid)&&pid>0){
+  if(Number.isInteger(pid)&&pid>0&&!childGroupStopped){
    try{process.kill(-pid,'SIGKILL');}
-   catch(error){if(error?.code==='ESRCH')stopped=true;}
-   if(!stopped){
+   catch(error){if(error?.code==='ESRCH')childGroupStopped=true;}
+   if(!childGroupStopped){
     const cleanupDeadline=Math.min(deadline,performance.now()+STARTUP_CLEANUP_MS);
     while(performance.now()<cleanupDeadline){
      try{process.kill(-pid,0);}
-     catch(error){if(error?.code==='ESRCH')stopped=true;break;}
+     catch(error){if(error?.code==='ESRCH')childGroupStopped=true;break;}
      const remaining=cleanupDeadline-performance.now();
      if(remaining>0)await sleep(Math.min(25,remaining));
     }
    }
   }
   const removed=dir?await removeProfileWithinDeadline(dir,deadline):true;
-  return stopped&&removed;
+  return childGroupStopped&&removed;
  };
  const launchAndDiscover=async(attemptDeadline)=>{
   let spawnFailure,collectingStartup=true,stderrReadFailed=false,startupStderr=Buffer.alloc(0);
@@ -78,6 +87,7 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
   try{
    child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
     '--remote-debugging-port=0','--user-data-dir='+dir,'about:blank'],{stdio:['ignore','ignore','pipe'],detached:true});
+   childGroupStopped=false;
   }catch(error){spawnFailure=spawnCategory(error?.code);throw startupError('Chrome spawn failed');}
   child.on('error',error=>{spawnFailure=spawnCategory(error?.code);});
   child.stderr?.on('error',()=>{stderrReadFailed=true;});
@@ -122,7 +132,7 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
    const attemptDeadline=Math.min(startupWorkDeadline,performance.now()+STARTUP_WINDOW_MS);
    try{
     port=await launchAndDiscover(attemptDeadline);
-    if(firstTimeout)console.info('Chrome DevTools startup recovered [attempt=2; phase=PORT_DISCOVERY; recovery=ONE_RETRY]');
+    if(firstTimeout)console.info(CDP_STARTUP_RECOVERY_DIAGNOSTIC);
     break;
    }catch(error){
     if(error?.code!=='CDP_PORT_DISCOVERY_TIMEOUT')throw error;
@@ -193,7 +203,9 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
   if(ws)ws.close();
   for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('CDP closed'));}
   if(startupReady){
-   try{if(Number.isInteger(child?.pid)&&child.pid>0)process.kill(-child.pid,'SIGKILL');}catch{}
+   try{if(!childGroupStopped&&Number.isInteger(child?.pid)&&child.pid>0)process.kill(-child.pid,'SIGKILL');}catch(error){
+    if(error?.code==='ESRCH')childGroupStopped=true;
+   }
    await sleep(100);if(dir)rmSync(dir,{recursive:true,force:true});
   }else if(dir)await cleanupStartupAttempt(startupDeadline);
  }

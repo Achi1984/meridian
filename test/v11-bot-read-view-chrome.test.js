@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
 function fixture() {
@@ -78,6 +78,7 @@ test('V11 bot component Chrome: synthetic client/model/view states at four width
     const env={...process.env};delete env.NODE_TEST_CONTEXT;
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],{env,encoding:'utf8',timeout:115000});
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     const rows=child.stdout.split('\n').filter(line=>line.includes('V11_BOT_COMPONENT_WIDTH'));
     assert.equal(rows.length,4);rows.forEach(row=>console.log(row));return;
   }
