@@ -100,7 +100,17 @@
       "verifier": "Northflank BuildKit manifest export and completed registry push, cross-checked against the published Image entry",
       "observedAt": "2026-11-10T18:04:00.329Z"
     },
-    "hostGlobalExclusivity": null,
+    "hostGlobalExclusivity": {
+      "scope": "global",
+      "candidateRunId": "btc-eur-paired-diag-20261116-002",
+      "result": "CLEAR",
+      "observedAt": "2026-11-16T17:33:31.016Z",
+      "verifier": "Meridian project owner confirmed the sole assigned host. Launch operator verified Northflank job history and dedicated volume evidence.",
+      "evidenceRef": "https://github.com/Achi1984/meridian/blob/3eb00ebbf5c5cc9ede7fd2bd4190c46a2aaf70dd/docs/operations/BTC_EUR_PAIRED_DIAG_002_REHEARSAL.md#exclusivity-before-run",
+      "operationalScope": "Single assigned host: Northflank job meridian-btc-eur-diag-002-rehearsal in achi1984s-team/meridian. The project owner explicitly confirmed this sole assignment and authorized one start.",
+      "jobRunsRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/runs",
+      "readbackRunId": "d4dade47-7044-4a87-8315-57f6bd25165d"
+    },
     "mountIdentity": {
       "schemaVersion": "MERIDIAN_MOUNT_IDENTITY_EVIDENCE_V1",
       "result": "CLEAR",
@@ -182,13 +192,13 @@
     }
   },
   "prelaunchHostInventory": {
-    "status": "ASSIGNED_SCOPE_OBSERVED_EXTERNALLY_UNCONFIRMED",
+    "status": "OWNER_CONFIRMED_SOLE_ASSIGNED_HOST",
     "observedAt": "2026-11-16T17:31:46.841Z",
     "team": "achi1984s-team",
     "project": "meridian",
     "job": "meridian-btc-eur-diag-002-rehearsal",
     "jobRunsRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/runs",
     "readbackRunId": "d4dade47-7044-4a87-8315-57f6bd25165d",
-    "notes": "Dedicated volume has one attachment and the prior independent readback reported the candidate directory absent. Job history showed only completed rehearsal runs. Confirmation that this is the sole assigned host is pending. Platform start was not submitted."
+    "notes": "The dedicated volume has one attachment. The independent readback reported the candidate directory absent. The job history showed completed rehearsal runs only."
   }
 }
