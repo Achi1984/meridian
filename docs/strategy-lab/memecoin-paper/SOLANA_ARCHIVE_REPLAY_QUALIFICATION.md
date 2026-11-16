@@ -184,8 +184,8 @@ No new fixture-driven preflight was added. The proven ALT-key asymmetry is in
 the external v0.7.34 GSFA builder; this repository has no OF1 adapter to test,
 and a synthetic fixture here could not prove an archive's real metadata format,
 epoch coverage, or completeness. A local census preflight would duplicate the
-diagnostic in open PR #1398 once it lands, rather than close a demonstrated
-Meridian interface gap.
+diagnostic merged in #1398 (`5c517a4df3f183c22bed9158aa197f8a79726d3e`),
+rather than close a demonstrated Meridian interface gap.
 
 ## Observed commands and results
 
@@ -193,11 +193,11 @@ Meridian interface gap.
   tree on `copilot/qualify-solana-archive-replay` at submitted head `b0b8af2`.
 - `git log -5 --oneline` → branch begins at `53527cc Initial plan` over
   `d713c5a Fix PostgreSQL V2 progress migration constraints (#1396)`.
-- GitHub PR #1398 read → **OPEN, UNMERGED, BLOCKED**, base `main` at
-  `d713c5a` (head `e79f8911d22d3451a957edbc7e0a87b16e57d31d`). Its
-  raw-response diagnostic is not in this checkout or on `main`. Do not
-  duplicate it. Reuse its exact-slot/hash/supply diagnostic only after it
-  merges.
+- GitHub PR #1398 read → **MERGED** at `5c517a4df3f183c22bed9158aa197f8a79726d3e`;
+  that main commit is included in this branch. Its raw-response diagnostic is
+  now available from `scripts/memecoin-paper/owner-census.mjs` and
+  `test/memecoin-paper-prospective-owner-census.test.js`; reuse it rather than
+  adding a duplicate.
 - GitHub release/tag metadata read for `rpcpool/yellowstone-faithful`
   `v0.7.34` → tag commit `fe631879f3830447ff481cba07e54b3cea4891c6`, published
   Linux asset metadata above. No `faithful-cli` binary was downloaded or run.
