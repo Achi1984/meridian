@@ -1,4 +1,5 @@
 export const PROGRESS_SCHEMA = 'SPOT_PAPER_PAIRED_PROGRESS_V1';
+export const PROGRESS_SCHEMA_V2 = 'SPOT_PAPER_PAIRED_PROGRESS_V2';
 export const PROGRESS_PATH = '/api/private/spot-paper-paired-progress';
 export const PROGRESS_ENDPOINT =
   `https://p01--achi-meridian--ttvk44grdlp7.code.run${PROGRESS_PATH}`;
@@ -48,36 +49,59 @@ export function validIdentity(value) {
 
 export function validateProgress(value, expectedIdentity) {
   try {
+    const version2 = value?.schemaVersion === PROGRESS_SCHEMA_V2;
     if (!validIdentity(expectedIdentity) ||
         !exactKeys(value, ['schemaVersion', 'identity', 'journalSequence',
           'journalSha256', 'classification', 'observedAt', 'valuationAt',
           'exportedAt', 'latestEventAt', 'terminal', 'currency', 'monetaryUnit',
-          'assumptions', 'arms']) ||
-        value.schemaVersion !== PROGRESS_SCHEMA ||
+          'assumptions', 'arms', ...(version2 ? ['runStartedAt',
+            'lastSuccessfulPollAt', 'completedCycles'] : [])]) ||
+        ![PROGRESS_SCHEMA, PROGRESS_SCHEMA_V2].includes(value.schemaVersion) ||
         !validIdentity(value.identity) ||
         canonicalJson(value.identity) !== canonicalJson(expectedIdentity) ||
-        !Number.isSafeInteger(value.journalSequence) || value.journalSequence < 2 ||
+        !Number.isSafeInteger(value.journalSequence) ||
+        value.journalSequence < (version2 ? 1 : 2) ||
         !matches(HASH, value.journalSha256) ||
-        value.classification !== 'OBSERVED_CHECKPOINT' ||
-        !time(value.observedAt) || value.valuationAt !== value.observedAt ||
-        !time(value.exportedAt) || value.exportedAt < value.observedAt ||
-        !time(value.latestEventAt) || value.latestEventAt < value.observedAt ||
-        value.latestEventAt > value.exportedAt ||
+        !time(value.exportedAt) ||
         value.currency !== 'EUR' || value.monetaryUnit !== 'CENTS' ||
         !exactKeys(value.terminal, ['status', 'at']) ||
         !['UNKNOWN', 'TERMINAL_RECORDED', 'INTERRUPTED_RECORDED']
           .includes(value.terminal.status) ||
-        (value.terminal.status === 'UNKNOWN' ? value.terminal.at !== null :
-          !time(value.terminal.at) || value.terminal.at < value.observedAt ||
-          value.terminal.at !== value.latestEventAt) ||
         !exactKeys(value.assumptions, ['feeBpsPerSide', 'slippageBpsPerSide',
           'ratesVerified', 'feeBasis', 'netEquityIncludesCosts']) ||
         value.assumptions.feeBpsPerSide !== 20 ||
         value.assumptions.slippageBpsPerSide !== 10 ||
         value.assumptions.ratesVerified !== false ||
         value.assumptions.feeBasis !== 'EEA_SPOT_ONLY_TAKER_ASSUMPTION' ||
-        value.assumptions.netEquityIncludesCosts !== true ||
-        !Array.isArray(value.arms) || value.arms.length !== 3) return null;
+        value.assumptions.netEquityIncludesCosts !== true) return null;
+    if (version2) {
+      if (!time(value.runStartedAt) || value.exportedAt < value.runStartedAt ||
+          !nonnegative(value.completedCycles) || value.completedCycles > 480 ||
+          !time(value.latestEventAt) || value.latestEventAt < value.runStartedAt ||
+          value.latestEventAt > value.exportedAt) return null;
+      if (value.classification === 'NO_OBSERVATION') {
+        if (value.observedAt !== null || value.valuationAt !== null ||
+            value.lastSuccessfulPollAt !== null || value.completedCycles !== 0 ||
+            value.arms !== null ||
+            (value.terminal.status === 'UNKNOWN' ? value.terminal.at !== null :
+              !time(value.terminal.at) || value.terminal.at < value.runStartedAt ||
+              value.terminal.at !== value.latestEventAt)) return null;
+        return JSON.parse(canonicalJson(value));
+      }
+      if (value.classification !== 'OBSERVED_CHECKPOINT' ||
+          !time(value.lastSuccessfulPollAt) ||
+          value.runStartedAt > value.lastSuccessfulPollAt ||
+          value.lastSuccessfulPollAt > value.observedAt ||
+          value.completedCycles < 1) return null;
+    } else if (value.classification !== 'OBSERVED_CHECKPOINT') return null;
+    if (!time(value.observedAt) || value.valuationAt !== value.observedAt ||
+        !time(value.exportedAt) || value.exportedAt < value.observedAt ||
+        !time(value.latestEventAt) || value.latestEventAt < value.observedAt ||
+        value.latestEventAt > value.exportedAt ||
+        !Array.isArray(value.arms) || value.arms.length !== 3 ||
+        (value.terminal.status === 'UNKNOWN' ? value.terminal.at !== null :
+          !time(value.terminal.at) || value.terminal.at < value.observedAt ||
+          value.terminal.at !== value.latestEventAt)) return null;
     for (const [index, arm] of value.arms.entries()) {
       const signed = ['startingCapitalCents', 'netEquityCents', 'netPnlCents',
         'cashCents'];

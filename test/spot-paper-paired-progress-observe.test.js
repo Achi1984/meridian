@@ -160,9 +160,23 @@ test('real exporter and publisher pass original financial snapshot into a bounde
     }});
   assert.equal((await observe(f.options)).status, 'MAX_TICKS');
   assert.equal(posts, 1);
+  assert.equal(body.schemaVersion, 'SPOT_PAPER_PAIRED_PROGRESS_V1');
+  assert.equal(Object.hasOwn(body, 'runStartedAt'), false);
   assert.equal(body.valuationAt, 121_000);
   assert.equal(body.arms[0].bookedFeesCents, 40);
   assert.equal(body.arms[0].modeledSlippageCents, 20);
+});
+
+test('default observer defers start-only V1 journals without publishing V2 sequence one', async t => {
+  const f = await fixture(t);
+  f.journal.events = [f.journal.events[0]];
+  f.journal.sequence = 1;
+  await writeFile(join(f.dir, 'journal.json'), journalEnvelope(f.journal));
+  f.options.maxTicks = 1;
+  f.options.exportImpl = () => exportProgress({runDirectory: f.dir,
+    expectedIdentity: f.expectedIdentity, now: () => f.now});
+  assert.deepEqual(await observe(f.options), {status: 'MAX_TICKS', ticks: 1});
+  assert.equal(f.sent.length, 0);
 });
 
 test('CLI rejects secret arguments and sanitizes errors; importing is inert', async () => {
