@@ -16,6 +16,9 @@ import {
 import {
   canonicalJson, PROGRESS_PATH, PROGRESS_SCHEMA, MAX_PROGRESS_BYTES, validateProgress
 } from '../scripts/spot-paper-paired-progress/contract.mjs';
+import {
+  PROGRESS_SCHEMA_V2, validatePairedProgress
+} from '../private-paired-progress-contract.mjs';
 import {syntheticExpectedPairedIdentity} from './helpers/spot-paper-paired-dashboard-fixture.mjs';
 import {progressJournalFixture, journalEnvelope} from './helpers/spot-paper-paired-progress-fixture.mjs';
 import {exportProgress} from '../scripts/spot-paper-paired-progress/export.mjs';
@@ -59,6 +62,25 @@ function progress(sequence = 2, status = 'UNKNOWN') {
       completedRoundTripCount: 0, recentFills: []
     }))
   };
+}
+function progressV2(sequence = 2, status = 'UNKNOWN') {
+  return {
+    ...progress(sequence, status),
+    schemaVersion: PROGRESS_SCHEMA_V2,
+    runStartedAt: 500,
+    lastSuccessfulPollAt: 900,
+    completedCycles: 2
+  };
+}
+function noObservationV2(status = 'UNKNOWN') {
+  const value = progressV2(1, status);
+  value.classification = 'NO_OBSERVATION';
+  value.lastSuccessfulPollAt = null;
+  value.completedCycles = 0;
+  value.observedAt = null;
+  value.valuationAt = null;
+  value.arms = null;
+  return value;
 }
 function request(method = 'GET', token = reader, value = progress()) {
   const req = Readable.from(method === 'POST' ? [Buffer.from(JSON.stringify(value))] : []);
@@ -151,6 +173,15 @@ test('shared journal fixture exports, uploads, reads and repeats without changin
 test('default disabled, exact flags, verified full identity and role-separated credentials fail closed', async () => {
   const off = configuration({});
   assert.equal(off.enabled, false);
+  assert.equal(off.v2Enabled, false);
+  assert.equal(configuration(env()).v2Enabled, false);
+  assert.equal(configuration({
+    ...env(), MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_V2_ENABLED: 'true'
+  }).v2Enabled, true);
+  assert.equal(configuration({
+    ...env(), MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_V2_ENABLED: 'true',
+    MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_DEPLOYMENT_VERIFIED: 'false'
+  }).v2Enabled, false);
   const unavailable = () => { throw Error('disabled route accessed database'); };
   assert.equal((await handle(request(), options({config: off, getStore: unavailable}))).status, 503);
   for (const flag of ['ENABLED', 'DEPLOYMENT_VERIFIED']) {
@@ -184,6 +215,55 @@ test('default disabled, exact flags, verified full identity and role-separated c
   }
   assert.equal((await handle(request('POST', ''), options({getStore: unavailable}))).status, 401);
   assert.equal((await handle(request('GET'), options({authorizedRead: undefined}))).status, 401);
+});
+
+test('V2 is explicitly gated for uploads and existing rows while V1 remains readable', async () => {
+  let writes = 0;
+  const disabled = options({
+    getStore: () => ({
+      get: async () => noObservationV2(),
+      put: async () => { writes++; return {status: 'STORED'}; }
+    })
+  });
+  const rejected = await handle(request('POST', uploader, noObservationV2()), disabled);
+  assert.equal(rejected.status, 503);
+  assert.equal(rejected.body.error, 'spot_paper_paired_progress_version_disabled');
+  assert.equal(writes, 0);
+  const hidden = await handle(request(), disabled);
+  assert.equal(hidden.status, 404);
+  assert.equal(hidden.body.error, 'spot_paper_paired_progress_not_found');
+
+  const enabled = options({
+    config: configuration({
+      ...env(), MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_V2_ENABLED: 'true'
+    }),
+    getStore: () => ({get: async () => noObservationV2(),
+      put: async () => { writes++; return {status: 'STORED'}; }})
+  });
+  assert.equal((await handle(request('POST', uploader, noObservationV2()), enabled)).status, 200);
+  assert.equal(writes, 1);
+  assert.equal((await handle(request(), enabled)).status, 200);
+
+  const v1 = await handle(request(), options({
+    getStore: () => ({get: async () => progress()})
+  }));
+  assert.equal(v1.status, 200);
+  assert.equal(v1.body.schemaVersion, PROGRESS_SCHEMA);
+});
+
+test('receiver validates V2 observation and sequence-one no-observation only', () => {
+  assert.deepEqual(validatePairedProgress(noObservationV2(), identity),
+    noObservationV2());
+  assert.deepEqual(validatePairedProgress(progressV2(), identity), progressV2());
+  assert.equal(validatePairedProgress(noObservationV2(), identity, {allowV2: false}), null);
+  assert.equal(validatePairedProgress({...progress(), journalSequence: 1}, identity), null);
+  assert.equal(validatePairedProgress(progressV2(1), identity), null);
+  const invalid = noObservationV2();
+  invalid.completedCycles = 1;
+  assert.equal(validatePairedProgress(invalid, identity), null);
+  const observed = progressV2();
+  observed.lastSuccessfulPollAt = observed.observedAt + 1;
+  assert.equal(validatePairedProgress(observed, identity), null);
 });
 
 test('exact allowlist, strict payload and read validation preserve original valuation timestamp', async () => {
@@ -273,11 +353,19 @@ test('atomic CAS compares whole identity including every account/model and freez
   assert.match(PAIRED_PROGRESS_UPSERT_SQL, /ON CONFLICT \(run_id\) DO UPDATE/);
   assert.match(PAIRED_PROGRESS_UPSERT_SQL, /current\.identity = EXCLUDED\.identity/);
   assert.match(PAIRED_PROGRESS_UPSERT_SQL, /current\.journal_sequence < EXCLUDED\.journal_sequence/);
+  assert.match(PAIRED_PROGRESS_UPSERT_SQL, /current\.payload->>'schemaVersion' = 'SPOT_PAPER_PAIRED_PROGRESS_V1'/);
+  assert.match(PAIRED_PROGRESS_UPSERT_SQL, /EXCLUDED\.payload->>'schemaVersion' = 'SPOT_PAPER_PAIRED_PROGRESS_V2'/);
   assert.match(PAIRED_PROGRESS_UPSERT_SQL, /current\.terminal_status = 'UNKNOWN'/);
-  for (const field of ['observedAt', 'valuationAt', 'latestEventAt']) {
-    assert.ok(PAIRED_PROGRESS_UPSERT_SQL.includes(
-      `(current.payload->>'${field}')::bigint <= (EXCLUDED.payload->>'${field}')::bigint`));
-  }
+  assert.match(PAIRED_PROGRESS_UPSERT_SQL, /current\.payload->>'observedAt' IS NULL/);
+  assert.match(PAIRED_PROGRESS_UPSERT_SQL, /current\.payload->>'valuationAt' IS NULL/);
+  assert.match(PAIRED_PROGRESS_UPSERT_SQL,
+    /\(current\.payload->>'latestEventAt'\)::bigint <= \(EXCLUDED\.payload->>'latestEventAt'\)::bigint/);
+  assert.match(PAIRED_PROGRESS_UPSERT_SQL,
+    /current\.payload->>'lastSuccessfulPollAt' IS NULL/);
+  assert.match(PAIRED_PROGRESS_UPSERT_SQL,
+    /current\.payload->'runStartedAt' = EXCLUDED\.payload->'runStartedAt'/);
+  assert.match(PAIRED_PROGRESS_UPSERT_SQL,
+    /\(current\.payload->>'completedCycles'\)::bigint <=\s*\(EXCLUDED\.payload->>'completedCycles'\)::bigint/);
   assert.doesNotMatch(PAIRED_PROGRESS_UPSERT_SQL, /SET\s+identity\s*=/);
   let parameters;
   const store = createPrivatePairedProgressStore({
@@ -305,6 +393,10 @@ test('atomic CAS compares whole identity including every account/model and freez
     query: async sql => ({rows: sql.includes('INSERT INTO') ? [] : [{payload: progress()}]})
   });
   assert.deepEqual(await repeatStore.put(repeated), {status: 'IDEMPOTENT'});
+  const invalidSequenceOne = progressV2(1);
+  await assert.rejects(createPrivatePairedProgressStore({
+    query: async () => { throw Error('invalid V2 must not reach SQL'); }
+  }).put(invalidSequenceOne), {code: 'INVALID_PROGRESS'});
 });
 
 test('store write deadline remains UNKNOWN after late commit and capacity is held to real settle', async () => {
@@ -367,6 +459,15 @@ test('migration is additive UNAPPLIED private progress storage and server regist
   assert.match(migration, /REVOKE ALL ON TABLE meridian_spot_paper_paired_progress FROM PUBLIC/);
   assert.doesNotMatch(migration, /\b(?:DROP|ALTER|DELETE|TRUNCATE)\b/i);
   assert.doesNotMatch(migration, /meridian_spot_paper_paired_reports\b/);
+  const forward = await readFile(new URL(
+    '../migrations/20261116_meridian_spot_paper_paired_progress_v2.sql', import.meta.url), 'utf8');
+  assert.match(forward, /UNAPPLIED/);
+  assert.match(forward, /SPOT_PAPER_PAIRED_PROGRESS_V1/);
+  assert.match(forward, /SPOT_PAPER_PAIRED_PROGRESS_V2/);
+  assert.match(forward, /journal_sequence = 1 AND payload->>'classification' = 'NO_OBSERVATION'/);
+  assert.match(forward, /octet_length\(payload::text\) <= 65536/);
+  assert.match(forward, /BEGIN;[\s\S]*COMMIT;/);
+  assert.doesNotMatch(forward, /\b(?:DROP\s+TABLE|DELETE|TRUNCATE)\b/i);
   const gateway = await readFile(new URL('../server-gateway.js', import.meta.url), 'utf8');
   assert.match(gateway, /handleSpotPaperPairedProgressGatewayRequest\(req/);
   assert.match(gateway, /createPrivatePairedProgressStore\(paperReportPool\(\)\)/);
@@ -398,9 +499,24 @@ const connectionString = process.env.MERIDIAN_TEST_PAPER_REPORT_DATABASE_URL;
   await admin.query(`CREATE SCHEMA "${schema}"`);
   created = true;
   database = new Pool({connectionString, max: 2, options: `-c search_path=${schema}`});
-  await database.query(await readFile(new URL(
-    '../migrations/20261110_meridian_spot_paper_paired_progress.sql', import.meta.url), 'utf8'));
+  const v1Migration = await readFile(new URL(
+    '../migrations/20261110_meridian_spot_paper_paired_progress.sql', import.meta.url), 'utf8');
+  await database.query(v1Migration);
+  const preservedV1 = progress();
+  preservedV1.identity.runId += '-preserved';
+  await database.query(
+    `INSERT INTO meridian_spot_paper_paired_progress
+      (run_id, identity, journal_sequence, journal_sha256, terminal_status, payload)
+     VALUES ($1, $2::jsonb, $3, $4, $5, $6::jsonb)`,
+    [preservedV1.identity.runId, canonicalJson(preservedV1.identity),
+      preservedV1.journalSequence, preservedV1.journalSha256,
+      preservedV1.terminal.status, canonicalJson(preservedV1)]);
+  const v2Migration = await readFile(new URL(
+    '../migrations/20261116_meridian_spot_paper_paired_progress_v2.sql', import.meta.url), 'utf8');
+  await database.query(v2Migration);
   const store = createPrivatePairedProgressStore(database);
+  assert.deepEqual(await store.get(preservedV1.identity), preservedV1,
+    'forward migration preserves the existing V1 row');
   const result = await Promise.all([store.put(progress()), store.put(progress())]);
   assert.deepEqual(result.map(value => value.status).sort(), ['IDEMPOTENT', 'STORED']);
   const repeated = progress();
@@ -463,6 +579,57 @@ const connectionString = process.env.MERIDIAN_TEST_PAPER_REPORT_DATABASE_URL;
   const fresher = {...structuredClone(timestamped), journalSequence: 3,
     observedAt: 1_100, valuationAt: 1_100, latestEventAt: 1_500};
   assert.equal((await store.put(fresher)).status, 'STORED');
+
+  const emptyV2 = noObservationV2();
+  emptyV2.identity.runId += '-empty-v2';
+  assert.equal((await store.put(emptyV2)).status, 'STORED');
+  assert.deepEqual(await store.get(emptyV2.identity), emptyV2);
+  const observedV2 = progressV2(2);
+  observedV2.identity = structuredClone(emptyV2.identity);
+  observedV2.completedCycles = 1;
+  assert.equal((await store.put(observedV2)).status, 'STORED',
+    'no-observation sequence one may advance to an observed checkpoint');
+
+  const upgraded = progress();
+  upgraded.identity.runId += '-v1-to-v2';
+  assert.equal((await store.put(upgraded)).status, 'STORED');
+  const upgradedV2 = progressV2(3);
+  upgradedV2.identity = structuredClone(upgraded.identity);
+  assert.equal((await store.put(upgradedV2)).status, 'STORED');
+  for (const change of [
+    value => { value.lastSuccessfulPollAt--; },
+    value => { value.completedCycles--; },
+    value => { value.runStartedAt++; }
+  ]) {
+    const regressed = progressV2(4);
+    regressed.identity = structuredClone(upgraded.identity);
+    change(regressed);
+    assert.ok(validatePairedProgress(regressed, upgraded.identity));
+    assert.equal((await store.put(regressed)).status, 'CONFLICT',
+      'V2 poll provenance and completed cycles cannot regress');
+  }
+  const equalSequenceV1 = {...structuredClone(upgraded), journalSequence: 3,
+    journalSha256: upgradedV2.journalSha256};
+  assert.equal((await store.put(equalSequenceV1)).status, 'CONFLICT',
+    'equal-sequence version changes are conflicts');
+  const downgrade = progress(4);
+  downgrade.identity = structuredClone(upgraded.identity);
+  assert.equal((await store.put(downgrade)).status, 'CONFLICT',
+    'V2 rows cannot be silently downgraded to V1');
+  const staleV2 = progressV2(2);
+  staleV2.identity = structuredClone(upgraded.identity);
+  assert.equal((await store.put(staleV2)).status, 'CONFLICT');
+  const terminalV2 = progressV2(4, 'TERMINAL_RECORDED');
+  terminalV2.identity = structuredClone(upgraded.identity);
+  assert.equal((await store.put(terminalV2)).status, 'STORED');
+  const unrelatedV2 = progressV2(5);
+  unrelatedV2.identity.runId += '-unrelated-v2';
+  assert.equal((await store.put(unrelatedV2)).status, 'STORED',
+    'unrelated identities remain writable');
+  const afterTerminal = progressV2(5, 'UNKNOWN');
+  afterTerminal.identity = structuredClone(upgraded.identity);
+  assert.equal((await store.put(afterTerminal)).status, 'CONFLICT');
+  assert.equal((await store.put(terminalV2)).status, 'IDEMPOTENT');
 
   const interrupted = progress(2, 'INTERRUPTED_RECORDED');
   interrupted.identity.runId += '-interrupted';
