@@ -23,7 +23,14 @@ import {SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
   spotPaperPairedReportDigest} from '../scripts/spot-paper-paired-report/envelope.mjs';
 import {syntheticPairedEvaluatorFixture} from
   './helpers/spot-paper-paired-evaluator-fixture.mjs';
-import {createSpotPaperPairedReportConnector} from
+import {
+  syntheticExpectedPairedIdentity,
+  syntheticPairedDashboard
+} from './helpers/spot-paper-paired-dashboard-fixture.mjs';
+import {
+  createSpotPaperPairedReportConnector,
+  SPOT_PAPER_PAIRED_REPORT_SELECTIONS
+} from
   '../v11/spot-paper-paired-report-connector.js';
 
 function verifiedFixture() {
@@ -248,6 +255,31 @@ test('legacy and canonical trend evaluator DTOs survive ingestion, gateway GET, 
     assert.deepEqual(connected.report, dto);
     connector.dispose();
   }
+});
+
+test('selected paired reader rejects a report bound to a different configured run ID', async () => {
+  const expected = syntheticExpectedPairedIdentity();
+  const report = syntheticPairedDashboard(expected);
+  let selectedRunId = null;
+  assert.deepEqual(SPOT_PAPER_PAIRED_REPORT_SELECTIONS.map(({runId}) => runId), [
+    'btc-eur-paired-diag-20261110-001',
+    'btc-eur-paired-diag-20261116-002'
+  ]);
+  const connector = createSpotPaperPairedReportConnector({
+    enabled: true,
+    transport: async ({runId}) => {
+      selectedRunId = runId;
+      return new Response(JSON.stringify({
+        schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
+        runId: report.identity.runId,
+        report
+      }), {status: 200, headers: {'content-type': 'application/json'}});
+    }
+  });
+  const result = await connector.read(SPOT_PAPER_PAIRED_REPORT_SELECTIONS[0].runId);
+  assert.equal(selectedRunId, SPOT_PAPER_PAIRED_REPORT_SELECTIONS[0].runId);
+  assert.equal(result.status, 'IDENTITY_MISMATCH');
+  connector.dispose();
 });
 
 test('operator CLI defaults to dry-run and bounds input files before database access', async () => {

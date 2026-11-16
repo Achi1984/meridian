@@ -22,6 +22,7 @@ export {
 
 const HASH = /^[a-f0-9]{64}$/;
 const MAX_ACTIVE_REQUESTS = 2;
+const MAX_CONFIGURED_IDENTITIES = 2;
 const INTERRUPTED_RUN_ID = 'btc-eur-trend-host-8h-002';
 const REPORT_LOOKUP_TIMEOUT_MS = 6_500;
 const diagnosticConfig = Object.freeze({
@@ -71,12 +72,38 @@ export function spotPaperPairedReportGatewayConfig(env = process.env) {
   const featureEnabled =
     env.MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED === 'true' &&
     env.MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED === 'true';
+  let expectedIdentities = [];
+  let invalidExpectedIdentities = false;
+  const rawIdentities = String(
+    env.MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITIES_JSON ?? '');
+  if (rawIdentities) {
+    try {
+      if (Buffer.byteLength(rawIdentities) > 32 * 1024) {
+        throw new Error('configured identity list too large');
+      }
+      const parsed = JSON.parse(rawIdentities);
+      if (!Array.isArray(parsed) || parsed.length === 0 ||
+          parsed.length > MAX_CONFIGURED_IDENTITIES ||
+          parsed.some(identity => !isValidSpotPaperPairedExpectedIdentity(identity)) ||
+          new Set(parsed.map(identity => identity.runId)).size !== parsed.length) {
+        invalidExpectedIdentities = true;
+      } else {
+        expectedIdentities = parsed;
+      }
+    } catch {
+      invalidExpectedIdentities = true;
+    }
+  }
   return Object.freeze({
     enabled: featureEnabled && expectedIdentity !== null,
     expectedIdentity,
     unsupportedIdentity: featureEnabled && unsupportedIdentity,
     expectedRunId: expectedIdentity?.runId ?? null,
-    expectedConfigHash: expectedIdentity?.configSha256 ?? null
+    expectedConfigHash: expectedIdentity?.configSha256 ?? null,
+    selectionEnabled: featureEnabled && !invalidExpectedIdentities &&
+      expectedIdentities.length > 0,
+    expectedIdentities: Object.freeze(expectedIdentities),
+    invalidExpectedIdentities: featureEnabled && invalidExpectedIdentities
   });
 }
 
@@ -108,12 +135,17 @@ function unavailable(error) {
   return response(503, {error: 'spot_paper_paired_report_store_unavailable'});
 }
 
-function queryPresent(req) {
-  try {
-    return new URL(req.url, 'http://gateway.invalid').search.length > 0;
-  } catch {
-    return true;
+function selectedRunId(req) {
+  let url;
+  try { url = new URL(req.url, 'http://gateway.invalid'); }
+  catch { return {malformed: true}; }
+  if (!url.search) return {requested: false};
+  const values = url.searchParams.getAll('runId');
+  if ([...url.searchParams.keys()].length !== 1 || values.length !== 1 ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(values[0])) {
+    return {malformed: true};
   }
+  return {requested: true, runId: values[0]};
 }
 
 function decodeRow(row, config) {
@@ -156,16 +188,35 @@ async function read(req, {config, getStore, authorizedRead, signal}) {
   if (typeof authorizedRead !== 'function' || !authorizedRead(req)) {
     return response(401, {error: 'read_token_required'});
   }
-  if (config?.unsupportedIdentity === true) {
+  const selection = selectedRunId(req);
+  if (selection.malformed) {
+    return response(400, {error: 'spot_paper_paired_report_query_not_supported'});
+  }
+  if (!selection.requested && config?.unsupportedIdentity === true) {
     return response(422, {error: 'spot_paper_paired_identity_unsupported'});
   }
-  if (!configured(config)) {
+  let selectedConfig = config;
+  if (selection.requested) {
+    if (req.method !== 'GET') return response(405, {error: 'method_not_allowed'});
+    if (config?.selectionEnabled !== true ||
+        !Array.isArray(config.expectedIdentities)) {
+      return response(400, {error: 'spot_paper_paired_report_query_not_supported'});
+    }
+    const expectedIdentity = config.expectedIdentities.find(identity =>
+      identity.runId === selection.runId);
+    if (!expectedIdentity || !isValidSpotPaperPairedExpectedIdentity(expectedIdentity)) {
+      return response(404, {error: 'spot_paper_paired_report_not_found'});
+    }
+    selectedConfig = {
+      enabled: true,
+      expectedIdentity,
+      expectedRunId: expectedIdentity.runId,
+      expectedConfigHash: expectedIdentity.configSha256
+    };
+  } else if (!configured(config)) {
     return response(503, {error: 'spot_paper_paired_transport_not_provisioned'});
   }
   if (req.method !== 'GET') return response(405, {error: 'method_not_allowed'});
-  if (queryPresent(req)) {
-    return response(400, {error: 'spot_paper_paired_report_query_not_supported'});
-  }
   const release = enterRequest();
   if (!release) return response(503, {error: 'spot_paper_paired_report_busy'});
   try {
@@ -174,14 +225,15 @@ async function read(req, {config, getStore, authorizedRead, signal}) {
     if (!store || typeof store.get !== 'function') {
       return response(503, {error: 'spot_paper_paired_report_store_unavailable'});
     }
-    const useDiagnosticFallback = config.expectedRunId === INTERRUPTED_RUN_ID;
+    const useDiagnosticFallback = !selection.requested &&
+      config.expectedRunId === INTERRUPTED_RUN_ID;
     const deadline = useDiagnosticFallback
       ? AbortSignal.timeout(REPORT_LOOKUP_TIMEOUT_MS) : null;
     const lookupSignal = deadline && signal ? AbortSignal.any([signal, deadline])
       : deadline ?? signal;
     try {
-      const row = await store.get(config.expectedRunId, {signal: lookupSignal});
-      if (row) return decodeRow(row, config);
+      const row = await store.get(selectedConfig.expectedRunId, {signal: lookupSignal});
+      if (row) return decodeRow(row, selectedConfig);
 
       if (useDiagnosticFallback) {
         lookupSignal.throwIfAborted();

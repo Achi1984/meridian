@@ -171,7 +171,74 @@ function renderCheckpoint(root, checkpoint, document) {
   root.append(section);
 }
 
-function renderModel(root, model, document, {loading = false} = {}) {
+function comparisonMetric(value, signed = false) {
+  const formatted = formatCents(value, signed);
+  return formatted?.label || 'Unbekannt — METRIC_MISSING';
+}
+
+function renderCrossRunComparison(root, comparison, document) {
+  if (!comparison) return;
+  const section = document.createElement('section');
+  section.setAttribute('aria-label', 'Vergleich ausgewählter Paper-Läufe');
+  section.setAttribute('style',
+    'display:grid;gap:10px;min-width:0;padding:12px;border:1px solid currentColor;border-radius:12px');
+  node(document, section, 'h3', 'Offline-Vergleich ausgewählter Paper-Läufe');
+  if (!comparison.available) {
+    node(document, section, 'p',
+      `Fenstervergleich nicht verfügbar — ${comparison.reason}. ` +
+      'Originalberichte und Zeitstempel bleiben getrennt; es wird kein Gewinner berechnet.');
+    root.append(section);
+    return;
+  }
+  node(document, section, 'p',
+    'Semantische Strategie-, Konto- und Kostenverträge stimmen überein. Kostenraten bleiben ' +
+    'unverifizierte Modellannahmen. Werte bleiben je Lauf und in Originaleinheiten; ' +
+    'keine Fenster werden zusammengeführt und es wird kein Gewinner berechnet.');
+  const runs = document.createElement('div');
+  runs.setAttribute('style',
+    'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:12px;min-width:0');
+  for (const run of comparison.runs) {
+    const card = document.createElement('section');
+    card.setAttribute('aria-label', `${run.label} Fenstervergleich`);
+    card.setAttribute('style',
+      'display:grid;gap:8px;min-width:0;padding:10px;border:1px solid currentColor;border-radius:8px');
+    node(document, card, 'h4', `${run.label} · ${run.runId}`);
+    if (run.syntheticFixture) {
+      node(document, card, 'p', 'SYNTHETIC FIXTURE · nur Vorschau, keine Produktionsdaten.');
+    }
+    field(document, card, 'Bewertungszeitpunkt · Europe/Wien',
+      run.valuationAtLabel || 'Unbekannt — VALUATION_TIME_UNAVAILABLE');
+    field(document, card, 'Run-Stoppzeit · Europe/Wien',
+      run.runStoppedAtLabel || 'Unbekannt — RUN_STOP_TIME_UNAVAILABLE');
+    field(document, card, 'Beobachtete Datenabdeckung',
+      run.observedCoverageLabel || 'Unbekannt — OBSERVED_COVERAGE_UNAVAILABLE');
+    field(document, card, 'Abgeschlossene Zyklen',
+      Number.isSafeInteger(run.completedCycles) ? String(run.completedCycles) :
+        'Unbekannt — COMPLETED_CYCLES_UNAVAILABLE');
+    for (const arm of run.arms) {
+      const metrics = document.createElement('section');
+      metrics.setAttribute('aria-label', `${run.label} ${arm.label} Kennzahlen`);
+      node(document, metrics, 'h5', arm.label);
+      field(document, metrics, 'Simulierte Fills',
+        Number.isSafeInteger(arm.fillCount) ? String(arm.fillCount) :
+          'Unbekannt — FILL_COUNT_UNAVAILABLE');
+      field(document, metrics, 'Gebuchte Gebühren',
+        comparisonMetric(arm.bookedFeesCents));
+      field(document, metrics, 'Modellierter Slippage',
+        comparisonMetric(arm.modeledSlippageCents));
+      field(document, metrics, 'Netto-PnL',
+        comparisonMetric(arm.netPnlCents, true));
+      field(document, metrics, 'Stichproben-Drawdown',
+        comparisonMetric(arm.sampledDrawdownCents));
+      card.append(metrics);
+    }
+    runs.append(card);
+  }
+  section.append(runs);
+  root.append(section);
+}
+
+function renderModel(root, model, document, {loading = false, comparison = null} = {}) {
   const isError = model.state === 'error';
   // The report and checkpoint reads are independent. A report read may still
   // be settling after the checkpoint has deterministically answered NOT_FOUND;
@@ -209,6 +276,7 @@ function renderModel(root, model, document, {loading = false} = {}) {
     checkpointNotFound ? 'empty' : model.state);
 
   renderCheckpoint(root, model.checkpoint, document);
+  renderCrossRunComparison(root, comparison, document);
   if (!model.available) {
     node(document, root, 'p', model.state === 'error' ?
       'Fehler: gemeinsamer Bericht konnte nicht geprüft werden. Fehlende Werte bleiben unbekannt.' :
@@ -312,9 +380,10 @@ function elapsed(ms) {
 }
 
 export function renderSpotPaperPaired(root, input, document = root?.ownerDocument,
-  {state = 'idle', progressSnapshot = null, expectedIdentity = null, ...options} = {}) {
+  {state = 'idle', progressSnapshot = null, expectedIdentity = null,
+    comparison = null, ...options} = {}) {
   if (!root || !document) return null;
   return renderModel(root, presentSpotPaperPairedReport(input, {
     state, progressSnapshot, expectedIdentity
-  }), document, options);
+  }), document, {...options, comparison});
 }
