@@ -268,24 +268,52 @@ compares an existing row's configuration and digest. On `CONFLICT` or
 readback first. A `DATABASE_URL` permission or migration change is outside this
 checklist and needs separate approval.
 
-The paired-report gateway is configured for one exact expected identity and
-its GET has no run-ID query parameter. Before readback, separately authorize
-the gateway and V11 dashboard configuration to use the verified Paper 002
-identity; the current dashboard identity is not a license to change the active
-writer or production permissions. The report gateway's configuration names are
-`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED`,
-`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED`, and
-`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON`. The progress
-dashboard identity is separately pinned in
-`$CHECKOUT/v11/spot-paper-paired-progress-config.js`; configure it only in a
-separately approved future dashboard release. Then use the existing authenticated Meridian
-V11 app-access flow and **Gepaarter Paper-Vergleich** view. Confirm the displayed
-run ID is `btc-eur-paired-diag-20261116-002`, status is
-`VERIFIED_COMPLETE`, all three arms and expected coverage are present, and
-the canonical report matches the staged DTO. The private gateway checks the
-stored envelope digest on read. Preserve the dry-run/write digest and
-authenticated readback result together; a checkpoint or terminal journal
-record alone is not a verified report or profitability claim.
+The paired-report gateway supports an explicit, bounded allowlist of one or
+two complete expected identities through
+`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITIES_JSON`. For an approved
+dashboard configuration, set it to a JSON array containing the independently
+reviewed exact Paper 001 identity from
+`docs/operations/receipts/btc-eur-paired-diag-20261110-001.expected-identity.json`
+and the exact Paper 002 identity for
+`btc-eur-paired-diag-20261116-002` from its independently reviewed receipt.
+The Paper 001 identity must have `runId` `btc-eur-paired-diag-20261110-001`.
+Do not derive either identity from a host export or journal. Keep the existing
+`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON` single-identity
+configuration unchanged: a GET without `runId` retains its legacy default
+identity and behavior. The allowlist only permits exact-ID lookups; it does not
+prove that a report is published. In particular, Paper 002 must remain missing
+or unavailable until its verified DTO has passed the import checks above and
+the authorized immutable import has completed. Do not treat an allowlisted
+Paper 002 identity or a 404 as evidence of a completed run.
+
+The allowlist remains behind the existing
+`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_ENABLED` and
+`MERIDIAN_SPOT_PAPER_PAIRED_REPORT_DEPLOYMENT_VERIFIED` gates. Configuration,
+deployment, database access, and imports require separate authorization and
+are not performed by this checklist. The observed-checkpoint/progress identity
+is a different read source, separately pinned in
+`$CHECKOUT/v11/spot-paper-paired-progress-config.js`; this paired-report
+allowlist does not change it.
+
+For real dashboard readback, use the existing authenticated Meridian V11
+app-access flow, unlock the app, and open **Gepaarter Paper-Vergleich**. Before
+Paper 002's verified import, read Paper 001 by its exact ID and confirm that
+Paper 002 remains `NOT_FOUND`/unavailable; do not accept the comparison as
+complete. After the verified DTO passes the checks above and its authorized
+immutable import completes, select `Paper 001`
+(`btc-eur-paired-diag-20261110-001`) and `Paper 002`
+(`btc-eur-paired-diag-20261116-002`) and invoke the comparison. Verify that
+each exact run ID is requested separately through the authenticated
+`/api/private/spot-paper-paired-report?runId=...` route and returns its own
+`VERIFIED_COMPLETE` report; never copy or expose the bearer token while
+checking the readback. Confirm the visible identity and canonical report for
+each run match its independently staged DTO, all baseline, challenger, and
+cash arms and expected coverage remain present, and each report's own
+valuation timestamp and metrics are preserved. The gateway revalidates the
+stored envelope digest on each read. Preserve each dry-run/write digest with
+the corresponding authenticated readback result; do not pool windows, declare
+a winner, or make a profitability claim. A checkpoint or terminal journal
+record alone is not a verified report.
 
 ## Interrupted or incomplete run retention
 
@@ -305,6 +333,8 @@ gateway, or production database request:
 
 ```sh
 node --test \
+  test/spot-paper-paired-host.test.js \
+  test/spot-paper-paired-finalization.test.js \
   test/spot-paper-paired-progress-export.test.js \
   test/spot-paper-paired-progress-observe.test.js \
   test/spot-paper-paired-report.test.js \

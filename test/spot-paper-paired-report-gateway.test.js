@@ -124,6 +124,11 @@ test('configured run selection is bounded, exact-identity, authenticated and rea
     report.syntheticFixture = true;
     return [identity.runId, row(report, identity)];
   }));
+  const legacyReport = syntheticPairedDashboard(identity);
+  legacyReport.evidenceStatus = 'VERIFIED_COMPLETE';
+  reports.set(identity.runId, row(legacyReport));
+  const secondReport = reports.get(identities[1].runId);
+  reports.delete(identities[1].runId);
   const calls = [];
   const selectedRead = (url, token = READ_TOKEN, override = {}) =>
     handleSpotPaperPairedReportGatewayRequest(request('GET', url, token), {
@@ -136,6 +141,26 @@ test('configured run selection is bounded, exact-identity, authenticated and rea
       ...override
     });
 
+  const legacyRead = await selectedRead(SPOT_PAPER_PAIRED_REPORT_PATH);
+  assert.equal(legacyRead.status, 200);
+  assert.equal(legacyRead.body.runId, identity.runId);
+  assert.deepEqual(calls, [identity.runId],
+    'GET without runId keeps the configured legacy identity');
+  calls.length = 0;
+
+  const firstRead = await selectedRead(
+    `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identities[0].runId}`);
+  assert.equal(firstRead.status, 200);
+  assert.equal(firstRead.body.runId, identities[0].runId);
+  assert.equal(firstRead.body.report.evidenceStatus, 'VERIFIED_COMPLETE');
+  const missingSecond = await selectedRead(
+    `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identities[1].runId}`);
+  assert.equal(missingSecond.status, 404);
+  assert.equal(missingSecond.body.error, 'spot_paper_paired_report_not_found');
+  assert.deepEqual(calls, identities.map(identity => identity.runId));
+
+  reports.set(identities[1].runId, secondReport);
+  calls.length = 0;
   for (const identity of identities) {
     const result = await selectedRead(
       `${SPOT_PAPER_PAIRED_REPORT_PATH}?runId=${identity.runId}`);
