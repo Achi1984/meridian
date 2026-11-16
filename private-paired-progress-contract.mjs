@@ -20,7 +20,7 @@ function validV2Metadata(value, expectedIdentity) {
     canonicalJson(value.identity) === canonicalJson(expectedIdentity) &&
     value.schemaVersion === PROGRESS_SCHEMA_V2 &&
     Number.isSafeInteger(value.journalSequence) && value.journalSequence >= 1 &&
-    HASH.test(value.journalSha256) &&
+    typeof value.journalSha256 === 'string' && HASH.test(value.journalSha256) &&
     time(value.runStartedAt) && time(value.exportedAt) &&
     value.exportedAt >= value.runStartedAt &&
     time(value.latestEventAt) && value.latestEventAt >= value.runStartedAt &&

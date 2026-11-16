@@ -258,6 +258,13 @@ test('receiver validates V2 observation and sequence-one no-observation only', (
   assert.equal(validatePairedProgress(noObservationV2(), identity, {allowV2: false}), null);
   assert.equal(validatePairedProgress({...progress(), journalSequence: 1}, identity), null);
   assert.equal(validatePairedProgress(progressV2(1), identity), null);
+  const arrayDigest = [digest('coercible-but-not-a-string')];
+  const invalidNoObservationDigest = noObservationV2();
+  invalidNoObservationDigest.journalSha256 = arrayDigest;
+  assert.equal(validatePairedProgress(invalidNoObservationDigest, identity), null);
+  const invalidObservedDigest = progressV2();
+  invalidObservedDigest.journalSha256 = arrayDigest;
+  assert.equal(validatePairedProgress(invalidObservedDigest, identity), null);
   const invalid = noObservationV2();
   invalid.completedCycles = 1;
   assert.equal(validatePairedProgress(invalid, identity), null);
