@@ -308,7 +308,10 @@ function parseRpcResponse(bytes) {
   } catch {
     fail("INVALID_JSON");
   }
-  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || payload.id !== 1 ||
+  const id = payload?.id;
+  const validId = id === null || typeof id === "string" || Number.isFinite(id);
+  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || !validId ||
+      (expectedId !== undefined && id !== expectedId) ||
       Object.hasOwn(payload, "error") || !isRecord(payload.result) ||
       !isRecord(payload.result.context) || !Array.isArray(payload.result.value)) {
     fail("INVALID_RPC_RESPONSE");
@@ -491,12 +494,15 @@ function rawBytes(bytes) {
   };
 }
 
-function prospectiveRpc(bytes) {
+function parseCensusRpc(bytes, expectedId) {
   let payload;
   try {
     payload = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(bytes));
   } catch { fail("INVALID_JSON"); }
-  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || payload.id !== 1 ||
+  const id = payload?.id;
+  const validId = id === null || typeof id === "string" || Number.isFinite(id);
+  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || !validId ||
+      (expectedId !== undefined && id !== expectedId) ||
       Object.hasOwn(payload, "error") || !isRecord(payload.result) ||
       Object.keys(payload.result).some(key => !["context", "value"].includes(key)) ||
       !isRecord(payload.result.context) ||
@@ -536,7 +542,7 @@ function checkedHistoricalBody(receipt, bounds) {
   const captured = Buffer.from(bytes);
   const actual = createHash("sha256").update(captured).digest("hex");
   if (actual !== sha256) fail("RESPONSE_DIGEST_MISMATCH");
-  return prospectiveRpc(captured);
+  return parseCensusRpc(captured);
 }
 
 // Offline diagnostic for exact-slot, standard-shaped RPC responses.
@@ -691,7 +697,7 @@ export async function captureProspectiveOwnerCensus({
         if (!Number.isInteger(response.status) || response.status < 200 || response.status >= 300) {
           fail(response.status === 429 ? "RATE_LIMITED" : "HTTP_ERROR");
         }
-        const rpc = prospectiveRpc(streamed.bytes);
+        const rpc = parseCensusRpc(streamed.bytes, 1);
         deadline.check();
         return rpc;
       } finally {
