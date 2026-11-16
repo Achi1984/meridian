@@ -6,7 +6,7 @@ import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {test} from 'node:test';
 import {join} from 'node:path';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 const globalHtml=html;
@@ -1548,6 +1548,7 @@ test('actual M11 app access and Strategies entry work at mobile and desktop widt
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
       {encoding:'utf8',timeout:175000,env});
     assert.equal(child.status,0,'browser child failed: '+String(child.stdout).slice(-2500)+' '+String(child.stderr).slice(-1200));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     const results=String(child.stdout).split('\n').filter(line=>line.startsWith('V11_STRATEGIES_WIDTH '));
     const measurements=String(child.stdout).split('\n').filter(line=>line.startsWith('V11_BOT_COMPACT_MEASURE '));
     assert.equal(results.length,5,'expected actual Chrome results at all four widths and desktop');

@@ -6,12 +6,13 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {fileURLToPath,pathToFileURL} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 test('V10 one-use access dialog: native keyboard, clearing and responsive layout',{timeout:120000},async()=>{
  if(typeof WebSocket!=='function'){
   const env={...process.env};delete env.NODE_TEST_CONTEXT;
   const r=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],{env,encoding:'utf8',timeout:115000});
-  assert.equal(r.status,0,String(r.stdout).slice(-2000)+String(r.stderr).slice(-1000));return;
+  assert.equal(r.status,0,String(r.stdout).slice(-2000)+String(r.stderr).slice(-1000));
+  forwardCdpStartupRecoveryDiagnostic(r.stdout);return;
  }
  const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
  assert.ok(chrome,'Chrome required; no silent skip');

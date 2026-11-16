@@ -14,7 +14,7 @@ import {createSyntheticSeries} from './fixtures/b1-7/synthetic-series.mjs';
 import {
   createInsufficientEvidenceProfile,createInsufficientEvidenceSeries
 } from '../scripts/research-supervisor/test_b1_generated_fixture.mjs';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {SPOT_PAPER_PAIRED_REPORT_ENDPOINT} from '../v11/spot-paper-paired-report-connector.js';
 import {SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT} from '../v11/spot-paper-paired-progress-connector.js';
 
@@ -246,6 +246,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
       {env,encoding:'utf8',timeout:235000});
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     const rows=child.stdout.split('\n').filter(line=>line.startsWith('V11_B12_SIZE '));
     assert.equal(rows.length,5);rows.forEach(row=>console.log(row));return;
   }

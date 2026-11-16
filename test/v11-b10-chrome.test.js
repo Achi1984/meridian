@@ -4,7 +4,7 @@ import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 
@@ -20,6 +20,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
       {env,encoding:'utf8',timeout:115000});
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     const rows=child.stdout.split('\n').filter(line=>line.includes('V11_B10_SIZE'));
     assert.equal(rows.length,sizes.length);rows.forEach(row=>console.log(row));return;
   }

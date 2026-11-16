@@ -5,7 +5,7 @@ import {join} from 'node:path';
 import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {
   projectSpotPaperPairedDashboard,
@@ -449,6 +449,7 @@ test('mobile Chrome renders canonical synthetic DTO without horizontal overflow'
     });
     assert.equal(child.status, 0,
       `${String(child.stdout).slice(-2500)}${String(child.stderr).slice(-1000)}`);
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     assert.match(child.stdout, /V11_SPOT_PAPER_PAIRED_SIZE .*"width":320/);
     assert.match(child.stdout, /V11_SPOT_PAPER_PAIRED_SIZE .*"width":390/);
     return;

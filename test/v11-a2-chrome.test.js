@@ -4,7 +4,7 @@ import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 
@@ -87,6 +87,7 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
     const child = spawnSync(process.execPath, ['--experimental-websocket', fileURLToPath(import.meta.url)],
       {env, encoding: 'utf8', timeout: 115000});
     assert.equal(child.status, 0, String(child.stdout).slice(-2500) + String(child.stderr).slice(-1000));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     const measurements = child.stdout.split('\n').filter(line => line.includes('V11_A2_WIDTH'));
     assert.equal(measurements.length, 4, 'four real CDP width measurements required');
     measurements.forEach(line => console.log(line));

@@ -5,7 +5,7 @@ import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
 import {join,normalize,sep} from 'node:path';
 import {fileURLToPath} from 'node:url';
 import {spawnSync} from 'node:child_process';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium']
   .find(path=>path&&existsSync(path));
@@ -116,6 +116,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
       const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
         {env,encoding:'utf8',timeout:175000});
       assert.equal(child.status,0,String(child.stdout).slice(-3000)+String(child.stderr).slice(-1000));
+      forwardCdpStartupRecoveryDiagnostic(child.stdout);
       const rows=child.stdout.split('\n').filter(line=>line.includes('V11_B11_SIZE'));
       assert.equal(rows.length,6);rows.forEach(row=>console.log(row));return;
     }
@@ -905,4 +906,3 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
       await new Promise(resolve=>server.close(resolve));
     }
   });
-

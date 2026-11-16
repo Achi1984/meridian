@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {test} from 'node:test';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate, VERIFY_ENDPOINT} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {SPOT_PAPER_REPORT_ENDPOINT} from '../v11/spot-paper-cockpit-controller.js';
@@ -176,6 +176,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
     const child = runFlaggedBrowserTest(name);
     assert.equal(child.status, 0,
       `${String(child.stdout).slice(-2500)}${String(child.stderr).slice(-1000)}`);
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     assertNamedTestPassed(child.stdout, name);
     for (const width of sizes) {
       assert.match(child.stdout, new RegExp(`V11_PAPER_BOT_WORKSPACE_SIZE .*"width":${width}`));

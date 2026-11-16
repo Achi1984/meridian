@@ -7,7 +7,7 @@ import {existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
 import {join} from 'node:path';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 const routes=new Map([
   ['/v10/strategy-arena.js',['../v10/strategy-arena.js','text/javascript']],
   ['/research/strategy-paper-arena.js',['../research/strategy-paper-arena.js','text/javascript']],
@@ -28,6 +28,7 @@ test('Paper Arena Chrome: native file import, integrity rejection and 320/390 la
     const env={...process.env};delete env.NODE_TEST_CONTEXT;
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],{env,encoding:'utf8',timeout:115000});
     assert.equal(child.status,0,String(child.stdout).slice(-2200)+String(child.stderr).slice(-1200));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     assert.equal(String(child.stdout).split('\n').filter(l=>l.startsWith('ARENA_CHROME_WIDTH ')).length,2);
     console.log(String(child.stdout).split('\n').filter(l=>l.startsWith('ARENA_CHROME_WIDTH ')).join('\n'));return;
   }
