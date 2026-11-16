@@ -200,5 +200,18 @@
     "jobRunsRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/runs",
     "readbackRunId": "d4dade47-7044-4a87-8315-57f6bd25165d",
     "notes": "The dedicated volume has one attachment. The independent readback reported the candidate directory absent. The job history showed completed rehearsal runs only."
+  },
+  "hostedPaperLaunch": {
+    "platform": "Northflank",
+    "runId": "b1cab3ae-4362-4cb4-b09b-fcd7a8a1b025",
+    "candidateRunId": "btc-eur-paired-diag-20261116-002",
+    "statusAtVerification": "RUNNING",
+    "containerEntrypointLoggedAt": "2026-11-16T17:34:11.542Z",
+    "expectedSourceSha": "ae924141854362257738322ac9a1022cd47e0b02",
+    "externalTimeoutSeconds": 28920,
+    "manualAttempts": 1,
+    "automaticRetries": 0,
+    "evidenceRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe?runs=b1cab3ae-4362-4cb4-b09b-fcd7a8a1b025",
+    "reportStatus": "PENDING_TERMINAL_READBACK"
   }
 }
