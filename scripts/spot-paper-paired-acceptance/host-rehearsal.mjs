@@ -38,7 +38,15 @@ async function main([dataRoot, candidateRunId, ...extra]) {
     "INVALID_DATA_ROOT");
   const uid = process.getuid?.();
   assert(Number.isInteger(uid) && uid > 0, "NONROOT_RUNTIME_REQUIRED");
-  assert((await readdir(dataRoot)).length === 0, "REHEARSAL_REQUIRES_EMPTY_ROOT");
+  const entries = await readdir(dataRoot);
+  if (entries.length === 1 && entries[0] === "lost+found") {
+    const recoveryDirectory = await lstat(join(dataRoot, "lost+found"));
+    assert(recoveryDirectory.isDirectory() && !recoveryDirectory.isSymbolicLink() &&
+      recoveryDirectory.uid === 0, "UNVERIFIED_FILESYSTEM_METADATA");
+    report({status: "FILESYSTEM_METADATA_ONLY", entry: "lost+found"});
+  } else {
+    assert(entries.length === 0, "REHEARSAL_REQUIRES_EMPTY_ROOT");
+  }
 
   const runId = `${candidateRunId}-sigterm`;
   const runDirectory = join(dataRoot, candidateRunId);
