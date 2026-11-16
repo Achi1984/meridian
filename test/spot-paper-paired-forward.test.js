@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { setTimeout as sleep } from "node:timers/promises";
 import {
   createBaselineArm, createCashControlArm, createChallengerArm,
   runSpotPaperPaired as runSpotPaperPairedLive,
@@ -28,7 +29,8 @@ import { sha256 } from "../scripts/spot-paper-pilot/core.mjs";
 import { readRunJournal } from "../scripts/spot-paper-pilot/journal.mjs";
 import { createSpotPaperPairedKrakenProvider } from
   "../scripts/spot-paper-paired/feed.mjs";
-import { main as pairedHostMain } from "../scripts/spot-paper-paired/host.mjs";
+import { main as pairedHostMain, runSpotPaperPairedWithSignals } from
+  "../scripts/spot-paper-paired/host.mjs";
 import { evaluatePairedPaperEvidence } from
   "../scripts/spot-paper-paired-report/evaluate.mjs";
 
@@ -498,6 +500,44 @@ test("paired timeout keeps terminal handling when diagnostic counters throw", as
   });
   assert.equal(journal.events.some(event =>
     event.type === "shared_feed_failure" && event.reason === "DURATION_LIMIT"), true);
+});
+
+test("OS SIGTERM preserves a committed synthetic paired cycle and seals the journal", async t => {
+  const setup = await fixture(t, { maxCycles: 2, maxRequests: 4, realMonotonic: true });
+  let notifyCheckpoint;
+  const checkpointReady = new Promise(resolve => { notifyCheckpoint = resolve; });
+  const stop = new AbortController();
+  setup.config.sleep = (ms, signal) => {
+    notifyCheckpoint();
+    return sleep(ms, undefined, { signal: AbortSignal.any([signal, stop.signal]) });
+  };
+  const runDirectory = join(setup.dataRoot, setup.config.runId);
+  const journalPath = join(runDirectory, "journal.json");
+  const run = runSpotPaperPairedWithSignals(signal =>
+    runSpotPaperPairedSynthetic({ ...setup.config, signal }));
+  try {
+    await waitFor(checkpointReady, "SYNTHETIC_CHECKPOINT", 5_000);
+    const before = JSON.parse(await readFile(journalPath, "utf8")).payload;
+    assert.equal(before.checkpoint.cycle, 1);
+    process.kill(process.pid, "SIGTERM");
+    const report = await waitFor(run, "SIGTERM_SHUTDOWN", 5_000);
+    assert.equal(report.stopReason, "OPERATOR_STOP");
+    assert.equal(report.liveTrading, false);
+    assert.deepEqual(setup.order.filter(event => event === "ohlc" || event === "ticker"),
+      ["ohlc", "ticker"]);
+
+    const after = await readRunJournal({ dataRoot: setup.dataRoot, runId: setup.config.runId });
+    assert.equal(after.reconciliationStatus, "READ_ONLY_VERIFIED");
+    assert.ok(after.sequence > before.sequence);
+    assert.deepEqual(after.events.slice(0, before.sequence), before.events);
+    assert.equal(after.events.at(-1).type, "terminal");
+    assert.equal(after.events.at(-1).report.stopReason, "OPERATOR_STOP");
+    assert.equal(existsSync(join(runDirectory, "writer.lock")), false);
+    assert.equal(existsSync(join(runDirectory, "journal.pending")), false);
+  } finally {
+    stop.abort();
+    await waitFor(run, "SYNTHETIC_CLEANUP", 5_000).catch(() => {});
+  }
 });
 
 test("paired cancellation omits a failed clock diagnostic and fences late completion", async t => {
