@@ -31,10 +31,10 @@ test('exports committed nonzero fees, negative/zero PnL and bounded validated fi
   assert.equal(result.status, 'EXPORTED');
   const p = result.progress;
   assert.equal(p.classification, 'OBSERVED_CHECKPOINT');
-  assert.equal(p.schemaVersion, 'SPOT_PAPER_PAIRED_PROGRESS_V2');
-  assert.equal(p.runStartedAt, f.journal.manifest.startedAt);
-  assert.equal(p.lastSuccessfulPollAt, f.journal.events[2].ticker.receivedAt);
-  assert.equal(p.completedCycles, 2);
+  assert.equal(p.schemaVersion, PROGRESS_SCHEMA);
+  assert.equal(Object.hasOwn(p, 'runStartedAt'), false);
+  assert.equal(Object.hasOwn(p, 'lastSuccessfulPollAt'), false);
+  assert.equal(Object.hasOwn(p, 'completedCycles'), false);
   assert.deepEqual(p.terminal, {status: 'UNKNOWN', at: null});
   assert.equal(p.valuationAt, 121_000);
   assert.equal(p.exportedAt - p.valuationAt, 60_000);
@@ -53,17 +53,16 @@ test('exports committed nonzero fees, negative/zero PnL and bounded validated fi
   assert.deepEqual(await readFile(f.path), before);
   assert.equal(await readFile(join(f.runDirectory, 'writer.lock'), 'utf8'), 'not liveness');
   assert.deepEqual(validateProgress(p, f.expectedIdentity), p);
-  const {runStartedAt, lastSuccessfulPollAt, completedCycles, ...legacy} = p;
-  legacy.schemaVersion = PROGRESS_SCHEMA;
-  assert.deepEqual(validateProgress(legacy, f.expectedIdentity), legacy);
 });
 
 test('projects ticker receipt provenance and exact zero cycles without timestamp substitution', async t => {
   const f = await fixture(t);
   f.journal.events[2].ticker.receivedAt = 120_999;
   await writeFile(f.path, journalEnvelope(f.journal));
-  const observed = await exportProgress(f.options);
+  const observed = await exportProgress({...f.options, projection: 'V2'});
   assert.equal(observed.status, 'EXPORTED');
+  assert.equal(observed.progress.schemaVersion, 'SPOT_PAPER_PAIRED_PROGRESS_V2');
+  assert.equal(observed.progress.runStartedAt, f.journal.manifest.startedAt);
   assert.equal(observed.progress.lastSuccessfulPollAt, 120_999);
   assert.notEqual(observed.progress.lastSuccessfulPollAt, observed.progress.observedAt);
   assert.notEqual(observed.progress.lastSuccessfulPollAt, observed.progress.exportedAt);
@@ -72,7 +71,8 @@ test('projects ticker receipt provenance and exact zero cycles without timestamp
   f.journal.events = [f.journal.events[0]];
   f.journal.sequence = 1;
   await writeFile(f.path, journalEnvelope(f.journal));
-  const empty = await exportProgress(f.options);
+  assert.deepEqual(await exportProgress(f.options), {status: 'UNKNOWN', progress: null});
+  const empty = await exportProgress({...f.options, projection: 'V2'});
   assert.equal(empty.status, 'EXPORTED');
   assert.equal(empty.progress.classification, 'NO_OBSERVATION');
   assert.equal(empty.progress.runStartedAt, f.journal.manifest.startedAt);
@@ -100,7 +100,7 @@ test('later failure and terminal evidence never freshens last financial observat
   f.journal.events.push({id: 'paired-terminal', type: 'terminal', at: 160_000, report});
   f.journal.sequence = f.journal.events.length;
   await writeFile(f.path, journalEnvelope(f.journal));
-  const {progress, status} = await exportProgress(f.options);
+  const {progress, status} = await exportProgress({...f.options, projection: 'V2'});
   assert.equal(status, 'EXPORTED');
   assert.equal(progress.observedAt, 121_000);
   assert.equal(progress.lastSuccessfulPollAt, f.journal.events[2].ticker.receivedAt);

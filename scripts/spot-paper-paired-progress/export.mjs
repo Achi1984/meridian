@@ -3,7 +3,7 @@ import {constants} from 'node:fs';
 import {open, lstat} from 'node:fs/promises';
 import {isAbsolute, normalize} from 'node:path';
 import {
-  PROGRESS_SCHEMA_V2, ROLES, MAX_RECENT_FILLS, canonicalJson,
+  PROGRESS_SCHEMA, PROGRESS_SCHEMA_V2, ROLES, MAX_RECENT_FILLS, canonicalJson,
   validIdentity, validateProgress, exactKeys
 } from './contract.mjs';
 
@@ -22,7 +22,7 @@ function matchesIdentity(value, identity) {
     .every(key => canonicalJson(value[key]) === canonicalJson(identity[key]));
 }
 
-function projectJournal(envelope, expectedIdentity, exportedAt, check) {
+function projectJournal(envelope, expectedIdentity, exportedAt, check, projection) {
   assert(exactKeys(envelope, ['payload', 'sha256']));
   const {payload, sha256} = envelope;
   assert(payload?.schemaVersion === 'SPOT_PAPER_PILOT_JOURNAL_V1' &&
@@ -145,6 +145,7 @@ function projectJournal(envelope, expectedIdentity, exportedAt, check) {
     }
   }
   if (latest === null) {
+    assert(projection === 'V2');
     const progress = validateProgress({
       schemaVersion: PROGRESS_SCHEMA_V2, identity: expectedIdentity,
       journalSequence: payload.sequence, journalSha256: sha256,
@@ -193,11 +194,14 @@ function projectJournal(envelope, expectedIdentity, exportedAt, check) {
     };
   });
   const progress = validateProgress({
-    schemaVersion: PROGRESS_SCHEMA_V2, identity: expectedIdentity,
+    schemaVersion: projection === 'V2' ? PROGRESS_SCHEMA_V2 : PROGRESS_SCHEMA,
+    identity: expectedIdentity,
     journalSequence: payload.sequence, journalSha256: sha256,
     classification: 'OBSERVED_CHECKPOINT',
-    runStartedAt: manifest.startedAt,
-    lastSuccessfulPollAt: latest.ticker.receivedAt, completedCycles: cycles,
+    ...(projection === 'V2' ? {
+      runStartedAt: manifest.startedAt,
+      lastSuccessfulPollAt: latest.ticker.receivedAt, completedCycles: cycles
+    } : {}),
     observedAt: latest.observedAt, valuationAt: latest.effectAt,
     exportedAt, latestEventAt: latestAt, terminal,
     currency: 'EUR', monetaryUnit: 'CENTS',
@@ -213,13 +217,14 @@ function projectJournal(envelope, expectedIdentity, exportedAt, check) {
 
 export async function exportProgress({
   runDirectory, expectedIdentity, now = Date.now, timeoutMs = 3000,
-  signal, io = {open, lstat}
+  signal, io = {open, lstat}, projection = 'V1'
 } = {}) {
   if (!validIdentity(expectedIdentity) || typeof runDirectory !== 'string' ||
       !isAbsolute(runDirectory) ||
       runDirectory.length > 4096 ||
       normalize(runDirectory).split('/').filter(Boolean).length > 128 ||
-      !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 5000) {
+      !Number.isSafeInteger(timeoutMs) || timeoutMs < 1 || timeoutMs > 5000 ||
+      !['V1', 'V2'].includes(projection)) {
     return {status: 'UNKNOWN', progress: null};
   }
   const deadline = performance.now() + timeoutMs;
@@ -288,7 +293,7 @@ export async function exportProgress({
       throw new Error('BUSY');
     }
     const text = new TextDecoder('utf-8', {fatal: true}).decode(first.bytes);
-    const result = projectJournal(JSON.parse(text), expectedIdentity, now(), check);
+    const result = projectJournal(JSON.parse(text), expectedIdentity, now(), check, projection);
     check();
     return result;
   })();
