@@ -81,11 +81,20 @@ checkout in the operator environment. Set it before using the commands:
 Replace this placeholder with the actual checkout; no runner-specific path or
 working directory is assumed. Keep CHECKOUT quoted in commands.
 
-1. Establish an operator-controlled read-only mount of the entire run directory,
-   or a quiescent/coherently captured transfer. A copied journal alone without
+1. Establish a coherent read-only view of the entire run directory. For a live
+   Northflank Single Read/Write (ReadWriteOnce) volume, a second reader Job or
+   Service cannot attach while the writer pod is mounted; a read-only request
+   does not override the one-pod access mode. Northflank documents Single
+   Read/Write and Multi Read/Write modes, not a simultaneous ReadOnlyMany mode:
+   https://northflank.com/docs/v1/application/databases-and-persistence/add-a-volume
+   For live checkpoints, the supported RWO-compatible design is a separately
+   bounded observer process in the same writer Job/pod, using this read-only
+   exporter and no journal-write interface. Do not launch a second pod against
+   the active RWO volume. After writer exit and detach, a separate reader may
+   attach read-only for terminal inspection. A copied journal alone without
    its pending-state context is not evidence that an active writer acknowledged
-   the snapshot. Do not copy during pending publication. A filesystem snapshot
-   containing journal.pending is rejected. Preserve the journal envelope bytes.
+   the snapshot. Do not copy during pending publication. Preserve journal
+   envelope bytes and all evidence, including incomplete files.
 2. Independently approve the expected identity against the pinned image receipt:
    $CHECKOUT/docs/operations/receipts/btc-eur-paired-diag-20261110-001.expected-identity.json
    Do not substitute any host8h expected identity or claim that this receipt
@@ -110,6 +119,41 @@ working directory is assumed. Keep CHECKOUT quoted in commands.
      MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY_JSON=<approved JSON>
    Missing/invalid gates or overlapping credentials disable the lane.
    There is one exact run allowlist, not a caller-selectable run/query parameter.
+
+Credential ownership for a future Northflank in-job observer:
+
+  Component                 Credential/configuration
+  ------------------------  -----------------------------------------------
+  Observer process          MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_PUBLISH_TOKEN
+  Progress gateway          MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_UPLOAD_TOKEN_SHA256
+                            plus the three explicit enable/identity settings above
+  Dashboard reader          Existing MERIDIAN_READ_TOKEN_SHA256 at the gateway;
+                            users continue through the authenticated app-access flow
+  Gateway storage           Existing DATABASE_URL and TLS configuration, gateway only
+  Paper writer              No progress-upload token, dashboard token, or database URL
+
+Provision the raw progress token as a protected secret for the future Northflank
+Job, then pass it only to the observer process; the writer process environment
+must omit it. Store only its digest in the separately approved gateway secret
+configuration. Do not place database, dashboard-reader, exchange, or feed
+credentials in the observer. The browser remains a manual bounded reader, not
+the publisher or scheduler. The current dashboard expected-identity module and
+gateway allowlist must also be separately reviewed for the exact future run.
+
+First-checkpoint readback:
+
+  1. In the authenticated V11 strategy view, manually select “Paper-Checkpoint
+     manuell prüfen” and confirm an available observed checkpoint and all three
+     virtual arms. The dashboard's independently pinned expected identity must
+     match the new run.
+  2. Through the authorized GET path, compare the response identity,
+     journalSequence and journalSha256 with the expected run and the first
+     ACCEPTED publish receipt. The GET endpoint has no run-ID query parameter.
+  3. Confirm classification OBSERVED_CHECKPOINT and compare observedAt with
+     valuationAt. The API readback is the last published checkpoint, not proof
+     of current writer liveness or feed health. Do not call valuationAt,
+     observedAt, exportedAt, or a publication receipt the last successful feed
+     poll; the current contract does not expose that field.
 
 One-shot export, inspect and dry-run (no network by default)
 ----------------------------------------------------------
