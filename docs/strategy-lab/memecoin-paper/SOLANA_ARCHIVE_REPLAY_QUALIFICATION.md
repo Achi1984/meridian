@@ -12,7 +12,7 @@ The technical target is the HEDGE mint
 `wDSAqt4tEZpDAwB9XY6ejkZvMFuT1zUMjUh67txeYhf` (classic SPL Token), USDC mint
 `EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v`, and CPMM pool
 `ishEsmyWEtrSksuaFP9xC16zy1w3ujV3idWACsNyriC`. The
-[/home/runner/work/meridian/meridian/docs/strategy-lab/memecoin-paper/PUBLIC_POOL_QUALIFICATION.md](/home/runner/work/meridian/meridian/docs/strategy-lab/memecoin-paper/PUBLIC_POOL_QUALIFICATION.md)
+[existing pool qualification receipt](PUBLIC_POOL_QUALIFICATION.md)
 receipt does **not** establish a historical census endpoint pair:
 
 | Existing observation | Recorded value | Why it is not a census endpoint |
@@ -31,20 +31,28 @@ Before any census acquisition, freeze one retrospective UTC cutoff `T` and
 compute `T−60m` by exact millisecond arithmetic. Bind both cutoffs to canonical
 finalized source evidence: use the existing bounded
 `createTimeBoundarySource()` in
-`/home/runner/work/meridian/meridian/scripts/memecoin-paper/history-time-boundary-source.mjs`
+[`scripts/memecoin-paper/history-time-boundary-source.mjs`](../../../scripts/memecoin-paper/history-time-boundary-source.mjs)
 and the bridge in
-`/home/runner/work/meridian/meridian/scripts/memecoin-paper/history-window-bridge.mjs`.
-Record the requested cutoff, each source-produced slot and its actual
-`getBlockTime` value, plus the neighboring boundary points. Use a predeclared
-rule (latest produced finalized slot whose source block time is at or before
-each cutoff); retain the actual block time as `observedAt`. Do not backdate
-acquisition time, interpolate slot times, or call a slot an exact wall-clock
-cutoff when its source block time differs. Missing, regressing, or untrusted
-boundary evidence leaves the pair **UNKNOWN**. The reused boundary code itself
-requires the exact identity-bound pool proof not to postdate the requested
-window. A proof acquired after a chosen historical endpoint cannot be reused
-for it. The boundary code labels source authentication `NOT_ESTABLISHED`; an
+[`scripts/memecoin-paper/history-window-bridge.mjs`](../../../scripts/memecoin-paper/history-window-bridge.mjs).
+Record the requested UTC cutoff and its source-provided finalized slot and
+recorded `getBlockTime`. The #1181 predecessor/successor search verifies
+surrounding chain-time context; it does not relax the census endpoint contract:
+the recorded timestamp for the selected slot must exactly equal the requested
+UTC cutoff at **both** endpoints. A latest-at-or-before slot with a different
+recorded time is not `observedAt` at that cutoff, even if its predecessor and
+successor bracket it. Do not interpolate slot times, backdate acquisition
+time, or substitute a nearby slot. Until accepted canonical finalized evidence
+provides an exact matching timestamp for each endpoint, keep the endpoint pair
+and census **UNKNOWN**. A proof acquired after a chosen historical endpoint
+cannot be reused if it violates the boundary source's identity/time binding.
+The boundary code labels source authentication `NOT_ESTABLISHED`; an
 independent trust decision is still required.
+
+An eventual replay can produce **retrospective proof** about reconstructed
+historical state; it cannot establish that this evidence was available to a
+decision-maker at that earlier decision time. Keep replay/acquisition time and
+any prior decision-time evidence receipt distinct. Do not backdate a receipt or
+describe retrospective availability as contemporaneous evidence.
 
 ## OF1 evidence and candidate-specific feasibility
 
@@ -68,7 +76,7 @@ or completeness of a particular HEDGE epoch.
 | RPC and indexes | The [tagged README](https://github.com/rpcpool/yellowstone-faithful/blob/v0.7.34/README.md) lists block/transaction/history/time RPC methods and epoch indexes; GSFA is an address-to-signatures index. | No historical `getProgramAccounts`/mint-filtered census or account-state-at-slot interface is documented by this tool. An address index cannot establish token balances or complete account enumeration. |
 | GSFA key coverage | In v0.7.34, the [GSFA builder](https://github.com/rpcpool/yellowstone-faithful/blob/v0.7.34/cmd-x-index-gsfa.go) indexes static transaction message keys and appends loaded ALT keys **only for Protobuf metadata**; there is no corresponding Serde-metadata branch. `--require-tx-metadata` defaults true and missing metadata makes index creation fail; disabling it cannot prove transaction success. | Do not use GSFA as the completeness proof. Metadata format and availability for every HEDGE-interval transaction are unverified. Any missing metadata or ALT-key ambiguity is **UNKNOWN**. |
 | CPI and transaction metadata | The tagged [metadata parser](https://github.com/rpcpool/yellowstone-faithful/blob/v0.7.34/solana-tx-meta-parsers/json.go) handles `inner_instructions`, grouping CPI records under top-level instruction indexes, with program/account indexes and instruction data. This can prove the recorded invocation structure when present and correctly bound to the transaction. | It does not prove a global slot scan is complete, reconstruct resulting account state, or authenticate the source. Missing inner-instruction metadata cannot be replaced by an empty CPI list. |
-| Historical account state | The CAR is an epoch ledger archive; the inspected schema and CLI provide no authenticated account-DB snapshot for arbitrary slots. | A complete state replay from a separately authenticated opening snapshot, or from a proven mint initialization plus full subsequent ledger replay, is required. Otherwise use a full validator replay from an authenticated starting state. |
+| Historical account state | The CAR is an epoch ledger archive; the inspected schema and CLI provide no authenticated account-DB snapshot for arbitrary slots. | A full validator replay needs a trusted, runnable validator and authenticated bank/account starting state. A mint-specific reconstruction may anchor at a proven successful mint initializer, but that instruction is not an account snapshot or validator starting state; reconstruction still needs verified complete canonical transaction/account history and independently validated state-transition semantics. |
 | Exact coverage/provenance | The [published project report](https://docs.triton.one/project-yellowstone/old-faithful-historical-archive/public-report-epoch-208) is a dated report scoped to epoch 208; it is not a per-epoch proof for an unpinned 2026 HEDGE interval. The official files host and docs were not reachable from this environment during review, and no catalog or CAR was fetched. | Whether every required HEDGE epoch exists, has all canonical slots, contains complete metadata, and descends from a trusted finalized source remains **UNKNOWN**. |
 
 In particular, a normal classic-SPL transfer instruction names source and
@@ -84,11 +92,12 @@ transaction archive and useful indexes, but the inspected tool and its
 published project claims do not substantiate a bounded, independently
 verifiable HEDGE holder census. This candidate remains **UNKNOWN / NOT
 QUALIFIED**. The smallest missing inputs are (1) an owner-frozen `T` plus
-source-bound endpoint slots, (2) either an independently authenticated
-opening account-state snapshot or a proven HEDGE mint-initialization
-transaction and complete ledger coverage from it, and (3) explicit
-authorization and trust criteria for the archive/export and independent
-finalized-slot replay.
+source-bound endpoint slots with exact recorded timestamp matches, (2) either
+an authenticated bank/account starting state for full validator replay or a
+proven HEDGE mint-initialization transaction plus verified complete canonical
+history and independently validated transition semantics for mint-specific
+reconstruction, and (3) explicit authorization and trust criteria for the
+archive/export and independent finalized-slot replay.
 
 ## Conditional bounded recipe (not authorized or executed)
 
@@ -98,8 +107,11 @@ opening state and the two pinned endpoint slots—not by an unbounded
 mint-address signature query:
 
 1. **Freeze identifiers.** Record chain `mainnet-beta`, exact mint/pool/quote,
-   `T−60m`, `T`, resolved finalized slots `S0` and `S1`, source block times,
-   opening-state identifier and digest, and the decision/replay tool versions.
+   requested UTC cutoffs `T−60m` and `T`, resolved finalized slots `S0` and
+   `S1`, exact matching source block times, opening-state identifier and
+   digest, and the decision/replay tool versions. Reject the pair if either
+   recorded timestamp differs from its requested cutoff; predecessor/successor
+   points are chain-time context only.
    If opening state is the mint initializer, pin its successful transaction,
    slot, and original source evidence; otherwise the initialized state is
    **UNKNOWN**.
@@ -117,27 +129,39 @@ mint-address signature query:
    sizes before parsing. The repo documents `faithful-cli index all
    <CAR> <INDEX_DIR>` and per-epoch CARs; the published bytes and catalog
    entries for the candidate epochs are **not yet known**.
-3. **Scan and replay once.** Sequentially scan every block/transaction from
-   the opening state through the end of `S1`, not just transactions returned
-   by GSFA. Reject an epoch if its CAR/root, slot map, transaction ordering,
-   required metadata, inner-instruction records, or ALT-loaded keys cannot be
-   verified for every relevant transaction. Replay effects with an
-   independently pinned Solana validator/runtime from the authenticated
-   opening state; alternatively require a full validator replay from its
-   authenticated starting state. Compare finalized slot/block or bank-hash
-   evidence from an independent canonical source. CAR integrity alone is not
-   this comparison.
-4. **Emit two independent state checkpoints.** At the end of each exact
-   finalized endpoint slot, retain raw mint supply and every active classic-SPL
-   token-account row for the mint, including zero balances, token-account
-   address, token-account authority, and raw amount. Track creation,
-   authority changes, transfers, burns, CPI effects, and closures through
-   replay. Require unique accounts and exact `BigInt` sum of all account
-   amounts equal to raw same-slot mint supply **before** exclusions. Then
-   exclude only separately verified selected-pool vault token accounts at the
-   token-account level; keep the unexcluded raw census and excluded amounts
-   in the receipt. Closed accounts are historical replay events, not endpoint
-   rows.
+3. **Scan and reconstruct.** Sequentially scan every block/transaction from
+   the approved starting point through the end of `S1`, not just transactions
+   returned by GSFA. Reject an epoch if its CAR/root, slot map, transaction
+   ordering, required metadata, inner-instruction records, or ALT-loaded keys
+   cannot be verified for every relevant transaction. Choose exactly one
+   reconstruction route and record its distinct prerequisite:
+   - **Full validator replay:** use a trusted, runnable, pinned validator and
+     authenticated bank/account starting state. Verify slot progression and
+     compare resulting bank/state evidence against an independent canonical
+     source.
+   - **Mint-specific reconstruction:** anchor only at the proven successful
+     HEDGE mint initializer, then require verified complete canonical
+     transaction/account history for every state-changing effect and
+     independently validated transition semantics, including CPI and loaded
+     addresses. The initializer alone is not a snapshot or validator starting
+     state.
+
+   For either route, compare finalized slot/block evidence from an independent
+   canonical source. CAR integrity alone is not this comparison.
+4. **Emit two independent state checkpoints.** At each exact finalized
+   endpoint slot `S`, the census reader's contract is a context-bearing
+   historical mint-filtered `getProgramAccounts` response plus a raw mint
+   `getAccountInfo` response requested at `S`; both response context slots
+   must equal each other and exactly equal `S`. Retain raw mint supply and
+   every active classic-SPL token-account row for the mint, including zero
+   balances, token-account address, token-account authority, and raw amount.
+   Track creation, authority changes, transfers, burns, CPI effects, and
+   closures through replay. Require unique accounts and exact `BigInt` sum of
+   all account amounts equal to raw same-slot mint supply **before**
+   exclusions. Then exclude only separately verified selected-pool vault
+   token accounts at the token-account level; keep the unexcluded raw census
+   and excluded amounts in the receipt. Closed accounts are historical replay
+   events, not endpoint rows.
 5. **Checkpoint and stop.** Preserve source requests/exports, exact CAR and
    metadata bytes or immutable export references, hashes, catalogs, tool
    binaries, replay logs, slot proof, and both endpoint manifests. Stop with
@@ -165,13 +189,15 @@ Meridian interface gap.
 
 ## Observed commands and results
 
-- `git status --short --branch` → clean working tree on
-  `copilot/qualify-solana-archive-replay`.
+- `git status --short --branch` before this review amendment → clean working
+  tree on `copilot/qualify-solana-archive-replay` at submitted head `b0b8af2`.
 - `git log -5 --oneline` → branch begins at `53527cc Initial plan` over
   `d713c5a Fix PostgreSQL V2 progress migration constraints (#1396)`.
-- GitHub PR #1398 read → **OPEN**, base `main` at `d713c5a`; its raw-response
-  diagnostic is not in this checkout or on `main`. Do not duplicate it. Reuse
-  its exact-slot/hash/supply diagnostic only after it merges.
+- GitHub PR #1398 read → **OPEN, UNMERGED, BLOCKED**, base `main` at
+  `d713c5a` (head `e79f8911d22d3451a957edbc7e0a87b16e57d31d`). Its
+  raw-response diagnostic is not in this checkout or on `main`. Do not
+  duplicate it. Reuse its exact-slot/hash/supply diagnostic only after it
+  merges.
 - GitHub release/tag metadata read for `rpcpool/yellowstone-faithful`
   `v0.7.34` → tag commit `fe631879f3830447ff481cba07e54b3cea4891c6`, published
   Linux asset metadata above. No `faithful-cli` binary was downloaded or run.
