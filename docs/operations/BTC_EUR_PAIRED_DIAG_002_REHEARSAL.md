@@ -27,3 +27,49 @@ Wait for `READY_FOR_SIGTERM`, then request one graceful platform stop. Record th
 The application output provides the non-root UID, matching canonical root and target path, and successful checkpoint write and readback. Combine it with the platform volume and instance assignment for `externalEvidence.mountIdentity`. For `externalEvidence.sigtermDrill`, record before/after checkpoint digests, preservation of the already-committed event, final readback, and independently measured platform stop latency. The application timing covers its own append and readback. The platform timing supplies the preflight's `graceMs`.
 
 Local validation at UID 1000 sent an OS SIGTERM to the foreground Node process. The persisted checkpoint advanced from 1 to 2, readback was `READ_ONLY_VERIFIED`, the intended Paper directory was absent, and repeat invocation against the occupied root was refused. These local observations do not clear hosted evidence gates.
+
+## Launch handoff after hosted rehearsal
+
+Diagnostic 002 passed the hosted mount probe and a follow-up SIGTERM drill
+with 60 seconds configured on the test job. The separate readback verified
+sequence 2, a terminal event and no lock or pending file. The candidate
+receipt keeps the initial interrupted journal as historical evidence.
+
+### Exclusivity before run
+
+The Meridian project Jobs inventory showed five jobs, all manual and with
+no active run at the time of inspection. The dedicated ReadWriteOnce volume
+showed one attachment, the diagnostic-002 rehearsal job. The read-only
+replacement on that volume also reported that the real candidate directory
+was absent. These are project-scoped observations and do not populate the
+global host evidence field. Reconcile the full operational host scope and
+recheck the exact job, attachment and candidate directory immediately before
+launch. Keep competing launches fenced until readback. Confirm any scope
+or writer reported outside the Meridian project before marking CLEAR.
+
+- [Meridian job inventory](https://app.northflank.com/t/achi1984s-team/project/meridian/jobs)
+- [Dedicated volume attachment](https://app.northflank.com/t/achi1984s-team/project/meridian/volumes/meridian-btc-eur-diag-002-rehearsal/attached)
+- [Read-only replacement run](https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe?runs=d4dade47-7044-4a87-8315-57f6bd25165d)
+
+### One-shot Paper launch plan
+
+Use the immutable image in the candidate receipt and its original
+`ENTRYPOINT`. Replace the synthetic rehearsal command completely with this
+job CMD:
+
+```text
+run --data-root /evidence-root --run-id btc-eur-paired-diag-20261116-002 --account-contract BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2 --model-pair BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1
+```
+
+Use one manual attempt, zero retries, no schedule and no image-triggered runs.
+Set the external timeout to 8 h 02 min and the termination grace to 60 s.
+Verify the planned image, CMD, volume assignment and limits before submission.
+The host enforces 8 h / 480 cycles and the receipt's data and virtual-risk
+limits. The run uses a public market feed and simulated executions only.
+
+After confirmed exit, obtain a read-only terminal export without touching
+journal files or removing locks. Evaluate against the exact identity in
+the receipt. Import only a verified terminal report into the private immutable
+store, compare canonical digest on readback, and check run identity, coverage,
+net P&L and the three arms in the authenticated Meridian dashboard. Retain
+any interrupted run as interrupted and distinguish it from a full comparison.
