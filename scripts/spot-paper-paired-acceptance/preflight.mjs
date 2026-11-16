@@ -8,9 +8,11 @@
  * record. No registry/provider/host query is performed here.
  */
 import { readFile } from "node:fs/promises";
+import { posix } from "node:path";
 
 const SHA256 = /^sha256:[a-f0-9]{64}$/;
 const SOURCE_SHA = /^[a-f0-9]{40}$/;
+const RUN_ID = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/;
 const REGISTRY_DIGEST = /^(?:[a-z0-9]+(?:[._-][a-z0-9]+)*\/)?[a-z0-9]+(?:[._/-][a-z0-9]+)*@sha256:[a-f0-9]{64}$/;
 const RFC3339 = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.\d{1,9})?(Z|[+-]\d{2}:\d{2})$/;
 
@@ -41,8 +43,10 @@ function validTimestamp(value) {
   return Number.isFinite(Date.parse(value));
 }
 
-function absolutePath(value) {
-  return nonEmptyString(value) && value.startsWith("/") && !value.includes("\0");
+function canonicalAbsolutePath(value) {
+  return typeof value === "string" && posix.isAbsolute(value) &&
+    !value.includes("\0") && posix.normalize(value) === value &&
+    (value === "/" || !value.endsWith("/"));
 }
 
 function validRuntimeUid(value) {
@@ -80,7 +84,8 @@ export function validatePairedPreflight(receipt, { expectedSourceSha } = {}) {
 
   const runId = identity.runId;
   const candidateRunId = receipt?.candidateRunId;
-  const validRunBinding = nonEmptyString(runId) && nonEmptyString(candidateRunId) && runId === candidateRunId;
+  const validRunBinding = typeof candidateRunId === "string" && RUN_ID.test(candidateRunId) &&
+    runId === candidateRunId;
   const accountIds = Array.isArray(models) ? models.map(model => model?.accountId) : [];
   const expectedIds = ["baseline", "challenger", "cash"].map(role => `${runId}-${role}`);
   const unique = accountIds.length === 3 && new Set(accountIds).size === accountIds.length;
@@ -101,9 +106,9 @@ export function validatePairedPreflight(receipt, { expectedSourceSha } = {}) {
     "independent host-side evidence must state a global CLEAR for this run and identify verifier, reference, and observation time"));
 
   const mount = evidence.mountIdentity;
-  const mountPathBinding = absolutePath(mount?.dataRoot) && absolutePath(mount?.runDirectory) &&
-    absolutePath(mount?.realpath) && mount.realpath === mount.dataRoot &&
-    mount.runDirectory.startsWith(`${mount.dataRoot}/`);
+  const mountPathBinding = validRunBinding && canonicalAbsolutePath(mount?.dataRoot) &&
+    mount.realpath === mount.dataRoot &&
+    mount.runDirectory === posix.join(mount.dataRoot, candidateRunId);
   checks.push(check("mount-identity-evidence",
     mount?.schemaVersion === "MERIDIAN_MOUNT_IDENTITY_EVIDENCE_V1" &&
     mount?.result === "CLEAR" && mountPathBinding &&
