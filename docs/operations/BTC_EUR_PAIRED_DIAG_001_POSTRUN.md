@@ -39,19 +39,20 @@ and 10 bp slippage per side. This is a single paper observation with
 
 ## Dashboard handoff
 
-This receipt stores aggregate observations. The immutable paired-report
-ingester expects the full evaluator DTO and the separately pinned exact-run
-identity. The raw-export hash above is distinct from the canonical ingester
-digest. The DTO was evaluated inside Northflank and was not retained as a
-file for ingestion. There is no ingestion or authenticated dashboard
-readback receipt for this run.
+On 2026-11-16 the full evaluator DTO was transferred privately and inserted
+into the immutable report store. The dry run and database readback matched on
+run ID, canonical content, and this ingester digest:
 
-Retrieve the complete validated DTO through a private transfer from the
-retained evidence, dry-run the ingester with the exact identity, and retain
-its run ID and digest. An operator can then approve a single immutable
-insert and compare the resulting authenticated readback with the dry run.
-Use the sequence in the [finalization runbook](../strategy-lab/paired-finalization/RUNBOOK.md)
-with the exact identity above; that runbook's example targets a different run.
+`b6edebbbc18bcf909a851a3630153d82e2e8802e99b376c28a1e1d5a4aaa8831`
+
+The digest covers the report envelope. The host-export SHA-256 above covers
+the raw export. [PR #1380](https://github.com/Achi1984/meridian/pull/1380)
+added a targeted fallback for the interrupted `btc-eur-trend-host-8h-002`
+selection when its final row is missing. The production gateway returned
+HTTP 200 and `VERIFIED_COMPLETE` for diagnostic 001 in the authorized handler
+check. The authenticated Meridian V11 strategy view displayed diagnostic 001
+and all three comparison arms under **Gepaarter Paper-Vergleich**. It reported
+479 completed cycles and 7 h 59 min 30 s of common data coverage.
 
 ## Follow-up paper test
 
