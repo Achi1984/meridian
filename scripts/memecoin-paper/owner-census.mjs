@@ -308,10 +308,7 @@ function parseRpcResponse(bytes) {
   } catch {
     fail("INVALID_JSON");
   }
-  const id = payload?.id;
-  const validId = id === null || typeof id === "string" || Number.isFinite(id);
-  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || !validId ||
-      (expectedId !== undefined && id !== expectedId) ||
+  if (!isRecord(payload) || payload.jsonrpc !== "2.0" || payload.id !== 1 ||
       Object.hasOwn(payload, "error") || !isRecord(payload.result) ||
       !isRecord(payload.result.context) || !Array.isArray(payload.result.value)) {
     fail("INVALID_RPC_RESPONSE");
