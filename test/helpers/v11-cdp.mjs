@@ -40,6 +40,11 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
  const startupWorkDeadline=startupDeadline-STARTUP_CLEANUP_MS;
  let dir,child,startupReady=false,childGroupStopped=false;
  let ws;const pending=new Map();let seq=0;
+ const releaseStartupChild=()=>{
+  child?.stderr?.destroy();
+  child?.unref();
+  child=undefined;
+ };
  const removeProfileWithinDeadline=async(profile,deadline)=>{
   if(!profile||performance.now()>=deadline)return false;
   let remover,result;
@@ -144,7 +149,7 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
     if(!await cleanupStartupAttempt(startupWorkDeadline)){
      throw Error(firstTimeout.message.slice(0,-1)+'; recovery=ABORTED_CLEANUP]');
     }
-    child=undefined;dir=undefined;
+    releaseStartupChild();dir=undefined;
     if(performance.now()>=startupWorkDeadline){
      throw Error(firstTimeout.message.slice(0,-1)+'; recovery=STARTUP_BUDGET_EXHAUSTED]');
     }
@@ -207,6 +212,9 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
     if(error?.code==='ESRCH')childGroupStopped=true;
    }
    await sleep(100);if(dir)rmSync(dir,{recursive:true,force:true});
-  }else if(dir)await cleanupStartupAttempt(startupDeadline);
+  }else if(dir){
+   try{await cleanupStartupAttempt(startupDeadline);}
+   finally{releaseStartupChild();}
+  }
  }
 }
