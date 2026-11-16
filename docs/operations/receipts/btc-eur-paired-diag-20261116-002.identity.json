@@ -101,7 +101,43 @@
       "observedAt": "2026-11-10T18:04:00.329Z"
     },
     "hostGlobalExclusivity": null,
-    "mountIdentity": null,
+    "mountIdentity": {
+      "schemaVersion": "MERIDIAN_MOUNT_IDENTITY_EVIDENCE_V1",
+      "result": "CLEAR",
+      "dataRoot": "/evidence-root",
+      "realpath": "/evidence-root",
+      "runDirectory": "/evidence-root/btc-eur-paired-diag-20261116-002",
+      "runDirectoryExistedBeforeStart": false,
+      "volumeId": "meridian-btc-eur-diag-002-rehearsal",
+      "instanceId": "meridian-btc-eur-diag-002-rehearsal-6afb336f7726c1507e683czkdq9",
+      "runtimeUser": {
+        "uid": 1000
+      },
+      "writable": true,
+      "readback": true,
+      "evidenceRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe/logs?runs=10402a2a-e63e-4146-99e9-0f09a80edf9f",
+      "verifier": "Northflank run log and dedicated ReadWriteOnce volume assignment cross-checked by operator",
+      "observedAt": "2026-11-16T16:46:51.731Z"
+    },
     "sigtermDrill": null
+  },
+  "hostedRehearsal": {
+    "result": "TERMINAL_CHECKPOINT_NOT_COMMITTED",
+    "rootEntry": "lost+found",
+    "manualRunId": "10402a2a-e63e-4146-99e9-0f09a80edf9f",
+    "stopRequestedAt": "2026-11-16T16:47:39.064Z",
+    "platformProcessTerminatedAt": "2026-11-16T16:47:40.087Z",
+    "platformStopSignalDeliveryVerified": false,
+    "readbackRunId": "af6053ea-ea66-4dfb-a0c1-0983ac4f2fbb",
+    "readbackRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe/logs?runs=af6053ea-ea66-4dfb-a0c1-0983ac4f2fbb",
+    "readback": {
+      "status": "WRITER_LOCK_PRESENT",
+      "sequence": 1,
+      "terminal": false,
+      "lock": true,
+      "pending": true,
+      "reconciliation": "UNKNOWN_PENDING_PUBLICATION",
+      "candidateDirectoryPresent": false
+    }
   }
 }
