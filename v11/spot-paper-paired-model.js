@@ -320,4 +320,102 @@ export function presentSpotPaperPairedReport(input, {
   };
 }
 
+function comparisonContract(report) {
+  const identity = report.identity;
+  const assumptions = report.assumptions;
+  if (!identity.modelPairId ||
+      !identity.models.every((model, index) =>
+        model.role === ARM_DEFINITIONS[index].id)) {
+    return {compatible: false, reason: 'STRATEGY_CONTRACT_NOT_VERIFIED'};
+  }
+  const accounts = [
+    assumptions.accountContractId,
+    assumptions.accountContractVersion,
+    assumptions.accountTier,
+    assumptions.accountingEngine
+  ];
+  if (accounts.some(value => value === undefined || value === null)) {
+    return {compatible: false, reason: 'ACCOUNT_CONTRACT_NOT_VERIFIED'};
+  }
+  if (assumptions.ratesVerified !== false || !assumptions.feeBasis ||
+      !assumptions.feeSource || !assumptions.feeAsOf) {
+    return {compatible: false, reason: 'COST_CONTRACT_NOT_VERIFIED'};
+  }
+  return {
+    compatible: true,
+    key: JSON.stringify({
+      pair: identity.pair,
+      modelPairId: identity.modelPairId,
+      models: identity.models.map(({role, modelId}) => ({role, modelId})),
+      accounts,
+      costs: [
+        assumptions.feeBasis,
+        assumptions.feeSource,
+        assumptions.feeAsOf,
+        assumptions.feeBpsPerSide,
+        assumptions.slippageBpsPerSide
+      ]
+    })
+  };
+}
+
+function comparisonRun(input, label) {
+  const report = projectSpotPaperPairedDashboard(input);
+  if (!report || report.evidenceStatus !== 'VERIFIED_COMPLETE') return null;
+  return {
+    label,
+    runId: report.identity.runId,
+    syntheticFixture: report.syntheticFixture,
+    valuationAt: report.timing.valuationAt,
+    valuationAtLabel: timestamp(report.timing.valuationAt),
+    runStoppedAt: report.timing.runStoppedAt,
+    runStoppedAtLabel: timestamp(report.timing.runStoppedAt),
+    observedCoverageMs: report.timing.observedCoverageMs,
+    observedCoverageLabel: elapsed(report.timing.observedCoverageMs),
+    completedCycles: report.timing.completedCycles,
+    arms: ARM_DEFINITIONS.map(({id, label: armLabel}) => {
+      const arm = report.arms[id];
+      return {
+        role: id,
+        label: armLabel,
+        fillCount: arm.fillCount,
+        bookedFeesCents: arm.bookedFeesCents,
+        modeledSlippageCents: arm.modeledSlippageCents,
+        netPnlCents: arm.netPnlCents,
+        sampledDrawdownCents: arm.sampledDrawdownCents
+      };
+    })
+  };
+}
+
+export function presentSpotPaperPairedComparison(firstInput, secondInput,
+  {firstLabel = 'Paper 001', secondLabel = 'Paper 002'} = {}) {
+  const first = comparisonRun(firstInput, firstLabel);
+  const second = comparisonRun(secondInput, secondLabel);
+  if (!first || !second) {
+    return {
+      available: false,
+      reason: 'VERIFIED_REPORTS_REQUIRED',
+      runs: [first, second]
+    };
+  }
+  const firstContract = comparisonContract(projectSpotPaperPairedDashboard(firstInput));
+  const secondContract = comparisonContract(projectSpotPaperPairedDashboard(secondInput));
+  if (!firstContract.compatible || !secondContract.compatible) {
+    return {
+      available: false,
+      reason: !firstContract.compatible ? firstContract.reason : secondContract.reason,
+      runs: [first, second]
+    };
+  }
+  if (firstContract.key !== secondContract.key) {
+    return {
+      available: false,
+      reason: 'SEMANTIC_CONTRACT_MISMATCH',
+      runs: [first, second]
+    };
+  }
+  return {available: true, reason: null, runs: [first, second]};
+}
+
 export {ARM_DEFINITIONS, MONEY_FIELDS, COUNT_FIELDS, formatCents};

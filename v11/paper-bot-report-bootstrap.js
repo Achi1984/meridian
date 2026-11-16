@@ -5,7 +5,8 @@ import {SPOT_PAPER_REPORT_ENDPOINT} from './spot-paper-cockpit-controller.js?v=B
 import {createSpotPaperReportConnector} from './spot-paper-report-connector.js?v=B16-M11-FIX16';
 import {
   createSpotPaperPairedReportConnector,
-  SPOT_PAPER_PAIRED_REPORT_ENDPOINT
+  SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
+  SPOT_PAPER_PAIRED_REPORT_SELECTIONS
 } from './spot-paper-paired-report-connector.js?v=B16-M11-FIX16';
 import {
   createSpotPaperPairedProgressConnector,
@@ -39,6 +40,16 @@ const pairedMessages = Object.freeze({
   unsupported_identity: 'Die neue Trend-Identität ist bis zum kanonischen #1319-Vertrag nicht unterstützt.',
   rejected: 'Der gepaarte Bericht konnte nicht validiert werden.',
   unavailable: 'Der gepaarte Bericht ist derzeit nicht verfügbar.'
+});
+const selectionMessages = Object.freeze({
+  ready: 'Zwei Paper-Läufe auswählen; der Vergleich liest nur diese freigegebenen IDs.',
+  loading: 'Die ausgewählten Paper-Berichte werden authentifiziert gelesen.',
+  available: 'Beide ausgewählten Berichte sind verfügbar; Kompatibilität wird separat geprüft.',
+  not_found: 'Ein ausgewählter Bericht ist nicht veröffentlicht oder nicht freigegeben.',
+  authentication_failed: 'Authentifizierung fehlgeschlagen. Bitte App-Zugang erneut öffnen.',
+  unavailable: 'Die ausgewählten Berichte sind derzeit nicht verfügbar.',
+  different_runs_required: 'Für einen Fenstervergleich müssen zwei verschiedene Läufe ausgewählt sein.',
+  selection_changed: 'Auswahl geändert; ältere Antworten werden verworfen.'
 });
 const progressMessages = Object.freeze({
   locked: 'Gesperrt. Vor dem Abruf den App-Zugang öffnen.',
@@ -145,6 +156,30 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
   pairedStateNode.setAttribute('role', 'status');
   pairedStateNode.setAttribute('aria-live', 'polite');
   pairedStateNode.setAttribute('aria-atomic', 'true');
+  const firstRun = document.createElement('select');
+  firstRun.setAttribute('aria-label', 'Erster Paper-Lauf');
+  const secondRun = document.createElement('select');
+  secondRun.setAttribute('aria-label', 'Zweiter Paper-Lauf');
+  for (const selection of SPOT_PAPER_PAIRED_REPORT_SELECTIONS) {
+    for (const select of [firstRun, secondRun]) {
+      const option = document.createElement('option');
+      option.value = selection.runId;
+      option.textContent = `${selection.label} · ${selection.runId}`;
+      select.append(option);
+    }
+  }
+  firstRun.value = SPOT_PAPER_PAIRED_REPORT_SELECTIONS[0].runId;
+  secondRun.value = SPOT_PAPER_PAIRED_REPORT_SELECTIONS[1].runId;
+  pairedControls.append(firstRun, secondRun);
+  const compareRuns = node(document, pairedControls, 'button',
+    'Ausgewählte Paper-Läufe vergleichen');
+  compareRuns.type = 'button';
+  compareRuns.setAttribute('style', 'min-height:44px;max-width:100%;white-space:normal');
+  const selectionStateNode = node(document, pairedControls, 'p',
+    selectionMessages.ready);
+  selectionStateNode.setAttribute('role', 'status');
+  selectionStateNode.setAttribute('aria-live', 'polite');
+  selectionStateNode.setAttribute('aria-atomic', 'true');
   pairedRoot.parentNode?.insertBefore(pairedControls, pairedRoot);
   const progressRefresh = node(document, pairedControls, 'button',
     'Paper-Checkpoint manuell prüfen');
@@ -178,6 +213,12 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
   let requestOwner = null;
   let pairedRequestOwner = null;
   let progressRequestOwner = null;
+  let comparisonReports = null;
+  let comparisonState = 'ready';
+  let comparisonGeneration = 0;
+  let comparisonRequestOwner = null;
+  let comparisonConnectors = [];
+  let comparisonReading = false;
   let authenticationFailed = false;
 
   function render() {
@@ -187,10 +228,16 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     refresh.setAttribute('aria-busy', String(reading));
     pairedRefresh.disabled = !enabled || !active || !access.isUnlocked() || pairedReading;
     pairedRefresh.setAttribute('aria-busy', String(pairedReading));
+    compareRuns.disabled = !enabled || !active || !access.isUnlocked() || comparisonReading;
+    compareRuns.setAttribute('aria-busy', String(comparisonReading));
+    firstRun.disabled = !active || !access.isUnlocked();
+    secondRun.disabled = !active || !access.isUnlocked();
     progressRefresh.disabled = !enabled || !progressEnabled || !active || !access.isUnlocked() ||
       progressReading;
     progressRefresh.setAttribute('aria-busy', String(progressReading));
     pairedStateNode.textContent = pairedMessages[pairedState] || pairedMessages.unavailable;
+    selectionStateNode.textContent = selectionMessages[comparisonState] ||
+      selectionMessages.unavailable;
     progressStateNode.textContent = progressMessages[progressState] ||
       progressMessages.unavailable;
     overview.update(report ? [sourceAdapter(report)] : [], pairedReport,
@@ -207,12 +254,13 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     paired.render(pairedReport, pairedState, progressSnapshot ?
       {...progressSnapshot, status: checkpointStatus} :
       {status: checkpointStatus, progress: null, ageMs: null},
-    progressExpectedIdentity);
+    progressExpectedIdentity, comparisonReports);
   }
 
   function clearPrivate() {
     generation++;
     pairedGeneration++;
+    comparisonGeneration++;
     progressGeneration++;
     reading = false;
     pairedReading = false;
@@ -223,6 +271,13 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     requestOwner = null;
     pairedRequestOwner = null;
     progressRequestOwner = null;
+    comparisonRequestOwner = null;
+    comparisonReading = false;
+    comparisonReports = null;
+    comparisonState = 'ready';
+    for (const reader of comparisonConnectors) reader.dispose();
+    comparisonConnectors = [];
+    paired.setComparisonReports(null);
     if (connector && !connector.isDisposed()) connector.dispose();
     if (pairedConnector && !pairedConnector.isDisposed()) pairedConnector.dispose();
     if (progressConnector && !progressConnector.isDisposed()) progressConnector.dispose();
@@ -247,6 +302,11 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
       !signal?.aborted && !disposed && active && access.isUnlocked() &&
       access.getToken() === owner.token;
   }
+  function ownsComparisonRequest(owner, signal) {
+    return owner !== null && owner.generation === comparisonGeneration &&
+      !signal?.aborted && !disposed && active && access.isUnlocked() &&
+      access.getToken() === owner.token;
+  }
   function ownsProgressRequest(owner, signal) {
     return owner !== null && owner.generation === progressGeneration &&
       !signal?.aborted && !disposed && active && access.isUnlocked() &&
@@ -254,10 +314,12 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
   }
 
   function transportFor(endpoint, getOwner, owns) {
-    return ({signal}) => {
+    return ({signal, runId = null}) => {
       const owner = getOwner();
       if (!owns(owner, signal)) return Promise.resolve(new Response(null, {status: 503}));
-      return fetchImpl(endpoint, {
+      const target = runId === null ? endpoint :
+        `${endpoint}?runId=${encodeURIComponent(runId)}`;
+      return fetchImpl(target, {
         method: 'GET',
         headers: {accept: 'application/json', authorization: 'Bearer ' + owner.token},
         cache: 'no-store',
@@ -393,6 +455,102 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     }
   }
 
+  function invalidateComparison() {
+    comparisonGeneration++;
+    comparisonRequestOwner = null;
+    comparisonReading = false;
+    comparisonReports = null;
+    comparisonState = 'selection_changed';
+    for (const reader of comparisonConnectors) reader.dispose();
+    comparisonConnectors = [];
+    render();
+  }
+
+  async function readComparison() {
+    if (disposed || !active) return;
+    if (!enabled) {
+      comparisonState = 'unavailable';
+      comparisonReports = null;
+      render();
+      return;
+    }
+    if (!access.isUnlocked() || !access.getToken()) {
+      comparisonState = 'authentication_failed';
+      comparisonReports = null;
+      render();
+      return;
+    }
+    const selectedIds = [firstRun.value, secondRun.value];
+    if (selectedIds[0] === selectedIds[1]) {
+      comparisonState = 'different_runs_required';
+      comparisonReports = null;
+      render();
+      return;
+    }
+    if (selectedIds.some(runId => !SPOT_PAPER_PAIRED_REPORT_SELECTIONS.some(
+      selection => selection.runId === runId))) {
+      comparisonState = 'unavailable';
+      comparisonReports = null;
+      render();
+      return;
+    }
+    comparisonGeneration++;
+    for (const reader of comparisonConnectors) reader.dispose();
+    comparisonConnectors = [];
+    const owner = {generation: comparisonGeneration, token: access.getToken()};
+    comparisonRequestOwner = owner;
+    comparisonReading = true;
+    comparisonReports = null;
+    comparisonState = 'loading';
+    render();
+    const readers = selectedIds.map(() => createPairedConnector({
+      enabled,
+      transport: transportFor(SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
+        () => comparisonRequestOwner, ownsComparisonRequest)
+    }));
+    comparisonConnectors = readers;
+    try {
+      const results = await Promise.all(readers.map((reader, index) =>
+        reader.read(selectedIds[index])));
+      if (!ownsComparisonRequest(owner) || !access.isUnlocked()) return;
+      comparisonReading = false;
+      if (results.some(result => result.status === 'AUTH_REQUIRED')) {
+        authenticationFailed = true;
+        access.lock();
+        return;
+      }
+      const selected = selectedIds.map((runId, index) => ({
+        runId,
+        report: results[index].status === 'AVAILABLE' ? results[index].report : null,
+        status: results[index].status
+      }));
+      comparisonReports = {
+        first: selected[0].report,
+        second: selected[1].report,
+        firstLabel: SPOT_PAPER_PAIRED_REPORT_SELECTIONS.find(
+          item => item.runId === selected[0].runId).label,
+        secondLabel: SPOT_PAPER_PAIRED_REPORT_SELECTIONS.find(
+          item => item.runId === selected[1].runId).label
+      };
+      comparisonState = results.every(result => result.status === 'AVAILABLE') ?
+        'available' : results.some(result => result.status === 'NOT_FOUND') ?
+          'not_found' : 'unavailable';
+      render();
+    } catch {
+      if (!ownsComparisonRequest(owner)) return;
+      comparisonReading = false;
+      comparisonReports = null;
+      comparisonState = 'unavailable';
+      render();
+    } finally {
+      if (comparisonRequestOwner === owner) comparisonRequestOwner = null;
+      if (owner.generation === comparisonGeneration) {
+        for (const reader of comparisonConnectors) reader.dispose();
+        comparisonConnectors = [];
+      }
+    }
+  }
+
   async function readProgress() {
     if (disposed || !active) return;
     if (!enabled || !progressEnabled) {
@@ -457,9 +615,14 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
 
   const onClick = () => { void read(); };
   const onPairedClick = () => { void readPaired(); };
+  const onCompareClick = () => { void readComparison(); };
+  const onSelectionChange = () => invalidateComparison();
   const onProgressClick = () => { void readProgress(); };
   refresh.addEventListener('click', onClick);
   pairedRefresh.addEventListener('click', onPairedClick);
+  compareRuns.addEventListener('click', onCompareClick);
+  firstRun.addEventListener('change', onSelectionChange);
+  secondRun.addEventListener('change', onSelectionChange);
   progressRefresh.addEventListener('click', onProgressClick);
   const unregister = access.registerReader(clearPrivate);
   const unsubscribe = access.subscribe(change => {
@@ -500,6 +663,7 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
     },
     refresh: read,
     refreshPaired: readPaired,
+    comparePairedRuns: readComparison,
     refreshProgress: readProgress,
     dispose() {
       if (disposed) return;
@@ -510,9 +674,13 @@ export function mountPaperBotReportWorkspace(overviewRoot, pairedRoot, document,
       unsubscribe();
       refresh.removeEventListener('click', onClick);
       pairedRefresh.removeEventListener('click', onPairedClick);
+      compareRuns.removeEventListener('click', onCompareClick);
+      firstRun.removeEventListener('change', onSelectionChange);
+      secondRun.removeEventListener('change', onSelectionChange);
       progressRefresh.removeEventListener('click', onProgressClick);
       connector?.dispose();
       pairedConnector?.dispose();
+      for (const reader of comparisonConnectors) reader.dispose();
       progressConnector?.dispose();
       overview.dispose();
       paired.dispose();

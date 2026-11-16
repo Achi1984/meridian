@@ -13,7 +13,10 @@ import {
   SPOT_PAPER_PAIRED_NEXT_RUN_MODELS,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
 } from '../scripts/spot-paper-paired-report/contract.mjs';
-import {presentSpotPaperPairedReport} from '../v11/spot-paper-paired-model.js';
+import {
+  presentSpotPaperPairedComparison,
+  presentSpotPaperPairedReport
+} from '../v11/spot-paper-paired-model.js';
 import {mountSpotPaperPairedPanel} from '../v11/spot-paper-paired-controller.js';
 import {renderSpotPaperPaired} from '../v11/spot-paper-paired-view.js';
 
@@ -353,6 +356,63 @@ test('challenger identity and validated trend diagnostic survive presentation', 
   assert.match(root.textContent, new RegExp(SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR));
   assert.match(root.textContent, /0\/5 abgeschlossene Rundreisen/);
   assert.match(root.textContent, /Profitabilität: NOT_ASSESSED/);
+});
+
+test('cross-run comparison retains original metrics but requires verified semantic contracts', () => {
+  const first = trendDto();
+  first.identity.runId = 'synthetic-paper-001';
+  first.evidenceStatus = 'VERIFIED_COMPLETE';
+  first.assumptions = {
+    feeBpsPerSide: 20,
+    slippageBpsPerSide: 10,
+    ratesVerified: false,
+    accountContractId: 'BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2',
+    accountContractVersion: 2,
+    feeBasis: 'EEA_SPOT_ONLY_TAKER_ASSUMPTION',
+    feeSource: 'https://www.okx.com/en-eu/help/important-notice-upcoming-spot-fee-adjustment-eea',
+    feeAsOf: '2026-11-09',
+    accountTier: 'UNKNOWN',
+    accountingEngine: 'PAIRED_FEE_SCENARIO_LEDGER_V1'
+  };
+  const second = structuredClone(first);
+  second.identity.runId = 'synthetic-paper-002';
+  second.identity.configSha256 = '9'.repeat(64);
+  second.timing.valuationAt += 86_400_000;
+  const model = presentSpotPaperPairedComparison(first, second, {
+    firstLabel: 'Paper 001',
+    secondLabel: 'Paper 002'
+  });
+  assert.equal(model.available, true);
+  assert.equal(model.reason, null);
+  assert.deepEqual(model.runs.map(run => run.runId),
+    ['synthetic-paper-001', 'synthetic-paper-002']);
+  assert.notEqual(model.runs[0].valuationAt, model.runs[1].valuationAt);
+  assert.equal(model.runs[0].arms[0].bookedFeesCents,
+    first.arms.baseline.bookedFeesCents);
+
+  const {root, document} = harness();
+  renderSpotPaperPaired(root, first, document, {
+    comparison: model
+  });
+  assert.match(root.textContent, /Offline-Vergleich ausgewählter Paper-Läufe/);
+  assert.match(root.textContent, /Semantische Strategie-, Konto- und Kostenverträge stimmen überein/);
+  assert.match(root.textContent, /Kostenraten bleiben unverifizierte Modellannahmen/);
+  assert.match(root.textContent, /Paper 001 · synthetic-paper-001/);
+  assert.match(root.textContent, /Paper 002 · synthetic-paper-002/);
+  assert.match(root.textContent, /SYNTHETIC FIXTURE/);
+  assert.match(root.textContent, /Simulierte Fills/);
+  assert.match(root.textContent, /Stichproben-Drawdown/);
+  assert.match(root.textContent, /08\.11\.2026, 20:59:59 \(Europe\/Wien\)/);
+  assert.doesNotMatch(root.textContent, /Challenger minus Baseline.*Offline/);
+
+  const incompatible = dto({evidenceStatus: 'VERIFIED_COMPLETE'});
+  const disabled = presentSpotPaperPairedComparison(first, incompatible);
+  assert.equal(disabled.available, false);
+  assert.equal(disabled.reason, 'STRATEGY_CONTRACT_NOT_VERIFIED');
+
+  const missing = presentSpotPaperPairedComparison(first, null);
+  assert.equal(missing.available, false);
+  assert.equal(missing.reason, 'VERIFIED_REPORTS_REQUIRED');
 });
 
 test('panel source has no implicit network, timer, storage, or HTML injection paths', () => {

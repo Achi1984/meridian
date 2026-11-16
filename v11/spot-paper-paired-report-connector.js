@@ -9,6 +9,10 @@ export const SPOT_PAPER_PAIRED_REPORT_TIMEOUT_MS = 8_000;
 export const SPOT_PAPER_PAIRED_REPORT_MAX_BYTES = 256 * 1024;
 export const SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA =
   'SPOT_PAPER_PAIRED_REPORT_ENVELOPE_V1';
+export const SPOT_PAPER_PAIRED_REPORT_SELECTIONS = Object.freeze([
+  Object.freeze({runId: 'btc-eur-paired-diag-20261110-001', label: 'Paper 001'}),
+  Object.freeze({runId: 'btc-eur-trend-host-8h-002', label: 'Paper 002'})
+]);
 
 const record = value => value !== null && typeof value === 'object' &&
   !Array.isArray(value);
@@ -129,9 +133,13 @@ export function createSpotPaperPairedReportConnector({
   let active = null;
   let disposed = false;
 
-  function read() {
+  function read(runId = null) {
     if (disposed) return Promise.resolve(outcome('DISPOSED'));
     if (!enabled) return Promise.resolve(outcome('TRANSPORT_UNAVAILABLE'));
+    if (runId !== null && !SPOT_PAPER_PAIRED_REPORT_SELECTIONS.some(
+      selection => selection.runId === runId)) {
+      return Promise.resolve(outcome('INVALID_SELECTION'));
+    }
     if (active) return Promise.resolve(outcome('BUSY'));
     const controller = new AbortController();
     const work = {controller, returned: false, settled: false, resolveDisposed: null};
@@ -140,8 +148,13 @@ export function createSpotPaperPairedReportConnector({
       work.settled = true;
       if (work.returned && active === work) active = null;
     };
-    const source = Promise.resolve().then(() => transport({signal: controller.signal}));
-    const projected = source.then(response => readResponse(response, controller.signal),
+    const source = Promise.resolve().then(() =>
+      transport({signal: controller.signal, runId}));
+    const projected = source.then(response =>
+      readResponse(response, controller.signal).then(result =>
+        runId !== null && result.status === 'AVAILABLE' &&
+            result.report.identity.runId !== runId ?
+          outcome('IDENTITY_MISMATCH', null, 'SELECTED_RUN_ID_MISMATCH') : result),
       error => outcome(controller.signal.aborted ? 'ABORTED' : 'UNAVAILABLE',
         null, error?.message || null));
     projected.then(release, release);

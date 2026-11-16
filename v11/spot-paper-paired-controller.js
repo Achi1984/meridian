@@ -1,4 +1,6 @@
 import {renderSpotPaperPaired} from './spot-paper-paired-view.js?v=B16-M11-FIX16';
+import {presentSpotPaperPairedComparison} from
+  './spot-paper-paired-model.js?v=B16-M11-FIX16';
 
 export function mountSpotPaperPairedPanel(root, {
   dto = null,
@@ -14,21 +16,29 @@ export function mountSpotPaperPairedPanel(root, {
   let currentExpectedIdentity = expectedIdentity;
   let currentLoading = loading === true;
   let currentState = state;
+  let currentComparisonReports = null;
   let disposed = false;
 
   function render(nextDto = currentDto, nextState = currentState,
     nextProgressSnapshot = currentProgressSnapshot,
-    nextExpectedIdentity = currentExpectedIdentity) {
+    nextExpectedIdentity = currentExpectedIdentity,
+    nextComparisonReports = currentComparisonReports) {
     if (disposed) return null;
     currentDto = nextDto;
     currentState = nextState;
     currentProgressSnapshot = nextProgressSnapshot;
     currentExpectedIdentity = nextExpectedIdentity;
+    currentComparisonReports = nextComparisonReports;
     return renderSpotPaperPaired(root, currentDto, document, {
       loading: currentLoading,
       state: currentState,
       progressSnapshot: currentProgressSnapshot,
-      expectedIdentity: currentExpectedIdentity
+      expectedIdentity: currentExpectedIdentity,
+      comparison: currentComparisonReports ? presentSpotPaperPairedComparison(
+        currentComparisonReports.first, currentComparisonReports.second, {
+          firstLabel: currentComparisonReports.firstLabel,
+          secondLabel: currentComparisonReports.secondLabel
+        }) : null
     });
   }
 
@@ -38,6 +48,11 @@ export function mountSpotPaperPairedPanel(root, {
     setLoading(value) {
       if (disposed) return;
       currentLoading = value === true;
+      render();
+    },
+    setComparisonReports(value) {
+      if (disposed) return;
+      currentComparisonReports = value;
       render();
     },
     dispose() {
