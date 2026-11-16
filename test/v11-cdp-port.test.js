@@ -8,7 +8,7 @@ const source=readFileSync(new URL('./helpers/v11-cdp.mjs',import.meta.url),'utf8
  .replace(/^import .*;\n/gm,'')
  .replace('export async function withMobileChrome','async function withMobileChrome');
 
-async function startup(values,{exitCode=null,signalCode=null,stderr=[],spawnError=null,syncSpawnError=null,pid=spawnError?undefined:123,stderrError=false}={}){
+async function startup(values,{exitCode=null,signalCode=null,finalSleepState=null,stderr=[],spawnError=null,syncSpawnError=null,pid=spawnError?undefined:123,stderrError=false}={}){
  const calls={reads:0,exists:0,sleeps:[],fetches:[],kills:[],removed:[],spawnOptions:null,maxRetained:0};
  const events={};
  const child={pid,exitCode,signalCode,on:(name,fn)=>{events[name]=fn;},stderr:{on:(name,fn)=>{
@@ -33,7 +33,11 @@ async function startup(values,{exitCode=null,signalCode=null,stderr=[],spawnErro
  // Substitute only the sleep dependency so exhaustion can be tested without time.
  const runnable=source.replace('const sleep=ms=>new Promise(r=>setTimeout(r,ms));',
   'const sleep=async ms=>recordSleep(ms);');
- sandbox.recordSleep=ms=>{calls.sleeps.push(ms);if(ms===50&&spawnError)events.error(spawnError);};
+ sandbox.recordSleep=ms=>{
+  calls.sleeps.push(ms);
+  if(ms===50&&spawnError)events.error(spawnError);
+  if(ms===50&&calls.sleeps.length===200&&finalSleepState)Object.assign(child,finalSleepState);
+ };
  const run=runInNewContext(runnable+'\nwithMobileChrome;',sandbox);
  let error;
  try{await run('synthetic-chrome',320,'about:blank',()=>{});}catch(e){error=e;}
@@ -89,6 +93,20 @@ test('child termination by signal is reported without exposing process output',a
  assert.deepEqual(calls.fetches,[]);
  assert.deepEqual(calls.sleeps,[100]);
 });
+
+for(const [state,diagnostic] of [[{signalCode:'SIGKILL'},'Chrome terminated by signal'],
+ [{exitCode:7},'Chrome exited 7']]){
+ test(diagnostic+' during the final polling sleep is reported and cleans up',async()=>{
+  const {calls,error}=await startup([undefined],{finalSleepState:state});
+  assert.equal(error.message,diagnostic+' [UNKNOWN]');
+  assert.equal(calls.exists,200);
+  assert.equal(calls.reads,0);
+  assert.deepEqual(calls.sleeps,[...Array(200).fill(50),100]);
+  assert.deepEqual(calls.fetches,[]);
+  assert.deepEqual(calls.kills,[[-123,'SIGKILL']]);
+  assert.equal(JSON.stringify(calls.removed),JSON.stringify([['/synthetic/profile',{recursive:true,force:true}]]));
+ });
+}
 
 test('startup stderr yields only fixed matched categories and preserves exhaustion',async()=>{
  const cases=[['pthread_create: Resource temporarily unavailable (11)','RESOURCE_UNAVAILABLE'],
