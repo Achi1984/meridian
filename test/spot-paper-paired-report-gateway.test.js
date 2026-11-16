@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import {createHash} from 'node:crypto';
 import {readFile} from 'node:fs/promises';
 import {test} from 'node:test';
+import {SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY as diagnosticIdentity}
+  from '../v11/spot-paper-paired-progress-config.js';
 import {createPrivateReportStore} from '../private-report-store.mjs';
 import {
   handleSpotPaperPairedReportGatewayRequest,
@@ -32,16 +34,16 @@ const canonical = value => {
   return `{${Object.keys(value).sort().map(key =>
     `${JSON.stringify(key)}:${canonical(value[key])}`).join(',')}}`;
 };
-const envelope = report => ({
+const envelope = (report, expected = identity) => ({
   schema: SPOT_PAPER_PAIRED_REPORT_ENVELOPE_SCHEMA,
-  runId: identity.runId,
+  runId: expected.runId,
   report
 });
-const row = report => {
-  const value = envelope(report);
+const row = (report, expected = identity) => {
+  const value = envelope(report, expected);
   return {
-    run_id: identity.runId,
-    config_hash: identity.configSha256,
+    run_id: expected.runId,
+    config_hash: expected.configSha256,
     content_sha256: hash(canonical(value)),
     envelope: value
   };
@@ -161,4 +163,63 @@ test('paired table migration is private and enforces bounded rows', async () => 
     connect() {},
     query() {}
   }, {tableName: 'meridian_spot_paper_unreviewed_reports'}), /invalid private report table/);
+});
+
+test('interrupted selection falls back only to the verified diagnostic report', async () => {
+  const interrupted = {...syntheticExpectedPairedIdentity({modelPair: true}),
+    runId: 'btc-eur-trend-host-8h-002'};
+  const fallbackEnv = {...env(),
+    MERIDIAN_SPOT_PAPER_PAIRED_REPORT_EXPECTED_IDENTITY_JSON: JSON.stringify(interrupted)};
+  const options = {config: spotPaperPairedReportGatewayConfig(fallbackEnv)};
+  const diagnostic = syntheticPairedDashboard(diagnosticIdentity);
+  diagnostic.evidenceStatus = 'VERIFIED_COMPLETE';
+  diagnostic.syntheticFixture = false;
+  diagnostic.timing.actualElapsedMs = 60_000;
+  diagnostic.trendActivityDiagnostic = {
+    schemaVersion: 'BTC_EUR_5M_TREND_ACTIVITY_DIAGNOSTIC_V1',
+    status: 'PARTIAL_COVERAGE',
+    completedRoundTripCount: 0,
+    requiredCompletedRoundTrips: 5,
+    observedCoverageMs: 60_000,
+    requiredCoverageMs: 86_400_000,
+    completeWindow: false,
+    forcedTrades: false,
+    deadlineExtensionAllowed: false,
+    profitability: 'NOT_ASSESSED'
+  };
+  const published = row(diagnostic, diagnosticIdentity);
+  const selected = row(syntheticPairedDashboard(interrupted), interrupted);
+  const calls = [];
+  const lookup = (primary, fallback, req = request(), config = options.config) =>
+    get(req, {config, getStore: () => ({get: async (id, {signal}) => {
+      calls.push({id, signal});
+      if (id !== interrupted.runId) return fallback;
+      if (primary instanceof Error) throw primary;
+      return primary;
+    }})});
+
+  const result = await lookup(null, published);
+  assert.equal(result.status, 200);
+  assert.equal(result.body.runId, diagnosticIdentity.runId);
+  assert.equal(result.body.report.evidenceStatus, 'VERIFIED_COMPLETE');
+  assert.deepEqual(calls.map(({id}) => id), [interrupted.runId, diagnosticIdentity.runId]);
+  assert.equal(calls[0].signal, calls[1].signal);
+
+  calls.length = 0;
+  assert.equal((await lookup(selected, published)).body.runId, interrupted.runId);
+  assert.equal((await lookup({...selected, content_sha256: '0'.repeat(64)}, published)).status, 503);
+  assert.equal((await lookup(new Error('unavailable'), published)).status, 503);
+  assert.deepEqual(calls.map(({id}) => id), Array(3).fill(interrupted.runId));
+
+  assert.equal((await lookup(null, null)).status, 404);
+  assert.equal((await lookup(null, {...published, config_hash: '0'.repeat(64)})).status, 409);
+  assert.equal((await lookup(null, row({...diagnostic, syntheticFixture: true}, diagnosticIdentity))).status, 422);
+  assert.equal((await lookup(null, row({...diagnostic, evidenceStatus: 'RUNNING_SNAPSHOT'}, diagnosticIdentity))).status, 422);
+
+  calls.length = 0;
+  assert.equal((await lookup(null, published, request('GET', undefined, 'wrong'))).status, 401);
+  assert.equal((await lookup(null, published, request(), {
+    ...options.config, enabled: false
+  })).status, 503);
+  assert.deepEqual(calls, []);
 });
