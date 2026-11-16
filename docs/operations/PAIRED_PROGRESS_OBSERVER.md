@@ -21,32 +21,45 @@ live observer. See [Northflank: Add a persistent volume](https://northflank.com/
 The diagnostic-002 rehearsal in [#1382](https://github.com/Achi1984/meridian/pull/1382)
 also verified sequential replacement readback, not concurrent live attachment.
 
-For a future launch that needs live checkpoints, keep the writer and observer
-inside the **same one-shot Northflank job/pod** so the RWO volume has only one
-pod attachment. A reviewed supervisor in that pod starts the writer and a
-separate observer process with independent bounded lifecycles. The observer
-uses the existing exporter, which opens journal files read-only and never
-changes the journal, pending marker, lock, account, or strategy state. It is an
-application-level read-only boundary, not a second RWO attachment or a
-ReadOnlyMany volume mode. Do not start a second job against the live volume.
-For a stronger platform-enforced read-only boundary, separately qualify a
-read-only mount for that job/container or select a new, separately approved
-shared-storage/snapshot design; neither is established for Paper 002.
+For a future launch that needs live checkpoints, the candidate design is an
+observer sidecar/container in the **same one-shot Northflank job/pod** so the
+RWO volume has only one pod attachment. The observer mounts that volume
+read-only and runs the existing bounded exporter in its own lifecycle; it
+never changes the journal, pending marker, lock, account, or strategy state.
+The RWO documentation establishes single-pod attachment, but does not by
+itself establish Northflank support for this exact multi-container job,
+container-specific mount mode, or isolation configuration. Verify those
+capabilities against the target job/API before treating this as launchable.
+Do not substitute a second job against the live volume.
 
-The writer process must not receive the uploader token. The supervisor passes
-the raw token only in the observer process environment, omitting it from the
-writer process environment. The observer process is bounded by an absolute
-UTC end time and a finite tick cap; it exits after a terminal journal record or
-on its bound. It has no retry/restart policy, and a publication failure must
-not affect the writer or its exit handling. This requires a separately reviewed
-future image/entrypoint and launch configuration; it is not an instruction to
-change the active Paper 002 job.
+Environment filtering between two processes is **not credential isolation**
+when both run under the same UID/container: the writer may be able to inspect
+the observer's process environment or secret. The raw uploader token must be
+available only in the observer container through an observer-only secret
+mount, with a distinct runtime UID, isolated PID/process namespace, no shared
+process namespace, and no `CAP_SYS_PTRACE` (or equivalent process-inspection
+authority) for the writer. Configure the observer container to omit the token
+from the writer's environment and mounts. Validate the effective user,
+mounts, capabilities, and process visibility in an offline rehearsal before
+any future launch. If Northflank cannot provide and verify this boundary, do
+not use the same-UID process-only design or expose the token to the writer;
+the blocker is unavailable per-container secret/process isolation. The
+supported alternative is to defer live publishing and use sequential
+post-exit readback, or separately approve a distinct publisher service fed by
+a coherent supported transfer (not a concurrent RWO attachment).
+
+The observer lifecycle is bounded by an absolute UTC end time and a finite tick
+cap; it exits after a terminal journal record or on its bound. It has no
+retry/restart policy, and a publication failure must not affect the writer or
+its exit handling. This requires a separately reviewed future image/entrypoint
+and launch configuration; it is not an instruction to change the active Paper
+002 job.
 
 ## Credential ownership and provisioning
 
 | Component | Credential/configuration | Provisioning location and boundary |
 | --- | --- | --- |
-| Observer process | Raw `MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_PUBLISH_TOKEN` | New, distinct Northflank job secret; pass only to the observer process. Never bake into the image, arguments, logs, or writer environment. |
+| Observer container | Raw `MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_PUBLISH_TOKEN` | New Northflank secret mounted only in the isolated observer container. Require a distinct UID/PID namespace, no shared process namespace, and no writer ptrace/process-inspection access. Never bake into the image, arguments, logs, or writer environment. |
 | Progress gateway | `MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_UPLOAD_TOKEN_SHA256` plus `MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_ENABLED=true`, `MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_DEPLOYMENT_VERIFIED=true`, and exact `MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_EXPECTED_IDENTITY_JSON` | Separately approved Meridian gateway deployment configuration. Store only the hash at the gateway; exact run identity allowlist is not caller-selectable. |
 | Dashboard read API | Existing `MERIDIAN_READ_TOKEN_SHA256` (or its existing secret-management input before startup hashing) | Existing Meridian gateway secret configuration; this remains independent of the upload token. Dashboard users use the existing authenticated app-access flow. |
 | Gateway storage | Existing private report/progress database configuration (`DATABASE_URL`) | Gateway service secret configuration only. It is never provided to the observer. |

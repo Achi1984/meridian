@@ -124,7 +124,7 @@ Credential ownership for a future Northflank in-job observer:
 
   Component                 Credential/configuration
   ------------------------  -----------------------------------------------
-  Observer process          MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_PUBLISH_TOKEN
+  Observer container       MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_PUBLISH_TOKEN
   Progress gateway          MERIDIAN_SPOT_PAPER_PAIRED_PROGRESS_UPLOAD_TOKEN_SHA256
                             plus the three explicit enable/identity settings above
   Dashboard reader          Existing MERIDIAN_READ_TOKEN_SHA256 at the gateway;
@@ -132,13 +132,23 @@ Credential ownership for a future Northflank in-job observer:
   Gateway storage           Existing DATABASE_URL and TLS configuration, gateway only
   Paper writer              No progress-upload token, dashboard token, or database URL
 
-Provision the raw progress token as a protected secret for the future Northflank
-Job, then pass it only to the observer process; the writer process environment
-must omit it. Store only its digest in the separately approved gateway secret
-configuration. Do not place database, dashboard-reader, exchange, or feed
-credentials in the observer. The browser remains a manual bounded reader, not
-the publisher or scheduler. The current dashboard expected-identity module and
-gateway allowlist must also be separately reviewed for the exact future run.
+Provision the raw progress token as a protected secret mounted only in the
+future observer container. Do not treat different environment variables as
+isolation when writer and observer are processes under the same UID/container:
+the writer may inspect the observer's environment or secret. Require a distinct
+runtime UID, an isolated PID/process namespace (not a shared process namespace),
+no `CAP_SYS_PTRACE` or equivalent writer inspection authority, and an
+observer-only secret mount. Verify effective UID, mounts, capabilities, and
+process visibility in an offline rehearsal before any launch. Northflank's RWO
+single-pod rule does not establish support for this multi-container/credential
+isolation configuration. If the platform cannot provide it, do not expose the
+token to the writer; defer to sequential post-exit readback or separately
+approve a publisher service using a coherent supported transfer. Store only
+the token digest in the separately approved gateway secret configuration. Do
+not place database, dashboard-reader, exchange, or feed credentials in the
+observer. The browser remains a manual bounded reader, not the publisher or
+scheduler. The current dashboard expected-identity module and gateway
+allowlist must also be separately reviewed for the exact future run.
 
 First-checkpoint readback:
 

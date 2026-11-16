@@ -46,49 +46,63 @@ readback is available in this preparation.
    concurrently. This is a sequential RWO replacement, as rehearsed in #1382.
 3. Use a private local staging directory and an operator-authenticated
    Northflank CLI. Keep CLI credentials outside the Job and shell command
-   arguments. The reader's custom command can capture the structural status
-   and terminal export in its temporary filesystem without printing the
-   private export to logs:
+   arguments. The reader's custom command captures structural status, terminal
+   export, and optional archive outputs in its temporary filesystem without
+   printing the private export to logs. Leave the host package command's
+   internal retrieval hold disabled; the shell writes the exit and final ready
+   markers first, then holds the reader open for one bounded download window on
+   either outcome:
 
    ```sh
    umask 077
+   OUT_DIR=/tmp
    node /app/scripts/spot-paper-paired/host.mjs status \
      --data-root /evidence-root \
      --run-id btc-eur-paired-diag-20261116-002 \
-     > /tmp/paired-002-status.json \
-     2> /tmp/paired-002-status.stderr
-   printf '%s\n' "$?" > /tmp/paired-002-status.exit
+     > "$OUT_DIR/paired-002-status.json" \
+     2> "$OUT_DIR/paired-002-status.stderr"
+   status_exit=$?
+   printf '%s\n' "$status_exit" > "$OUT_DIR/paired-002-status.exit"
    node /app/scripts/spot-paper-paired/host.mjs export \
      --data-root /evidence-root \
      --run-id btc-eur-paired-diag-20261116-002 \
-     > /tmp/paired-002-export.json \
-     2> /tmp/paired-002-export.stderr
-   printf '%s\n' "$?" > /tmp/paired-002-export.exit
+     > "$OUT_DIR/paired-002-export.json" \
+     2> "$OUT_DIR/paired-002-export.stderr"
+   export_exit=$?
+   printf '%s\n' "$export_exit" > "$OUT_DIR/paired-002-export.exit"
    node /app/scripts/spot-paper-paired/host.mjs package \
      --data-root /evidence-root \
      --run-id btc-eur-paired-diag-20261116-002 \
-     --archive /tmp/btc-eur-paired-diag-20261116-002.tar \
-     --manifest /tmp/btc-eur-paired-diag-20261116-002.manifest.json \
-     --retrieval-window-ms 300000 \
-     > /tmp/paired-002-package.json \
-     2> /tmp/paired-002-package.stderr
+     --archive "$OUT_DIR/btc-eur-paired-diag-20261116-002.tar" \
+     --manifest "$OUT_DIR/btc-eur-paired-diag-20261116-002.manifest.json" \
+     > "$OUT_DIR/paired-002-package.json" \
+     2> "$OUT_DIR/paired-002-package.stderr"
    package_exit=$?
-   printf '%s\n' "$package_exit" > /tmp/paired-002-package.exit
-   if [ "$package_exit" -ne 0 ]; then sleep 300; fi
+   printf '%s\n' "$package_exit" > "$OUT_DIR/paired-002-package.exit"
+   if [ "$package_exit" -eq 0 ]; then
+     ready=PACKAGE_READY
+   else
+     ready=PACKAGE_FAILED
+   fi
+   printf '%s\n' "$ready" > "$OUT_DIR/paired-002-reader.ready.tmp"
+   mv "$OUT_DIR/paired-002-reader.ready.tmp" "$OUT_DIR/paired-002-reader.ready"
+   sleep 300
    ```
 
-   Run this as a reviewed custom `/bin/sh -c` command in the reader Job. The
-   package command waits for the five-minute native download window when it
-   succeeds; it intentionally refuses a lock or pending publication. If it
-   fails, the shell still waits so the status/export and error metadata can be
-   downloaded. Do not use `set -e` to hide or discard an export failure:
+   Run this as a reviewed custom `/bin/sh -c` command in the reader Job with a
+   platform execution limit of at least **420 seconds** (and higher if startup
+   or scheduling needs more): allow up to 60 seconds for the bounded package
+   operation, then the 300-second retrieval hold, plus startup/exit margin.
+   The package command intentionally refuses a lock or pending publication;
+   the `PACKAGE_FAILED` path still writes its markers and waits the same
+   bounded retrieval window. Do not use `set -e` to hide or discard failures:
    retain every exit status, stderr file, and output in the private staging
    area. A nonzero export exit, invalid JSON, writer lock, pending publication,
    `INCOMPLETE_UNKNOWN`, or a reconciliation status other than
    `READ_ONLY_VERIFIED` is not a verified terminal export.
-4. Download both files from the exact reader Job and instance into separate
-   empty local directories. Substitute only operator-selected IDs and private
-   staging paths:
+4. Wait for the final ready marker from the exact reader Job and instance before
+   downloading any artifacts. Use a private local staging directory; poll for
+   at most 240 seconds so the 300-second reader hold leaves time to download:
 
    ```sh
    set -euo pipefail
@@ -97,6 +111,28 @@ readback is available in this preparation.
    : "${READER_INSTANCE_NAME:?set the exact reader instance name}"
    stage="$(mktemp -d)"
    mkdir "$stage/status" "$stage/export" "$stage/metadata"
+   ready_attempt=0
+   ready_file=
+   while [ "$ready_attempt" -lt 48 ]; do
+     probe="$stage/ready-probe-$ready_attempt"
+     mkdir "$probe"
+     if northflank download job file \
+       --projectId meridian \
+       --jobId "$READER_JOB_ID" \
+       --instanceName "$READER_INSTANCE_NAME" \
+       --remotePath /tmp/paired-002-reader.ready \
+       --localPath "$probe" &&
+       [ -f "$probe/paired-002-reader.ready" ]; then
+       ready_file="$probe/paired-002-reader.ready"
+       break
+     fi
+     ready_attempt=$((ready_attempt + 1))
+     sleep 5
+   done
+   test -n "$ready_file"
+   ready_status="$(cat "$ready_file")"
+   case "$ready_status" in PACKAGE_READY|PACKAGE_FAILED) ;; *) exit 1 ;; esac
+
    northflank download job file \
      --projectId meridian \
      --jobId "$READER_JOB_ID" \
@@ -119,7 +155,8 @@ readback is available in this preparation.
        --remotePath "/tmp/$file" \
        --localPath "$stage/metadata"
    done
-   if [ "$(cat "$stage/metadata/paired-002-package.exit")" = 0 ]; then
+   if [ "$ready_status" = PACKAGE_READY ] &&
+     [ "$(cat "$stage/metadata/paired-002-package.exit")" = 0 ]; then
      mkdir "$stage/archive" "$stage/manifest"
      northflank download job file \
        --projectId meridian \
@@ -189,9 +226,9 @@ non-quiescent run. If it fails, do not retry it against a locked/pending run;
 preserve incomplete evidence on the original volume instead of trying to
 repair, clean, rename, or restart it.
 
-When package exit is zero, the command above downloads the archive and manifest
-using the exact reader Job/instance identifiers into separate empty
-directories. Compare the archive
+When the ready marker says `PACKAGE_READY` and the package exit is zero, the
+command above downloads the archive and manifest using the exact reader
+Job/instance identifiers into separate empty directories. Compare the archive
 SHA-256 with `archiveSha256` from that package result, then validate every
 manifest path, member type, size, and hash before extraction. Follow the
 bounded TAR/manifest validation sequence in
@@ -275,3 +312,12 @@ node --test \
   test/spot-paper-paired-report-gateway.test.js \
   test/v11-paper-bot-report-bootstrap.test.js
 ```
+
+The reader artifact/ready-marker/download ordering was also exercised locally
+with stubbed host commands and a stub `northflank download`, using an 8-second
+test hold instead of the operational 300 seconds. Both `PACKAGE_READY` and
+`PACKAGE_FAILED` paths wrote their exit and final ready markers; the success
+path made archive and manifest available, and every required status/export/
+package/marker file was downloaded while the stub reader process was still
+alive. No provider, active Paper job, volume, credential, or production service
+was accessed.
