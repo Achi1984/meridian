@@ -51,6 +51,13 @@ or writer reported outside the Meridian project before marking CLEAR.
 - [Dedicated volume attachment](https://app.northflank.com/t/achi1984s-team/project/meridian/volumes/meridian-btc-eur-diag-002-rehearsal/attached)
 - [Read-only replacement run](https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe?runs=d4dade47-7044-4a87-8315-57f6bd25165d)
 
+The team-wide Projects view showed a single project, Meridian. Its
+Services inventory listed `achi-meridian`, `meridian-paired-paper-build`
+and `meridian-paper-observer`. This establishes the visible Northflank
+inventory. It does not establish whether any other operator-managed host
+is assigned this run identity. Leave `hostGlobalExclusivity` unpopulated
+until that operational scope is reconciled.
+
 ### One-shot Paper launch plan
 
 Use the immutable image in the candidate receipt and its original
