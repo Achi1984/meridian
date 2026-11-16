@@ -3,8 +3,13 @@ import {spawn} from 'node:child_process';
 import {existsSync,readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
+import {performance} from 'node:perf_hooks';
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const STARTUP_STDERR_BYTES=4096;
+const STARTUP_WINDOW_MS=10_000;
+const STARTUP_BUDGET_MS=25_000;
+const STARTUP_CLEANUP_MS=1_000;
+const PROFILE_REMOVAL_SCRIPT='require("node:fs").rmSync(process.argv[1],{recursive:true,force:true})';
 function spawnCategory(code){
  if(['EAGAIN','ENOMEM','EMFILE','ENFILE'].includes(code))return 'RESOURCE_UNAVAILABLE';
  if(code==='ENOENT')return 'EXECUTABLE_UNAVAILABLE';
@@ -21,15 +26,55 @@ function stderrCategory(bytes){
  return 'UNKNOWN';
 }
 export async function withMobileChrome(chrome,width,url,probe,height=844,beforeNavigate){
- const dir=mkdtempSync(join(tmpdir(),'v11-cdp-'));
- let child,spawnFailure,collectingStartup=true,stderrReadFailed=false,startupStderr=Buffer.alloc(0);
+ const startupDeadline=performance.now()+STARTUP_BUDGET_MS;
+ const startupWorkDeadline=startupDeadline-STARTUP_CLEANUP_MS;
+ let dir,child,startupReady=false;
  let ws;const pending=new Map();let seq=0;
- const startupError=(prefix,details='')=>Error(prefix+' ['+(spawnFailure||
-  (startupStderr.length?stderrCategory(startupStderr):stderrReadFailed?'STDERR_UNAVAILABLE':'UNKNOWN'))+
-  (details?'; '+details:'')+']');
- const childExitError=()=>child.exitCode!==null?startupError('Chrome exited '+child.exitCode):
-  child.signalCode!=null?startupError('Chrome terminated by signal'):null;
- try{
+ const removeProfileWithinDeadline=async(profile,deadline)=>{
+  if(!profile||performance.now()>=deadline)return false;
+  let remover,result;
+  try{
+   remover=spawn(process.execPath,['-e',PROFILE_REMOVAL_SCRIPT,profile],{stdio:'ignore'});
+   remover.on('error',()=>{if(result===undefined)result=false;});
+   remover.on('exit',code=>{if(result===undefined)result=code===0;});
+  }catch{return false;}
+  while(result===undefined&&performance.now()<deadline){
+   const remaining=deadline-performance.now();
+   if(remaining>0)await sleep(Math.min(25,remaining));
+  }
+  if(result===true)return true;
+  try{if(Number.isInteger(remover.pid)&&remover.pid>0)process.kill(remover.pid,'SIGKILL');}catch{}
+  remover.unref?.();
+  return false;
+ };
+ const cleanupStartupAttempt=async(deadline)=>{
+  const pid=child?.pid;
+  let stopped=false;
+  if(Number.isInteger(pid)&&pid>0){
+   try{process.kill(-pid,'SIGKILL');}
+   catch(error){if(error?.code==='ESRCH')stopped=true;}
+   if(!stopped){
+    const cleanupDeadline=Math.min(deadline,performance.now()+STARTUP_CLEANUP_MS);
+    while(performance.now()<cleanupDeadline){
+     try{process.kill(-pid,0);}
+     catch(error){if(error?.code==='ESRCH')stopped=true;break;}
+     const remaining=cleanupDeadline-performance.now();
+     if(remaining>0)await sleep(Math.min(25,remaining));
+    }
+   }
+  }
+  const removed=dir?await removeProfileWithinDeadline(dir,deadline):true;
+  return stopped&&removed;
+ };
+ const launchAndDiscover=async(attemptDeadline)=>{
+  let spawnFailure,collectingStartup=true,stderrReadFailed=false,startupStderr=Buffer.alloc(0);
+  const startupError=(prefix,details='')=>{
+   const category=spawnFailure||(startupStderr.length?stderrCategory(startupStderr):
+    stderrReadFailed?'STDERR_UNAVAILABLE':'UNKNOWN');
+   return Error(prefix+' ['+category+(details?'; '+details:'')+']');
+  };
+  const childExitError=()=>child.exitCode!==null?startupError('Chrome exited '+child.exitCode):
+   child.signalCode!=null?startupError('Chrome terminated by signal'):null;
   try{
    child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
     '--remote-debugging-port=0','--user-data-dir='+dir,'about:blank'],{stdio:['ignore','ignore','pipe'],detached:true});
@@ -42,8 +87,8 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
    if(remaining>0)startupStderr=Buffer.concat([startupStderr,chunk.subarray(0,remaining)]);
   });
   let port,portFileState='MISSING',startupPolls=0;
-  for(let i=0;i<200;i++){
-   startupPolls=i+1;
+  for(;startupPolls<200&&performance.now()<attemptDeadline;){
+   startupPolls++;
    if(spawnFailure)throw startupError('Chrome spawn failed');
    const exitError=childExitError();if(exitError)throw exitError;
    const f=join(dir,'DevToolsActivePort');
@@ -53,13 +98,50 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
     if(Number.isInteger(candidate)&&candidate>=1&&candidate<=65535){port=candidate;break;}
     portFileState=contents.length===0?'EMPTY':contents.includes('\n')?'INVALID':'INCOMPLETE';
    }
-   await sleep(50);
+   const remaining=attemptDeadline-performance.now();
+   if(remaining>0)await sleep(Math.min(50,remaining));
   }
   if(spawnFailure)throw startupError('Chrome spawn failed');
   const exitError=childExitError();if(exitError)throw exitError;
-  if(!port)throw startupError('Chrome DevTools startup timeout',
-   'phase=PORT_DISCOVERY; port='+portFileState+'; polls='+startupPolls+'; child=RUNNING');
+  if(!port){
+   const category=spawnFailure||(startupStderr.length?stderrCategory(startupStderr):
+    stderrReadFailed?'STDERR_UNAVAILABLE':'UNKNOWN');
+   const details='phase=PORT_DISCOVERY; port='+portFileState+'; polls='+startupPolls+'; child=RUNNING';
+   const error=startupError('Chrome DevTools startup timeout',details);
+   error.code='CDP_PORT_DISCOVERY_TIMEOUT';
+   error.startupDiagnostic=category+'; '+details;
+   throw error;
+  }
   collectingStartup=false;startupStderr=Buffer.alloc(0);
+  return port;
+ };
+ try{
+  dir=mkdtempSync(join(tmpdir(),'v11-cdp-'));
+  let port,firstTimeout;
+  for(let attempt=0;attempt<2;attempt++){
+   const attemptDeadline=Math.min(startupWorkDeadline,performance.now()+STARTUP_WINDOW_MS);
+   try{
+    port=await launchAndDiscover(attemptDeadline);
+    if(firstTimeout)console.info('Chrome DevTools startup recovered [attempt=2; phase=PORT_DISCOVERY; recovery=ONE_RETRY]');
+    break;
+   }catch(error){
+    if(error?.code!=='CDP_PORT_DISCOVERY_TIMEOUT')throw error;
+    if(firstTimeout){
+     throw Error('Chrome DevTools startup timeout [attempts=2; first={'+firstTimeout.startupDiagnostic+
+      '}; second={'+error.startupDiagnostic+'}]');
+    }
+    firstTimeout=error;
+    if(!await cleanupStartupAttempt(startupWorkDeadline)){
+     throw Error(firstTimeout.message.slice(0,-1)+'; recovery=ABORTED_CLEANUP]');
+    }
+    child=undefined;dir=undefined;
+    if(performance.now()>=startupWorkDeadline){
+     throw Error(firstTimeout.message.slice(0,-1)+'; recovery=STARTUP_BUDGET_EXHAUSTED]');
+    }
+    dir=mkdtempSync(join(tmpdir(),'v11-cdp-'));
+   }
+  }
+  startupReady=true;
   const targets=await(await fetch('http://127.0.0.1:'+port+'/json/list',{signal:AbortSignal.timeout(5000)})).json();
   const page=targets.find(x=>x.type==='page');if(!page)throw Error('No Chrome page target');
   if(typeof WebSocket!=='function')throw Error('Node WebSocket unavailable; run Node with --experimental-websocket');
@@ -108,10 +190,11 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
   if(r.exceptionDetails)throw Error('CDP probe exception '+JSON.stringify(r.exceptionDetails));
   return r.result?.value;
  }finally{
-  collectingStartup=false;startupStderr=Buffer.alloc(0);
   if(ws)ws.close();
   for(const p of pending.values()){clearTimeout(p.timer);p.reject(Error('CDP closed'));}
-  try{if(Number.isInteger(child?.pid)&&child.pid>0)process.kill(-child.pid,'SIGKILL');}catch{}
-  await sleep(100);rmSync(dir,{recursive:true,force:true});
+  if(startupReady){
+   try{if(Number.isInteger(child?.pid)&&child.pid>0)process.kill(-child.pid,'SIGKILL');}catch{}
+   await sleep(100);if(dir)rmSync(dir,{recursive:true,force:true});
+  }else if(dir)await cleanupStartupAttempt(startupDeadline);
  }
 }
