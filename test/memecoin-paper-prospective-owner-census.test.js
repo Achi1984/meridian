@@ -591,8 +591,8 @@ test("failed acquisition never publishes; partial storage writes and readback fa
   assert.equal(failedReadback.reason, "PROSPECTIVE_READBACK_FAILED");
 });
 
-function receipt(value, slot) {
-  const bytes = Buffer.from(JSON.stringify(rpc(value, slot)));
+function receipt(value, slot, id = 1) {
+  const bytes = Buffer.from(JSON.stringify({...rpc(value, slot), id}));
   return {bytes, sha256: hash(bytes)};
 }
 
@@ -617,6 +617,24 @@ test("exact historical slot reconciles raw supply without admitting data", async
   assert.equal(result.coverage.complete, false);
   assert.equal(result.executionAuthorized, false);
   assert.equal(Object.hasOwn(result, "observedAt"), false);
+});
+
+test("historical responses accept external IDs while live capture requires its own ID", async () => {
+  const valid = await diagnoseHistoricalOwnerCensus({
+    ...input(), accounts: receipt([token()], 100, 2),
+    mint: receipt(mint(), 100, "historical-mint")
+  });
+  assert.equal(valid.diagnostic.supplyReconciled, true);
+
+  const invalid = await diagnoseHistoricalOwnerCensus({
+    ...input(), accounts: receipt([token()], 100, {})
+  });
+  assert.equal(invalid.reason, "INVALID_RPC_RESPONSE");
+
+  const prospective = await capture(offline({
+    responseFor: () => new Response(JSON.stringify({...rpc([token()]), id: 2}))
+  }));
+  assert.equal(prospective.reason, "INVALID_RPC_RESPONSE");
 });
 
 test("both responses must match the requested historical slot", async () => {
