@@ -7,7 +7,7 @@ import {join} from 'node:path';
 import {execFileSync} from 'node:child_process';
 import {exportProgress, MAX_JOURNAL_BYTES} from
   '../scripts/spot-paper-paired-progress/export.mjs';
-import {validateProgress, validIdentity, canonicalJson} from
+import {PROGRESS_SCHEMA, validateProgress, validIdentity, canonicalJson} from
   '../scripts/spot-paper-paired-progress/contract.mjs';
 import {progressJournalFixture, journalEnvelope} from
   './helpers/spot-paper-paired-progress-fixture.mjs';
@@ -31,6 +31,10 @@ test('exports committed nonzero fees, negative/zero PnL and bounded validated fi
   assert.equal(result.status, 'EXPORTED');
   const p = result.progress;
   assert.equal(p.classification, 'OBSERVED_CHECKPOINT');
+  assert.equal(p.schemaVersion, PROGRESS_SCHEMA);
+  assert.equal(Object.hasOwn(p, 'runStartedAt'), false);
+  assert.equal(Object.hasOwn(p, 'lastSuccessfulPollAt'), false);
+  assert.equal(Object.hasOwn(p, 'completedCycles'), false);
   assert.deepEqual(p.terminal, {status: 'UNKNOWN', at: null});
   assert.equal(p.valuationAt, 121_000);
   assert.equal(p.exportedAt - p.valuationAt, 60_000);
@@ -51,6 +55,42 @@ test('exports committed nonzero fees, negative/zero PnL and bounded validated fi
   assert.deepEqual(validateProgress(p, f.expectedIdentity), p);
 });
 
+test('projects ticker receipt provenance and exact zero cycles without timestamp substitution', async t => {
+  const f = await fixture(t);
+  f.journal.events[2].ticker.receivedAt = 120_999;
+  await writeFile(f.path, journalEnvelope(f.journal));
+  const observed = await exportProgress({...f.options, projection: 'V2'});
+  assert.equal(observed.status, 'EXPORTED');
+  assert.equal(observed.progress.schemaVersion, 'SPOT_PAPER_PAIRED_PROGRESS_V2');
+  assert.equal(observed.progress.runStartedAt, f.journal.manifest.startedAt);
+  assert.equal(observed.progress.lastSuccessfulPollAt, 120_999);
+  assert.notEqual(observed.progress.lastSuccessfulPollAt, observed.progress.observedAt);
+  assert.notEqual(observed.progress.lastSuccessfulPollAt, observed.progress.exportedAt);
+  assert.equal(observed.progress.completedCycles, 2);
+
+  f.journal.events = [f.journal.events[0]];
+  f.journal.sequence = 1;
+  await writeFile(f.path, journalEnvelope(f.journal));
+  assert.deepEqual(await exportProgress(f.options), {status: 'UNKNOWN', progress: null});
+  const empty = await exportProgress({...f.options, projection: 'V2'});
+  assert.equal(empty.status, 'EXPORTED');
+  assert.equal(empty.progress.classification, 'NO_OBSERVATION');
+  assert.equal(empty.progress.runStartedAt, f.journal.manifest.startedAt);
+  assert.equal(empty.progress.lastSuccessfulPollAt, null);
+  assert.equal(empty.progress.completedCycles, 0);
+  assert.equal(empty.progress.observedAt, null);
+  assert.equal(empty.progress.valuationAt, null);
+  assert.equal(empty.progress.arms, null);
+  assert.deepEqual(validateProgress(empty.progress, f.expectedIdentity), empty.progress);
+});
+
+test('invalid partial observation is unavailable rather than counted', async t => {
+  const f = await fixture(t);
+  f.journal.events[2].ticker.receivedAt = null;
+  await writeFile(f.path, journalEnvelope(f.journal));
+  assert.deepEqual(await exportProgress(f.options), {status: 'UNKNOWN', progress: null});
+});
+
 test('later failure and terminal evidence never freshens last financial observation', async t => {
   const f = await fixture(t);
   await writeFile(join(f.runDirectory, 'writer.lock'), 'not terminal verification');
@@ -60,9 +100,11 @@ test('later failure and terminal evidence never freshens last financial observat
   f.journal.events.push({id: 'paired-terminal', type: 'terminal', at: 160_000, report});
   f.journal.sequence = f.journal.events.length;
   await writeFile(f.path, journalEnvelope(f.journal));
-  const {progress, status} = await exportProgress(f.options);
+  const {progress, status} = await exportProgress({...f.options, projection: 'V2'});
   assert.equal(status, 'EXPORTED');
   assert.equal(progress.observedAt, 121_000);
+  assert.equal(progress.lastSuccessfulPollAt, f.journal.events[2].ticker.receivedAt);
+  assert.equal(progress.completedCycles, 2);
   assert.equal(progress.latestEventAt, 160_000);
   assert.deepEqual(progress.terminal, {status: 'INTERRUPTED_RECORDED', at: 160_000});
   assert.equal(JSON.stringify(progress).includes('sensitive'), false);
