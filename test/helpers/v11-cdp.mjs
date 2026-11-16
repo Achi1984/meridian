@@ -24,8 +24,11 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
  const dir=mkdtempSync(join(tmpdir(),'v11-cdp-'));
  let child,spawnFailure,collectingStartup=true,stderrReadFailed=false,startupStderr=Buffer.alloc(0);
  let ws;const pending=new Map();let seq=0;
- const startupError=prefix=>Error(prefix+' ['+(spawnFailure||
-  (startupStderr.length?stderrCategory(startupStderr):stderrReadFailed?'STDERR_UNAVAILABLE':'UNKNOWN'))+']');
+ const startupError=(prefix,details='')=>Error(prefix+' ['+(spawnFailure||
+  (startupStderr.length?stderrCategory(startupStderr):stderrReadFailed?'STDERR_UNAVAILABLE':'UNKNOWN'))+
+  (details?'; '+details:'')+']');
+ const childExitError=()=>child.exitCode!==null?startupError('Chrome exited '+child.exitCode):
+  child.signalCode!=null?startupError('Chrome terminated by signal'):null;
  try{
   try{
    child=spawn(chrome,['--headless=new','--no-sandbox','--disable-gpu','--disable-dev-shm-usage',
@@ -38,20 +41,24 @@ export async function withMobileChrome(chrome,width,url,probe,height=844,beforeN
    const remaining=STARTUP_STDERR_BYTES-startupStderr.length;
    if(remaining>0)startupStderr=Buffer.concat([startupStderr,chunk.subarray(0,remaining)]);
   });
-  let port;
+  let port,portFileState='MISSING',startupPolls=0;
   for(let i=0;i<200;i++){
+   startupPolls=i+1;
    if(spawnFailure)throw startupError('Chrome spawn failed');
-   if(child.exitCode!==null)throw startupError('Chrome exited '+child.exitCode);
+   const exitError=childExitError();if(exitError)throw exitError;
    const f=join(dir,'DevToolsActivePort');
    if(existsSync(f)){
-    const match=/^([0-9]+)\n/.exec(readFileSync(f,'utf8'));
+    const contents=readFileSync(f,'utf8'),match=/^([0-9]+)\n/.exec(contents);
     const candidate=match?Number(match[1]):0;
     if(Number.isInteger(candidate)&&candidate>=1&&candidate<=65535){port=candidate;break;}
+    portFileState=contents.length===0?'EMPTY':contents.includes('\n')?'INVALID':'INCOMPLETE';
    }
    await sleep(50);
   }
   if(spawnFailure)throw startupError('Chrome spawn failed');
-  if(!port)throw startupError('Chrome DevTools startup timeout');
+  const exitError=childExitError();if(exitError)throw exitError;
+  if(!port)throw startupError('Chrome DevTools startup timeout',
+   'phase=PORT_DISCOVERY; port='+portFileState+'; polls='+startupPolls+'; child=RUNNING');
   collectingStartup=false;startupStderr=Buffer.alloc(0);
   const targets=await(await fetch('http://127.0.0.1:'+port+'/json/list',{signal:AbortSignal.timeout(5000)})).json();
   const page=targets.find(x=>x.type==='page');if(!page)throw Error('No Chrome page target');

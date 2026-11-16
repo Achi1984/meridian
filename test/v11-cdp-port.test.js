@@ -8,10 +8,10 @@ const source=readFileSync(new URL('./helpers/v11-cdp.mjs',import.meta.url),'utf8
  .replace(/^import .*;\n/gm,'')
  .replace('export async function withMobileChrome','async function withMobileChrome');
 
-async function startup(values,{exitCode=null,stderr=[],spawnError=null,syncSpawnError=null,pid=spawnError?undefined:123,stderrError=false}={}){
+async function startup(values,{exitCode=null,signalCode=null,stderr=[],spawnError=null,syncSpawnError=null,pid=spawnError?undefined:123,stderrError=false}={}){
  const calls={reads:0,exists:0,sleeps:[],fetches:[],kills:[],removed:[],spawnOptions:null,maxRetained:0};
  const events={};
- const child={pid,exitCode,on:(name,fn)=>{events[name]=fn;},stderr:{on:(name,fn)=>{
+ const child={pid,exitCode,signalCode,on:(name,fn)=>{events[name]=fn;},stderr:{on:(name,fn)=>{
   if(name==='data')for(const text of stderr)fn(Buffer.from(text));
   if(name==='error'&&stderrError)fn(Error('SECRET stderr /private/path'));
  }}};
@@ -62,10 +62,11 @@ test('valid inclusive port boundaries are accepted immediately',async()=>{
  }
 });
 
-test('incomplete and invalid files exhaust the original 200 polls without fetch',async()=>{
- for(const value of ['', '32123', '0\n', '65536\n',undefined]){
+test('absent, incomplete and invalid files exhaust the original 200 polls without fetch',async()=>{
+ for(const [value,state] of [['','EMPTY'],['32123','INCOMPLETE'],['0\n','INVALID'],
+  ['65536\n','INVALID'],[undefined,'MISSING']]){
   const {calls,error}=await startup([value]);
-  assert.match(error.message,/Chrome DevTools startup timeout/);
+  assert.equal(error.message,'Chrome DevTools startup timeout [UNKNOWN; phase=PORT_DISCOVERY; port='+state+'; polls=200; child=RUNNING]');
   assert.equal(calls.exists,200);
   assert.equal(calls.reads,value===undefined?0:200);
   assert.deepEqual(calls.sleeps,[...Array(200).fill(50),100]);
@@ -81,6 +82,14 @@ test('early child exit still fails immediately and cleans up',async()=>{
  assert.deepEqual(calls.sleeps,[100]);
 });
 
+test('child termination by signal is reported without exposing process output',async()=>{
+ const {calls,error}=await startup([undefined],{signalCode:'SIGKILL'});
+ assert.equal(error.message,'Chrome terminated by signal [UNKNOWN]');
+ assert.equal(calls.exists,0);
+ assert.deepEqual(calls.fetches,[]);
+ assert.deepEqual(calls.sleeps,[100]);
+});
+
 test('startup stderr yields only fixed matched categories and preserves exhaustion',async()=>{
  const cases=[['pthread_create: Resource temporarily unavailable (11)','RESOURCE_UNAVAILABLE'],
   ['Cannot allocate memory','RESOURCE_UNAVAILABLE'],['Too many open files','RESOURCE_UNAVAILABLE'],
@@ -91,7 +100,7 @@ test('startup stderr yields only fixed matched categories and preserves exhausti
   ['ordinary Chrome output /private/SECRET token=SECRET','UNKNOWN']];
  for(const [diagnostic,category] of cases){
   const {calls,error}=await startup([undefined],{stderr:['SECRET private-prefix\n'+diagnostic+'\nhttps://SECRET.invalid']});
-  assert.equal(error.message,'Chrome DevTools startup timeout ['+category+']');
+  assert.equal(error.message,'Chrome DevTools startup timeout ['+category+'; phase=PORT_DISCOVERY; port=MISSING; polls=200; child=RUNNING]');
   assert.equal(calls.exists,200);assert.equal(calls.sleeps.length,201);
   assert.deepEqual(calls.fetches,[]);
   assert.doesNotMatch(error.message,/SECRET|private|https:/);
@@ -103,11 +112,11 @@ test('stderr retention is byte bounded across chunks and never exposes the prefi
  for(const stderr of [['x'.repeat(4096),'Cannot allocate memory SECRET'],['x'.repeat(100000)+'Cannot allocate memory SECRET']]){
   const {calls,error}=await startup([undefined],{stderr});
   assert.equal(calls.maxRetained,4096);
-  assert.equal(error.message,'Chrome DevTools startup timeout [UNKNOWN]');
+  assert.equal(error.message,'Chrome DevTools startup timeout [UNKNOWN; phase=PORT_DISCOVERY; port=MISSING; polls=200; child=RUNNING]');
  }
  const {calls,error}=await startup([undefined],{stderr:['SECRET /private/\nResource temporarily ','unavailable\n'+'x'.repeat(100000)]});
  assert.equal(calls.maxRetained,4096);
- assert.equal(error.message,'Chrome DevTools startup timeout [RESOURCE_UNAVAILABLE]');
+ assert.equal(error.message,'Chrome DevTools startup timeout [RESOURCE_UNAVAILABLE; phase=PORT_DISCOVERY; port=MISSING; polls=200; child=RUNNING]');
  const ready=await startup(['32123\n'],{stderr:['Cannot allocate memory SECRET']});
  assert.equal(ready.error.message,'No Chrome page target'); // diagnostics never bypass later browser checks
  assert.equal(ready.calls.fetches.length,1);
@@ -129,6 +138,5 @@ test('synchronous spawn errors and stderr failures are sanitized and clean the p
  assert.equal(calls.exists,0);assert.deepEqual(calls.sleeps,[100]);
  assert.deepEqual(calls.fetches,[]);assert.deepEqual(calls.kills,[]);
  const stderr=await startup([undefined],{stderrError:true});
- assert.equal(stderr.error.message,'Chrome DevTools startup timeout [STDERR_UNAVAILABLE]');
+ assert.equal(stderr.error.message,'Chrome DevTools startup timeout [STDERR_UNAVAILABLE; phase=PORT_DISCOVERY; port=MISSING; polls=200; child=RUNNING]');
 });
-
