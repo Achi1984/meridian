@@ -4,7 +4,7 @@ import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
 import {join} from 'node:path';
 import {spawnSync} from 'node:child_process';
 import {fileURLToPath} from 'node:url';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate,VERIFY_ENDPOINT} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 import {projectOperatorReport} from '../scripts/memecoin-paper/operator-report.mjs';
@@ -152,6 +152,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
     const child=runFlaggedBrowserTest(
       'M11 Paper cockpit demo is responsive and keyboard accessible at five widths',235000);
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     assertNamedTestPassed(child.stdout,
       'M11 Paper cockpit demo is responsive and keyboard accessible at five widths');
     const rows=child.stdout.split('\n').filter(line=>/^(?:# )?V11_PAPER_COCKPIT_SIZE /.test(line));
@@ -583,6 +584,7 @@ test('early Strategies navigation remains active when its module bootstrap initi
     const name='early Strategies navigation remains active when its module bootstrap initializes';
     const child=runFlaggedBrowserTest(name,55000);
     assert.equal(child.status,0,String(child.stdout).slice(-2500)+String(child.stderr).slice(-1000));
+    forwardCdpStartupRecoveryDiagnostic(child.stdout);
     assertNamedTestPassed(child.stdout,name);
     return;
   }

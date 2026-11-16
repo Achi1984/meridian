@@ -4,7 +4,7 @@ import {test} from 'node:test';
 import {spawnSync} from 'node:child_process';
 import {existsSync} from 'node:fs';
 import {fileURLToPath} from 'node:url';
-import {withMobileChrome} from './helpers/v11-cdp.mjs';
+import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 import {unlockAppThroughGate} from './helpers/v11-app-access-browser.mjs';
 import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(p=>p&&existsSync(p));
@@ -39,6 +39,7 @@ if(typeof WebSocket!=='function'){
  delete childEnv.NODE_TEST_CONTEXT;
  const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],{encoding:'utf8',timeout:115000,env:childEnv});
  assert.equal(child.status,0,'WebSocket-enabled Node child failed: '+String(child.stdout).slice(-1200)+' '+String(child.stderr).slice(-1200));
+ forwardCdpStartupRecoveryDiagnostic(child.stdout);
  const evidence=String(child.stdout).split('\n').filter(line=>line.includes('V11_CDP_WIDTH'));
  console.log('V11_CDP_CHILD_OUTPUT',String(child.stdout).slice(-1600));
  assert.equal(evidence.length,4,'Expected four actual CDP width measurements');
