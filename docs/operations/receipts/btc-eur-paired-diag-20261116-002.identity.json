@@ -9,14 +9,16 @@
     "sourceArchiveSha256": "39ee4d8f21c1f4e59e6a5a812be13e98dce879ec1ca86964717e26021e9b5843",
     "baseImageRef": "node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293",
     "baseImageId": "sha256:11cedc39e663e7c5d5cb9cc77a461a0d2adc25537b94e6831a6108f09cb2001b",
-    "registryDigest": null
+    "registryDigest": "registry.northflank.com/meridian/meridian-paired-paper-build@sha256:936bda34bfe1445be9ecee9be0324d33f55ba2966b9822ac4c2bad44fdf1f91e"
   },
   "sourceVerification": {
     "referenceBuild": "curvy-coach-4375",
     "buildUrl": "https://app.northflank.com/t/achi1984s-team/project/meridian/services/meridian-paired-paper-build/builds/curvy-coach-4375",
     "observedSourceSha": "ae924141854362257738322ac9a1022cd47e0b02",
-    "registryPublicationProven": false,
-    "localAcceptanceDerivedFrom": "btc-eur-paired-diag-20261110-001.identity.json"
+    "registryPublicationProven": true,
+    "localAcceptanceDerivedFrom": "btc-eur-paired-diag-20261110-001.identity.json",
+    "taggedImageReference": "registry.northflank.com/meridian/meridian-paired-paper-build:curvy-coach-4375",
+    "taggedImageUrl": "https://app.northflank.com/t/achi1984s-team/project/meridian/images/meridian-paired-paper-build:curvy-coach-4375"
   },
   "identityCommand": {
     "mode": "identity-only",
@@ -92,7 +94,12 @@
     "promotion": false
   },
   "externalEvidence": {
-    "registryDigest": null,
+    "registryDigest": {
+      "repositoryDigest": "registry.northflank.com/meridian/meridian-paired-paper-build@sha256:936bda34bfe1445be9ecee9be0324d33f55ba2966b9822ac4c2bad44fdf1f91e",
+      "evidenceRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/services/meridian-paired-paper-build/builds/curvy-coach-4375/logs",
+      "verifier": "Northflank BuildKit manifest export and completed registry push, cross-checked against the published Image entry",
+      "observedAt": "2026-11-10T18:04:00.329Z"
+    },
     "hostGlobalExclusivity": null,
     "mountIdentity": null,
     "sigtermDrill": null
