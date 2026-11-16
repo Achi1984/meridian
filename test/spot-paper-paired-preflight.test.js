@@ -86,6 +86,31 @@ test("mount and SIGTERM evidence are fail-closed and structurally bound", () => 
   assert.equal(validatePairedPreflight(candidate).checks.find(check => check.name === "sigterm-drill-evidence").status, "BLOCKED");
 });
 
+test("mount proof must identify the exact candidate below a canonical root", () => {
+  const candidate = structuredClone(receipt);
+  candidate.acceptedImage.registryDigest = "registry.example/meridian/pair@sha256:" + "1".repeat(64);
+  candidate.externalEvidence = validExternalEvidence(candidate);
+  const mount = candidate.externalEvidence.mountIdentity;
+  const runId = candidate.candidateRunId;
+  for (const [root, directory] of [
+    ["/evidence-root", "/evidence-root/other-run"],
+    ["/evidence-root", `/evidence-root/nested/${runId}`],
+    ["/evidence-root", `/evidence-root/../${runId}`],
+    ["/scratch/../evidence-root", `/scratch/../evidence-root/${runId}`],
+    ["/evidence-root/", `/evidence-root//${runId}`]
+  ]) {
+    Object.assign(mount, {dataRoot: root, realpath: root, runDirectory: directory});
+    assert.ok(validatePairedPreflight(candidate).blockers.includes("mount-identity-evidence"), directory);
+  }
+
+  const invalidRunId = `../${runId}`;
+  candidate.candidateRunId = invalidRunId;
+  candidate.identity.runId = invalidRunId;
+  candidate.identity.models.forEach(model => { model.accountId = `${invalidRunId}-${model.role}`; });
+  candidate.externalEvidence = validExternalEvidence(candidate);
+  assert.ok(validatePairedPreflight(candidate).blockers.includes("host-uniqueness-source-bound"));
+});
+
 function validExternalEvidence(candidate) {
   return {
     registryDigest: {
