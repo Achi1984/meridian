@@ -14,11 +14,10 @@ import {
   createPrivatePairedProgressStore, PAIRED_PROGRESS_UPSERT_SQL
 } from '../private-paired-progress-store.mjs';
 import {
-  canonicalJson, PROGRESS_PATH, PROGRESS_SCHEMA, MAX_PROGRESS_BYTES, validateProgress
+  canonicalJson, PROGRESS_PATH, PROGRESS_SCHEMA, PROGRESS_SCHEMA_V2,
+  MAX_PROGRESS_BYTES, validateProgress
 } from '../scripts/spot-paper-paired-progress/contract.mjs';
-import {
-  PROGRESS_SCHEMA_V2, validatePairedProgress
-} from '../private-paired-progress-contract.mjs';
+import {validateStoredPairedProgress} from '../private-paired-progress-validation.mjs';
 import {syntheticExpectedPairedIdentity} from './helpers/spot-paper-paired-dashboard-fixture.mjs';
 import {progressJournalFixture, journalEnvelope} from './helpers/spot-paper-paired-progress-fixture.mjs';
 import {exportProgress} from '../scripts/spot-paper-paired-progress/export.mjs';
@@ -252,25 +251,25 @@ test('V2 is explicitly gated for uploads and existing rows while V1 remains read
 });
 
 test('receiver validates V2 observation and sequence-one no-observation only', () => {
-  assert.deepEqual(validatePairedProgress(noObservationV2(), identity),
+  assert.deepEqual(validateProgress(noObservationV2(), identity),
     noObservationV2());
-  assert.deepEqual(validatePairedProgress(progressV2(), identity), progressV2());
-  assert.equal(validatePairedProgress(noObservationV2(), identity, {allowV2: false}), null);
-  assert.equal(validatePairedProgress({...progress(), journalSequence: 1}, identity), null);
-  assert.equal(validatePairedProgress(progressV2(1), identity), null);
+  assert.deepEqual(validateProgress(progressV2(), identity), progressV2());
+  assert.equal(validateStoredPairedProgress({...progress(), journalSequence: 1}, identity), null);
+  assert.equal(validateProgress(progressV2(1), identity).classification, 'OBSERVED_CHECKPOINT');
+  assert.equal(validateStoredPairedProgress(progressV2(1), identity), null);
   const arrayDigest = [digest('coercible-but-not-a-string')];
   const invalidNoObservationDigest = noObservationV2();
   invalidNoObservationDigest.journalSha256 = arrayDigest;
-  assert.equal(validatePairedProgress(invalidNoObservationDigest, identity), null);
+  assert.equal(validateProgress(invalidNoObservationDigest, identity), null);
   const invalidObservedDigest = progressV2();
   invalidObservedDigest.journalSha256 = arrayDigest;
-  assert.equal(validatePairedProgress(invalidObservedDigest, identity), null);
+  assert.equal(validateProgress(invalidObservedDigest, identity), null);
   const invalid = noObservationV2();
   invalid.completedCycles = 1;
-  assert.equal(validatePairedProgress(invalid, identity), null);
+  assert.equal(validateProgress(invalid, identity), null);
   const observed = progressV2();
   observed.lastSuccessfulPollAt = observed.observedAt + 1;
-  assert.equal(validatePairedProgress(observed, identity), null);
+  assert.equal(validateProgress(observed, identity), null);
 });
 
 test('exact allowlist, strict payload and read validation preserve original valuation timestamp', async () => {
@@ -611,7 +610,7 @@ const connectionString = process.env.MERIDIAN_TEST_PAPER_REPORT_DATABASE_URL;
     const regressed = progressV2(4);
     regressed.identity = structuredClone(upgraded.identity);
     change(regressed);
-    assert.ok(validatePairedProgress(regressed, upgraded.identity));
+    assert.ok(validateStoredPairedProgress(regressed, upgraded.identity));
     assert.equal((await store.put(regressed)).status, 'CONFLICT',
       'V2 poll provenance and completed cycles cannot regress');
   }

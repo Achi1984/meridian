@@ -1,7 +1,7 @@
 import {
   canonicalJson, validIdentity
 } from './scripts/spot-paper-paired-progress/contract.mjs';
-import {validatePairedProgress} from './private-paired-progress-contract.mjs';
+import {validateStoredPairedProgress} from './private-paired-progress-validation.mjs';
 import {PAPER_REPORT_STORE_LIMITS} from './private-report-store.mjs';
 
 const TABLE = 'meridian_spot_paper_paired_progress';
@@ -110,7 +110,7 @@ export function createPrivatePairedProgressStore(db, {
       });
     },
     put(value, {signal} = {}) {
-      const payload = validatePairedProgress(value, value?.identity);
+      const payload = validateStoredPairedProgress(value, value?.identity);
       if (!payload) return Promise.reject(failure('INVALID_PROGRESS'));
       return bounded(true, signal, async assertActive => {
         let result;
@@ -129,7 +129,7 @@ export function createPrivatePairedProgressStore(db, {
         const existing = await db.query(
           `SELECT payload FROM ${TABLE} WHERE run_id = $1 AND identity = $2::jsonb`,
           [payload.identity.runId, canonicalJson(payload.identity)]);
-        const previous = validatePairedProgress(existing.rows[0]?.payload, payload.identity);
+        const previous = validateStoredPairedProgress(existing.rows[0]?.payload, payload.identity);
         return {
           status: previous &&
             previous.journalSequence === payload.journalSequence &&

@@ -1,11 +1,9 @@
 import {createHash, timingSafeEqual} from 'node:crypto';
 import {readBoundedRequestBody} from './report-transfer-gateway.mjs';
 import {
-  PROGRESS_PATH, MAX_PROGRESS_BYTES, validIdentity
+  PROGRESS_PATH, PROGRESS_SCHEMA_V2, MAX_PROGRESS_BYTES, validIdentity
 } from './scripts/spot-paper-paired-progress/contract.mjs';
-import {
-  PROGRESS_SCHEMA_V2, validatePairedProgress
-} from './private-paired-progress-contract.mjs';
+import {validateStoredPairedProgress} from './private-paired-progress-validation.mjs';
 
 export {PROGRESS_PATH, MAX_PROGRESS_BYTES};
 export const PROGRESS_BODY_TIMEOUT_MS = 5_000;
@@ -150,9 +148,7 @@ export async function handleSpotPaperPairedProgressGatewayRequest(req, {
         if (input?.schemaVersion === PROGRESS_SCHEMA_V2 && config.v2Enabled !== true) {
           return error(503, 'version_disabled');
         }
-        payload = validatePairedProgress(input, config.expectedIdentity, {
-          allowV2: config.v2Enabled === true
-        });
+        payload = validateStoredPairedProgress(input, config.expectedIdentity);
       } catch {}
       if (!payload) return error(400, 'invalid');
     }
@@ -166,9 +162,7 @@ export async function handleSpotPaperPairedProgressGatewayRequest(req, {
       if (result.schemaVersion === PROGRESS_SCHEMA_V2 && config.v2Enabled !== true) {
         return error(404, 'not_found');
       }
-      const clean = validatePairedProgress(result, config.expectedIdentity, {
-        allowV2: config.v2Enabled === true
-      });
+      const clean = validateStoredPairedProgress(result, config.expectedIdentity);
       return clean ? response(200, clean) : error(503, 'corrupt');
     }
     if (result?.status === 'CONFLICT') return error(409, 'conflict');
