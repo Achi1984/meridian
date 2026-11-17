@@ -1,13 +1,34 @@
 # BTC/EUR paired diagnostic 002: post-exit terminal export checklist
 
-## Scope and evidence available
+## Verified closeout · 2026-11-17
+
+- Northflank reported the exact Paper 002 writer run as `SUCCESS`, with no
+  active writer instance. The terminal export is from that completed run.
+- A verified backup was available before the original volume was temporarily
+  assigned to the separate reader. The reader's process denied filesystem writes
+  on the evidence path. The original volume was reassigned to its writer job
+  after retrieval, and Northflank confirmed the restored assignment.
+- The downloaded status and export checksums matched. The evaluator reported
+  `VERIFIED_COMPLETE` and `TERMINAL_REPORT_RECONCILED`, with neither a writer
+  lock nor pending publication. The journal reconciled with the independently
+  pinned Paper 002 identity.
+- The immutable private report insert succeeded, and the stored envelope
+  matched the tested import digest. The authenticated Meridian V11 comparison
+  subsequently loaded Paper 001 and Paper 002 by their respective run IDs.
+  The gateway returned `VERIFIED_COMPLETE` for both stored reports. The
+  historical default report identity was preserved.
+- The private report, raw journal, credentials, and report digests are held
+  outside this repository. The checklist below records the procedure used to
+  validate imports and retains the original launch evidence for audit.
+
+## Scope and launch evidence
 
 This is a post-exit-only, read-only checklist. It does not authorize or change
 the active writer, image, volume, journal, runtime, strategy, time limit,
 permissions, schedule, or credentials. Do not mount or read its volume until
 Northflank independently shows the writer is terminal and its pod has detached.
 
-The latest available candidate evidence is the [#1382 identity receipt at
+The independently pinned launch identity is the [#1382 receipt at
 head `87e8cacbdc28b362ac3d416507b8a3cbaf15019f`](https://github.com/Achi1984/meridian/blob/87e8cacbdc28b362ac3d416507b8a3cbaf15019f/docs/operations/receipts/btc-eur-paired-diag-20261116-002.identity.json)
 and its [rehearsal record](https://github.com/Achi1984/meridian/blob/87e8cacbdc28b362ac3d416507b8a3cbaf15019f/docs/operations/BTC_EUR_PAIRED_DIAG_002_REHEARSAL.md).
 That receipt identifies:
@@ -28,10 +49,8 @@ pending publication. A separate `/evidence-root/platform-r2` synthetic
 follow-up verified SIGTERM, sequence `1→2`, exit code 0, and a read-only
 replacement with no lock/pending file. Neither synthetic attempt is a Paper
 002 result. Keep the attempts separate and preserve the first rehearsal's
-evidence. The latest candidate receipt records the host uniqueness check and
-launch; recheck current provider state before post-exit work. No terminal Paper
-002 export, evaluator result, report digest, private import, or dashboard
-readback is available in this preparation.
+evidence. The launch receipt records the host uniqueness check and launch.
+Recheck the provider state before any new post-exit work.
 
 ## Read-only retrieval after writer exit
 
