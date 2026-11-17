@@ -1,5 +1,9 @@
 import {createHash} from "node:crypto";
-import {isSolanaPublicKey} from "./cpmm-swap-observations.mjs";
+import {
+  isSolanaPublicKey,
+  RAYDIUM_CPMM_LAYOUT
+} from "./cpmm-swap-observations.mjs";
+import {LAUNCH_HISTORY_SOURCE_VERSION} from "./launch-history-source.mjs";
 
 export const JITO_BUNDLE_MEMBERSHIP_DIAGNOSTIC_VERSION =
   "jito-bundle-membership-diagnostic-v1";
@@ -123,13 +127,21 @@ function requestBinding(requestBytes, expectedBundleIds, responseId) {
   return {status: "MATCHED", reason: null};
 }
 
-function validReceipt(receipt) {
+function validSwapReceipt(receipt) {
   return isRecord(receipt) && receipt.status === "DECODED" &&
     receipt.kind === "RAYDIUM_CPMM_SWAP" &&
-    (receipt.commitment === "finalized" || receipt.finalized === true) &&
-    receipt.chainId === "solana" &&
+    receipt.programId === RAYDIUM_CPMM_LAYOUT.programId &&
     isSolanaPublicKey(receipt.mint) && isSolanaPublicKey(receipt.pool) &&
     signatureIsValid(receipt.signature) && validSlot(receipt.slot);
+}
+
+function validLaunchHistory(history) {
+  return isRecord(history) &&
+    history.sourceVersion === LAUNCH_HISTORY_SOURCE_VERSION &&
+    history.commitment === "finalized" &&
+    Array.isArray(history.transactions) &&
+    history.transactions.length <= JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxTransactionReceipts &&
+    isRecord(history.coverage);
 }
 
 function memberTransactions(status) {
@@ -167,7 +179,8 @@ export function diagnoseJitoBundleMembership({
   requestBytes,
   requestedBundleIds,
   identity,
-  transactionReceipts
+  launchHistory,
+  swapReceipts
 } = {}) {
   const result = baseResult(identity);
   if (!validIdentity(identity)) return {...result, reason: "INVALID_EXPECTED_IDENTITY"};
@@ -187,9 +200,9 @@ export function diagnoseJitoBundleMembership({
       new Set(requestedBundleIds).size !== requestedBundleIds.length) {
     return {...result, reason: "INVALID_REQUESTED_BUNDLE_IDS"};
   }
-  if (!Array.isArray(transactionReceipts) ||
-      transactionReceipts.length > JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxTransactionReceipts) {
-    return unknownRows(result, requestedBundleIds, "TRANSACTION_RECEIPTS_MISSING_OR_OVER_LIMIT");
+  if (!validLaunchHistory(launchHistory) || !Array.isArray(swapReceipts) ||
+      swapReceipts.length > JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxTransactionReceipts) {
+    return unknownRows(result, requestedBundleIds, "CANONICAL_SWAP_OR_HISTORY_RECEIPT_INVALID");
   }
   if (!(rawResponseBytes instanceof Uint8Array) || rawResponseBytes.byteLength === 0 ||
       rawResponseBytes.byteLength > JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxResponseBytes) {
@@ -273,13 +286,21 @@ export function diagnoseJitoBundleMembership({
     }
   }
 
-  const receiptsBySignature = new Map();
-  for (let index = 0; index < transactionReceipts.length; index += 1) {
-    const receipt = transactionReceipts[index];
+  const swapsBySignature = new Map();
+  for (let index = 0; index < swapReceipts.length; index += 1) {
+    const receipt = swapReceipts[index];
     if (!isRecord(receipt) || !signatureIsValid(receipt.signature)) continue;
-    const entries = receiptsBySignature.get(receipt.signature) ?? [];
+    const entries = swapsBySignature.get(receipt.signature) ?? [];
     entries.push({receipt, index});
-    receiptsBySignature.set(receipt.signature, entries);
+    swapsBySignature.set(receipt.signature, entries);
+  }
+  const historyBySignature = new Map();
+  for (let index = 0; index < launchHistory.transactions.length; index += 1) {
+    const transaction = launchHistory.transactions[index];
+    if (!isRecord(transaction) || !signatureIsValid(transaction.signature)) continue;
+    const entries = historyBySignature.get(transaction.signature) ?? [];
+    entries.push({transaction, index});
+    historyBySignature.set(transaction.signature, entries);
   }
 
   result.rows = requestedBundleIds.map((bundleId, requestIndex) => {
@@ -309,20 +330,45 @@ export function diagnoseJitoBundleMembership({
       if ((signatureOccurrences.get(signature)?.size ?? 0) > 0) {
         return rowResult(bundleId, status, index, "CONFLICTING_BUNDLE_MEMBERSHIP");
       }
-      const candidates = receiptsBySignature.get(signature) ?? [];
+      const candidates = swapsBySignature.get(signature) ?? [];
       if (candidates.length > 1) {
-        return rowResult(bundleId, status, index, "AMBIGUOUS_TRANSACTION_RECEIPT");
+        return rowResult(bundleId, status, index, "AMBIGUOUS_SWAP_RECEIPT");
       }
       if (candidates.length === 0) continue;
-      const {receipt, index: receiptIndex} = candidates[0];
-      if (!validReceipt(receipt) || receipt.chainId !== identity.chainId ||
-          receipt.mint !== identity.mint || receipt.pool !== identity.pool) {
-        return rowResult(bundleId, status, index, "TRANSACTION_RECEIPT_IDENTITY_MISMATCH");
+      const {receipt: swap, index: swapReceiptIndex} = candidates[0];
+      if (!validSwapReceipt(swap) || swap.mint !== identity.mint ||
+          swap.pool !== identity.pool) {
+        return rowResult(bundleId, status, index, "SWAP_RECEIPT_IDENTITY_MISMATCH");
       }
-      if (receipt.slot !== status.slot) {
+      if (swap.slot !== status.slot) {
+        return rowResult(bundleId, status, index, "SWAP_RECEIPT_SLOT_MISMATCH");
+      }
+      const historyEntries = historyBySignature.get(signature) ?? [];
+      if (historyEntries.length > 1) {
+        return rowResult(bundleId, status, index, "AMBIGUOUS_HISTORY_TRANSACTION");
+      }
+      if (historyEntries.length === 0) {
+        return rowResult(bundleId, status, index, "FINALIZED_HISTORY_TRANSACTION_MISSING");
+      }
+      const {transaction, index: historyTransactionIndex} = historyEntries[0];
+      const signatureList = transaction.transaction?.signatures;
+      if (transaction.status !== "SUCCESS" || !isRecord(transaction.transaction) ||
+          !Array.isArray(signatureList) || signatureList.length < 1 ||
+          signatureList.length > 64 || signatureList[0] !== signature ||
+          !signatureList.every(signatureIsValid) ||
+          !isRecord(transaction.meta) || transaction.meta.err !== null) {
+        return rowResult(bundleId, status, index, "HISTORY_TRANSACTION_NOT_SUCCESSFUL");
+      }
+      if (!validSlot(transaction.slot) || transaction.slot !== status.slot ||
+          transaction.slot !== swap.slot) {
         return rowResult(bundleId, status, index, "TRANSACTION_RECEIPT_SLOT_MISMATCH");
       }
-      matchedTransactions.push({signature, slot: receipt.slot, receiptIndex});
+      matchedTransactions.push({
+        signature,
+        slot: transaction.slot,
+        swapReceiptIndex,
+        historyTransactionIndex
+      });
     }
     if (matchedTransactions.length === 0) {
       return rowResult(bundleId, status, index, "NO_POOL_SPECIFIC_TRANSACTION_RECEIPT");

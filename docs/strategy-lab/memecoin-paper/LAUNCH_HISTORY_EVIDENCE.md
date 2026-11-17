@@ -165,9 +165,13 @@ roster, historical window, rug predicate, bundle detector, or hard-gate mapping.
 and offline only. It accepts a copy of immutable captured JSON-RPC response
 bytes and their expected SHA-256, one to five externally supplied bundle IDs,
 an exact `solana` chain/mint/pool and inclusive launch-slot window, and
-canonical `DECODED` Raydium CPMM swap receipts marked finalized. A receipt must
-bind its unique 64-byte base58 signature, slot, chain, mint, and pool. When the
-original request bytes are also available, the diagnostic checks the
+canonical `DECODED` Raydium CPMM swap receipts joined to the existing
+`LAUNCH_HISTORY_SOURCE_VERSION` receipt. The history receipt must declare
+`commitment: "finalized"` and contain one successful transaction at the same
+signature and slot with matching transaction signature and `meta.err: null`.
+Each swap receipt binds its unique 64-byte base58 signature, slot, mint, pool,
+and Raydium CPMM program. When the original request bytes are also available,
+the diagnostic checks the
 `getBundleStatuses` method, exact requested ID list, and JSON-RPC request and
 response IDs. Without those bytes, request/response binding is explicitly
 `UNAVAILABLE`; a response digest alone does not bind a request or provider.
@@ -222,8 +226,8 @@ following public references (checked 2026-11-02; no RPC endpoint was contacted):
   documents address-scoped signature history and `before` pagination.
 - Solana [`getTransaction`](https://solana.com/docs/rpc/http/gettransaction)
   documents transaction lookup and `maxSupportedTransactionVersion`.
-- Jito [Low Latency Transaction Send](https://docs.jito.wtf/lowlatencytxnsend/)
-  documents `getBundleStatuses`, the maximum-five-ID status request, and
+- Jito [`getBundleStatuses`](https://docs.jito.wtf/lowlatencytxnsend/#getbundlestatuses)
+  documents the maximum-five-ID status request and
   finalized bundle status fields. Jito [Bundles](https://docs.jito.wtf/bundles/)
   documents the Bundle Explorer limitation for direct BAM/DBI bundles. The
   diagnostic implemented here parses captured responses only; it does not call

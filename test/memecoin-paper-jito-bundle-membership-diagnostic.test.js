@@ -6,6 +6,8 @@ import {
   JITO_BUNDLE_MEMBERSHIP_DIAGNOSTIC_VERSION,
   diagnoseJitoBundleMembership
 } from "../scripts/memecoin-paper/jito-bundle-membership-diagnostic.mjs";
+import {LAUNCH_HISTORY_SOURCE_VERSION} from "../scripts/memecoin-paper/launch-history-source.mjs";
+import {RAYDIUM_CPMM_LAYOUT} from "../scripts/memecoin-paper/cpmm-swap-observations.mjs";
 
 const MINT = "So11111111111111111111111111111111111111112";
 const POOL = "SysvarRent111111111111111111111111111111111";
@@ -48,17 +50,37 @@ function request(bundleIds = [BUNDLE_ID], id = 1) {
   }));
 }
 
-function receipt(overrides = {}) {
+function swapReceipt(overrides = {}) {
   return {
     status: "DECODED",
     kind: "RAYDIUM_CPMM_SWAP",
-    commitment: "finalized",
-    chainId: "solana",
+    programId: RAYDIUM_CPMM_LAYOUT.programId,
     mint: MINT,
     pool: POOL,
     signature: SIGNATURE,
     slot: 120,
     ...overrides
+  };
+}
+
+function historyTransaction(overrides = {}) {
+  return {
+    signature: SIGNATURE,
+    slot: 120,
+    status: "SUCCESS",
+    transaction: {signatures: [SIGNATURE]},
+    meta: {err: null},
+    ...overrides
+  };
+}
+
+function launchHistory(transactions = [historyTransaction()]) {
+  return {
+    sourceVersion: LAUNCH_HISTORY_SOURCE_VERSION,
+    source: "Solana JSON-RPC",
+    commitment: "finalized",
+    coverage: {complete: false},
+    transactions
   };
 }
 
@@ -69,7 +91,8 @@ function diagnose(bytes = response(), options = {}) {
     requestBytes: request(),
     requestedBundleIds: [BUNDLE_ID],
     identity: IDENTITY,
-    transactionReceipts: [receipt()],
+    launchHistory: launchHistory(),
+    swapReceipts: [swapReceipt()],
     ...options
   });
 }
@@ -86,7 +109,12 @@ test("reports a finalized exact-signature pool-swap match with raw provenance on
   assert.equal(result.rows[0].rawStatus.bundle_id, BUNDLE_ID);
   assert.equal(result.rows[0].rawStatusIndex, 0);
   assert.deepEqual(result.rows[0].matchedTransactions, [
-    {signature: SIGNATURE, slot: 120, receiptIndex: 0}
+    {
+      signature: SIGNATURE,
+      slot: 120,
+      swapReceiptIndex: 0,
+      historyTransactionIndex: 0
+    }
   ]);
   assert.equal(result.sourceAuthentication, "NOT_ESTABLISHED");
   assert.equal(result.sourceCoverage, "UNKNOWN");
@@ -95,7 +123,9 @@ test("reports a finalized exact-signature pool-swap match with raw provenance on
 });
 
 test("a missing pool-specific receipt and mismatched request binding remain unknown", () => {
-  const unmatched = diagnose(response(), {transactionReceipts: [receipt({signature: OTHER_SIGNATURE})]});
+  const unmatched = diagnose(response(), {
+    swapReceipts: [swapReceipt({signature: OTHER_SIGNATURE})]
+  });
   assert.equal(unmatched.rows[0].classification, "UNKNOWN");
   assert.equal(unmatched.rows[0].reason, "NO_POOL_SPECIFIC_TRANSACTION_RECEIPT");
 
@@ -114,7 +144,8 @@ test("duplicate status rows and duplicate member signatures are ambiguous", () =
   ]), {
     requestedBundleIds: [BUNDLE_ID, OTHER_BUNDLE_ID],
     requestBytes: request([BUNDLE_ID, OTHER_BUNDLE_ID]),
-    transactionReceipts: [receipt()]
+    launchHistory: launchHistory(),
+    swapReceipts: [swapReceipt()]
   });
   assert.equal(duplicateRows.rows[0].reason, "DUPLICATE_BUNDLE_STATUS");
   assert.equal(duplicateRows.rows[0].classification, "UNKNOWN");
@@ -130,15 +161,16 @@ test("duplicate status rows and duplicate member signatures are ambiguous", () =
   ]), {
     requestedBundleIds: [BUNDLE_ID, OTHER_BUNDLE_ID],
     requestBytes: request([BUNDLE_ID, OTHER_BUNDLE_ID]),
-    transactionReceipts: [receipt()]
+    launchHistory: launchHistory(),
+    swapReceipts: [swapReceipt()]
   });
   assert.ok(conflictingMembership.rows.every(row =>
     row.reason === "CONFLICTING_BUNDLE_MEMBERSHIP"));
 
   const duplicateReceipt = diagnose(response(), {
-    transactionReceipts: [receipt(), receipt()]
+    swapReceipts: [swapReceipt(), swapReceipt()]
   });
-  assert.equal(duplicateReceipt.rows[0].reason, "AMBIGUOUS_TRANSACTION_RECEIPT");
+  assert.equal(duplicateReceipt.rows[0].reason, "AMBIGUOUS_SWAP_RECEIPT");
 });
 
 test("future, out-of-window, nonfinalized, and failed statuses are not positive", () => {
@@ -173,12 +205,22 @@ test("digest mismatch, null or truncated absence, and unknown IDs stay unknown",
 
 test("receipt identity and slot mismatches are unknown", () => {
   const wrongIdentity = diagnose(response(), {
-    transactionReceipts: [receipt({pool: "Vote111111111111111111111111111111111111111"})]
+    swapReceipts: [swapReceipt({pool: "Vote111111111111111111111111111111111111111"})]
   });
-  assert.equal(wrongIdentity.rows[0].reason, "TRANSACTION_RECEIPT_IDENTITY_MISMATCH");
+  assert.equal(wrongIdentity.rows[0].reason, "SWAP_RECEIPT_IDENTITY_MISMATCH");
 
-  const wrongSlot = diagnose(response(), {transactionReceipts: [receipt({slot: 121})]});
+  const wrongSlot = diagnose(response(), {
+    launchHistory: launchHistory([historyTransaction({slot: 121})])
+  });
   assert.equal(wrongSlot.rows[0].reason, "TRANSACTION_RECEIPT_SLOT_MISMATCH");
+
+  const failedHistoryTransaction = diagnose(response(), {
+    launchHistory: launchHistory([
+      historyTransaction({status: "TRANSACTION_NOT_SUCCESSFUL"})
+    ])
+  });
+  assert.equal(failedHistoryTransaction.rows[0].reason,
+    "HISTORY_TRANSACTION_NOT_SUCCESSFUL");
 });
 
 test("uncaptured request binding remains unavailable and BAM Explorer gaps are documented", async () => {
