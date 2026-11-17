@@ -1,12 +1,12 @@
-import {createAdvisorSection} from './paper-advisor-view.js?v=B16-M11-FIX16';
-import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B16-M11-FIX16';
-import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX16';
-import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B16-M11-FIX16';
-import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B16-M11-FIX16';
-import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B16-M11-FIX16';
-import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX16';
-import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B16-M11-FIX16';
-import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B16-M11-FIX16';
+import {createAdvisorSection} from './paper-advisor-view.js?v=B16-M11-FIX17';
+import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B16-M11-FIX17';
+import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX17';
+import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B16-M11-FIX17';
+import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B16-M11-FIX17';
+import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B16-M11-FIX17';
+import {renderPaperReadiness} from './paper-readiness-view.js?v=B16-M11-FIX17';
+import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B16-M11-FIX17';
+import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B16-M11-FIX17';
 
 let catalogRoot = document.getElementById('strategy-catalog');
 let catalogStatus = document.getElementById('strategy-load-status');

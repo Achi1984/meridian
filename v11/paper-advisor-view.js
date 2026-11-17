@@ -1,4 +1,4 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX16';
+import {appAccess} from './app-access.js?v=B16-M11-FIX17';
 
 const NUMBER = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 8});
 const EURO = new Intl.NumberFormat('de-AT', {style: 'currency', currency: 'EUR'});
