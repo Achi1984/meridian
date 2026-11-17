@@ -527,6 +527,12 @@
       <p class="sub">Paper-Test und Forschungsmodelle sind getrennte Bereiche. Hier siehst du Berichte; deine Pionex-Bots findest du unter Bots. Diese Ansicht startet oder stoppt keinen Handel.</p>
       <p id="strategy-load-status" class="strategy-load-status" role="status" aria-live="polite">Das lokale Register wird erst beim Öffnen dieser Ansicht gelesen.</p>
       <div id="strategy-catalog" aria-busy="false"></div>
+      <details class="strategy-source-notice" id="paper-advisor">
+        <summary>BTC/EUR · Modellentscheidungen im Zehn-Minuten-Takt</summary>
+        <p><label>Lokalen Paperbericht öffnen <input type="file" accept=".json,application/json" data-advisor-file></label></p>
+        <p role="status" data-advisor-status>Kein Bericht geladen.</p>
+        <div data-advisor-result style="overflow-wrap:anywhere"></div>
+      </details>
       <div id="strategy-arena-root"></div>
     </section>
   </main>
@@ -630,6 +636,7 @@
 <script type="module" src="./bot-read-bootstrap.js?v=B16-M11-FIX16"></script>
 <script type="module" src="./depot-read-bootstrap.js?v=B16-M11-FIX16"></script>
 <script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11-FIX16"></script>
+<script type="module" src="./paper-advisor-view.js?v=1"></script>
 <script type="module" src="./agent-status-bootstrap.js?v=B16-M11-FIX16"></script>
 </body>
 </html>
