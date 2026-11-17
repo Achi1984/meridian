@@ -75,17 +75,39 @@ function zeroByteReceipt(data, at) {
     bytes: 0, requestStartedAt: at, receivedAt: at };
 }
 
+const realSetTimeout = setTimeout;
+const realClearTimeout = clearTimeout;
+
 async function waitFor(promise, label, timeoutMs = 1_000) {
   let timer;
   try {
     return await Promise.race([
       promise,
       new Promise((_, reject) => {
-        timer = setTimeout(() => reject(new Error(`${label}_TIMEOUT`)), timeoutMs);
+        timer = realSetTimeout(() => reject(new Error(`${label}_TIMEOUT`)), timeoutMs);
       })
     ]);
   } finally {
-    clearTimeout(timer);
+    realClearTimeout(timer);
+  }
+}
+
+async function runStalledOhlcToDeadline(t, setup) {
+  let monotonic = setup.config.monotonicNow();
+  setup.config.monotonicNow = () => monotonic;
+  // Keep real filesystem latency out of the simulated transport budget.
+  t.mock.timers.enable({ apis: ["setTimeout"] });
+  try {
+    const pending = runSpotPaperPairedSynthetic(setup.config);
+    const reachedOhlc = Promise.race([setup.pendingOhlc, pending.then(() => {
+      assert.fail("Run finished before the OHLC request stalled");
+    })]);
+    await waitFor(reachedOhlc, "OHLC_ENTRY");
+    monotonic += setup.config.maxDurationMs;
+    t.mock.timers.tick(setup.config.maxDurationMs);
+    return await waitFor(pending, "OUTER_TIMEOUT");
+  } finally {
+    t.mock.timers.reset();
   }
 }
 
@@ -396,9 +418,10 @@ test("shared request, byte, and monotonic deadline bounds apply to the whole run
   assert.equal(byteReport.stopReason, "SHARED_FEED_FAILURE");
   assert.ok(byteReport.deliveredBytes > 1);
 
-  const deadline = await fixture(t, { maxCycles: 1, maxDurationMs: 100 });
-  deadline.config.provider.fetchOhlc = () => new Promise(() => {});
-  const deadlineReport = await runSpotPaperPairedSynthetic(deadline.config);
+  const deadline = await fixture(t, {
+    maxCycles: 1, maxDurationMs: 100, hangOhlcPhase: "BODY"
+  });
+  const deadlineReport = await runStalledOhlcToDeadline(t, deadline);
   assert.equal(deadlineReport.stopReason, "DURATION_LIMIT");
   assert.equal(deadlineReport.requests, 1);
 });
@@ -442,15 +465,10 @@ test("paired transport failures are bounded, sanitized, and leave the failed cyc
 
 test("outer deadlines and explicit aborts retain the stalled request phase", async t => {
   for (const phase of ["HEADERS", "BODY"]) {
-    let monotonic = 100;
     const setup = await fixture(t, {
-      maxCycles: 1, maxRequests: 2, maxDurationMs: 40,
-      monotonicClock: () => monotonic, hangOhlcPhase: phase
+      maxCycles: 1, maxRequests: 2, maxDurationMs: 40, hangOhlcPhase: phase
     });
-    const pending = runSpotPaperPairedSynthetic(setup.config);
-    await waitFor(setup.pendingOhlc, "OHLC_ENTRY");
-    monotonic += setup.config.maxDurationMs;
-    const report = await waitFor(pending, "OUTER_TIMEOUT");
+    const report = await runStalledOhlcToDeadline(t, setup);
     assert.equal(report.stopReason, "DURATION_LIMIT");
     assert.equal(report.requests, 1);
     assert.equal(report.transportDiagnostic.requestKind, "OHLC");
@@ -476,10 +494,8 @@ test("outer deadlines and explicit aborts retain the stalled request phase", asy
 });
 
 test("paired timeout keeps terminal handling when diagnostic counters throw", async t => {
-  let monotonic = 100;
   const setup = await fixture(t, {
-    maxCycles: 1, maxRequests: 2, maxDurationMs: 40,
-    monotonicClock: () => monotonic, hangOhlcPhase: "BODY"
+    maxCycles: 1, maxRequests: 2, maxDurationMs: 40, hangOhlcPhase: "BODY"
   });
   const fetchOhlc = setup.provider.fetchOhlc.bind(setup.provider);
   setup.provider.fetchOhlc = runtime => {
@@ -488,10 +504,7 @@ test("paired timeout keeps terminal handling when diagnostic counters throw", as
     };
     return fetchOhlc(runtime);
   };
-  const pending = runSpotPaperPairedSynthetic(setup.config);
-  await waitFor(setup.pendingOhlc, "COUNTER_TIMEOUT_ENTRY");
-  monotonic += setup.config.maxDurationMs;
-  const report = await waitFor(pending, "COUNTER_TIMEOUT");
+  const report = await runStalledOhlcToDeadline(t, setup);
   assert.equal(report.stopReason, "DURATION_LIMIT");
   assert.equal(report.requests, 1);
   assert.equal(Object.hasOwn(report, "transportDiagnostic"), false);
