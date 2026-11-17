@@ -1,5 +1,6 @@
 """Single-writer, ten-minute BTC/EUR paper advisor. No exchange order client."""
 import argparse
+from feeds import POLICY_DIGEST, POLICY_VERSION
 import fcntl
 import json
 import math
@@ -80,7 +81,7 @@ def connect(path, model):
     with db:
         db.execute('CREATE TABLE IF NOT EXISTS slots (slot INTEGER PRIMARY KEY, record TEXT)')
         db.execute('CREATE TABLE IF NOT EXISTS config (id INTEGER PRIMARY KEY, value TEXT NOT NULL)')
-        identity=json.dumps([VERSION,model])
+        identity=json.dumps([VERSION,POLICY_VERSION,POLICY_DIGEST,model])
         db.execute('INSERT OR IGNORE INTO config VALUES (1,?)',(identity,))
         if db.execute('SELECT value FROM config WHERE id=1').fetchone()[0]!=identity:
             raise ValueError('model or policy changed: use a separate challenger database')
@@ -111,14 +112,19 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
         history.append(json.loads(raw)['report']['last'])
     snapshot=None
     market_status='OK'
-    try:
-        snapshot=feeds.market(slot)
-    except Exception as exc:
-        market_status=str(exc) if isinstance(exc,feeds.FeedError) else 'MARKET_ERROR'
+    if forced(states['model'],slot) and forced(states['reference'],slot):
+        market_status='DAY_CLOSE_BOOK_ONLY'
+    else:
+        try:
+            snapshot=feeds.market(slot)
+        except Exception as exc:
+            market_status=str(exc) if isinstance(exc,feeds.FeedError) else 'MARKET_ERROR'
     action,reason,usage='HOLD','MARKET_UNAVAILABLE',None
     cost=0
     if forced(states['model'],slot):
         action,reason='SELL' if D(states['model']['btc']) else 'HOLD','DAY_CLOSE'
+    elif not key:
+        reason='MODEL_KEY_UNAVAILABLE'
     elif snapshot and clock() < slot+90:
         # A separately committed slot reservation already records possible request intent.
         try:
@@ -142,7 +148,7 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
     except Exception:
         book=None
     now=clock()
-    if book and not 0 <= now-book['received'] <= 5:
+    if book and any(not 0 <= now-book[field] <= 5 for field in ('received','bidAt','askAt')):
         book=None
     in_slot=slot <= now < slot+STEP
     executable=book if in_slot else None
@@ -158,7 +164,7 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
     total=None if pending or cost is None or prior_cost is None else prior_cost+cost
     report=dict(schema='MERIDIAN_ADVISOR_V1',asOf=iso(now),model=model,arms={k:mark(v,book) for k,v in states.items()},
                 last=last,apiCostEur=total)
-    record=dict(version=VERSION,promptVersion=feeds.POLICY_VERSION,marketStatus=market_status,slot=slot,states=states,report=report,inputs=snapshot,executionBook=book,
+    record=dict(version=VERSION,promptVersion=POLICY_VERSION,promptDigest=POLICY_DIGEST,marketStatus=market_status,slot=slot,states=states,report=report,inputs=snapshot,executionBook=book,
                 referenceAction=ref,referenceExecution=ref_execution,usage=usage,slotApiCostEur=cost,pendingSlots=pending)
     with db:
         db.execute('UPDATE slots SET record=? WHERE slot=?',(json.dumps(record,allow_nan=False),slot))
@@ -173,8 +179,10 @@ def main():
     args=parser.parse_args()
     key=os.environ.get('OPENAI_API_KEY')
     model=os.environ.get('MERIDIAN_OPENAI_MODEL')
-    if not key or not model:
-        parser.error('set OPENAI_API_KEY and MERIDIAN_OPENAI_MODEL (pinned model version)')
+    if not model:
+        parser.error('set MERIDIAN_OPENAI_MODEL to a pinned model version')
+    if not key and not (args.directory/'advisor.sqlite').is_file():
+        parser.error('set OPENAI_API_KEY before starting a new model account')
     rates=None
     raw=os.environ.get('MERIDIAN_EUR_PER_MILLION')
     if raw:
