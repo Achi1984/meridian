@@ -103,6 +103,13 @@ function launchHistory(transactions = [historyTransaction()]) {
         evidenceId: "fixture:pool"
       }]
     },
+    signatures: [...new Map(transactions.map(transaction => [transaction.signature, {
+      signature: transaction.signature,
+      slot: transaction.slot,
+      err: null,
+      errorStatus: null,
+      subjectAddresses: transaction.subjectAddresses
+    }])).values()],
     transactions
   };
 }
@@ -326,6 +333,70 @@ test("available history for non-swap bundle members cannot contradict a positive
   }
 });
 
+test("available collector signature records reject failed, conflicting, duplicate, or wrong-slot members", async () => {
+  const {identity, history, decodedSwap, signature} = await actualCanonicalInputs();
+  const memberSignature = "1".repeat(63) + "2";
+  const bytes = response([
+    status({
+      transactions: [signature, memberSignature],
+      slot: identity.launchWindow.startInclusive
+    })
+  ], {contextSlot: identity.launchWindow.endInclusive + 1});
+  const signatureRecord = overrides => ({
+    signature: memberSignature,
+    slot: identity.launchWindow.startInclusive,
+    blockTime: null,
+    err: null,
+    subjectAddresses: [identity.pool],
+    errorStatus: null,
+    ...overrides
+  });
+  const diagnoseHistory = historyOverrides => diagnoseJitoBundleMembership({
+    rawResponseBytes: bytes,
+    expectedSha256: createHash("sha256").update(bytes).digest("hex"),
+    requestBytes: request(),
+    requestedBundleIds: [BUNDLE_ID],
+    identity,
+    launchHistory: {
+      ...history,
+      ...historyOverrides
+    },
+    swapReceipts: [decodedSwap]
+  });
+  const failedMember = diagnoseHistory({
+    signatures: [...history.signatures, signatureRecord({
+      err: {InstructionError: [0, "Custom"]},
+      errorStatus: "FAILED_TRANSACTION"
+    })]
+  });
+  assert.equal(failedMember.rows[0].classification, "UNKNOWN");
+  assert.equal(failedMember.rows[0].reason, "HISTORY_SIGNATURE_NOT_SUCCESSFUL");
+  assert.equal(failedMember.rows[0].matchedTransactions.length, 0);
+
+  const conflictingMember = diagnoseHistory({
+    signatures: [...history.signatures, signatureRecord({
+      errorStatus: "CONFLICTING_SIGNATURE_RECORD"
+    })]
+  });
+  assert.equal(conflictingMember.rows[0].reason, "CONFLICTING_HISTORY_SIGNATURE_RECORD");
+
+  const wrongSlot = diagnoseHistory({
+    signatures: [...history.signatures, signatureRecord({
+      slot: identity.launchWindow.startInclusive + 1
+    })]
+  });
+  assert.equal(wrongSlot.rows[0].reason, "HISTORY_SIGNATURE_SLOT_MISMATCH");
+
+  const duplicateMember = diagnoseHistory({
+    signatures: [
+      ...history.signatures,
+      signatureRecord(),
+      signatureRecord({err: {InstructionError: [0, "Custom"]}})
+    ]
+  });
+  assert.equal(duplicateMember.rows[0].reason, "AMBIGUOUS_HISTORY_SIGNATURE");
+});
+
 test("future, out-of-window, nonfinalized, and failed statuses are not positive", () => {
   const future = diagnose(response([status({slot: 132})], {contextSlot: 131}));
   assert.equal(future.rows[0].reason, "FUTURE_OR_INVALID_BUNDLE_SLOT");
@@ -439,4 +510,3 @@ test("uncaptured request binding remains unavailable and BAM Explorer gaps are d
   assert.match(docs, /Direct BAM Ingest|DBI/);
   assert.match(docs, /Bundle Explorer/);
 });
-

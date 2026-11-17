@@ -11,6 +11,7 @@ export const JITO_BUNDLE_DIAGNOSTIC_LIMITS = Object.freeze({
   maxResponseBytes: 1_048_576,
   maxRequestBytes: 65_536,
   maxBundleIds: 5,
+  maxSignatureRecords: 20_000,
   maxTransactionReceipts: 2_000
 });
 
@@ -145,6 +146,9 @@ function launchHistoryProblem(history, identity) {
       history.commitment !== "finalized" ||
       !Array.isArray(history.transactions) ||
       history.transactions.length > JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxTransactionReceipts ||
+      history.signatures !== undefined &&
+        (!Array.isArray(history.signatures) ||
+         history.signatures.length > JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxSignatureRecords) ||
       !isRecord(history.coverage) ||
       !validSlot(interval?.startInclusive) || !validSlot(interval?.endInclusive) ||
       interval.endInclusive < interval.startInclusive) {
@@ -300,6 +304,14 @@ export function diagnoseJitoBundleMembership({
       signatureToBundleIds.set(signature, bundleIds);
     }
   }
+  const wantedSignatures = new Set(signatureToBundleIds.keys());
+  const historySignaturesBySignature = new Map();
+  for (const signatureRecord of launchHistory.signatures ?? []) {
+    if (!isRecord(signatureRecord) || !wantedSignatures.has(signatureRecord.signature)) continue;
+    const records = historySignaturesBySignature.get(signatureRecord.signature) ?? [];
+    records.push(signatureRecord);
+    historySignaturesBySignature.set(signatureRecord.signature, records);
+  }
   const swapsBySignature = new Map();
   for (let index = 0; index < swapReceipts.length; index += 1) {
     const receipt = swapReceipts[index];
@@ -352,11 +364,31 @@ export function diagnoseJitoBundleMembership({
       if (candidate && swap.slot !== status.slot) {
         return rowResult(bundleId, status, index, "SWAP_RECEIPT_SLOT_MISMATCH");
       }
+      const signatureRecords = historySignaturesBySignature.get(signature) ?? [];
+      if (signatureRecords.length > 1) {
+        return rowResult(bundleId, status, index, "AMBIGUOUS_HISTORY_SIGNATURE");
+      }
+      const signatureRecord = signatureRecords[0];
+      if (signatureRecord && (!validSlot(signatureRecord.slot) ||
+          !Object.hasOwn(signatureRecord, "err") ||
+          !Object.hasOwn(signatureRecord, "errorStatus"))) {
+        return rowResult(bundleId, status, index, "MALFORMED_HISTORY_SIGNATURE_RECORD");
+      }
+      if (signatureRecord?.errorStatus === "CONFLICTING_SIGNATURE_RECORD") {
+        return rowResult(bundleId, status, index, "CONFLICTING_HISTORY_SIGNATURE_RECORD");
+      }
+      if (signatureRecord &&
+          (signatureRecord.err !== null || signatureRecord.errorStatus !== null)) {
+        return rowResult(bundleId, status, index, "HISTORY_SIGNATURE_NOT_SUCCESSFUL");
+      }
       const historyEntries = historyBySignature.get(signature) ?? [];
       if (historyEntries.length > 1) {
         return rowResult(bundleId, status, index, "AMBIGUOUS_HISTORY_TRANSACTION");
       }
       if (historyEntries.length === 0) {
+        if (signatureRecord && signatureRecord.slot !== status.slot) {
+          return rowResult(bundleId, status, index, "HISTORY_SIGNATURE_SLOT_MISMATCH");
+        }
         if (!candidate) continue;
         return rowResult(bundleId, status, index, "FINALIZED_HISTORY_TRANSACTION_MISSING");
       }
@@ -377,6 +409,9 @@ export function diagnoseJitoBundleMembership({
           transaction.slot > launchHistory.slotInterval.endInclusive) {
         return rowResult(bundleId, status, index, "TRANSACTION_RECEIPT_SLOT_MISMATCH");
       }
+      if (signatureRecord && signatureRecord.slot !== status.slot) {
+        return rowResult(bundleId, status, index, "HISTORY_SIGNATURE_SLOT_MISMATCH");
+      }
       if (!candidate) continue;
       matchedTransactions.push({
         signature,
@@ -392,4 +427,3 @@ export function diagnoseJitoBundleMembership({
   });
   return result;
 }
-

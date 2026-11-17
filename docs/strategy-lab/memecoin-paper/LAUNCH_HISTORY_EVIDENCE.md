@@ -186,7 +186,10 @@ The launch-history receipt must have a
 pool once in both `declaredSubjects` and `coverage.subjects`, and include the
 matched transaction's pool in `subjectAddresses`. This binds the canonical
 transaction to the pool-specific scan input without treating partial history
-coverage as complete.
+coverage as complete. Available `signatures` records are checked by exact member
+signature, including members without swap receipts; duplicate, failed/conflicted,
+malformed, or wrong-slot records keep the row `UNKNOWN`. Missing signature
+records in a partial receipt remain unproven and do not count as coverage.
 
 The recognized success shape is JSON-RPC `result.context.slot` plus
 `result.value` rows with a 64-hex `bundle_id`, a `transactions` array of
