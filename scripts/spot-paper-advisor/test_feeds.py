@@ -26,6 +26,18 @@ class FeedTests(unittest.TestCase):
         with patch.object(feeds,'_kraken',return_value=data), self.assertRaisesRegex(feeds.FeedError,'GAP'):
             feeds._candles(5,900,3)
 
+    def test_public_timeout_retries_with_new_book(self):
+        quote = dict(bids=[['100','2',99]],asks=[['101','3',100]])
+        with patch.object(feeds,'_kraken',side_effect=[feeds.FeedError('REQUEST_FAILED'),quote]) as read:
+            self.assertEqual(feeds.book(lambda:100)['bidAt'],99)
+            self.assertEqual(read.call_count,2)
+
+    def test_repeated_public_error_stops(self):
+        with patch.object(feeds,'_kraken',side_effect=feeds.FeedError('HTTP_503')) as read:
+            with self.assertRaisesRegex(feeds.FeedError,'HTTP_503'):
+                feeds.book(lambda:100)
+            self.assertEqual(read.call_count,2)
+
     def test_stale_book_fails(self):
         book=dict(bids=[['100','2',90]],asks=[['101','3',99]])
         with patch.object(feeds,'_kraken',return_value=book), self.assertRaisesRegex(feeds.FeedError,'BOOK_TIME_INVALID'):

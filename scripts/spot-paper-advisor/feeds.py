@@ -82,7 +82,7 @@ def _positive(value):
     return n
 
 
-def book(now=time.time):
+def _book_once(now):
     started = time.monotonic()
     levels = _kraken('Depth?pair=XBTEUR&count=1')
     received = now()
@@ -105,11 +105,24 @@ def book(now=time.time):
     return dict(bid=bid, ask=ask, bidSize=bid_size, askSize=ask_size, received=received, bidAt=bid_at, askAt=ask_at)
 
 
+def _retry_public_read(read, *args):
+    try:
+        return read(*args)
+    except FeedError as exc:
+        if str(exc) not in {'REQUEST_FAILED', 'SLOW_BOOK', 'HTTP_502', 'HTTP_503', 'HTTP_504'}:
+            raise
+    return read(*args)
+
+
+def book(now=time.time):
+    return _retry_public_read(_book_once, now)
+
+
 def _candles(interval, slot, length):
     step = interval * 60
     end = slot - slot % step
     start = end - length*step
-    data = _kraken(f'OHLC?pair=XBTEUR&interval={interval}')
+    data = _retry_public_read(_kraken, f'OHLC?pair=XBTEUR&interval={interval}')
     if not isinstance(data, list) or len(data) < 2:
         raise FeedError('EMPTY_OHLC')
     candles = []

@@ -1,3 +1,4 @@
+import {createAdvisorSection} from './paper-advisor-view.js?v=B16-M11-FIX16';
 import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B16-M11-FIX16';
 import {createStrategyArenaView} from './strategy-arena.js?v=B16-M11-FIX16';
 import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B16-M11-FIX16';
@@ -42,6 +43,7 @@ function mountWorkspace(){
   const botOverviewRoot=document.createElement('section');
   botOverviewRoot.id='paper-bot-overview-root';
   botReports.append(botOverviewRoot);
+  createAdvisorSection(collapsedSection('paper-advisor','BTC/EUR · Modellentscheidungen im Zehn-Minuten-Takt'));
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';

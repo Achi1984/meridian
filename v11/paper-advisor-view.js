@@ -92,4 +92,22 @@ export function mountAdvisor(root, access = appAccess) {
   });
 }
 
-if (typeof document !== 'undefined') mountAdvisor(document.getElementById('paper-advisor'));
+export function createAdvisorSection(section) {
+  const document = section.ownerDocument;
+  const label = document.createElement('label');
+  label.textContent = 'Lokalen Paperbericht öffnen ';
+  const input = document.createElement('input');
+  input.type = 'file';
+  input.accept = '.json,application/json';
+  input.setAttribute('data-advisor-file', '');
+  label.append(input);
+  const status = document.createElement('p');
+  status.setAttribute('data-advisor-status', '');
+  status.setAttribute('role', 'status');
+  status.textContent = 'Kein Bericht geladen.';
+  const result = document.createElement('div');
+  result.setAttribute('data-advisor-result', '');
+  result.style.overflowWrap = 'anywhere';
+  section.append(label, status, result);
+  mountAdvisor(section);
+}
