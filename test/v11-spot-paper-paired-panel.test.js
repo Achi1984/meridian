@@ -387,6 +387,8 @@ test('cross-run comparison retains original metrics but requires verified semant
   assert.deepEqual(model.runs.map(run => run.runId),
     ['btc-eur-paired-diag-20261110-001', 'btc-eur-paired-diag-20261116-002']);
   assert.notEqual(model.runs[0].valuationAt, model.runs[1].valuationAt);
+  assert.deepEqual(model.runs.map(run => run.arms.find(arm => arm.role === 'challenger').label),
+    ['CONFIRM2_COOLDOWN10 · 5M-SMA20-Trend', 'CONFIRM2_COOLDOWN10 · 5M-SMA20-Trend']);
   assert.equal(model.runs[0].arms[0].bookedFeesCents,
     first.arms.baseline.bookedFeesCents);
 
