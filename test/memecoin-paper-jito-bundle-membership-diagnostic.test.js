@@ -295,6 +295,10 @@ test("response status rows are joined only by bundle ID, never by array position
   });
   assert.equal(partialReordered.rows[0].classification, "POSITIVE_MATCH");
   assert.equal(partialReordered.rows[1].reason, "MISSING_OR_NULL_STATUS");
+
+  const extraPlaceholder = diagnose(response([null, status()]));
+  assert.equal(extraPlaceholder.rows[0].classification, "UNKNOWN");
+  assert.equal(extraPlaceholder.rows[0].reason, "STATUS_CARDINALITY_MISMATCH");
 });
 
 test("future, out-of-window, nonfinalized, and failed statuses are not positive", () => {
@@ -410,3 +414,4 @@ test("uncaptured request binding remains unavailable and BAM Explorer gaps are d
   assert.match(docs, /Direct BAM Ingest|DBI/);
   assert.match(docs, /Bundle Explorer/);
 });
+
