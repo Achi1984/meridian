@@ -1,4 +1,5 @@
 """Public Kraken spot prices and one structured OpenAI Responses decision per call."""
+import hashlib
 import json
 import math
 import time
@@ -33,6 +34,9 @@ _SCHEMA = {'type':'object', 'properties':{'action':{'type':'string','enum':['BUY
            'reason':{'type':'string'}}, 'required':['action','reason'], 'additionalProperties':False}
 
 
+POLICY_DIGEST = hashlib.sha256((_POLICY + json.dumps(_SCHEMA, sort_keys=True)).encode()).hexdigest()
+
+
 def _request(url, *, body=None, key=None, timeout=5):
     headers = {'User-Agent':'Meridian-Paper/1', 'Accept':'application/json'}
     if key:
@@ -60,7 +64,7 @@ def _request(url, *, body=None, key=None, timeout=5):
 
 
 def _kraken(path):
-    data = _request(_KRAKEN + path)
+    data = _request(_KRAKEN + path, timeout=12 if path.startswith('OHLC?') else 5)
     if data.get('error') != [] or not isinstance(data.get('result'), dict) or 'XXBTZEUR' not in data['result']:
         raise FeedError('KRAKEN_RESPONSE_INVALID')
     return data['result']['XXBTZEUR']
@@ -94,18 +98,18 @@ def book(now=time.time):
         price, amount, updated = row
         if type(updated) is not int or not 0 <= received-updated <= 5:
             raise FeedError('BOOK_TIME_INVALID')
-        sides.append((_positive(price), _positive(amount)))
-    (bid,bid_size),(ask,ask_size) = sides
+        sides.append((_positive(price), _positive(amount), updated))
+    (bid,bid_size,bid_at),(ask,ask_size,ask_at) = sides
     if bid > ask:
         raise FeedError('CROSSED_BOOK')
-    return dict(bid=bid, ask=ask, bidSize=bid_size, askSize=ask_size, received=received)
+    return dict(bid=bid, ask=ask, bidSize=bid_size, askSize=ask_size, received=received, bidAt=bid_at, askAt=ask_at)
 
 
 def _candles(interval, slot, length):
     step = interval * 60
     end = slot - slot % step
     start = end - length*step
-    data = _kraken(f'OHLC?pair=XBTEUR&interval={interval}&since={start-step}')
+    data = _kraken(f'OHLC?pair=XBTEUR&interval={interval}')
     if not isinstance(data, list) or len(data) < 2:
         raise FeedError('EMPTY_OHLC')
     candles = []
@@ -161,6 +165,8 @@ def decide(context, model, key):
     usage = _usage(response)
     if time.monotonic()-start>30:
         raise FeedError('MODEL_TIMEOUT', usage)
+    if response.get('model') != model:
+        raise FeedError('MODEL_SNAPSHOT_MISMATCH', usage)
     if response.get('status') != 'completed' or usage is None:
         raise FeedError('MODEL_INCOMPLETE_OR_USAGE_MISSING',usage)
     try:
