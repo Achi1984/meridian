@@ -11,7 +11,7 @@ class FeedTests(unittest.TestCase):
         def fetch(path):
             if path.startswith('Depth'):
                 return dict(bids=[['100','2',slot]],asks=[['101','3',slot]])
-            step = 300 if 'interval=5&' in path else 3600
+            step = 300 if path.endswith('interval=5') else 3600
             length = 72 if step==300 else 24
             end = slot-slot%step
             return [[end-step*i,'100','110','90','101',0,0,0] for i in range(length,-1,-1)]
@@ -34,7 +34,7 @@ class FeedTests(unittest.TestCase):
     def test_structured_decision_and_refusal_accounting(self):
         usage=dict(input_tokens=100, input_tokens_details={'cached_tokens':50},output_tokens=20)
         part={'type':'output_text','text':json.dumps({'action':'HOLD','reason':'Warten.'})}
-        resp={'status':'completed','output':[{'type':'message','role':'assistant','content':[part]}],'usage':usage}
+        resp={'model':'model','status':'completed','output':[{'type':'message','role':'assistant','content':[part]}],'usage':usage}
         with patch.object(feeds,'_request',return_value=resp) as post:
             self.assertEqual(feeds.decide({},'model','key'),('HOLD','Warten.',{'input':100,'cached':50,'output':20}))
             self.assertTrue(json.loads(post.call_args.kwargs['body'])['text']['format']['strict'])
