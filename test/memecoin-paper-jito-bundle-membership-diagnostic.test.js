@@ -6,11 +6,20 @@ import {
   JITO_BUNDLE_MEMBERSHIP_DIAGNOSTIC_VERSION,
   diagnoseJitoBundleMembership
 } from "../scripts/memecoin-paper/jito-bundle-membership-diagnostic.mjs";
-import {LAUNCH_HISTORY_SOURCE_VERSION} from "../scripts/memecoin-paper/launch-history-source.mjs";
-import {RAYDIUM_CPMM_LAYOUT} from "../scripts/memecoin-paper/cpmm-swap-observations.mjs";
+import {
+  acquireLaunchHistory,
+  LAUNCH_HISTORY_SOURCE_VERSION,
+  SOLANA_RPC_ORIGIN
+} from "../scripts/memecoin-paper/launch-history-source.mjs";
+import {
+  decodeCpmmSuccessfulSwap,
+  RAYDIUM_CPMM_LAYOUT
+} from "../scripts/memecoin-paper/cpmm-swap-observations.mjs";
+import {makeFixture} from "./fixtures/memecoin-paper-analyst-window-evidence/source-shaped.mjs";
 
 const MINT = "So11111111111111111111111111111111111111112";
 const POOL = "SysvarRent111111111111111111111111111111111";
+const OTHER_POOL = "SysvarC1ock11111111111111111111111111111111";
 const BUNDLE_ID = "a".repeat(64);
 const OTHER_BUNDLE_ID = "b".repeat(64);
 const SIGNATURE = "1".repeat(64);
@@ -68,6 +77,7 @@ function historyTransaction(overrides = {}) {
     signature: SIGNATURE,
     slot: 120,
     status: "SUCCESS",
+    subjectAddresses: [POOL],
     transaction: {signatures: [SIGNATURE]},
     meta: {err: null},
     ...overrides
@@ -79,7 +89,20 @@ function launchHistory(transactions = [historyTransaction()]) {
     sourceVersion: LAUNCH_HISTORY_SOURCE_VERSION,
     source: "Solana JSON-RPC",
     commitment: "finalized",
-    coverage: {complete: false},
+    declaredSubjects: [{
+      address: POOL,
+      source: "synthetic fixture",
+      evidenceId: "fixture:pool"
+    }],
+    slotInterval: {startInclusive: 100, endInclusive: 132},
+    coverage: {
+      complete: false,
+      subjects: [{
+        address: POOL,
+        source: "synthetic fixture",
+        evidenceId: "fixture:pool"
+      }]
+    },
     transactions
   };
 }
@@ -95,6 +118,69 @@ function diagnose(bytes = response(), options = {}) {
     swapReceipts: [swapReceipt()],
     ...options
   });
+}
+
+async function actualCanonicalInputs() {
+  const fixture = makeFixture({buyCount: 1, sellCount: 0, includeBoundaryRows: false});
+  const transactionRow = fixture.transactions[0];
+  const identity = {
+    ...fixture.identity,
+    launchWindow: {
+      startInclusive: transactionRow.slot,
+      endInclusive: transactionRow.slot
+    }
+  };
+  const decodedSwap = decodeCpmmSuccessfulSwap(transactionRow, {
+    identity: fixture.identity,
+    poolProof: fixture.poolProof
+  });
+  let observedAt = 1_000;
+  const history = await acquireLaunchHistory({
+    subjects: [{
+      address: fixture.identity.pool,
+      source: "synthetic fixture pool",
+      evidenceId: "fixture:pool-history"
+    }],
+    startSlot: transactionRow.slot,
+    endSlot: transactionRow.slot,
+    transport: async requestValue => {
+      assert.equal(requestValue.url, SOLANA_RPC_ORIGIN);
+      const requestBody = JSON.parse(requestValue.body);
+      let result;
+      if (requestBody.method === "getSlot") {
+        result = transactionRow.slot + 1;
+      } else if (requestBody.method === "getSignaturesForAddress") {
+        assert.equal(requestBody.params[0], fixture.identity.pool);
+        result = [{
+          signature: transactionRow.signature,
+          slot: transactionRow.slot,
+          blockTime: transactionRow.blockTime,
+          err: null
+        }];
+      } else if (requestBody.method === "getTransaction") {
+        assert.equal(requestBody.params[0], transactionRow.signature);
+        result = {
+          slot: transactionRow.slot,
+          blockTime: transactionRow.blockTime,
+          version: "legacy",
+          transaction: transactionRow.transaction,
+          meta: transactionRow.meta
+        };
+      } else {
+        throw new Error(`unexpected RPC method: ${requestBody.method}`);
+      }
+      return new Response(JSON.stringify({
+        jsonrpc: "2.0",
+        id: requestBody.id,
+        result
+      }), {status: 200});
+    },
+    clock: () => observedAt++
+  });
+  assert.equal(history.coverage.subjects[0].address, fixture.identity.pool);
+  assert.equal(history.transactions[0].status, "SUCCESS");
+  assert.equal(decodedSwap.status, "DECODED");
+  return {identity, history, decodedSwap, signature: transactionRow.signature};
 }
 
 test("reports a finalized exact-signature pool-swap match with raw provenance only", () => {
@@ -122,6 +208,26 @@ test("reports a finalized exact-signature pool-swap match with raw provenance on
   assert.equal(result.executionAuthorized, false);
 });
 
+test("joins actual canonical CPMM decoder output to an acquired finalized launch-history receipt", async () => {
+  const {identity, history, decodedSwap, signature} = await actualCanonicalInputs();
+  const capturedResponse = response([
+    status({transactions: [signature], slot: identity.launchWindow.startInclusive})
+  ], {contextSlot: identity.launchWindow.endInclusive + 1});
+  const result = diagnoseJitoBundleMembership({
+    rawResponseBytes: capturedResponse,
+    expectedSha256: createHash("sha256").update(capturedResponse).digest("hex"),
+    requestBytes: request(),
+    requestedBundleIds: [BUNDLE_ID],
+    identity,
+    launchHistory: history,
+    swapReceipts: [decodedSwap]
+  });
+
+  assert.equal(result.rows[0].classification, "POSITIVE_MATCH");
+  assert.equal(result.rows[0].matchedTransactions[0].signature, signature);
+  assert.deepEqual(history.declaredSubjects.map(subject => subject.address), [identity.pool]);
+});
+
 test("a missing pool-specific receipt and mismatched request binding remain unknown", () => {
   const unmatched = diagnose(response(), {
     swapReceipts: [swapReceipt({signature: OTHER_SIGNATURE})]
@@ -147,13 +253,19 @@ test("duplicate status rows and duplicate member signatures are ambiguous", () =
     launchHistory: launchHistory(),
     swapReceipts: [swapReceipt()]
   });
-  assert.equal(duplicateRows.rows[0].reason, "DUPLICATE_BUNDLE_STATUS");
-  assert.equal(duplicateRows.rows[0].classification, "UNKNOWN");
+  assert.ok(duplicateRows.rows.every(row =>
+    row.reason === "DUPLICATE_BUNDLE_STATUS" && row.classification === "UNKNOWN"));
 
   const duplicateSignature = diagnose(response([
     status({transactions: [SIGNATURE, SIGNATURE]})
   ]));
-  assert.equal(duplicateSignature.rows[0].reason, "INVALID_OR_DUPLICATE_MEMBER_SIGNATURE");
+  assert.equal(duplicateSignature.rows[0].reason, "MALFORMED_STATUS_MEMBERSHIP");
+
+  const repeatedOversizedList = diagnose(response([
+    status({transactions: Array.from({length: 1_000}, () => SIGNATURE)})
+  ]));
+  assert.ok(repeatedOversizedList.rows.every(row =>
+    row.reason === "MALFORMED_STATUS_MEMBERSHIP" && row.classification === "UNKNOWN"));
 
   const conflictingMembership = diagnose(response([
     status(),
@@ -171,6 +283,18 @@ test("duplicate status rows and duplicate member signatures are ambiguous", () =
     swapReceipts: [swapReceipt(), swapReceipt()]
   });
   assert.equal(duplicateReceipt.rows[0].reason, "AMBIGUOUS_SWAP_RECEIPT");
+});
+
+test("response status rows are joined only by bundle ID, never by array position", () => {
+  const partialReordered = diagnose(response([
+    null,
+    status()
+  ]), {
+    requestedBundleIds: [BUNDLE_ID, OTHER_BUNDLE_ID],
+    requestBytes: request([BUNDLE_ID, OTHER_BUNDLE_ID])
+  });
+  assert.equal(partialReordered.rows[0].classification, "POSITIVE_MATCH");
+  assert.equal(partialReordered.rows[1].reason, "MISSING_OR_NULL_STATUS");
 });
 
 test("future, out-of-window, nonfinalized, and failed statuses are not positive", () => {
@@ -197,7 +321,7 @@ test("digest mismatch, null or truncated absence, and unknown IDs stay unknown",
   assert.equal(absent.rows[0].reason, "MISSING_OR_NULL_STATUS");
 
   const truncated = diagnose(response([]));
-  assert.equal(truncated.rows[0].reason, "STATUS_CARDINALITY_MISMATCH");
+  assert.equal(truncated.rows[0].reason, "MISSING_OR_NULL_STATUS");
 
   const unknownId = diagnose(response([status({bundle_id: OTHER_BUNDLE_ID})]));
   assert.equal(unknownId.rows[0].reason, "UNKNOWN_BUNDLE_ID_IN_RESPONSE");
@@ -221,6 +345,57 @@ test("receipt identity and slot mismatches are unknown", () => {
   });
   assert.equal(failedHistoryTransaction.rows[0].reason,
     "HISTORY_TRANSACTION_NOT_SUCCESSFUL");
+});
+
+test("history window and declared pool subject must bind the candidate receipt", () => {
+  const wrongWindow = diagnose(response(), {
+    launchHistory: {
+      ...launchHistory(),
+      slotInterval: {startInclusive: 99, endInclusive: 132}
+    }
+  });
+  assert.equal(wrongWindow.rows[0].reason, "HISTORY_INTERVAL_NOT_PINNED_TO_LAUNCH_WINDOW");
+
+  const wrongPoolSubject = diagnose(response(), {
+    launchHistory: {
+      ...launchHistory(),
+      declaredSubjects: [{
+        address: OTHER_POOL,
+        source: "synthetic fixture",
+        evidenceId: "fixture:other"
+      }],
+      coverage: {
+        complete: false,
+        subjects: [{
+          address: OTHER_POOL,
+          source: "synthetic fixture",
+          evidenceId: "fixture:other"
+        }]
+      }
+    }
+  });
+  assert.equal(wrongPoolSubject.rows[0].reason, "POOL_SUBJECT_NOT_UNAMBIGUOUSLY_DECLARED");
+
+  const mismatchedPoolEvidence = diagnose(response(), {
+    launchHistory: {
+      ...launchHistory(),
+      coverage: {
+        complete: false,
+        subjects: [{
+          address: POOL,
+          source: "different synthetic source",
+          evidenceId: "fixture:other-pool-evidence"
+        }]
+      }
+    }
+  });
+  assert.equal(mismatchedPoolEvidence.rows[0].reason,
+    "POOL_SUBJECT_COVERAGE_BINDING_MISMATCH");
+
+  const wrongTransactionSubject = diagnose(response(), {
+    launchHistory: launchHistory([historyTransaction({subjectAddresses: [OTHER_POOL]})])
+  });
+  assert.equal(wrongTransactionSubject.rows[0].reason, "HISTORY_TRANSACTION_NOT_SUCCESSFUL");
 });
 
 test("uncaptured request binding remains unavailable and BAM Explorer gaps are documented", async () => {

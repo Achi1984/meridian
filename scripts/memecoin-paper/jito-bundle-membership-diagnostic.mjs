@@ -135,13 +135,37 @@ function validSwapReceipt(receipt) {
     signatureIsValid(receipt.signature) && validSlot(receipt.slot);
 }
 
-function validLaunchHistory(history) {
-  return isRecord(history) &&
-    history.sourceVersion === LAUNCH_HISTORY_SOURCE_VERSION &&
-    history.commitment === "finalized" &&
-    Array.isArray(history.transactions) &&
-    history.transactions.length <= JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxTransactionReceipts &&
-    isRecord(history.coverage);
+function launchHistoryProblem(history, identity) {
+  const interval = history?.slotInterval;
+  const subject = row => isRecord(row) && row.address === identity.pool &&
+    typeof row.source === "string" && row.source.trim().length > 0 &&
+    typeof row.evidenceId === "string" && row.evidenceId.trim().length > 0;
+  if (!isRecord(history) ||
+      history.sourceVersion !== LAUNCH_HISTORY_SOURCE_VERSION ||
+      history.commitment !== "finalized" ||
+      !Array.isArray(history.transactions) ||
+      history.transactions.length > JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxTransactionReceipts ||
+      !isRecord(history.coverage) ||
+      !validSlot(interval?.startInclusive) || !validSlot(interval?.endInclusive) ||
+      interval.endInclusive < interval.startInclusive) {
+    return "CANONICAL_SWAP_OR_HISTORY_RECEIPT_INVALID";
+  }
+  if (interval.startInclusive !== identity.launchWindow.startInclusive ||
+      interval.endInclusive !== identity.launchWindow.endInclusive) {
+    return "HISTORY_INTERVAL_NOT_PINNED_TO_LAUNCH_WINDOW";
+  }
+  const declared = Array.isArray(history.declaredSubjects)
+    ? history.declaredSubjects.filter(subject) : [];
+  const covered = Array.isArray(history.coverage.subjects)
+    ? history.coverage.subjects.filter(subject) : [];
+  if (declared.length !== 1 || covered.length !== 1) {
+    return "POOL_SUBJECT_NOT_UNAMBIGUOUSLY_DECLARED";
+  }
+  if (declared[0].source !== covered[0].source ||
+      declared[0].evidenceId !== covered[0].evidenceId) {
+    return "POOL_SUBJECT_COVERAGE_BINDING_MISMATCH";
+  }
+  return null;
 }
 
 function memberTransactions(status) {
@@ -200,9 +224,11 @@ export function diagnoseJitoBundleMembership({
       new Set(requestedBundleIds).size !== requestedBundleIds.length) {
     return {...result, reason: "INVALID_REQUESTED_BUNDLE_IDS"};
   }
-  if (!validLaunchHistory(launchHistory) || !Array.isArray(swapReceipts) ||
+  const historyProblem = launchHistoryProblem(launchHistory, identity);
+  if (historyProblem) return unknownRows(result, requestedBundleIds, historyProblem);
+  if (!Array.isArray(swapReceipts) ||
       swapReceipts.length > JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxTransactionReceipts) {
-    return unknownRows(result, requestedBundleIds, "CANONICAL_SWAP_OR_HISTORY_RECEIPT_INVALID");
+    return unknownRows(result, requestedBundleIds, "CANONICAL_SWAP_RECEIPTS_MISSING_OR_OVER_LIMIT");
   }
   if (!(rawResponseBytes instanceof Uint8Array) || rawResponseBytes.byteLength === 0 ||
       rawResponseBytes.byteLength > JITO_BUNDLE_DIAGNOSTIC_LIMITS.maxResponseBytes) {
@@ -243,49 +269,34 @@ export function diagnoseJitoBundleMembership({
       !validSlot(response.context.slot) || !Array.isArray(response.value)) {
     return unknownRows(result, requestedBundleIds, "UNSUPPORTED_STATUS_RESPONSE_SHAPE");
   }
-  if (response.value.length !== requestedBundleIds.length) {
-    return unknownRows(result, requestedBundleIds, "STATUS_CARDINALITY_MISMATCH");
-  }
-
   const rowsById = new Map();
-  const unknownStatusIndices = new Set();
-  const unknownIds = new Set();
+  const signatureToBundleIds = new Map();
   for (let index = 0; index < response.value.length; index += 1) {
     const status = response.value[index];
-    if (status === null) {
-      unknownStatusIndices.add(index);
-      continue;
-    }
+    if (status === null) continue;
     if (!isRecord(status) || typeof status.bundle_id !== "string" ||
         !BUNDLE_ID.test(status.bundle_id)) {
-      unknownStatusIndices.add(index);
-      continue;
+      return unknownRows(result, requestedBundleIds, "MALFORMED_UNATTRIBUTED_STATUS");
     }
-    const entries = rowsById.get(status.bundle_id) ?? [];
-    entries.push({status, index});
-    rowsById.set(status.bundle_id, entries);
-    if (!requestedBundleIds.includes(status.bundle_id)) unknownIds.add(status.bundle_id);
-  }
-  if (unknownIds.size > 0) {
-    return unknownRows(result, requestedBundleIds, "UNKNOWN_BUNDLE_ID_IN_RESPONSE");
-  }
-  const signatureOccurrences = new Map();
-  for (const entries of rowsById.values()) {
-    for (const {status} of entries) {
-      if (!Array.isArray(status.transactions)) continue;
-      for (const signature of status.transactions) {
-        const ids = signatureOccurrences.get(signature) ?? new Set();
-        for (const otherEntries of rowsById.values()) {
-          for (const {status: other} of otherEntries) {
-            if (other !== status && Array.isArray(other.transactions) &&
-                other.transactions.includes(signature)) ids.add(other.bundle_id);
-          }
-        }
-        signatureOccurrences.set(signature, ids);
-      }
+    if (!requestedBundleIds.includes(status.bundle_id)) {
+      return unknownRows(result, requestedBundleIds, "UNKNOWN_BUNDLE_ID_IN_RESPONSE");
+    }
+    const existing = rowsById.get(status.bundle_id);
+    if (existing) {
+      return unknownRows(result, requestedBundleIds, "DUPLICATE_BUNDLE_STATUS");
+    }
+    const signatures = memberTransactions(status);
+    if (!signatures) {
+      return unknownRows(result, requestedBundleIds, "MALFORMED_STATUS_MEMBERSHIP");
+    }
+    const entry = {status, index, signatures};
+    rowsById.set(status.bundle_id, entry);
+    for (const signature of signatures) {
+      const bundleIds = signatureToBundleIds.get(signature) ?? new Set();
+      bundleIds.add(status.bundle_id);
+      signatureToBundleIds.set(signature, bundleIds);
     }
   }
-
   const swapsBySignature = new Map();
   for (let index = 0; index < swapReceipts.length; index += 1) {
     const receipt = swapReceipts[index];
@@ -303,17 +314,12 @@ export function diagnoseJitoBundleMembership({
     historyBySignature.set(transaction.signature, entries);
   }
 
-  result.rows = requestedBundleIds.map((bundleId, requestIndex) => {
-    const entries = rowsById.get(bundleId) ?? [];
-    if (entries.length > 1) {
-      return rowResult(bundleId, entries[0].status, entries[0].index, "DUPLICATE_BUNDLE_STATUS");
-    }
-    if (unknownStatusIndices.has(requestIndex) || entries.length === 0) {
+  result.rows = requestedBundleIds.map(bundleId => {
+    const entry = rowsById.get(bundleId);
+    if (!entry) {
       return rowResult(bundleId, null, null, "MISSING_OR_NULL_STATUS");
     }
-    const {status, index} = entries[0];
-    const signatures = memberTransactions(status);
-    if (!signatures) return rowResult(bundleId, status, index, "INVALID_OR_DUPLICATE_MEMBER_SIGNATURE");
+    const {status, index, signatures} = entry;
     if (!validSlot(status.slot) || status.slot > response.context.slot) {
       return rowResult(bundleId, status, index, "FUTURE_OR_INVALID_BUNDLE_SLOT");
     }
@@ -327,7 +333,7 @@ export function diagnoseJitoBundleMembership({
 
     const matchedTransactions = [];
     for (const signature of signatures) {
-      if ((signatureOccurrences.get(signature)?.size ?? 0) > 0) {
+      if ((signatureToBundleIds.get(signature)?.size ?? 0) > 1) {
         return rowResult(bundleId, status, index, "CONFLICTING_BUNDLE_MEMBERSHIP");
       }
       const candidates = swapsBySignature.get(signature) ?? [];
@@ -355,12 +361,17 @@ export function diagnoseJitoBundleMembership({
       if (transaction.status !== "SUCCESS" || !isRecord(transaction.transaction) ||
           !Array.isArray(signatureList) || signatureList.length < 1 ||
           signatureList.length > 64 || signatureList[0] !== signature ||
+          new Set(signatureList).size !== signatureList.length ||
           !signatureList.every(signatureIsValid) ||
-          !isRecord(transaction.meta) || transaction.meta.err !== null) {
+          !isRecord(transaction.meta) || transaction.meta.err !== null ||
+          !Array.isArray(transaction.subjectAddresses) ||
+          !transaction.subjectAddresses.includes(identity.pool)) {
         return rowResult(bundleId, status, index, "HISTORY_TRANSACTION_NOT_SUCCESSFUL");
       }
       if (!validSlot(transaction.slot) || transaction.slot !== status.slot ||
-          transaction.slot !== swap.slot) {
+          transaction.slot !== swap.slot ||
+          transaction.slot < launchHistory.slotInterval.startInclusive ||
+          transaction.slot > launchHistory.slotInterval.endInclusive) {
         return rowResult(bundleId, status, index, "TRANSACTION_RECEIPT_SLOT_MISMATCH");
       }
       matchedTransactions.push({

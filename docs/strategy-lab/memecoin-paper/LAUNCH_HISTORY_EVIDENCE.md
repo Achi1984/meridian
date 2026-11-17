@@ -176,6 +176,18 @@ the diagnostic checks the
 response IDs. Without those bytes, request/response binding is explicitly
 `UNAVAILABLE`; a response digest alone does not bind a request or provider.
 
+Status rows are associated by their explicit `bundle_id`, never by array
+position. A null row or a requested ID absent from `result.value` leaves that
+ID `UNKNOWN`; no missing ID is inferred from a row's position. A malformed
+unattributable row, invalid/oversized member-signature list, or duplicate
+status ID makes the response ambiguous and keeps all requested IDs `UNKNOWN`.
+The launch-history receipt must have a
+`slotInterval` exactly equal to the pinned launch window, declare the selected
+pool once in both `declaredSubjects` and `coverage.subjects`, and include the
+matched transaction's pool in `subjectAddresses`. This binds the canonical
+transaction to the pool-specific scan input without treating partial history
+coverage as complete.
+
 The recognized success shape is JSON-RPC `result.context.slot` plus
 `result.value` rows with a 64-hex `bundle_id`, a `transactions` array of
 base58 signatures, `slot`, `confirmation_status: "finalized"`, and
