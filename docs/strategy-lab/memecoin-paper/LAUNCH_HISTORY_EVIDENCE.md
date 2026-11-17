@@ -147,9 +147,9 @@ correction and evidence mapping have been reviewed.
    source-verified Jito bundle ID and bundle status binding the exact member
    signatures; use the mint initialization slot as the launch window under
    review. Solana RPC slot equality alone is only a same-slot observation and
-   never satisfies that definition. This packet has no Jito source, bundle
-   IDs, or verified bundle denominator; the existing bundle metric therefore
-   remains `UNKNOWN`.
+   never satisfies that definition. The offline diagnostic below is not a
+   trusted Jito source and does not provide a verified bundle denominator; the
+   existing bundle metric therefore remains `UNKNOWN`.
 5. **Recipient proposal:** define initial recipients only after an owner sets
    the included launch interval and source/denominator policy. Until then,
    report successful `mintTo` observations with transaction IDs and keep the
@@ -157,6 +157,57 @@ correction and evidence mapping have been reviewed.
 
 These are explicit proposals for review; none silently approves a developer
 roster, historical window, rug predicate, bundle detector, or hard-gate mapping.
+
+## Offline captured Jito response diagnostic
+
+`diagnoseJitoBundleMembership()` in
+`scripts/memecoin-paper/jito-bundle-membership-diagnostic.mjs` is source-side
+and offline only. It accepts a copy of immutable captured JSON-RPC response
+bytes and their expected SHA-256, one to five externally supplied bundle IDs,
+an exact `solana` chain/mint/pool and inclusive launch-slot window, and
+canonical `DECODED` Raydium CPMM swap receipts marked finalized. A receipt must
+bind its unique 64-byte base58 signature, slot, chain, mint, and pool. When the
+original request bytes are also available, the diagnostic checks the
+`getBundleStatuses` method, exact requested ID list, and JSON-RPC request and
+response IDs. Without those bytes, request/response binding is explicitly
+`UNAVAILABLE`; a response digest alone does not bind a request or provider.
+
+The recognized success shape is JSON-RPC `result.context.slot` plus
+`result.value` rows with a 64-hex `bundle_id`, a `transactions` array of
+base58 signatures, `slot`, `confirmation_status: "finalized"`, and
+`err: {"Ok": null}`. The Jito reference describes `err` as carrying retryable
+or non-retryable status-lookup errors, but does not provide a concrete error
+value example; the diagnostic therefore treats every non-success `err` shape
+as `UNKNOWN`, without interpreting it. The API returns `null` for a bundle
+that is not found or has not landed. It checks recent status history only
+(including up to 300 rooted slots in the reference description), so it is not
+a historical completeness source. A positive row requires unique member signatures,
+non-future in-window slot, successful finalized status, and at least one
+unambiguous same-slot signature join to the exact pool/mint canonical swap
+receipt. The diagnostic retains the raw status row and its index alongside
+the raw-response digest. Null or missing statuses, JSON-RPC errors, other
+error representations, non-finalized states, unsupported shapes, unknown or
+duplicate IDs, duplicate signatures, and receipt mismatches remain `UNKNOWN`.
+It does not infer a mint or pool from a bundle status row; that identity comes
+only from the joined swap receipt.
+
+For independent review, retain the original response bytes and verify their
+digest; retain the original request bytes when available; record the exact
+requested IDs, expected chain/mint/pool/window, and complete or partial
+finalized canonical swap/transaction receipts used for the join. Any broader
+acceptance additionally needs independently established source identity and
+trust, complete finalized transaction and bundle-membership coverage for the
+whole finite window, the exact supported-pool initialization/first-swap
+evidence, and the separately approved supply numerator/denominator. This
+diagnostic does not establish those inputs, source completeness, that no other
+bundle exists, or eligibility for the existing 10% gate. A positive match is
+not provider authentication or a numerator.
+
+The Jito Bundle Explorer is not a completeness oracle: the current bundles
+documentation notes that direct BAM/DBI bundles are not shown there. An absent
+Explorer result or absent/null `getBundleStatuses` row therefore cannot be
+treated as proof of no bundle. The diagnostic makes no network request and
+does not feed the launch-history classifier or any Paper gate.
 
 ## Official source references
 
@@ -172,11 +223,15 @@ following public references (checked 2026-11-02; no RPC endpoint was contacted):
 - Solana [`getTransaction`](https://solana.com/docs/rpc/http/gettransaction)
   documents transaction lookup and `maxSupportedTransactionVersion`.
 - Jito [Low Latency Transaction Send](https://docs.jito.wtf/lowlatencytxnsend/)
-  documents bundle submission and bundle identifiers. The source implemented
-  here does not call Jito and cannot establish membership from a slot alone.
+  documents `getBundleStatuses`, the maximum-five-ID status request, and
+  finalized bundle status fields. Jito [Bundles](https://docs.jito.wtf/bundles/)
+  documents the Bundle Explorer limitation for direct BAM/DBI bundles. The
+  diagnostic implemented here parses captured responses only; it does not call
+  Jito or establish source authentication/completeness.
 
 The standard Node test uses only generated fixtures:
 
 ```sh
 node --test test/memecoin-paper-launch-history.test.js
+node --test test/memecoin-paper-jito-bundle-membership-diagnostic.test.js
 ```
