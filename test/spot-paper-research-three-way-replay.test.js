@@ -11,10 +11,10 @@ const acquisition = (data, requestStartedAt, receivedAt) => {
   return {data, raw, sha256: sha256(Buffer.from(raw, "utf8")),
     requestStartedAt, receivedAt};
 };
-const ohlc = (closes, startAt) => {
+const ohlc = (closes, startAt, spread = 0) => {
   const rows = closes.map((close, index) => {
     const value = close.toFixed(8);
-    return [(startAt + index * MINUTE) / 1000, value, value, value, value,
+    return [(startAt + index * MINUTE) / 1000, value, (close + spread).toFixed(8), (close - spread).toFixed(8), value,
       value, "1.00000000", 1];
   });
   const value = closes.at(-1).toFixed(8);
@@ -58,4 +58,43 @@ test("three-way replay executes all arms on one causal synthetic stream", () => 
   }
   assert.equal(result.arms.rangePullback.fillCount, 0);
   assert.equal(result.arms.cash.finalCashCents, 100_000);
+});
+
+test("range replay ignores warm-up entries and records only filled entries and ATR exits", () => {
+  const closes = [...Array(72).fill(100), 99, 98, 97, 96, 95, 95.1, 95.2, 89];
+  const warmupEnd = closes.length - 2;
+  const observations = [warmupEnd, warmupEnd + 1, warmupEnd + 2].map((count, index) => {
+    const at = BASE + count * MINUTE + 1_000;
+    const window = closes.slice(0, count);
+    const quote = ticker(index === 2 ? 95 : window.at(-1));
+    if (index === 1) quote.result.XXBTZEUR.a[0] = "99.00000000";
+    return {at: at + 100, decisionAt: at,
+      ohlc: acquisition(ohlc(window, BASE, 1), at - 100, at),
+      ticker: acquisition(quote, at + 1, at + 20)};
+  });
+  const result = compareThreeSpotPaperStrategies(observations);
+  assert.equal(result.status, "COMPARISON_AVAILABLE");
+  const range = result.arms.rangePullback;
+  assert.equal(range.fillCount, 0);
+  assert.equal(range.rejectedEntryCount, 1);
+  assert.equal(range.positionStatus, "FLAT");
+
+  const allowed = observations.map((observation, index) => index !== 1 ? observation : {
+    ...observation, ticker: acquisition(ticker(closes[warmupEnd]),
+      observation.ticker.requestStartedAt, observation.ticker.receivedAt)
+  });
+  const completed = compareThreeSpotPaperStrategies(allowed);
+  assert.equal(completed.status, "COMPARISON_AVAILABLE");
+  assert.deepEqual(completed.arms.rangePullback.fills.map(fill => [fill.executionAt, fill.reason]), [
+    [observations[1].at, "RANGE_PULLBACK_ATR_RSI"], [observations[2].at, "ATR_STOP"]
+  ]);
+  const riskExit = allowed.map((observation, index) => index !== 2 ? observation : {
+    ...observation, ticker: acquisition(ticker(89),
+      observation.ticker.requestStartedAt, observation.ticker.receivedAt)
+  });
+  const stopped = compareThreeSpotPaperStrategies(riskExit);
+  assert.equal(stopped.status, "COMPARISON_AVAILABLE");
+  assert.equal(stopped.arms.rangePullback.fills.at(-1).reason, "SAMPLED_2PCT_BID_STOP");
+  assert.equal(stopped.arms.rangePullback.positionStatus, "FLAT");
+
 });
