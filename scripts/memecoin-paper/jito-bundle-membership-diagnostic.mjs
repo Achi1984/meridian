@@ -269,6 +269,9 @@ export function diagnoseJitoBundleMembership({
       !validSlot(response.context.slot) || !Array.isArray(response.value)) {
     return unknownRows(result, requestedBundleIds, "UNSUPPORTED_STATUS_RESPONSE_SHAPE");
   }
+  if (response.value.length > requestedBundleIds.length) {
+    return unknownRows(result, requestedBundleIds, "STATUS_CARDINALITY_MISMATCH");
+  }
   const rowsById = new Map();
   const signatureToBundleIds = new Map();
   for (let index = 0; index < response.value.length; index += 1) {
@@ -388,3 +391,4 @@ export function diagnoseJitoBundleMembership({
   });
   return result;
 }
+
