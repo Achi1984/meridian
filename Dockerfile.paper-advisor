@@ -1,0 +1,7 @@
+FROM python:3.12-slim
+WORKDIR /app
+COPY scripts/spot-paper-advisor/ /app/
+RUN groupadd -g 10001 paper && useradd --no-log-init -u 10001 -g paper paper && mkdir -p /state && chown paper:paper /state
+USER paper
+ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
+ENTRYPOINT ["python","worker.py","--directory","/state"]

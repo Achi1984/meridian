@@ -1,4 +1,4 @@
-import {isSpotPaperThreeWayDashboardEnvelope} from '../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B16-M11-FIX16';
+import {isSpotPaperThreeWayDashboardEnvelope} from '../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B16-M11-FIX17';
 
 const MAX_REPORT_BYTES = 64 * 1024 * 1024;
 

@@ -3,7 +3,7 @@ import {
   MONEY_FIELDS,
   formatCents,
   presentSpotPaperPairedReport
-} from './spot-paper-paired-model.js?v=B16-M11-FIX16';
+} from './spot-paper-paired-model.js?v=B16-M11-FIX17';
 
 let panelSequence = 0;
 const MONEY_LABELS = new Map(MONEY_FIELDS.map(([key, label]) => [key, label]));
