@@ -343,13 +343,13 @@ export function diagnoseJitoBundleMembership({
       if (candidates.length > 1) {
         return rowResult(bundleId, status, index, "AMBIGUOUS_SWAP_RECEIPT");
       }
-      if (candidates.length === 0) continue;
-      const {receipt: swap, index: swapReceiptIndex} = candidates[0];
-      if (!validSwapReceipt(swap) || swap.mint !== identity.mint ||
-          swap.pool !== identity.pool) {
+      const candidate = candidates[0];
+      const swap = candidate?.receipt;
+      if (candidate && (!validSwapReceipt(swap) || swap.mint !== identity.mint ||
+          swap.pool !== identity.pool)) {
         return rowResult(bundleId, status, index, "SWAP_RECEIPT_IDENTITY_MISMATCH");
       }
-      if (swap.slot !== status.slot) {
+      if (candidate && swap.slot !== status.slot) {
         return rowResult(bundleId, status, index, "SWAP_RECEIPT_SLOT_MISMATCH");
       }
       const historyEntries = historyBySignature.get(signature) ?? [];
@@ -357,6 +357,7 @@ export function diagnoseJitoBundleMembership({
         return rowResult(bundleId, status, index, "AMBIGUOUS_HISTORY_TRANSACTION");
       }
       if (historyEntries.length === 0) {
+        if (!candidate) continue;
         return rowResult(bundleId, status, index, "FINALIZED_HISTORY_TRANSACTION_MISSING");
       }
       const {transaction, index: historyTransactionIndex} = historyEntries[0];
@@ -367,20 +368,20 @@ export function diagnoseJitoBundleMembership({
           new Set(signatureList).size !== signatureList.length ||
           !signatureList.every(signatureIsValid) ||
           !isRecord(transaction.meta) || transaction.meta.err !== null ||
-          !Array.isArray(transaction.subjectAddresses) ||
-          !transaction.subjectAddresses.includes(identity.pool)) {
+          (candidate && (!Array.isArray(transaction.subjectAddresses) ||
+            !transaction.subjectAddresses.includes(identity.pool)))) {
         return rowResult(bundleId, status, index, "HISTORY_TRANSACTION_NOT_SUCCESSFUL");
       }
       if (!validSlot(transaction.slot) || transaction.slot !== status.slot ||
-          transaction.slot !== swap.slot ||
           transaction.slot < launchHistory.slotInterval.startInclusive ||
           transaction.slot > launchHistory.slotInterval.endInclusive) {
         return rowResult(bundleId, status, index, "TRANSACTION_RECEIPT_SLOT_MISMATCH");
       }
+      if (!candidate) continue;
       matchedTransactions.push({
         signature,
         slot: transaction.slot,
-        swapReceiptIndex,
+        swapReceiptIndex: candidate.index,
         historyTransactionIndex
       });
     }
