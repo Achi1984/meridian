@@ -379,7 +379,7 @@ function comparisonRun(input, label) {
       const arm = report.arms[id];
       return {
         role: id,
-        label: armLabel,
+        label: id === 'challenger' ? challengerLabel(arm.modelId) : armLabel,
         fillCount: arm.fillCount,
         bookedFeesCents: arm.bookedFeesCents,
         modeledSlippageCents: arm.modeledSlippageCents,
