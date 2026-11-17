@@ -301,6 +301,31 @@ test("response status rows are joined only by bundle ID, never by array position
   assert.equal(extraPlaceholder.rows[0].reason, "STATUS_CARDINALITY_MISMATCH");
 });
 
+test("available history for non-swap bundle members cannot contradict a positive match", () => {
+  const memberSignature = "1".repeat(63) + "2";
+  const bytes = response([status({transactions: [SIGNATURE, memberSignature]})]);
+  const other = historyTransaction({
+    signature: memberSignature, transaction: {signatures: [memberSignature]},
+    subjectAddresses: [OTHER_POOL]
+  });
+  assert.equal(diagnose(bytes).rows[0].classification, "POSITIVE_MATCH");
+  assert.equal(diagnose(bytes, {
+    launchHistory: launchHistory([historyTransaction(), other])
+  }).rows[0].matchedTransactions.length, 1);
+
+  for (const [rows, reason] of [
+    [[{...other, slot: 121}], "TRANSACTION_RECEIPT_SLOT_MISMATCH"],
+    [[{...other, status: "TRANSACTION_NOT_SUCCESSFUL"}], "HISTORY_TRANSACTION_NOT_SUCCESSFUL"],
+    [[other, other], "AMBIGUOUS_HISTORY_TRANSACTION"]
+  ]) {
+    const result = diagnose(bytes, {
+      launchHistory: launchHistory([historyTransaction(), ...rows])
+    });
+    assert.equal(result.rows[0].classification, "UNKNOWN");
+    assert.equal(result.rows[0].reason, reason);
+  }
+});
+
 test("future, out-of-window, nonfinalized, and failed statuses are not positive", () => {
   const future = diagnose(response([status({slot: 132})], {contextSlot: 131}));
   assert.equal(future.rows[0].reason, "FUTURE_OR_INVALID_BUNDLE_SLOT");
