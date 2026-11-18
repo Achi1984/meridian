@@ -122,6 +122,7 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
         if (arm.action === 'SKIPPED') {
           const causes = {
             CANDLES: 'Kurskerzen fehlen oder sind ungültig', BOOK: 'Orderbuch fehlt oder ist unbrauchbar',
+            BOOK_TIME: 'Zeitstempel im Orderbuch ungültig oder zu alt',
             RATE_LIMIT: 'Kraken-Anfragelimit erreicht', REQUEST: 'Kraken-Abruf fehlgeschlagen',
             MARKET: 'Marktdaten fehlen', MODEL_ACCESS: 'Modellzugang fehlt',
             MODEL: 'Modellantwort fehlt', WINDOW: 'Entscheidungsfenster abgelaufen'
