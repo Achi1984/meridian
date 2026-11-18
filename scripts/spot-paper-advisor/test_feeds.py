@@ -39,6 +39,31 @@ class FeedTests(unittest.TestCase):
         with patch.object(feeds,'_kraken',return_value=data), self.assertRaisesRegex(feeds.FeedError,'GAP'):
             feeds._candles(5,900,3)
 
+    def test_publication_delay_only_retries_the_pending_last_candle(self):
+        slot = 900
+        rows = [[i * 300, 100, 110, 90, 101, 0, 0, 0] for i in range(4)]
+        for responses, expected_waits, succeeds in (
+            ([rows[:-1], rows], [5], True),
+            ([rows[:-1], rows[:-1], rows], [5, 10], True),
+            ([rows[:-1]] * 3, [5, 10], False),
+            ([rows[:2]], [], False),
+            ([rows[:2] + rows[3:]], [], False),
+        ):
+            with self.subTest(waits=expected_waits, succeeds=succeeds):
+                clock = [slot]
+                def advance(seconds):
+                    clock[0] += seconds
+                with patch.object(feeds, '_kraken', side_effect=responses) as fetch, \
+                        patch.object(feeds.time, 'sleep', side_effect=advance) as sleep:
+                    if succeeds:
+                        result = feeds._candles(5, slot, 3, lambda: clock[0])
+                        self.assertEqual([row[0] for row in result], [0, 300, 600])
+                    else:
+                        with self.assertRaisesRegex(feeds.FeedError, 'INCOMPLETE_OHLC'):
+                            feeds._candles(5, slot, 3, lambda: clock[0])
+                    self.assertEqual([c.args[0] for c in sleep.call_args_list], expected_waits)
+                    self.assertEqual(fetch.call_count, len(responses))
+
     def test_public_timeout_retries_with_new_book(self):
         quote = dict(bids=[['100','2',99]],asks=[['101','3',100]])
         with patch.object(feeds,'_kraken',side_effect=[feeds.FeedError('REQUEST_FAILED'),quote]) as read:
