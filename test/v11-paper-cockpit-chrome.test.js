@@ -472,8 +472,13 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root > details > summary')`),
           true,'primary Paper source details follow its refresh');
         await key('Tab','Tab',9);
+        for (const selector of ['#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]']) {
+          assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
+            true, 'live pilot control is reachable in document order: '+selector);
+          await key('Tab','Tab',9);
+        }
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-section > summary')`),
-          true,'Paper-bot overview disclosure follows the primary report details');
+          true,'Paper-bot overview disclosure follows the live pilot controls');
         await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-section button')`),
           true,'overview refresh is keyboard reachable before its disclosure controls');
