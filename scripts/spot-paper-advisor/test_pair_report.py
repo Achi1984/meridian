@@ -68,3 +68,15 @@ class PairReportTest(unittest.TestCase):
                 self.assertEqual(arm['action'], 'SKIPPED' if expected else 'HOLD')
                 self.assertIsNone(arm['equity'])
                 self.assertIsNone(arm['change'])
+
+    def test_buy_decision_preserves_its_recorded_execution(self):
+        for outcome in ('PAPER_BUY', 'POSITION_UNCHANGED', 'NO_FRESH_BOOK',
+                        'DECISION_WINDOW_EXPIRED', 'INSUFFICIENT_ASK_SIZE', None, 'unrecognized'):
+            with self.subTest(outcome=outcome):
+                last = dict(action='BUY', reason='signal')
+                if outcome is not None:
+                    last['execution'] = outcome
+                raw = json.dumps({'report': {'last': last, 'arms': {'model': {'equityEur': 995}}}})
+                arm = describe(raw, 1000)
+                self.assertEqual(arm['action'], 'BUY')
+                self.assertEqual(arm.get('execution'), None if outcome == 'unrecognized' else outcome)

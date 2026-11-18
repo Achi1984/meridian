@@ -115,6 +115,8 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
       const header = add(add(pair,'thead',''),'tr','');
       for (const label of ['Modell','Entscheidung','Kontowert','Seit Vergleichsstart']) add(header,'th',label).scope='col';
       const body = add(pair,'tbody','');
+      const latestSlot = Math.floor(Date.parse(report.last.at) / 600000) * 600000;
+      const sameSlot = Date.parse(comparison.at) === latestSlot;
       for (const [label, arm] of [['V1',comparison.v1],['V2',comparison.v2]]) {
         const row = add(body,'tr','');
         add(row,'th',label).scope='row';
@@ -127,17 +129,21 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
             MARKET: 'Marktdaten fehlen', MODEL_ACCESS: 'Modellzugang fehlt',
             MODEL: 'Modellantwort fehlt', WINDOW: 'Entscheidungsfenster abgelaufen'
           };
-          const sameSlot = Date.parse(comparison.at) === Math.floor(Date.parse(report.last.at) / 600000) * 600000;
           const fallback = label === 'V1' && sameSlot ? skippedReason(report.last.reason) : null;
           decision.append(doc.createElement('br'));
           add(decision,'small', (Object.hasOwn(causes, arm.skipCause) && causes[arm.skipCause]) || fallback || 'Grund nicht gemeldet');
+        } else if (arm.action === 'BUY' || arm.action === 'SELL') {
+          const baselineExecution = label === 'V1' && sameSlot && arm.action === report.last.action
+            ? report.last.execution : null;
+          const outcome = arm.execution ?? baselineExecution;
+          decision.append(doc.createElement('br'));
+          add(decision, 'small', Object.hasOwn(executions, outcome) ? executions[outcome] : 'Ausführung nicht gemeldet');
         }
         add(row,'td',Number.isFinite(arm.equity) ? EURO.format(arm.equity) : 'Bewertung fehlt');
         const cell = add(row,'td',Number.isFinite(arm.change) ?
           (arm.change > 0 ? '+' : '') + EURO.format(arm.change) : 'Ausstehend');
         if (arm.change) cell.className = arm.change > 0 ? 'advisor-gain' : 'advisor-loss';
       }
-      const latestSlot = Math.floor(Date.parse(report.last.at) / 600000) * 600000;
       if (Date.parse(comparison.at) < latestSlot) {
         add(content, 'p', 'Für den jüngsten Takt steht der gemeinsame Vergleich noch aus.');
       }
