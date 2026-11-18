@@ -62,7 +62,7 @@ function mountWorkspace(){
   );
   const host8hRoot=document.createElement('section');
   host8hRoot.id='spot-paper-host8h-root';
-  workspace.insertBefore(host8hRoot,catalogStatus || catalogRoot);
+  workspace.insertBefore(host8hRoot,botReports);
   spotPaperHost8hDashboard=mountSpotPaperHost8hDashboard(host8hRoot,document,window);
 
   const history=collapsedSection('paper-history-section','Frühere Paper-Berichte');
