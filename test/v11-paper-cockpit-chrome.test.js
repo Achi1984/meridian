@@ -59,6 +59,9 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
     pilotAudit:{closedModelTrades:0, maxObservedDrawdownPct:0.119, modeledApiUsd:0.001,
       apiBudgetUsd:3, unresolvedReserveUsd:0}
   };
+  pilot.decisions = [pilot.report.last, {at:new Date(Date.now()-600000).toISOString(),
+    action:'HOLD', reason:'MARKET_UNAVAILABLE', execution:'HOLD'}];
+  pilot.trades = [];
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
       if (await servePilotFixture(call, event, pilot)) return;
@@ -221,6 +224,10 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(tile.title,'Kaufen');
         assert.match(tile.loss,/-.*1,19/);
         assert.equal(tile.detailsOpen,false);
+        const skipped = await evaluate(`document.querySelector('#paper-advisor .advisor-skipped > summary')?.textContent`);
+        assert.match(skipped, /Ausgesetzt · Marktdaten fehlen/);
+        assert.match(await evaluate(`document.querySelector('#paper-advisor [data-key="trades"]').textContent`),
+          /Kein vollständiges Kauf-Verkauf-Paar/);
         assert.equal(tile.overflow,false,'pilot comparison fits the viewport at '+size.width);
         const pilotEvidence = evidence || process.env.V11_A2_EVIDENCE_DIR;
         if (pilotEvidence && size.width === 390) {
