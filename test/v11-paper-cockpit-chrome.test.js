@@ -222,6 +222,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
             loss:root.querySelector('.advisor-loss')?.textContent, detailsOpen:root.querySelector('.advisor-detail')?.open};
         })()`);
         assert.equal(tile.title,'Kaufen');
+        assert.match(await evaluate(`document.querySelector('#paper-advisor .advisor-headline').textContent`),/1,19.*hinter Referenz/);
+        assert.match(await evaluate(`document.querySelector('#paper-advisor [data-key="history"] > summary').textContent`),/Modell entschied bei 1 von 2/);
         assert.match(tile.loss,/-.*1,19/);
         assert.equal(tile.detailsOpen,false);
         const skipped = await evaluate(`document.querySelector('#paper-advisor .advisor-skipped > summary')?.textContent`);
@@ -433,8 +435,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.progressSettled(),3);
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B18-M11');
-          const view=await import('./paper-cockpit-view.js?v=B18-M11');
+          const model=await import('./paper-cockpit-model.js?v=B19-M11');
+          const view=await import('./paper-cockpit-view.js?v=B19-M11');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
