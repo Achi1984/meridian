@@ -37,21 +37,20 @@ test('version history: native keyboard, focus and compact viewport at five width
    };
    await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,screenWidth:width,screenHeight:height});
    await unlockAppThroughGate(call);
-   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),strategy:rect('.strategy-entry-link'),status:rect('#autonomy-status'),brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
+   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),shortcut:rect('.terminal-entry'),status:rect('#autonomy-status'),brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
    assert.ok(header.identity.top>=20,'identity has breathing room below the safe area');
    assert.ok(header.brandVisible&&header.historyVisible,'identity and version descriptions remain visible');
-   for(const target of [header.version,header.lock,header.strategy]){
+   for(const target of [header.version,header.lock]){
     assert.ok(target.width>=44&&target.height>=44,'header actions retain touch targets');
     assert.ok(target.left>=16&&target.right<=width-16+1,'header actions stay inside horizontal safe padding');
    }
    assert.ok(header.version.right+11<=header.lock.left,'build and lock controls have a clear gap');
-   assert.ok(header.strategy.top>=Math.max(header.version.bottom,header.lock.bottom)+11,'strategy action has a separate spaced row');
-   assert.ok(header.status.top>=header.strategy.bottom+7,'status is separated from navigation');
+   assert.ok(header.shortcut.height<=1,'shortcut occupies no visible header row');
+   assert.ok(header.status.top>=header.lock.bottom+7,'status is separated from navigation');
    assert.ok(header.root<=width+1,'header does not introduce horizontal scrolling');
    if(width<=600){
     if(!await evaluate('matchMedia("(min-width:376px)").matches')) assert.ok(header.version.top>=header.identity.bottom+15,'narrow mobile identity occupies its own row');
     else assert.ok(header.identity.right<=header.version.left && header.identity.top<header.version.bottom,'compact mobile header fits one row');
-    assert.ok(header.strategy.width>=width-33,'mobile strategy action uses available width');
    }
    const before=await evaluate(`JSON.stringify({value:document.querySelector('.portfolio-value').textContent,sources:[...document.querySelectorAll('.trust-cell span')].map(x=>x.textContent),decision:document.querySelector('[data-decision-owner]').textContent})`);
    assert.equal(await evaluate(`document.getElementById('version-panel').hidden`),true);
@@ -61,12 +60,12 @@ test('version history: native keyboard, focus and compact viewport at five width
    assert.equal(await evaluate(`document.getElementById('version-panel').hidden`),false);
    const metrics=await evaluate(`(()=>{const b=document.getElementById('version-toggle').getBoundingClientRect(),p=document.getElementById('version-panel').getBoundingClientRect(),c=document.getElementById('version-close').getBoundingClientRect();return {width:innerWidth,height:innerHeight,buttonWidth:b.width,buttonHeight:b.height,panel:{left:p.left,right:p.right,top:p.top,bottom:p.bottom,height:p.height},body:document.body.scrollWidth,root:document.documentElement.scrollWidth,close:{left:c.left,right:c.right,top:c.top,bottom:c.bottom,width:c.width,height:c.height},expanded:document.getElementById('version-toggle').getAttribute('aria-expanded')};})()`);
    assert.equal(metrics.width,width);assert.equal(metrics.height,height);assert.ok(metrics.buttonWidth>=44&&metrics.buttonHeight>=44);assert.ok(metrics.panel.left>=0&&metrics.panel.right<=width+1&&metrics.body<=width+1&&metrics.root<=width+1);assert.ok(metrics.close.width>=44&&metrics.close.height>=44&&metrics.close.left>=metrics.panel.left&&metrics.close.right<=metrics.panel.right&&metrics.close.top>=0&&metrics.close.bottom<=height);assert.equal(metrics.expanded,'true');
-   assert.equal(await evaluate(`document.querySelector('.version-history-list li strong').textContent`),'Meridian 11 · B17');
+   assert.equal(await evaluate(`document.querySelector('.version-history-list li strong').textContent`),'Meridian 11 · B18');
    const history=await evaluate(`document.querySelector('.version-history-list').innerText`);
    assert.match(history,/Meridian 11 · B14/);assert.match(history,/Meridian 11 · B12/);assert.match(history,/Terminal 10\.0-r130/);
    const reachable=await evaluate(`(()=>{const p=document.getElementById('version-panel'),note=p.querySelector(':scope > p:last-child'),targets=[...p.querySelectorAll('.version-history-list li'),note],positions=[];for(const item of targets){item.scrollIntoView({block:'center'});const r=item.getBoundingClientRect();positions.push({top:r.top,bottom:r.bottom});}return {positions,note:{directChild:note.parentElement===p,text:note.textContent.trim()},body:document.body.scrollWidth,root:document.documentElement.scrollWidth};})()`);
    assert.equal(reachable.note.directChild,true);assert.equal(reachable.note.text,'Statischer Verlauf · Integrationsdaten sind keine Veröffentlichungsdaten. Mit Escape schließen.');
-   assert.equal(reachable.positions.length,25);assert.ok(reachable.positions.every(r=>r.top>=0&&r.bottom<=height),'all history entries and the closing note can be brought into the short viewport: '+JSON.stringify({width,height,...reachable}));assert.ok(reachable.body<=width+1&&reachable.root<=width+1);
+   assert.equal(reachable.positions.length,26);assert.ok(reachable.positions.every(r=>r.top>=0&&r.bottom<=height),'all history entries and the closing note can be brought into the short viewport: '+JSON.stringify({width,height,...reachable}));assert.ok(reachable.body<=width+1&&reachable.root<=width+1);
    await evaluate(`window.scrollTo(0,0)`);
    assert.equal(await evaluate(`document.activeElement.id`),'version-toggle','focus remains on the disclosure toggle before tab navigation');
    await key('Tab','Tab',9);

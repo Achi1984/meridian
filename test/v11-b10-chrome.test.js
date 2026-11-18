@@ -49,7 +49,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
         body:document.body.scrollWidth,root:document.documentElement.scrollWidth,
         header:Math.round(document.querySelector('.topbar').getBoundingClientRect().height),
         headerPadding:parseFloat(getComputedStyle(document.querySelector('.topbar')).paddingTop),
-        headerControlsFit:[...document.querySelectorAll('.identity,.header-actions,.terminal-entry,#autonomy-status summary')].every(node=>{
+        headerControlsFit:[...document.querySelectorAll('.identity,.header-actions,#autonomy-status summary')].every(node=>{
           const r=node.getBoundingClientRect();return r.top>=0&&r.left>=0&&r.right<=innerWidth&&node.scrollWidth<=node.clientWidth+1;
         }),
         statusOpen:document.getElementById('autonomy-status').open,
@@ -64,7 +64,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
           return {value:{top:value.top,bottom:value.bottom},status:{top:status.top,bottom:status.bottom},navTop:nav.top};
         })(),
         disclosureHeight:document.querySelector('#autonomy-status summary').getBoundingClientRect().height,
-        targets:[...document.querySelectorAll('#nav button,#version-toggle,.strategy-entry-link,#autonomy-status summary,.command-context-details>summary')].every(node=>node.getBoundingClientRect().height>=44)
+        targets:[...document.querySelectorAll('#nav button,#version-toggle,#autonomy-status summary,.command-context-details>summary')].every(node=>node.getBoundingClientRect().height>=44)
       })`);
       assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
       assert.equal(initial.scrollY,0,'initial portfolio visibility is measured without scrolling');

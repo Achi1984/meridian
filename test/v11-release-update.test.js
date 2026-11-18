@@ -18,24 +18,24 @@ function fixture(options={}){
     currentUrl:'https://example.test/meridian/v11/?view=bots#view-bots',
     now:()=>clock,canReload:()=>safe,navigate:url=>navigation.push(url),onUpdate:value=>updates.push(value),
     schedule:fn=>{timers.set(++serial,fn);return serial;},cancelSchedule:id=>timers.delete(id),
-    fetchImpl:async(url,init)=>{requests.push({url,init});return response('B17-M11');},...options});
+    fetchImpl:async(url,init)=>{requests.push({url,init});return response('B18-M11');},...options});
   return {update,requests,navigation,updates,timers,setSafe:value=>{safe=value;},advance:()=>{clock+=60000;}};
 }
 
 test('release identity requires exactly five coherent approved local entries',()=>{
   assert.equal(readReleaseSources(sources('B16-M11-FIX12')),'B16-M11-FIX12');
-  assert.equal(readReleaseHtml(html('B17-M11')),'B17-M11');
+  assert.equal(readReleaseHtml(html('B18-M11')),'B18-M11');
   for(const invalid of [[],sources('B16-M11-FIX12').slice(1),[...sources('B16-M11-FIX12'),'./extra.js?v=B16-M11-FIX12'],
     [...sources('B16-M11-FIX12').slice(1),sources('B16-M11-FIX12')[1]],
     sources('B16-M11-FIX12').map((s,i)=>i===0?s.replace('FIX12','FIX13'):s),
     sources('B16-M11-FIX12').map(s=>s.replace('./','https://other.test/')),
     sources('B0-M11'),sources('B16-M11-FIX0')])assert.equal(readReleaseSources(invalid),null);
-  assert.equal(readReleaseHtml(html('B17-M11').replace('11-preview','10')),null);
+  assert.equal(readReleaseHtml(html('B18-M11').replace('11-preview','10')),null);
   assert.equal(readReleaseHtml('x'.repeat(128*1024+1)),null);
 });
 
 test('served index is recognized without a second manually maintained version manifest',()=>{
-  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B17-M11');
+  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B18-M11');
 });
 
 test('a loaded FIX16 page detects and applies the served FIX17 release',async()=>{
@@ -43,7 +43,7 @@ test('a loaded FIX16 page detects and applies the served FIX17 release',async()=
   const f=fixture({currentRelease:'B16-M11-FIX16',
     fetchImpl:async()=>new Response(index,{headers:{'content-type':'text/html; charset=utf-8'}})});
   await f.update.check();
-  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B17-M11#view-bots']);
+  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B18-M11#view-bots']);
 });
 
 test('locked safe tab checks only public HTML without credentials and reloads a newer release once',async()=>{
@@ -52,7 +52,7 @@ test('locked safe tab checks only public HTML without credentials and reloads a 
   const init=f.requests[0].init;
   assert.equal(init.cache,'no-store');assert.equal(init.credentials,'omit');assert.equal(init.redirect,'error');
   assert.equal(init.referrerPolicy,'no-referrer');assert.deepEqual(init.headers,{accept:'text/html'});
-  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B17-M11#view-bots']);
+  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B18-M11#view-bots']);
   f.advance();await f.update.check();f.update.reconsider();assert.equal(f.navigation.length,1);
   assert.equal(f.requests.length,1);assert.equal(f.timers.size,0);
 });
@@ -62,13 +62,13 @@ test('same release, older CDN response and incoherent release never reload',asyn
     const f=fixture({fetchImpl:async()=>response(value)});await f.update.check();
     assert.equal(f.navigation.length,0);assert.equal(f.updates.length,0);
   }
-  const f=fixture({fetchImpl:async()=>new Response(html('B17-M11').replace('app-access-bootstrap.js?v=B17','app-access-bootstrap.js?v=B16'),{headers:{'content-type':'text/html'}})});
+  const f=fixture({fetchImpl:async()=>new Response(html('B18-M11').replace('app-access-bootstrap.js?v=B18','app-access-bootstrap.js?v=B16'),{headers:{'content-type':'text/html'}})});
   await f.update.check();assert.equal(f.navigation.length,0);
 });
 
 test('unlocked or typing tab defers reload; explicit button action can apply',async()=>{
   const f=fixture();f.setSafe(false);await f.update.check();
-  assert.deepEqual(f.updates,['B17-M11']);assert.equal(f.navigation.length,0);
+  assert.deepEqual(f.updates,['B18-M11']);assert.equal(f.navigation.length,0);
   assert.equal(f.update.applyUpdate(),true);assert.equal(f.navigation.length,1);
 });
 
@@ -78,8 +78,8 @@ test('pending release is automatically applied when the tab becomes safe',async(
 });
 
 test('URL attempt marker prevents automatic reload loops even when HTML remains stale',async()=>{
-  const f=fixture({currentUrl:'https://example.test/meridian/v11/?m11build=B17-M11'});
-  await f.update.check();assert.equal(f.navigation.length,0);assert.deepEqual(f.updates,['B17-M11']);
+  const f=fixture({currentUrl:'https://example.test/meridian/v11/?m11build=B18-M11'});
+  await f.update.check();assert.equal(f.navigation.length,0);assert.deepEqual(f.updates,['B18-M11']);
   f.advance();await f.update.check();assert.equal(f.navigation.length,0);
   assert.equal(f.update.applyUpdate(),true,'only an explicit retry may navigate again');
 });
@@ -95,8 +95,8 @@ test('initial/pageshow/focus bursts share one in-flight request and a one-minute
 test('offline, non-HTML and oversized responses leave the loaded app usable',async()=>{
   for(const fetchImpl of [async()=>{throw Error('offline');},
     async()=>new Response('{}',{headers:{'content-type':'application/json'}}),
-    async()=>new Response(html('B17-M11'),{status:503,headers:{'content-type':'text/html'}}),
-    async()=>new Response(html('B17-M11'),{headers:{'content-type':'text/html','content-length':'999999'}}),
+    async()=>new Response(html('B18-M11'),{status:503,headers:{'content-type':'text/html'}}),
+    async()=>new Response(html('B18-M11'),{headers:{'content-type':'text/html','content-length':'999999'}}),
     async()=>new Response('x'.repeat(128*1024+1),{headers:{'content-type':'text/html'}})]){
     const f=fixture({fetchImpl});await f.update.check();assert.equal(f.navigation.length,0);assert.equal(f.updates.length,0);
     assert.equal(f.timers.size,0);
@@ -106,14 +106,14 @@ test('offline, non-HTML and oversized responses leave the loaded app usable',asy
 test('deadline releases a stuck fetch and late completion cannot navigate',async()=>{
   let resolve;
   const f=fixture({fetchImpl:()=>new Promise(r=>{resolve=r;})});const pending=f.update.check();
-  [...f.timers.values()][0]();await pending;resolve(response('B17-M11'));await tick();
+  [...f.timers.values()][0]();await pending;resolve(response('B18-M11'));await tick();
   assert.equal(f.navigation.length,0);assert.equal(f.timers.size,0);
 });
 
 test('dispose aborts pending work and removes further update authority',async()=>{
   let resolve;
   const f=fixture({fetchImpl:()=>new Promise(r=>{resolve=r;})});const pending=f.update.check();
-  f.update.dispose();await pending;resolve(response('B17-M11'));await tick();
+  f.update.dispose();await pending;resolve(response('B18-M11'));await tick();
   assert.equal(f.navigation.length,0);assert.equal(f.update.applyUpdate(),false);assert.equal(f.timers.size,0);
 });
 
@@ -135,7 +135,7 @@ function mounted({status='locked',typed='',hidden=false}={}){
   const navigation=[];window.location={href:'https://example.test/v11/',replace:url=>navigation.push(url)};
   let listener,requests=0;
   const access={subscribe:fn=>{listener=fn;fn({status});return ()=>{listener=null;};}};
-  const mount=mountReleaseUpdate(document,window,{access,fetchImpl:async()=>{requests++;return response('B17-M11');}});
+  const mount=mountReleaseUpdate(document,window,{access,fetchImpl:async()=>{requests++;return response('B18-M11');}});
   return {mount,document,window,input,navigation,body,requests:()=>requests,setStatus:s=>listener?.({status:s})};
 }
 
