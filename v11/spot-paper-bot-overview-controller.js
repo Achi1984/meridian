@@ -1,4 +1,4 @@
-import {renderSpotPaperBotOverview} from './spot-paper-bot-overview-view.js?v=B17-M11';
+import {renderSpotPaperBotOverview} from './spot-paper-bot-overview-view.js?v=B18-M11';
 
 export function mountSpotPaperBotOverview(root, {
   adapters = [],
