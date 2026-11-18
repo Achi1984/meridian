@@ -613,7 +613,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(resetHistory.overflow,false);
         const pairedPath=new URL(SPOT_PAPER_PAIRED_REPORT_ENDPOINT).pathname;
         const progressPath=new URL(SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT).pathname;
-        assert.ok(catalog.resources.every(path=>path===pairedPath||path===progressPath||
+        assert.ok(catalog.resources.every(path=>path===new URL(pilotEndpoint).pathname||path===pairedPath||path===progressPath||
           !/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
         assert.ok(catalog.resources.includes('/docs/strategy-lab/campaign-20261013.json'));
         await evaluate(`(()=>{
