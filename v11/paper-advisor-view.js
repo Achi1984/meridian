@@ -24,7 +24,7 @@ export function validAdvisorReport(report) {
   });
 }
 
-export function renderAdvisorReport(root, report, audit) {
+export function renderAdvisorReport(root, report, audit, decisions, trades) {
   const doc = root.ownerDocument;
   const content = doc.createDocumentFragment();
   function add(parent, tag, value) {
@@ -107,8 +107,46 @@ export function renderAdvisorReport(root, report, audit) {
     fact(list, 'BTC', NUMBER.format(arm.btc));
     fact(list, 'Leben', arm.lives === null ? 'Unbekannt' : NUMBER.format(arm.lives));
   }
+  let historyFocus;
+  function disclosure(parent, key, title) {
+    const section = add(parent, 'details', '');
+    section.className = 'advisor-history';
+    section.dataset.key = key;
+    const existing = [...root.querySelectorAll('.advisor-history')].find(node => node.dataset.key === key);
+    section.open = Boolean(existing?.open);
+    const summary = add(section, 'summary', title);
+    if (existing && existing.firstElementChild === doc.activeElement) historyFocus = summary;
+    return section;
+  }
+  if (Array.isArray(decisions)) {
+    const history = disclosure(content, 'history', 'Verlauf · letzte ' + decisions.length +
+      (decisions.length === 1 ? ' Entscheidung' : ' Entscheidungen'));
+    for (const row of decisions) {
+      const skipped = ['MARKET_UNAVAILABLE','DECISION_WINDOW_EXPIRED','MODEL_KEY_UNAVAILABLE'].includes(row.reason) ||
+        row.reason.startsWith('MODEL_UNAVAILABLE');
+      const action = skipped ? 'Ausgesetzt' : actions[row.action] || row.action;
+      const reason = reasons[row.reason] || row.reason;
+      const summary = DATE.format(new Date(row.at)) + ' · ' + action + ' · ' +
+        (skipped ? reason : executions[row.execution] || row.execution);
+      const entry = disclosure(history, row.at, summary);
+      if (skipped) entry.classList.add('advisor-skipped');
+      add(entry, 'p', reason);
+    }
+  }
+  if (Array.isArray(trades)) {
+    const section = disclosure(content, 'trades', 'Abgeschlossene Paper-Trades · letzte 24 Stunden');
+    if (!trades.length) add(section, 'p', 'Kein vollständiges Kauf-Verkauf-Paar im verfügbaren Verlauf.');
+    for (const trade of trades) {
+      const minutes = Math.round((Date.parse(trade.sellAt) - Date.parse(trade.buyAt)) / 60000);
+      const line = add(section, 'p', 'Kauf ' + DATE.format(new Date(trade.buyAt)) +
+        ' · Verkauf ' + DATE.format(new Date(trade.sellAt)) + ' · ' + minutes + ' Min. · ');
+      const amount = add(line, 'strong', (trade.netEur > 0 ? '+' : '') + EURO.format(trade.netEur) + ' netto');
+      amount.className = trade.netEur > 0 ? 'advisor-gain' : trade.netEur < 0 ? 'advisor-loss' : '';
+    }
+  }
   root.replaceChildren(content);
   if (restoreFocus) toggle.focus({preventScroll:true});
+  historyFocus?.focus({preventScroll:true});
 }
 
 export function mountAdvisor(root, access = appAccess) {
@@ -145,13 +183,13 @@ export function mountAdvisor(root, access = appAccess) {
         cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', signal: request.signal
       });
       if (!response.ok) throw new Error('Report unavailable');
-      const {report, pilotAudit} = await response.json();
+      const {report, pilotAudit, decisions, trades} = await response.json();
       if (controller !== request || !access.isUnlocked()) return;
       if (!validAdvisorReport(report) || !pilotAudit ||
           !['closedModelTrades','maxObservedDrawdownPct','modeledApiUsd','apiBudgetUsd','unresolvedReserveUsd'].every(key => nonnegative(pilotAudit[key]))) {
         throw new Error('Invalid report');
       }
-      renderAdvisorReport(result, report, pilotAudit);
+      renderAdvisorReport(result, report, pilotAudit, decisions, trades);
       result.dataset.asOf = report.asOf;
       const stale = Date.now() - Date.parse(report.asOf) > 15 * 60 * 1000;
       status.dataset.state = stale ? 'warning' : 'fresh';

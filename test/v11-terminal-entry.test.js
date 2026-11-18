@@ -818,7 +818,7 @@ function restoreDashboardClarity(source){
 function restoreB2(source){
   const advisorStyles = source.match(/\n    #paper-advisor \{[^]*?    #paper-advisor input\[type=file\][^\n]*\n/)?.[0];
   assert.ok(advisorStyles, 'live pilot styles present');
-  assert.equal(gitBlob(advisorStyles), '4546b7c89018b4654c0feb563d60caa715e977a5', 'exact scoped live pilot style addition');
+  assert.equal(gitBlob(advisorStyles), '6e55d5ac849e4ccc841f2d210d6b4fba4be0e79a', 'exact scoped live pilot style addition');
   source = source.replace(advisorStyles, '');
   source=restoreDashboardClarity(source);
   const ledgerManualCss='    .ledger-manual{margin-top:24px;overflow-wrap:anywhere}\n    .ledger-manual label{display:block;margin:12px 0}\n    .ledger-manual input,.ledger-manual textarea{display:block;box-sizing:border-box;width:100%;max-width:100%;padding:10px;color:inherit;background:#111e2d;border:1px solid #54799a;border-radius:8px}\n    .ledger-manual button{max-width:100%;white-space:normal}\n    .ledger-manual li{margin:8px 0}\n';
