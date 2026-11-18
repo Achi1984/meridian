@@ -142,12 +142,14 @@ def _book_once(now):
         if not isinstance(row, list) or len(row) != 3:
             raise FeedError('INVALID_BOOK')
         price, amount, updated = row
-        if type(updated) is not int or not 0 <= received-updated <= 5:
+        if type(updated) is not int or updated > received:
             raise FeedError('BOOK_TIME_INVALID')
         sides.append((_positive(price), _positive(amount), updated))
     (bid,bid_size,bid_at),(ask,ask_size,ask_at) = sides
     if bid > ask:
         raise FeedError('CROSSED_BOOK')
+    if received - min(bid_at, ask_at) > 5:
+        raise FeedError('STALE_BOOK')
     return dict(bid=bid, ask=ask, bidSize=bid_size, askSize=ask_size, received=received, bidAt=bid_at, askAt=ask_at)
 
 
@@ -155,7 +157,9 @@ def _retry_public_read(read, *args):
     try:
         return read(*args)
     except FeedError as exc:
-        if str(exc) not in {'REQUEST_FAILED', 'SLOW_BOOK', 'HTTP_502', 'HTTP_503', 'HTTP_504'}:
+        if str(exc) == 'STALE_BOOK':
+            time.sleep(1)
+        elif str(exc) not in {'REQUEST_FAILED', 'SLOW_BOOK', 'HTTP_502', 'HTTP_503', 'HTTP_504'}:
             raise
     return read(*args)
 
