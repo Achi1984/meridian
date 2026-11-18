@@ -816,6 +816,10 @@ function restoreDashboardClarity(source){
   return source;
 }
 function restoreB2(source){
+  const palette = source.match(/  <style id="m11-dashboard-palette">[^]*?<\/style>\n/)?.[0];
+  assert.ok(palette, 'dashboard palette present');
+  assert.equal(gitBlob(palette), '666451c72b4e4472bf5cb421a21cf76cf8401f82', 'reviewed dashboard layout and colors');
+  source = source.replace(palette, '');
   const advisorStyles = source.match(/\n    #paper-advisor \{[^]*?    #paper-advisor input\[type=file\][^\n]*\n/)?.[0];
   assert.ok(advisorStyles, 'live pilot styles present');
   assert.equal(gitBlob(advisorStyles), '974996fe4058a8ace8ced369035e8a4b95f41c84', 'exact scoped live pilot style addition');
