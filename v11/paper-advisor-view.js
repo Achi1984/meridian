@@ -52,10 +52,15 @@ export function renderAdvisorReport(root, report, audit) {
   hero.className = 'advisor-headline';
   const signal = add(hero, 'div', '');
   add(signal, 'small', 'Entscheidung');
-  add(signal, 'h3', actions[report.last.action] || report.last.action);
+  const decision = add(signal, 'h3', actions[report.last.action] || report.last.action);
+  decision.dataset.action = report.last.action;
   const execution = add(signal, 'p', executions[report.last.execution] || report.last.execution);
   if (reasons[report.last.reason] && report.last.execution === 'HOLD') {
     execution.textContent += ' · ' + reasons[report.last.reason];
+  }
+  if (['MARKET_UNAVAILABLE', 'DECISION_WINDOW_EXPIRED'].includes(report.last.reason) ||
+      ['NO_FRESH_BOOK', 'DECISION_WINDOW_EXPIRED'].includes(report.last.execution)) {
+    execution.className = 'advisor-caution';
   }
   const balance = add(hero, 'div', '');
   add(balance, 'small', 'Modellkonto');
