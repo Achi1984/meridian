@@ -477,6 +477,12 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.match(tile.loss,/-.*1,19/);
         assert.equal(tile.detailsOpen,false);
         assert.equal(tile.overflow,false,'pilot comparison fits the viewport at '+size.width);
+        if (evidence && size.width === 390) {
+          mkdirSync(evidence,{recursive:true});
+          await evaluate(`document.querySelector('#paper-advisor').scrollIntoView({block:'start'})`);
+          const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+          writeFileSync(join(evidence,'paper-advisor-390.png'),Buffer.from(image.data,'base64'));
+        }
         await evaluate(`document.querySelector('#paper-bot-overview-section').open=true`);
         const focus=await evaluate(`(()=>{
           document.getElementById('app-main').focus();
