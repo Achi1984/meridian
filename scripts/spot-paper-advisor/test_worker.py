@@ -46,6 +46,18 @@ class PaperTest(unittest.TestCase):
         self.now+=STEP
         self.feed.decide.side_effect=FeedError('MODEL_INCOMPLETE',dict(input=100,cached=0,output=0))
         self.assertAlmostEqual(self.run_slot()['apiCostEur'],.00039)
+    def test_model_failure_preserves_hold_and_sanitizes_diagnostics(self):
+        for error, expected in [(FeedError('HTTP_403'), 'HTTP_403'), (ValueError('private'), 'UNCLASSIFIED'),
+                                (FeedError('HTTP_401:private'), 'UNCLASSIFIED')]:
+            self.feed.decide.side_effect = error
+            report = self.run_slot()
+            self.assertEqual(report['last']['reason'], f'MODEL_UNAVAILABLE: {expected}')
+            self.assertEqual(report['last']['execution'], 'HOLD')
+            self.assertNotIn('private', json.dumps(report))
+            self.assertIsNone(report['apiCostEur'])
+            self.slot += STEP
+            self.now += STEP
+
     def test_missing_key_still_liquidates(self):
         self.run_slot()
         self.slot+=86400-STEP

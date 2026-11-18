@@ -1,6 +1,6 @@
 """Single-writer, ten-minute BTC/EUR paper advisor. No exchange order client."""
 import argparse
-from feeds import POLICY_DIGEST, POLICY_VERSION
+from feeds import POLICY_DIGEST, POLICY_VERSION, model_failure
 import fcntl
 import json
 import math
@@ -136,7 +136,9 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
             cost=estimate_cost(usage,rates)
         except Exception as exc:
             usage=getattr(exc,'usage',None)
-            action,reason,cost='HOLD','MODEL_UNAVAILABLE',estimate_cost(usage,rates)
+            action = 'HOLD'
+            reason = f'MODEL_UNAVAILABLE: {model_failure(exc)}'
+            cost = estimate_cost(usage, rates)
     elif snapshot:
         reason='DECISION_WINDOW_EXPIRED'
     ref=reference(snapshot['ten'],states['reference']) if snapshot else 'HOLD'
