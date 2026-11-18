@@ -94,3 +94,30 @@ class PilotTest(unittest.TestCase):
                         BudgetedFeeds(db, STEP, 2*STEP).decide({}, MODEL, 'test')
                 self.assertEqual(db.execute('SELECT charge,settled FROM calls').fetchone(), expected)
                 db.close()
+
+class PairedDirectoryTest(unittest.TestCase):
+    def test_separate_path_baseline_end_and_budget(self):
+        import tempfile
+        from pathlib import Path
+        import pilot
+        import worker
+        start = 86400
+        with tempfile.TemporaryDirectory() as tmp:
+            volume = Path(tmp).resolve()
+            base = worker.connect(volume / 'pilot.sqlite', pilot.MODEL)
+            pilot.configure(base, start, start)
+            base.execute('INSERT INTO calls VALUES (?,?,1)', (start, 100))
+            base.commit()
+            directory, end = pilot.paired_directory(volume, start + 600)
+            self.assertNotEqual(directory, volume)
+            self.assertEqual(end, start + 7 * worker.DAY)
+            v2 = worker.connect(directory / 'pilot.sqlite', pilot.MODEL, challenger=True)
+            pilot.configure(v2, start + 600, start + 600)
+            audit = pilot.audit(v2, start + 600, start + 600, end=end)
+            self.assertEqual(audit['endUtc'], worker.iso(end))
+            self.assertEqual(audit['modeledApiUsd'], 0)
+            self.assertEqual(base.execute('SELECT SUM(charge) FROM calls').fetchone()[0], 100)
+            with self.assertRaises(ValueError):
+                pilot.paired_directory(volume, end)
+            v2.close()
+            base.close()
