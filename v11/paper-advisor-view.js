@@ -24,7 +24,7 @@ export function validAdvisorReport(report) {
   });
 }
 
-export function renderAdvisorReport(root, report, audit, decisions, trades, krakenUsd) {
+export function renderAdvisorReport(root, report, audit, decisions, trades, krakenUsd, comparison) {
   const doc = root.ownerDocument;
   const content = doc.createDocumentFragment();
   function add(parent, tag, value) {
@@ -106,6 +106,27 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
     const pnl = value === null ? null : Math.round((value - 1000) * 100) / 100;
     const cell = add(row, 'td', pnl === null ? '—' : (pnl > 0 ? '+' : '') + EURO.format(pnl || 0));
     if (pnl) cell.className = pnl > 0 ? 'advisor-gain' : 'advisor-loss';
+  }
+  if (audit) {
+    const pair = add(content, 'table', '');
+    pair.className = 'advisor-accounts';
+    add(pair, 'caption', 'V1 und V2 · gemeinsamer Vergleich');
+    if (comparison?.v1 && comparison?.v2 && timestamp(comparison.at) && timestamp(comparison.start)) {
+      const header = add(add(pair,'thead',''),'tr','');
+      for (const label of ['Modell','Entscheidung','Seit Vergleichsstart']) add(header,'th',label).scope='col';
+      const body = add(pair,'tbody','');
+      for (const [label, arm] of [['V1',comparison.v1],['V2',comparison.v2]]) {
+        const row = add(body,'tr','');
+        add(row,'th',label).scope='row';
+        add(row,'td',arm.action === 'SKIPPED' ? 'Ausgesetzt' : actions[arm.action] || 'Unbekannt');
+        const cell = add(row,'td',Number.isFinite(arm.change) ?
+          (arm.change > 0 ? '+' : '') + EURO.format(arm.change) : 'Ausstehend');
+        if (arm.change) cell.className = arm.change > 0 ? 'advisor-gain' : 'advisor-loss';
+      }
+      add(content,'small','Start · '+DATE.format(new Date(comparison.start))+' · Gemeinsamer Stand · '+DATE.format(new Date(comparison.at)));
+    } else {
+      add(content,'small','Gemeinsamer Bericht ausstehend');
+    }
   }
   const old = root.querySelector('.advisor-detail');
   const restoreFocus = old && old.querySelector('summary') === doc.activeElement;
@@ -210,13 +231,13 @@ export function mountAdvisor(root, access = appAccess) {
         cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', signal: request.signal
       });
       if (!response.ok) throw new Error('Report unavailable');
-      const {report, pilotAudit, decisions, trades, krakenUsd} = await response.json();
+      const {report, pilotAudit, decisions, trades, krakenUsd, comparison} = await response.json();
       if (controller !== request || !access.isUnlocked()) return;
       if (!validAdvisorReport(report) || !pilotAudit ||
           !['closedModelTrades','maxObservedDrawdownPct','modeledApiUsd','apiBudgetUsd','unresolvedReserveUsd'].every(key => nonnegative(pilotAudit[key]))) {
         throw new Error('Invalid report');
       }
-      renderAdvisorReport(result, report, pilotAudit, decisions, trades, krakenUsd);
+      renderAdvisorReport(result, report, pilotAudit, decisions, trades, krakenUsd, comparison);
       result.dataset.asOf = report.asOf;
       const stale = Date.now() - Date.parse(report.asOf) > 15 * 60 * 1000;
       status.dataset.state = stale ? 'warning' : 'fresh';
