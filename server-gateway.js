@@ -1,3 +1,4 @@
+import {latestPilotReport} from "./paper-advisor-gateway.js";
 import http from "node:http";
 import fs from "node:fs/promises";
 import crypto from "node:crypto";
@@ -456,6 +457,14 @@ const server=http.createServer(async(req,res)=>{
       return writeSpotPaperPairedProgressRouteResponse(
         req,res,spotPaperPairedProgressRoute,origin,writeJson
       );
+    }
+    if (req.method === "GET" && u.pathname === "/api/private/paper-advisor") {
+      if (!authorizedRead(req)) return writeJson(res,401,{error:"read_token_required"},origin||"");
+      try {
+        return writeJson(res,200,await latestPilotReport(),origin||"");
+      } catch {
+        return writeJson(res,503,{error:"pilot_report_unavailable"},origin||"");
+      }
     }
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
       const [current,shareState,m15,h1,h4,d1]=await Promise.all([

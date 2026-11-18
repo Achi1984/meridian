@@ -43,7 +43,9 @@ function mountWorkspace(){
   const botOverviewRoot=document.createElement('section');
   botOverviewRoot.id='paper-bot-overview-root';
   botReports.append(botOverviewRoot);
-  createAdvisorSection(collapsedSection('paper-advisor','BTC/EUR · Modellentscheidungen im Zehn-Minuten-Takt'));
+  const advisor = collapsedSection('paper-advisor','BTC/EUR · Live-Paperbot',botReports);
+  advisor.open = true;
+  createAdvisorSection(advisor);
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';

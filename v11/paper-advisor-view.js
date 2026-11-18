@@ -23,7 +23,7 @@ export function validAdvisorReport(report) {
   });
 }
 
-export function renderAdvisorReport(root, report) {
+export function renderAdvisorReport(root, report, audit) {
   const doc = root.ownerDocument;
   const content = doc.createDocumentFragment();
   function add(parent, tag, value) {
@@ -36,12 +36,20 @@ export function renderAdvisorReport(root, report) {
     add(list, 'dt', label);
     add(list, 'dd', value);
   }
-  add(content, 'h3', report.last.action);
+  const actions = {BUY: 'Kaufen', SELL: 'Verkaufen', HOLD: 'Halten'};
+  add(content, 'h3', actions[report.last.action] || report.last.action);
   const meta = add(content, 'dl', '');
   fact(meta, 'Entscheidung', DATE.format(new Date(report.last.at)));
-  fact(meta, 'Grund', report.last.reason);
+  fact(meta, 'Grund', report.last.reason === 'DECISION_WINDOW_EXPIRED'
+    ? 'Entscheidungsfenster verpasst' : report.last.reason);
   fact(meta, 'Paper-Ausführung', report.last.execution);
   fact(meta, 'Modell', report.model);
+  if (audit) {
+    fact(meta, 'Geschlossene Trades', audit.closedModelTrades);
+    fact(meta, 'Größter Rückgang', NUMBER.format(audit.maxObservedDrawdownPct) + ' %');
+    fact(meta, 'API-Verbrauch (geschätzt)', NUMBER.format(audit.modeledApiUsd) + ' / ' + audit.apiBudgetUsd + ' USD');
+    fact(meta, 'Offene Kostenreserve', NUMBER.format(audit.unresolvedReserveUsd) + ' USD');
+  }
   fact(meta, 'API-Kosten', report.apiCostEur === null ? 'Unbekannt' : EURO.format(report.apiCostEur));
   const cards = add(content, 'div', '');
   cards.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:1rem';
@@ -52,6 +60,7 @@ export function renderAdvisorReport(root, report) {
     const list = add(card, 'dl', '');
     fact(list, 'Leben', arm.lives === null ? 'Unbekannt' : NUMBER.format(arm.lives));
     fact(list, 'Eigenkapital', arm.equityEur === null ? 'Bewertung ausstehend' : EURO.format(arm.equityEur));
+    fact(list, 'Ergebnis seit Start', arm.equityEur === null ? 'Ausstehend' : EURO.format(arm.equityEur - 1000));
     fact(list, 'Cash', EURO.format(arm.cashEur));
     fact(list, 'BTC', NUMBER.format(arm.btc));
   }
@@ -70,7 +79,54 @@ export function mountAdvisor(root, access = appAccess) {
     result.replaceChildren();
     status.textContent = 'Kein Bericht geladen.';
   }
-  access.subscribe(state => { if (state.status !== 'unlocked') clear(); });
+  const doc = root.ownerDocument;
+  let timer, controller, manual = false;
+  function stop() {
+    clearTimeout(timer);
+    controller?.abort();
+    controller = null;
+  }
+  async function refresh() {
+    stop();
+    if (doc.hidden || manual || !access.isUnlocked()) return;
+    const request = new AbortController();
+    controller = request;
+    const timeout = setTimeout(() => request.abort(), 10000);
+    try {
+      const response = await fetch('https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/paper-advisor', {
+        headers: {authorization: 'Bearer ' + access.getToken()}, credentials: 'omit',
+        cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', signal: request.signal
+      });
+      if (!response.ok) throw new Error('Report unavailable');
+      const {report, pilotAudit} = await response.json();
+      if (controller !== request || !access.isUnlocked()) return;
+      if (!validAdvisorReport(report) || !pilotAudit ||
+          !['closedModelTrades','maxObservedDrawdownPct','modeledApiUsd','apiBudgetUsd','unresolvedReserveUsd'].every(key => nonnegative(pilotAudit[key]))) {
+        throw new Error('Invalid report');
+      }
+      renderAdvisorReport(result, report, pilotAudit);
+      const stale = Date.now() - Date.parse(report.asOf) > 15 * 60 * 1000;
+      status.textContent = (stale ? 'Veralteter Datenstand · ' : 'Datenstand · ') + DATE.format(new Date(report.asOf));
+    } catch {
+      if (controller === request && access.isUnlocked()) status.textContent = 'Live-Daten derzeit nicht abrufbar.';
+    } finally {
+      clearTimeout(timeout);
+      if (controller === request) {
+        controller = null;
+        timer = setTimeout(refresh, 60000);
+      }
+    }
+  }
+  access.subscribe(state => {
+    if (state.status === 'unlocked') refresh();
+    else { stop(); manual = false; clear(); }
+  });
+  doc.addEventListener('visibilitychange', refresh);
+  root.querySelector('[data-advisor-live]').addEventListener('click', () => {
+    manual = false;
+    clear();
+    refresh();
+  });
   fileInput.addEventListener('change', async () => {
     const file = fileInput.files?.[0];
     clear();
@@ -79,13 +135,15 @@ export function mountAdvisor(root, access = appAccess) {
       status.textContent = 'Die Berichtsdatei überschreitet 256 KiB.';
       return;
     }
+    stop();
+    manual = true;
     const current = generation;
     try {
       const report = JSON.parse(await file.text());
       if (current !== generation || !access.isUnlocked()) return;
       if (!validAdvisorReport(report)) throw new Error('invalid report');
       renderAdvisorReport(result, report);
-      status.textContent = 'Datenstand ' + DATE.format(new Date(report.asOf));
+      status.textContent = 'Lokaler Bericht · ' + DATE.format(new Date(report.asOf));
     } catch {
       if (current === generation) status.textContent = 'Datei unlesbar oder kein gültiger Meridian-Modellbericht.';
     }
@@ -108,6 +166,10 @@ export function createAdvisorSection(section) {
   const result = document.createElement('div');
   result.setAttribute('data-advisor-result', '');
   result.style.overflowWrap = 'anywhere';
-  section.append(label, status, result);
+  const live = document.createElement('button');
+  live.type = 'button';
+  live.textContent = 'Live-Daten aktualisieren';
+  live.setAttribute('data-advisor-live', '');
+  section.append(status, result, live, label);
   mountAdvisor(section);
 }
