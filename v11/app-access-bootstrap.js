@@ -11,6 +11,17 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   const main=document.getElementById('app-main');
   if(!app||!gate||!form||!input||!status||!lockButton)return null;
   let disposed=false,lastStatus='locked',submissionGeneration=0;
+  let strategyLinkPending=window.location?.hash==='#view-strategies';
+  function followStrategyLink(){
+    if(!strategyLinkPending||app.hidden||document.hidden||!access.isUnlocked())return;
+    strategyLinkPending=false;
+    const tab=document.querySelector('#nav button[data-v="strategies"]');
+    if(tab&&tab.getAttribute('aria-current')!=='page')tab.click();
+  }
+  function hashchange(){
+    strategyLinkPending=window.location.hash==='#view-strategies';
+    followStrategyLink();
+  }
   function render(state){
     if(disposed)return;
     if(state.status==='unlocked'&&!document.hidden){
@@ -28,7 +39,10 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
     if(state.status==='locked')status.textContent='Gesperrt. Das Meridian-Passwort wird nicht gespeichert.';
     else if(state.status==='checking')status.textContent='Zugang wird geprüft.';
     else status.textContent='Zugang geprüft. Manuelle Datenabfragen bleiben getrennt.';
-    if(visible)window.ensureStrategyWorkspace?.();
+    if(visible){
+      followStrategyLink();
+      window.ensureStrategyWorkspace?.();
+    }
   }
   async function submit(event){
     event.preventDefault();
@@ -64,6 +78,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   lockButton.addEventListener('click',lock);
   document.addEventListener('visibilitychange',visibility);
   document.addEventListener('keydown',keydown);
+  window.addEventListener('hashchange',hashchange);
   window.addEventListener('focus',focus);
   window.addEventListener('pagehide',pagehide);
   window.addEventListener('pageshow',pageshow);
@@ -79,6 +94,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
     lockButton.removeEventListener('click',lock);
     document.removeEventListener('visibilitychange',visibility);
     document.removeEventListener('keydown',keydown);
+    window.removeEventListener('hashchange',hashchange);
     window.removeEventListener('focus',focus);
     window.removeEventListener('pagehide',pagehide);
     window.removeEventListener('pageshow',pageshow);

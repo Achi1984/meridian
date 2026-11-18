@@ -180,10 +180,12 @@ class Target{
   focus(){this.focused=true;}
 }
 
-function mountHarness({initialCredential=PASSWORD,verifyResult='unlocked',revalidateReaders=()=>{},access:providedAccess}={}){
+function mountHarness({locationHash='',strategyTab=null,initialCredential=PASSWORD,verifyResult='unlocked',revalidateReaders=()=>{},access:providedAccess}={}){
   const ids=['app','app-access-gate','app-access-form','app-access-password','app-access-status','app-access-lock','app-main'];
   const nodes=new Map(ids.map(id=>[id,new Target()]));
   const document=new Target(),window=new Target();
+  window.location={hash:locationHash};
+  document.querySelector=selector=>selector==='#nav button[data-v="strategies"]'?strategyTab:null;
   document.getElementById=id=>nodes.get(id);
   let credential=initialCredential,locks=0;const subscribers=new Set();
   const publish=()=>{for(const listener of subscribers)listener({status:credential?'unlocked':'locked'});};
@@ -318,4 +320,20 @@ test('access modules do not persist credentials or private snapshots',()=>{
   const source=readFileSync(new URL('../v11/app-access.js',import.meta.url),'utf8')+
     readFileSync(new URL('../v11/app-access-bootstrap.js',import.meta.url),'utf8');
   assert.doesNotMatch(source,/localStorage|sessionStorage|indexedDB|document\.cookie|location\.href/);
+});
+
+test('strategy deeplink waits for unlock, honors fragment changes and fires once per navigation',async()=>{
+  let clicks=0;
+  const h=mountHarness({initialCredential:null,locationHash:'#view-strategies',
+    strategyTab:{click(){clicks++;},getAttribute(){return null;}}});
+  assert.equal(clicks,0);
+  await h.access.verify(PASSWORD);
+  assert.equal(clicks,1);
+  h.window.fire('focus');
+  assert.equal(clicks,1);
+  h.window.location.hash='#app-main';h.window.fire('hashchange');
+  assert.equal(clicks,1);
+  h.window.location.hash='#view-strategies';h.window.fire('hashchange');
+  assert.equal(clicks,2);
+  h.mounted.dispose();
 });
