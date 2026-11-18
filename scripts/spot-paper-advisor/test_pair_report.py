@@ -55,6 +55,7 @@ class PairReportTest(unittest.TestCase):
     def test_skipped_detail_uses_only_recorded_operational_categories(self):
         for reason, status, expected in (
                 ('MARKET_UNAVAILABLE', 'INCOMPLETE_OHLC', 'CANDLES'),
+                ('MARKET_UNAVAILABLE', 'BOOK_TIME_INVALID', 'BOOK_TIME'),
                 ('MARKET_UNAVAILABLE', 'HTTP_429', 'RATE_LIMIT'),
                 ('MARKET_UNAVAILABLE', None, 'MARKET'),
                 ('MARKET_UNAVAILABLE', 'unexpected provider detail', 'MARKET'),
