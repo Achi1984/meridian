@@ -98,7 +98,7 @@ function renderModel(root, model, document, options = {}) {
   root.replaceChildren();
   root.className = 'card paper-cockpit spot-paper-host8h';
   root.setAttribute('style', 'min-width:0;max-width:100%;overflow-wrap:anywhere');
-  const heading = node(document, root, 'h2', 'Paper-Bot · BTC/EUR');
+  const heading = node(document, root, 'h2', 'BTC/EUR · 8-Stunden-Testbericht');
   heading.id = 'spot-paper-host8h-heading';
   root.setAttribute('aria-labelledby', heading.id);
   node(document, root, 'p', 'Simulierter Handel · kein Echtgeld', 'caption');

@@ -514,7 +514,7 @@ test('Dashboard distinguishes a missing summary from a missing route on bounded 
     response({error: 'host8h_report_not_found'}, 404));
   missingSummary.controller.setActive(true);
   await new Promise(resolve => setImmediate(resolve));
-  assert.match(missingSummary.root.textContent, /Der erste Paper-Bericht fehlt noch/);
+  assert.match(missingSummary.root.textContent, /Für diesen 8-Stunden-Test liegt noch kein Bericht vor/);
   missingSummary.controller.dispose();
 
   const missingRoute = dashboardDependencies(async () => response({error: 'not_found'}, 404));

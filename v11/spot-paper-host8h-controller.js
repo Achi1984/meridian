@@ -16,7 +16,7 @@ const messages = {
   loading: 'Paper-Daten werden geladen …',
   unavailable: 'Paper-Daten sind gerade nicht erreichbar. Bitte später erneut versuchen.',
   'transport-not-provisioned': 'Paper-Daten noch nicht verbunden.',
-  'summary-not-found': 'Die Verbindung steht. Der erste Paper-Bericht fehlt noch.',
+  'summary-not-found': 'Für diesen 8-Stunden-Test liegt noch kein Bericht vor.',
   rejected: 'Der Paper-Bericht konnte nicht geprüft werden. Bitte erneut laden.',
   stale: 'Der letzte Paper-Bericht ist veraltet.'
 };
