@@ -433,8 +433,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.progressSettled(),3);
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B16-M11-FIX17');
-          const view=await import('./paper-cockpit-view.js?v=B16-M11-FIX17');
+          const model=await import('./paper-cockpit-model.js?v=B17-M11');
+          const view=await import('./paper-cockpit-view.js?v=B17-M11');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
