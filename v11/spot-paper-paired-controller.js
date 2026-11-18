@@ -1,6 +1,6 @@
-import {renderSpotPaperPaired} from './spot-paper-paired-view.js?v=B18-M11';
+import {renderSpotPaperPaired} from './spot-paper-paired-view.js?v=B19-M11';
 import {presentSpotPaperPairedComparison} from
-  './spot-paper-paired-model.js?v=B18-M11';
+  './spot-paper-paired-model.js?v=B19-M11';
 
 export function mountSpotPaperPairedPanel(root, {
   dto = null,

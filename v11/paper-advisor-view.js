@@ -1,4 +1,4 @@
-import {appAccess} from './app-access.js?v=B18-M11';
+import {appAccess} from './app-access.js?v=B19-M11';
 
 const NUMBER = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 8});
 const PERCENT = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 2});
@@ -48,17 +48,28 @@ export function renderAdvisorReport(root, report, audit, decisions, trades) {
     DECISION_WINDOW_EXPIRED: 'Entscheidungsfenster verpasst',
     MARKET_UNAVAILABLE: 'Marktdaten fehlen', DAY_CLOSE: 'Handelstag beendet'
   };
+  function skippedReason(reason) {
+    if (reason === 'MODEL_KEY_UNAVAILABLE') return 'Modellzugang fehlt';
+    if (reason.startsWith('MODEL_UNAVAILABLE')) return 'Modellantwort fehlt';
+    if (reason === 'MARKET_UNAVAILABLE' || reason === 'DECISION_WINDOW_EXPIRED') return reasons[reason];
+    return null;
+  }
+  function actionLabel(row) {
+    return skippedReason(row.reason) ? 'Ausgesetzt' : actions[row.action] || row.action;
+  }
   const hero = add(content, 'div', '');
   hero.className = 'advisor-headline';
   const signal = add(hero, 'div', '');
   add(signal, 'small', 'Entscheidung');
-  const decision = add(signal, 'h3', actions[report.last.action] || report.last.action);
-  decision.dataset.action = report.last.action;
+  const decision = add(signal, 'h3', actionLabel(report.last));
+  const skipped = skippedReason(report.last.reason);
+  decision.dataset.action = skipped ? 'SKIPPED' : report.last.action;
   const execution = add(signal, 'p', executions[report.last.execution] || report.last.execution);
-  if (reasons[report.last.reason] && report.last.execution === 'HOLD') {
+  if (skipped) execution.textContent = skipped;
+  else if (reasons[report.last.reason] && report.last.execution === 'HOLD') {
     execution.textContent += ' · ' + reasons[report.last.reason];
   }
-  if (['MARKET_UNAVAILABLE', 'DECISION_WINDOW_EXPIRED'].includes(report.last.reason) ||
+  if (skipped ||
       ['NO_FRESH_BOOK', 'DECISION_WINDOW_EXPIRED'].includes(report.last.execution)) {
     execution.className = 'advisor-caution';
   }
@@ -66,6 +77,14 @@ export function renderAdvisorReport(root, report, audit, decisions, trades) {
   add(balance, 'small', 'Modellkonto');
   const equity = report.arms.model.equityEur;
   add(balance, 'strong', equity === null ? 'Ausstehend' : EURO.format(equity));
+
+  const reference = report.arms.reference.equityEur;
+  if (equity !== null && reference !== null) {
+    const cents = Math.round(equity * 100) - Math.round(reference * 100);
+    const comparison = cents === 0 ? 'Gleichauf mit Referenz' :
+      EURO.format(Math.abs(cents) / 100) + (cents > 0 ? ' vor Referenz' : ' hinter Referenz');
+    add(balance, 'p', comparison);
+  }
 
   const table = add(content, 'table', '');
   table.className = 'advisor-accounts';
@@ -119,13 +138,14 @@ export function renderAdvisorReport(root, report, audit, decisions, trades) {
     return section;
   }
   if (Array.isArray(decisions)) {
-    const history = disclosure(content, 'history', 'Verlauf · letzte ' + decisions.length +
-      (decisions.length === 1 ? ' Entscheidung' : ' Entscheidungen'));
+    const modelCount = decisions.filter(row => row.reason !== 'DAY_CLOSE' && !skippedReason(row.reason)).length;
+    const title = decisions.length ? 'Verlauf · Modell entschied bei ' + modelCount + ' von ' +
+      decisions.length + (decisions.length === 1 ? ' Zeitpunkt' : ' Zeitpunkten') : 'Verlauf · Keine Zeitpunkte verfügbar';
+    const history = disclosure(content, 'history', title);
     for (const row of decisions) {
-      const skipped = ['MARKET_UNAVAILABLE','DECISION_WINDOW_EXPIRED','MODEL_KEY_UNAVAILABLE'].includes(row.reason) ||
-        row.reason.startsWith('MODEL_UNAVAILABLE');
-      const action = skipped ? 'Ausgesetzt' : actions[row.action] || row.action;
-      const reason = reasons[row.reason] || row.reason;
+      const skipped = skippedReason(row.reason);
+      const action = actionLabel(row);
+      const reason = skipped || reasons[row.reason] || row.reason;
       const summary = DATE.format(new Date(row.at)) + ' · ' + action + ' · ' +
         (skipped ? reason : executions[row.execution] || row.execution);
       const entry = disclosure(history, row.at, summary);
