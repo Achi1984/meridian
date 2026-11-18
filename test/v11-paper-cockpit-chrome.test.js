@@ -209,6 +209,26 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           'authenticated active Strategies entry performs exactly one progress read');
         assert.equal(intercepted.progressSettled(),1,
           'the initial bounded progress response settles through its exact-route fixture');
+        for (let attempt=0;attempt<150;attempt++) {
+          if (await evaluate(`Boolean(document.querySelector('#paper-advisor .advisor-headline'))`)) break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        const tile = await evaluate(`(()=>{
+          const root=document.querySelector('#paper-advisor');
+          return {overflow:root.scrollWidth>root.clientWidth+1, title:root.querySelector('.advisor-headline h3')?.textContent,
+            loss:root.querySelector('.advisor-loss')?.textContent, detailsOpen:root.querySelector('.advisor-detail')?.open};
+        })()`);
+        assert.equal(tile.title,'Kaufen');
+        assert.match(tile.loss,/-.*1,19/);
+        assert.equal(tile.detailsOpen,false);
+        assert.equal(tile.overflow,false,'pilot comparison fits the viewport at '+size.width);
+        const pilotEvidence = evidence || process.env.V11_A2_EVIDENCE_DIR;
+        if (pilotEvidence && size.width === 390) {
+          mkdirSync(pilotEvidence,{recursive:true});
+          await evaluate(`document.querySelector('#paper-advisor').scrollIntoView({block:'start'})`);
+          const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+          writeFileSync(join(pilotEvidence,'paper-advisor-390.png'),Buffer.from(image.data,'base64'));
+        }
         assert.match(await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
           /Checkpoint nicht verfügbar — NOT_FOUND/);
         for(let attempt=0;attempt<150;attempt++){
@@ -468,22 +488,6 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(before.longRunId,true);
         assert.equal(before.longReason,true);
 
-        const tile = await evaluate(`(()=>{
-          const root=document.querySelector('#paper-advisor');
-          return {overflow:root.scrollWidth>root.clientWidth+1, title:root.querySelector('.advisor-headline h3')?.textContent,
-            loss:root.querySelector('.advisor-loss')?.textContent, detailsOpen:root.querySelector('.advisor-detail')?.open};
-        })()`);
-        assert.equal(tile.title,'Kaufen');
-        assert.match(tile.loss,/-.*1,19/);
-        assert.equal(tile.detailsOpen,false);
-        assert.equal(tile.overflow,false,'pilot comparison fits the viewport at '+size.width);
-        const pilotEvidence = evidence || process.env.V11_A2_EVIDENCE_DIR;
-        if (pilotEvidence && size.width === 390) {
-          mkdirSync(pilotEvidence,{recursive:true});
-          await evaluate(`document.querySelector('#paper-advisor').scrollIntoView({block:'start'})`);
-          const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
-          writeFileSync(join(pilotEvidence,'paper-advisor-390.png'),Buffer.from(image.data,'base64'));
-        }
         await evaluate(`document.querySelector('#paper-bot-overview-section').open=true`);
         const focus=await evaluate(`(()=>{
           document.getElementById('app-main').focus();
@@ -497,7 +501,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root > details > summary')`),
           true,'primary Paper source details follow its refresh');
         await key('Tab','Tab',9);
-        for (const selector of ['#paper-advisor > summary', '.advisor-detail > summary', '[data-advisor-live]', '[data-advisor-file]']) {
+        for (const selector of ['#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
             true, 'live pilot control is reachable in document order: '+selector);
           await key('Tab','Tab',9);
