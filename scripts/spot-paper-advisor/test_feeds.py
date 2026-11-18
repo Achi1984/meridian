@@ -76,10 +76,31 @@ class FeedTests(unittest.TestCase):
                 feeds.book(lambda:100)
             self.assertEqual(read.call_count,2)
 
-    def test_stale_book_fails(self):
-        book=dict(bids=[['100','2',90]],asks=[['101','3',99]])
-        with patch.object(feeds,'_kraken',return_value=book), self.assertRaisesRegex(feeds.FeedError,'BOOK_TIME_INVALID'):
-            feeds.book(lambda:100)
+    def test_stale_book_refresh_is_bounded_and_rechecks_both_sides(self):
+        stale = dict(bids=[['100','2',94]], asks=[['101','3',100]])
+        fresh = dict(bids=[['102','2',96]], asks=[['103','3',101]])
+        old_ask = dict(bids=fresh['bids'], asks=[['103','3',95]])
+        for second, succeeds in [(fresh, True), (old_ask, False)]:
+            with self.subTest(succeeds=succeeds), \
+                 patch.object(feeds, '_kraken', side_effect=[stale, second]) as read, \
+                 patch.object(feeds.time, 'sleep') as sleep:
+                clock = iter([100, 101]).__next__
+                if succeeds:
+                    quote = feeds.book(clock)
+                    self.assertEqual((quote['bid'], quote['ask'], quote['received']), (102, 103, 101))
+                else:
+                    with self.assertRaisesRegex(feeds.FeedError, 'STALE_BOOK'):
+                        feeds.book(clock)
+                sleep.assert_called_once_with(1)
+                self.assertEqual(read.call_count, 2)
+
+    def test_future_or_malformed_timestamp_fails_without_retry(self):
+        for invalid in (101, '100'):
+            quote = dict(bids=[['100','2',100]], asks=[['101','3',invalid]])
+            with self.subTest(invalid=invalid), patch.object(feeds,'_kraken',return_value=quote) as read:
+                with self.assertRaisesRegex(feeds.FeedError, 'BOOK_TIME_INVALID'):
+                    feeds.book(lambda:100)
+                read.assert_called_once()
 
     def test_structured_decision_and_refusal_accounting(self):
         usage=dict(input_tokens=100, input_tokens_details={'cached_tokens':50},output_tokens=20)
