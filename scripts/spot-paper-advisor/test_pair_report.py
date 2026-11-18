@@ -6,7 +6,7 @@ import unittest
 
 from unittest.mock import patch
 
-from pair_report import comparison, iso
+from pair_report import comparison, describe, iso
 from pilot import publish_pair
 
 
@@ -51,3 +51,20 @@ class PairReportTest(unittest.TestCase):
             publish_pair(Path('/state'), 1800)
         sleep.assert_called_once_with(1)
         output.assert_not_called()
+
+    def test_skipped_detail_uses_only_recorded_operational_categories(self):
+        for reason, status, expected in (
+                ('MARKET_UNAVAILABLE', 'INCOMPLETE_OHLC', 'CANDLES'),
+                ('MARKET_UNAVAILABLE', 'BOOK_TIME_INVALID', 'BOOK_TIME'),
+                ('MARKET_UNAVAILABLE', 'HTTP_429', 'RATE_LIMIT'),
+                ('MARKET_UNAVAILABLE', None, 'MARKET'),
+                ('MARKET_UNAVAILABLE', 'unexpected provider detail', 'MARKET'),
+                ('MODEL_UNAVAILABLE: provider detail', 'OK', 'MODEL'),
+                ('wait for recovery', 'OK', None)):
+            with self.subTest(reason=reason, status=status):
+                report = dict(arms={'model': {'equityEur': None}}, last=dict(action='HOLD', reason=reason))
+                arm = describe(json.dumps(dict(report=report, marketStatus=status)), 1000)
+                self.assertEqual(arm.get('skipCause'), expected)
+                self.assertEqual(arm['action'], 'SKIPPED' if expected else 'HOLD')
+                self.assertIsNone(arm['equity'])
+                self.assertIsNone(arm['change'])

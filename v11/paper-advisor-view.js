@@ -113,12 +113,26 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
     add(pair, 'caption', 'V1 und V2 · gemeinsamer Vergleich');
     if (comparison?.v1 && comparison?.v2 && timestamp(comparison.at) && timestamp(comparison.start)) {
       const header = add(add(pair,'thead',''),'tr','');
-      for (const label of ['Modell','Entscheidung','Seit Vergleichsstart']) add(header,'th',label).scope='col';
+      for (const label of ['Modell','Entscheidung','Kontowert','Seit Vergleichsstart']) add(header,'th',label).scope='col';
       const body = add(pair,'tbody','');
       for (const [label, arm] of [['V1',comparison.v1],['V2',comparison.v2]]) {
         const row = add(body,'tr','');
         add(row,'th',label).scope='row';
-        add(row,'td',arm.action === 'SKIPPED' ? 'Ausgesetzt' : actions[arm.action] || 'Unbekannt');
+        const decision = add(row,'td',arm.action === 'SKIPPED' ? 'Ausgesetzt' : actions[arm.action] || 'Unbekannt');
+        if (arm.action === 'SKIPPED') {
+          const causes = {
+            CANDLES: 'Kurskerzen fehlen oder sind ungültig', BOOK: 'Orderbuch fehlt oder ist unbrauchbar',
+            BOOK_TIME: 'Zeitstempel im Orderbuch ungültig oder zu alt',
+            RATE_LIMIT: 'Kraken-Anfragelimit erreicht', REQUEST: 'Kraken-Abruf fehlgeschlagen',
+            MARKET: 'Marktdaten fehlen', MODEL_ACCESS: 'Modellzugang fehlt',
+            MODEL: 'Modellantwort fehlt', WINDOW: 'Entscheidungsfenster abgelaufen'
+          };
+          const sameSlot = Date.parse(comparison.at) === Math.floor(Date.parse(report.last.at) / 600000) * 600000;
+          const fallback = label === 'V1' && sameSlot ? skippedReason(report.last.reason) : null;
+          decision.append(doc.createElement('br'));
+          add(decision,'small', (Object.hasOwn(causes, arm.skipCause) && causes[arm.skipCause]) || fallback || 'Grund nicht gemeldet');
+        }
+        add(row,'td',Number.isFinite(arm.equity) ? EURO.format(arm.equity) : 'Bewertung fehlt');
         const cell = add(row,'td',Number.isFinite(arm.change) ?
           (arm.change > 0 ? '+' : '') + EURO.format(arm.change) : 'Ausstehend');
         if (arm.change) cell.className = arm.change > 0 ? 'advisor-gain' : 'advisor-loss';

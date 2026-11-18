@@ -9,14 +9,42 @@ def iso(slot):
     return datetime.fromtimestamp(slot, timezone.utc).isoformat()
 
 
+# Export only operational categories. Ledger records also contain model prose.
+def skip_cause(reason, market_status):
+    if reason == 'MARKET_UNAVAILABLE':
+        if market_status in ('EMPTY_OHLC', 'INCOMPLETE_OHLC', 'INVALID_OHLC', 'OHLC_GAP_OR_INVALID_RANGE'):
+            return 'CANDLES'
+        if market_status == 'BOOK_TIME_INVALID':
+            return 'BOOK_TIME'
+        if market_status in ('SLOW_BOOK', 'EMPTY_BOOK', 'INVALID_BOOK', 'CROSSED_BOOK'):
+            return 'BOOK'
+        if market_status == 'HTTP_429':
+            return 'RATE_LIMIT'
+        if market_status == 'REQUEST_FAILED':
+            return 'REQUEST'
+        if market_status == 'SLOT_EXPIRED':
+            return 'WINDOW'
+        return 'MARKET'
+    if reason == 'MODEL_KEY_UNAVAILABLE':
+        return 'MODEL_ACCESS'
+    if reason.startswith('MODEL_UNAVAILABLE'):
+        return 'MODEL'
+    if reason == 'DECISION_WINDOW_EXPIRED':
+        return 'WINDOW'
+    return None
+
+
 def describe(raw, initial):
-    report = json.loads(raw)['report']
+    record = json.loads(raw)
+    report = record['report']
     equity = report['arms']['model']['equityEur']
     last = report['last']
-    skipped = (last['reason'].startswith(('MODEL_UNAVAILABLE', 'MODEL_KEY_UNAVAILABLE'))
-               or last['reason'] in ('MARKET_UNAVAILABLE', 'DECISION_WINDOW_EXPIRED'))
-    action = 'SKIPPED' if skipped else last['action']
-    return dict(action=action, equity=equity, change=None if equity is None or initial is None else round(equity-initial, 2))
+    cause = skip_cause(last['reason'], record.get('marketStatus'))
+    change = None if equity is None or initial is None else round(equity-initial, 2)
+    arm = dict(action='SKIPPED' if cause else last['action'], equity=equity, change=change)
+    if cause:
+        arm['skipCause'] = cause
+    return arm
 
 
 def comparison(volume):
