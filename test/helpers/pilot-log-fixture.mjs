@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 
 export const pilotEndpoint = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/paper-advisor';
 
-export async function servePilotFixture(call, event) {
+export async function servePilotFixture(call, event, payload) {
   const {method, headers, url} = event.request;
   if (url !== pilotEndpoint) return false;
   const preflight = method === 'OPTIONS';
@@ -13,7 +13,8 @@ export async function servePilotFixture(call, event) {
   }
   await call('Fetch.fulfillRequest', {
     requestId: event.requestId,
-    responseCode: preflight ? 204 : 503,
+    responseCode: preflight ? 204 : payload ? 200 : 503,
+    ...(payload && !preflight ? {body:Buffer.from(JSON.stringify(payload)).toString('base64')} : {}),
     responseHeaders: [
       {name:'Access-Control-Allow-Origin', value:'*'},
       {name:'Access-Control-Allow-Methods', value:'GET'},

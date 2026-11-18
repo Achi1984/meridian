@@ -50,9 +50,18 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
   })).toString('base64');
   let reads=0,host8hReads=0,pairedReads=0,pairedSettled=0;
   let progressReads=0,progressSettled=0,failure=null,verificationOwned=false;
+  const asOf = new Date().toISOString();
+  const cash = {cashEur:1000, btc:0, equityEur:1000, lives:1};
+  const pilot = {
+    report:{schema:'MERIDIAN_ADVISOR_V1', asOf, model:'test', apiCostEur:null,
+      last:{at:asOf, action:'BUY', reason:'Testsignal', execution:'PAPER_BUY'},
+      arms:{model:{cashEur:900, btc:0.0017, equityEur:998.81, lives:0.99881}, reference:cash, cash}},
+    pilotAudit:{closedModelTrades:0, maxObservedDrawdownPct:0.119, modeledApiUsd:0.001,
+      apiBudgetUsd:3, unresolvedReserveUsd:0}
+  };
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
-      if (await servePilotFixture(call, event)) return;
+      if (await servePilotFixture(call, event, pilot)) return;
       if(new URL(event.request.url).origin===localOrigin){
         await call('Fetch.continueRequest',{requestId:event.requestId});
         return;
@@ -459,6 +468,15 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(before.longRunId,true);
         assert.equal(before.longReason,true);
 
+        const tile = await evaluate(`(()=>{
+          const root=document.querySelector('#paper-advisor');
+          return {overflow:root.scrollWidth>root.clientWidth+1, title:root.querySelector('.advisor-headline h3')?.textContent,
+            loss:root.querySelector('.advisor-loss')?.textContent, detailsOpen:root.querySelector('.advisor-detail')?.open};
+        })()`);
+        assert.equal(tile.title,'Kaufen');
+        assert.match(tile.loss,/-.*1,19/);
+        assert.equal(tile.detailsOpen,false);
+        assert.equal(tile.overflow,false,'pilot comparison fits the viewport at '+size.width);
         await evaluate(`document.querySelector('#paper-bot-overview-section').open=true`);
         const focus=await evaluate(`(()=>{
           document.getElementById('app-main').focus();
@@ -472,7 +490,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root > details > summary')`),
           true,'primary Paper source details follow its refresh');
         await key('Tab','Tab',9);
-        for (const selector of ['#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]']) {
+        for (const selector of ['#paper-advisor > summary', '.advisor-detail > summary', '[data-advisor-live]', '[data-advisor-file]']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
             true, 'live pilot control is reachable in document order: '+selector);
           await key('Tab','Tab',9);
