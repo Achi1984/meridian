@@ -150,11 +150,10 @@ def book(now=time.time):
     return _retry_public_read(_book_once, now)
 
 
-def _candles(interval, slot, length):
+def _closed_window(data, interval, slot, length):
     step = interval * 60
     end = slot - slot % step
     start = end - length*step
-    data = _retry_public_read(_kraken, f'OHLC?pair=XBTEUR&interval={interval}')
     if not isinstance(data, list) or len(data) < 2:
         raise FeedError('EMPTY_OHLC')
     candles = []
@@ -169,17 +168,40 @@ def _candles(interval, slot, length):
         if t != start + len(candles)*step or not l <= min(o,c) <= max(o,c) <= h:
             raise FeedError('OHLC_GAP_OR_INVALID_RANGE')
         candles.append([t,o,h,l,c])
+    # The last Kraken row is provisional. At rollover it can still be the
+    # final required candle even though every earlier closed candle is present.
+    tail = data[-1]
+    if (len(candles) == length-1 and isinstance(tail, list) and len(tail) == 8
+            and type(tail[0]) is int and tail[0] == end-step):
+        return None
     if len(candles) != length:
         raise FeedError('INCOMPLETE_OHLC')
     return candles
 
 
+def _candles(interval, slot, length, now=time.time):
+    path = f'OHLC?pair=XBTEUR&interval={interval}'
+    for offset in (0, 5, 15):
+        if offset:
+            remaining = slot + offset - now()
+            if remaining <= 0:
+                continue
+            time.sleep(remaining)
+            if now() >= slot + 90:
+                break
+        rows = _retry_public_read(_kraken, path)
+        window = _closed_window(rows, interval, slot, length)
+        if window is not None:
+            return window
+    raise FeedError('INCOMPLETE_OHLC')
+
+
 def market(slot, now=time.time):
     if type(slot) is not int or slot % 600 or not slot <= now() < slot+600:
         raise FeedError('INVALID_SLOT')
-    five = _candles(5,slot,72)
+    five = _candles(5,slot,72,now)
     ten = [[a[0],a[1],max(a[2],b[2]),min(a[3],b[3]),b[4]] for a,b in zip(five[::2],five[1::2])]
-    hour = _candles(60,slot,24)
+    hour = _candles(60,slot,24,now)
     quote = book(now)
     if not slot <= quote['received'] < slot+600:
         raise FeedError('SLOT_EXPIRED')
