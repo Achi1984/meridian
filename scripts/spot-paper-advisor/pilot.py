@@ -103,12 +103,27 @@ def publish(db, directory, start, slot, report=None, *, end=None):
     print(json.dumps(payload, allow_nan=False), flush=True)
     # Publish from the regular job stdout only when this is the baseline volume.
     if (directory/'challenger-v2'/'pilot.sqlite').is_file():
+        publish_pair(directory.resolve(), slot)
+
+
+def publish_pair(directory, slot):
+    last_at = None
+    # Allow the challenger to finish during the first 90 seconds of this slot.
+    deadline = slot + 90
+    while True:
         try:
-            _, row = comparison(directory.resolve())
-            if row:
+            _, row = comparison(directory)
+            if row and row['at'] != last_at:
+                last_at = row['at']
                 print(json.dumps({'pilotAudit': {'comparison': row}}, allow_nan=False), flush=True)
+            if last_at == iso(slot):
+                return
         except (sqlite3.Error, ValueError, KeyError, TypeError):
             print('PAIR_REPORT_UNAVAILABLE', flush=True)
+        remaining = deadline - time.time()
+        if remaining <= 0:
+            return
+        time.sleep(min(5, remaining))
 
 
 def paired_directory(volume, start):

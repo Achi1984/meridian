@@ -123,6 +123,10 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
           (arm.change > 0 ? '+' : '') + EURO.format(arm.change) : 'Ausstehend');
         if (arm.change) cell.className = arm.change > 0 ? 'advisor-gain' : 'advisor-loss';
       }
+      const latestSlot = Math.floor(Date.parse(report.last.at) / 600000) * 600000;
+      if (Date.parse(comparison.at) < latestSlot) {
+        add(content, 'p', 'Für den jüngsten Takt steht der gemeinsame Vergleich noch aus.');
+      }
       add(content,'small','Start · '+DATE.format(new Date(comparison.start))+' · Gemeinsamer Stand · '+DATE.format(new Date(comparison.at)));
     } else {
       add(content,'small','Gemeinsamer Bericht ausstehend');
