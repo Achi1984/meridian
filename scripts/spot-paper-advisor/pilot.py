@@ -3,6 +3,7 @@ import argparse
 import fcntl
 import json
 import os
+import sqlite3
 import time
 from pathlib import Path
 
@@ -66,7 +67,7 @@ class BudgetedFeeds:
             self.db.execute('UPDATE calls SET charge=?, settled=1 WHERE slot=?', (charge, self.slot))
 
 
-def audit(db, start, slot):
+def audit(db, start, slot, *, end=None):
     settled, unknown = db.execute('SELECT COALESCE(SUM(charge*settled),0), COALESCE(SUM(charge*(1-settled)),0) FROM calls').fetchone()
     # Read compact fields only. Rebuild from the committed ledger, including after a crash.
     rows = db.execute("""SELECT json_extract(record,'$.report.arms.model.equityEur'),
@@ -82,17 +83,17 @@ def audit(db, start, slot):
         if equity is not None:
             peak = max(peak, equity)
             drawdown = max(drawdown, 1 - equity / peak)
-    return dict(startUtc=iso(start), endUtc=iso(start+7*DAY), completedSlots=completed,
+    return dict(startUtc=iso(start), endUtc=iso(end if end is not None else start+7*DAY), completedSlots=completed,
                 missingOrPendingSlots=1+(slot-start)//STEP-completed, closedModelTrades=closed,
                 modelFailures=failures, maxObservedDrawdownPct=100*drawdown,
                 modeledApiUsd=settled/UNIT, unresolvedReserveUsd=unknown/UNIT, apiBudgetUsd=BUDGET/UNIT)
 
 
-def publish(db, directory, start, slot, report=None):
+def publish(db, directory, start, slot, report=None, *, end=None):
     if report is None:
         row = db.execute('SELECT record FROM slots WHERE record IS NOT NULL ORDER BY slot DESC LIMIT 1').fetchone()
         report = json.loads(row[0])['report'] if row else None
-    summary = audit(db, start, slot)
+    summary = audit(db, start, slot, end=end)
     payload = dict(pilotAudit=summary, report=report)
     for name, value in (('report', report), ('audit', payload)):
         tmp = directory/f'pilot-{name}.tmp'
@@ -101,10 +102,30 @@ def publish(db, directory, start, slot, report=None):
     print(json.dumps(payload, allow_nan=False), flush=True)
 
 
-def run(directory, start, key, *, challenger=False):
+def paired_directory(volume, start):
+    baseline = volume / 'pilot.sqlite'
+    db = sqlite3.connect(baseline.as_uri() + '?mode=ro', uri=True)
+    try:
+        baseline_start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
+    finally:
+        db.close()
+    end = baseline_start + 7 * DAY
+    if not baseline_start <= start < end:
+        raise ValueError('challenger start outside baseline pilot')
+    directory = volume / 'challenger-v2'
+    directory.mkdir(mode=0o700, exist_ok=True)
+    if directory.resolve() != directory:
+        raise ValueError('challenger directory must be isolated')
+    return directory, end
+
+
+def run(directory, start, key, *, challenger=False, paired=False):
     if not os.path.ismount(directory):
         raise ValueError('pilot directory must be a mounted persistent volume')
     end = start + 7 * DAY
+    if paired:
+        challenger = True
+        directory, end = paired_directory(directory.resolve(), start)
     if time.time() >= end and not (directory/'pilot.sqlite').is_file():
         print('PILOT_ENDED', flush=True)
         return
@@ -121,9 +142,9 @@ def run(directory, start, key, *, challenger=False):
             if slot >= end:
                 break
             report = cycle(db, slot, MODEL, key, BudgetedFeeds(db, slot, end))
-            publish(db, directory, start, slot, report)
+            publish(db, directory, start, slot, report, end=end)
             time.sleep(max(0, min(slot+STEP, end)-time.time()))
-        publish(db, directory, start, end-STEP)
+        publish(db, directory, start, end-STEP, end=end)
         db.close()
         print('PILOT_ENDED', flush=True)
 
@@ -133,5 +154,7 @@ if __name__ == '__main__':
     parser.add_argument('--directory', type=Path, required=True)
     parser.add_argument('--start', type=int, required=True)
     parser.add_argument('--challenger', action='store_true', help='Use v2 in a separate pilot volume')
+    parser.add_argument('--paired-challenger', action='store_true',
+                        help='Use isolated V2 files on the baseline volume and end at its cutoff')
     args = parser.parse_args()
-    run(args.directory, args.start, os.environ['OPENAI_API_KEY'], challenger=args.challenger)
+    run(args.directory, args.start, os.environ['OPENAI_API_KEY'], challenger=args.challenger, paired=args.paired_challenger)
