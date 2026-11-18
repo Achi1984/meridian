@@ -8,6 +8,7 @@ import time
 from pathlib import Path
 
 import feeds
+from pair_report import comparison
 from worker import DAY, STEP, connect, cycle, iso
 
 MODEL = 'gpt-4.1-mini-2025-04-14'
@@ -100,6 +101,14 @@ def publish(db, directory, start, slot, report=None, *, end=None):
         tmp.write_text(json.dumps(value, allow_nan=False, ensure_ascii=False))
         tmp.replace(directory/f'pilot-{name}.json')
     print(json.dumps(payload, allow_nan=False), flush=True)
+    # Publish from the regular job stdout only when this is the baseline volume.
+    if (directory/'challenger-v2'/'pilot.sqlite').is_file():
+        try:
+            _, row = comparison(directory.resolve())
+            if row:
+                print(json.dumps({'pilotAudit': {'comparison': row}}, allow_nan=False), flush=True)
+        except (sqlite3.Error, ValueError, KeyError, TypeError):
+            print('PAIR_REPORT_UNAVAILABLE', flush=True)
 
 
 def paired_directory(volume, start):

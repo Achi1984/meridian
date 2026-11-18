@@ -1,11 +1,8 @@
 """Publish a bounded, read-only comparison of the two co-located paper ledgers."""
 from contextlib import closing
 from datetime import datetime, timezone
-import fcntl
 import json
-from pathlib import Path
 import sqlite3
-import time
 
 
 def iso(slot):
@@ -41,21 +38,3 @@ def comparison(volume):
         slot, v1, v2 = pair
         return end, dict(start=iso(start), at=iso(slot), v1=describe(v1, opening[0] if opening else None),
                          v2=describe(v2, 1000))
-
-
-def publish(volume):
-    last = None
-    with (volume/'challenger-v2'/'comparison.lock').open('a') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        while True:
-            end, row = comparison(volume)
-            if row and row['at'] != last:
-                print(json.dumps({'pilotAudit': {'comparison': row}}, allow_nan=False), flush=True)
-                last = row['at']
-            if time.time() >= end:
-                return
-            time.sleep(30)
-
-
-if __name__ == '__main__':
-    publish(Path('/state'))
