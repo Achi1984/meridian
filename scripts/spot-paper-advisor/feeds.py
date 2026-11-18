@@ -199,12 +199,14 @@ def _usage(response):
     return counts
 
 
-def decide(context, model, key):
+def decide(context, model, key, *, service_tier=None):
     if not key or not model:
         raise FeedError('MODEL_NOT_CONFIGURED')
     body = dict(model=model, store=False, instructions=_POLICY, input=json.dumps(context,allow_nan=False),
                 max_output_tokens=1024, text={'format':{'type':'json_schema','name':'paper_decision',
                 'strict':True,'schema':_SCHEMA}})
+    if service_tier is not None:
+        body['service_tier'] = service_tier
     start = time.monotonic()
     response = _request(_OPENAI, body=json.dumps(body).encode(), key=key, timeout=30)
     usage = _usage(response)

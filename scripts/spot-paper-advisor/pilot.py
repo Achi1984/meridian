@@ -51,12 +51,19 @@ class BudgetedFeeds:
                 raise feeds.FeedError('PILOT_BUDGET_LIMIT')
             self.db.execute('INSERT INTO calls VALUES (?,?,0)', (self.slot, RESERVE))
         # Leave the complete reservation in place if usage is unknown or the process dies.
-        result = feeds.decide(context, model, key)
-        usage = result[2]
+        try:
+            result = feeds.decide(context, model, key, service_tier='default')
+        except feeds.FeedError as error:
+            if error.usage is not None and str(error) != 'MODEL_SNAPSHOT_MISMATCH':
+                self.settle(error.usage)
+            raise
+        self.settle(result[2])
+        return result
+
+    def settle(self, usage):
         charge = 4 * (usage['input'] - usage['cached']) + usage['cached'] + 16 * usage['output']
         with self.db:
             self.db.execute('UPDATE calls SET charge=?, settled=1 WHERE slot=?', (charge, self.slot))
-        return result
 
 
 def audit(db, start, slot):
@@ -81,11 +88,24 @@ def audit(db, start, slot):
                 modeledApiUsd=settled/UNIT, unresolvedReserveUsd=unknown/UNIT, apiBudgetUsd=BUDGET/UNIT)
 
 
+def publish(db, directory, start, slot, report=None):
+    if report is None:
+        row = db.execute('SELECT record FROM slots WHERE record IS NOT NULL ORDER BY slot DESC LIMIT 1').fetchone()
+        report = json.loads(row[0])['report'] if row else None
+    summary = audit(db, start, slot)
+    payload = dict(pilotAudit=summary, report=report)
+    for name, value in (('report', report), ('audit', payload)):
+        tmp = directory/f'pilot-{name}.tmp'
+        tmp.write_text(json.dumps(value, allow_nan=False, ensure_ascii=False))
+        tmp.replace(directory/f'pilot-{name}.json')
+    print(json.dumps(payload, allow_nan=False), flush=True)
+
+
 def run(directory, start, key):
     if not os.path.ismount(directory):
         raise ValueError('pilot directory must be a mounted persistent volume')
     end = start + 7 * DAY
-    if time.time() >= end:
+    if time.time() >= end and not (directory/'pilot.sqlite').is_file():
         print('PILOT_ENDED', flush=True)
         return
     with (directory/'pilot-writer.lock').open('a') as lock:
@@ -101,14 +121,10 @@ def run(directory, start, key):
             if slot >= end:
                 break
             report = cycle(db, slot, MODEL, key, BudgetedFeeds(db, slot, end))
-            if report is not None:
-                summary = audit(db, start, slot)
-                encoded = json.dumps(report, allow_nan=False, ensure_ascii=False)
-                tmp = directory/'pilot-report.tmp'
-                tmp.write_text(encoded)
-                tmp.replace(directory/'pilot-report.json')
-                print(json.dumps(dict(pilotAudit=summary, report=report), allow_nan=False), flush=True)
+            publish(db, directory, start, slot, report)
             time.sleep(max(0, min(slot+STEP, end)-time.time()))
+        publish(db, directory, start, end-STEP)
+        db.close()
         print('PILOT_ENDED', flush=True)
 
 
