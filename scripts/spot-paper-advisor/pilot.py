@@ -101,7 +101,7 @@ def publish(db, directory, start, slot, report=None):
     print(json.dumps(payload, allow_nan=False), flush=True)
 
 
-def run(directory, start, key):
+def run(directory, start, key, *, challenger=False):
     if not os.path.ismount(directory):
         raise ValueError('pilot directory must be a mounted persistent volume')
     end = start + 7 * DAY
@@ -110,7 +110,7 @@ def run(directory, start, key):
         return
     with (directory/'pilot-writer.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        db = connect(directory/'pilot.sqlite', MODEL)
+        db = connect(directory/'pilot.sqlite', MODEL, challenger=challenger)
         configure(db, start, time.time())
         while time.time() < end:
             now = time.time()
@@ -132,5 +132,6 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, required=True)
     parser.add_argument('--start', type=int, required=True)
+    parser.add_argument('--challenger', action='store_true', help='Use v2 in a separate pilot volume')
     args = parser.parse_args()
-    run(args.directory, args.start, os.environ['OPENAI_API_KEY'])
+    run(args.directory, args.start, os.environ['OPENAI_API_KEY'], challenger=args.challenger)

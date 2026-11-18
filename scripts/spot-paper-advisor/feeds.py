@@ -60,6 +60,20 @@ _SCHEMA = {'type':'object', 'properties':{'action':{'type':'string','enum':['BUY
 POLICY_DIGEST = hashlib.sha256((_POLICY + json.dumps(_SCHEMA, sort_keys=True)).encode()).hexdigest()
 
 
+CHALLENGER_VERSION = 'btc-eur-spot-intraday-v2'
+_CHALLENGER = _POLICY + """
+Evaluate the latest closed candles independently on every slot. When flat, assess a
+breakout above the prior six-bar high and a recovery after a pullback separately.
+Use the hourly context, recent range and time to mandatory exit to judge whether
+a plausible move clears the break-even exit bid. Historical range is not a forecast.
+Book sizes measure fillability of this specific order, not directional conviction.
+When long, reassess the remaining opportunity versus downside from the current bid.
+Do not wait for break-even if the thesis fails. Do not force a trade to meet a quota.
+Explain the decisive observation in German; when flat and holding, name the
+observable change needed for entry. Use the supplied execution arithmetic."""
+CHALLENGER_DIGEST = hashlib.sha256((_CHALLENGER + json.dumps(_SCHEMA, sort_keys=True)).encode()).hexdigest()
+
+
 def _request(url, *, body=None, key=None, timeout=5):
     headers = {'User-Agent':'Meridian-Paper/1', 'Accept':'application/json'}
     if key:
@@ -224,7 +238,7 @@ def _usage(response):
 def decide(context, model, key, *, service_tier=None):
     if not key or not model:
         raise FeedError('MODEL_NOT_CONFIGURED')
-    body = dict(model=model, store=False, instructions=_POLICY, input=json.dumps(context,allow_nan=False),
+    body = dict(model=model, store=False, instructions=(_CHALLENGER if context.get("policy") == CHALLENGER_VERSION else _POLICY), input=json.dumps(context,allow_nan=False),
                 max_output_tokens=1024, text={'format':{'type':'json_schema','name':'paper_decision',
                 'strict':True,'schema':_SCHEMA}})
     if service_tier is not None:

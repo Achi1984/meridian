@@ -81,3 +81,39 @@ class PaperTest(unittest.TestCase):
             return 'BUY','late',dict(input=1,cached=0,output=1)
         self.feed.decide.side_effect=slow
         self.assertEqual(self.run_slot()['last']['execution'],'DECISION_WINDOW_EXPIRED')
+
+class ChallengerTest(unittest.TestCase):
+    setUp = PaperTest.setUp
+    run_slot = PaperTest.run_slot
+    def test_challenger_context_and_record(self):
+        self.db = connect(':memory:', 'fixed-model', challenger=True)
+        self.feed.market.side_effect = lambda _: dict(
+            ten=[[i, 100, 101, 99, 100] for i in range(6)] + [[6, 100, 150, 95, 103]],
+            book=self.quote)
+        for action in ('BUY', 'HOLD', 'SELL'):
+            self.feed.decide.return_value = (action, 'Test', None)
+            report = self.run_slot()
+            context = self.feed.decide.call_args.args[0]
+            self.assertNotIn('recent', context)
+            self.assertEqual(context['policy'], 'btc-eur-spot-intraday-v2')
+            evidence = context['executionContext']
+            self.assertEqual(evidence['priorHourHighEur'], 101)
+            self.assertTrue(evidence['askCoversEntry'])
+            self.assertAlmostEqual(evidence['entryBreakEvenExitBidEur'], 10000*1.001*1.005/(.999*.995))
+            self.assertEqual(report['last']['execution'], {'BUY':'PAPER_BUY','HOLD':'HOLD','SELL':'PAPER_SELL'}[action])
+            self.slot += STEP
+            self.now += STEP
+
+    def test_small_visible_size_is_compared_to_paper_quantity(self):
+        from worker import challenger_inputs, initial
+        snapshot = dict(book=dict(self.quote, askSize=.001), ten=[[i,100,101,99,100] for i in range(7)])
+        self.assertFalse(challenger_inputs(snapshot, initial(), self.slot)['askCoversEntry'])
+
+    def test_baseline_ledger_cannot_be_reopened_as_challenger(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'pilot.sqlite'
+            connect(path, 'fixed-model').close()
+            with self.assertRaisesRegex(ValueError, 'separate challenger database'):
+                connect(path, 'fixed-model', challenger=True)

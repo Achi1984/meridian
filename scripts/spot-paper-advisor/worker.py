@@ -1,6 +1,6 @@
 """Single-writer, ten-minute BTC/EUR paper advisor. No exchange order client."""
 import argparse
-from feeds import POLICY_DIGEST, POLICY_VERSION, model_failure
+from feeds import CHALLENGER_DIGEST, CHALLENGER_VERSION, POLICY_DIGEST, POLICY_VERSION, model_failure
 import fcntl
 import json
 import math
@@ -76,12 +76,30 @@ def reference(candles, state):
     return 'HOLD'
 
 
-def connect(path, model):
+def challenger_inputs(snapshot, state, slot):
+    book = snapshot['book']
+    bid, ask = D(str(book['bid'])), D(str(book['ask']))
+    entry_unit = ask * (1 + SLIP) * (1 + FEE)
+    exit_factor = (1 - SLIP) * (1 - FEE)
+    quantity = (min(D(100), D(state['cash'])) / entry_unit).quantize(D('.00000001'), rounding=ROUND_DOWN)
+    ten = snapshot['ten']
+    previous = ten[-7:-1]
+    return dict(entryBreakEvenExitBidEur=float(entry_unit / exit_factor),
+                breakEvenRiseFromBidPct=float(100 * (entry_unit / (bid * exit_factor) - 1)),
+                askCoversEntry=quantity > 0 and quantity <= D(str(book['askSize'])),
+                bidCoversPosition=D(state['btc']) <= D(str(book['bidSize'])),
+                priorHourHighEur=max(row[2] for row in previous),
+                priorHourLowEur=min(row[3] for row in previous),
+                minutesUntilMandatoryExit=(DAY - STEP - slot % DAY) // 60)
+
+
+def connect(path, model, *, challenger=False):
     db = sqlite3.connect(path)
     with db:
         db.execute('CREATE TABLE IF NOT EXISTS slots (slot INTEGER PRIMARY KEY, record TEXT)')
         db.execute('CREATE TABLE IF NOT EXISTS config (id INTEGER PRIMARY KEY, value TEXT NOT NULL)')
-        identity=json.dumps([VERSION,POLICY_VERSION,POLICY_DIGEST,model])
+        identity=json.dumps([VERSION, CHALLENGER_VERSION if challenger else POLICY_VERSION,
+                             CHALLENGER_DIGEST if challenger else POLICY_DIGEST, model])
         db.execute('INSERT OR IGNORE INTO config VALUES (1,?)',(identity,))
         if db.execute('SELECT value FROM config WHERE id=1').fetchone()[0]!=identity:
             raise ValueError('model or policy changed: use a separate challenger database')
@@ -110,6 +128,7 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
     history=[]
     for (raw,) in db.execute('SELECT record FROM slots WHERE record IS NOT NULL ORDER BY slot DESC LIMIT 6'):
         history.append(json.loads(raw)['report']['last'])
+    _, policy, digest, _ = json.loads(db.execute("SELECT value FROM config WHERE id=1").fetchone()[0])
     snapshot=None
     market_status='OK'
     if forced(states['model'],slot) and forced(states['reference'],slot):
@@ -128,9 +147,13 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
     elif snapshot and clock() < slot+90:
         # A separately committed slot reservation already records possible request intent.
         try:
-            action,reason,usage=feeds.decide({'policy':VERSION,'slotUtc':iso(slot),'market':snapshot,
+            context = {'policy':VERSION,'slotUtc':iso(slot),'market':snapshot,
                 'portfolio':mark(states['model'],snapshot['book']),'recent':history[::-1],
-                'initialEur':1000,'entryBudgetEur':100,'feeBpsPerSide':50,'slippageBpsPerSide':10},model,key)
+                'initialEur':1000,'entryBudgetEur':100,'feeBpsPerSide':50,'slippageBpsPerSide':10}
+            if policy == CHALLENGER_VERSION:
+                context.update(policy=policy, executionContext=challenger_inputs(snapshot, states['model'], slot))
+                del context['recent']
+            action,reason,usage=feeds.decide(context, model, key)
             if action not in ('BUY','SELL','HOLD') or not isinstance(reason,str) or not reason.strip():
                 raise ValueError('invalid decision')
             cost=estimate_cost(usage,rates)
@@ -166,7 +189,7 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
     total=None if pending or cost is None or prior_cost is None else prior_cost+cost
     report=dict(schema='MERIDIAN_ADVISOR_V1',asOf=iso(now),model=model,arms={k:mark(v,book) for k,v in states.items()},
                 last=last,apiCostEur=total)
-    record=dict(version=VERSION,promptVersion=POLICY_VERSION,promptDigest=POLICY_DIGEST,marketStatus=market_status,slot=slot,states=states,report=report,inputs=snapshot,executionBook=book,
+    record=dict(version=VERSION,promptVersion=policy,promptDigest=digest,marketStatus=market_status,slot=slot,states=states,report=report,inputs=snapshot,executionBook=book,
                 referenceAction=ref,referenceExecution=ref_execution,usage=usage,slotApiCostEur=cost,pendingSlots=pending)
     with db:
         db.execute('UPDATE slots SET record=? WHERE slot=?',(json.dumps(record,allow_nan=False),slot))
@@ -177,6 +200,7 @@ def main():
     import feeds
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory',type=Path,required=True)
+    parser.add_argument('--challenger', action='store_true', help='Use the v2 decision policy in a separate directory')
     parser.add_argument('--once',action='store_true')
     args=parser.parse_args()
     key=os.environ.get('OPENAI_API_KEY')
@@ -194,7 +218,7 @@ def main():
     args.directory.mkdir(parents=True,exist_ok=True)
     with (args.directory/'writer.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        db=connect(args.directory/'advisor.sqlite',model)
+        db=connect(args.directory/'advisor.sqlite',model,challenger=args.challenger)
         while True:
             slot=int(time.time())//STEP*STEP
             cycle(db,slot,model,key,feeds,rates)
