@@ -1,3 +1,4 @@
+import {servePilotFixture, pilotEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -51,6 +52,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
   let progressReads=0,progressSettled=0,failure=null,verificationOwned=false;
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
+      if (await servePilotFixture(call, event)) return;
       if(new URL(event.request.url).origin===localOrigin){
         await call('Fetch.continueRequest',{requestId:event.requestId});
         return;
@@ -383,7 +385,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
-        const approvedExternal=new Set([VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
+        const approvedExternal=new Set([pilotEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
           SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
           SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
         assert.ok(resources.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
@@ -470,8 +472,13 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#spot-paper-host8h-root > details > summary')`),
           true,'primary Paper source details follow its refresh');
         await key('Tab','Tab',9);
+        for (const selector of ['#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]']) {
+          assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
+            true, 'live pilot control is reachable in document order: '+selector);
+          await key('Tab','Tab',9);
+        }
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-section > summary')`),
-          true,'Paper-bot overview disclosure follows the primary report details');
+          true,'Paper-bot overview disclosure follows the live pilot controls');
         await key('Tab','Tab',9);
         assert.equal(await evaluate(`document.activeElement===document.querySelector('#paper-bot-overview-section button')`),
           true,'overview refresh is keyboard reachable before its disclosure controls');

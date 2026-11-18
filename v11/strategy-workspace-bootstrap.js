@@ -12,6 +12,7 @@ let catalogRoot = document.getElementById('strategy-catalog');
 let catalogStatus = document.getElementById('strategy-load-status');
 let arenaRoot = document.getElementById('strategy-arena-root');
 let arena = null;
+let advisorController = null;
 let paperCockpit = null;
 let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
@@ -43,7 +44,10 @@ function mountWorkspace(){
   const botOverviewRoot=document.createElement('section');
   botOverviewRoot.id='paper-bot-overview-root';
   botReports.append(botOverviewRoot);
-  createAdvisorSection(collapsedSection('paper-advisor','BTC/EUR · Modellentscheidungen im Zehn-Minuten-Takt'));
+  const advisor = collapsedSection('paper-advisor','BTC/EUR · Live-Paperbot',botReports);
+  advisor.open = true;
+  advisorController = createAdvisorSection(advisor);
+  advisorController.setActive(Boolean(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')));
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';
@@ -105,6 +109,7 @@ function requestWorkspaceLoad(){
   pendingWorkspaceLoad = true;
   const active=document.querySelector('#nav button[data-v="strategies"][aria-current="page"]');
   if(active){
+    advisorController?.setActive(true);
     paperCockpit?.setActive(true);
     spotPaperCockpit?.setActive(true);
     spotPaperHost8hDashboard?.setActive(true);
@@ -159,6 +164,7 @@ function bindNavWhenReady(){
   nav.addEventListener('click',event=>{
     const button=event.target.closest?.('button[data-v]');
     if(!button || !nav.contains(button)) return;
+    advisorController?.setActive(button.dataset.v==='strategies');
     paperCockpit?.setActive(button.dataset.v==='strategies');
     spotPaperCockpit?.setActive(button.dataset.v==='strategies');
     spotPaperHost8hDashboard?.setActive(button.dataset.v==='strategies');
@@ -168,6 +174,7 @@ function bindNavWhenReady(){
   navObserver?.disconnect();
   navObserver = null;
   if(nav.querySelector('button[data-v="strategies"][aria-current="page"]')){
+    advisorController?.setActive(true);
     paperCockpit?.setActive(true);
     spotPaperCockpit?.setActive(true);
     spotPaperHost8hDashboard?.setActive(true);

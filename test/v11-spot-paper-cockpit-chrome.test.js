@@ -1,3 +1,4 @@
+import {servePilotFixture, pilotEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {existsSync} from 'node:fs';
 import {spawnSync} from 'node:child_process';
@@ -95,6 +96,7 @@ async function interceptReport(call, accepted) {
   let failure;
   const off = call.onEvent('Fetch.requestPaused', event => {
     void (async () => {
+      if (await servePilotFixture(call, event)) return;
       assert.equal(event.request.url, SPOT_PAPER_REPORT_ENDPOINT);
       if (event.request.method === 'OPTIONS') {
         await call('Fetch.fulfillRequest', {
@@ -127,7 +129,7 @@ async function interceptReport(call, accepted) {
     })().catch(error => { failure = error; });
   });
   await call('Fetch.enable', {
-    patterns: [{urlPattern: `${SPOT_PAPER_REPORT_ENDPOINT}*`, requestStage: 'Request'}]
+    patterns: [{urlPattern: pilotEndpoint, requestStage: 'Request'}, {urlPattern: `${SPOT_PAPER_REPORT_ENDPOINT}*`, requestStage: 'Request'}]
   });
   return {
     reads: () => reads,
