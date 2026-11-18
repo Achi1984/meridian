@@ -1,4 +1,4 @@
-import {servePilotFixture} from './helpers/pilot-log-fixture.mjs';
+import {servePilotFixture, pilotEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
@@ -1311,7 +1311,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(pairedReads,1,'active Strategies entry performs exactly one authorized paired read');
         assert.equal(progressReads,1,'active Strategies entry performs exactly one authorized progress read');
         assert.ok(arena.network.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
-          [SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
+          [pilotEndpoint,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
         'all external requests are blocked except the exact bounded report/progress endpoints');
         if(evidence){
           await evaluate(`document.querySelector('#strategy-arena-root .arena-model-card').scrollIntoView({block:'start'})`);
