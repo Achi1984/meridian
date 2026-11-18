@@ -7,7 +7,9 @@ async function readReport() {
   if (!token) throw new Error('Missing pilot log access');
   const runId = process.env.MERIDIAN_PILOT_RUN_ID;
   if (!/^[a-f0-9-]{36}$/i.test(runId || '')) throw new Error('Missing pilot run');
-  const [rows, usdBars] = await Promise.all([readRun(runId, token), readUsdBars()]);
+  const [items, usdBars] = await Promise.all([readRun(runId, token), readUsdBars()]);
+  const rows = items.filter(item => item.report);
+  const comparisons = items.map(item => item.pilotAudit?.comparison).filter(Boolean);
   // This pilot moved to a new job instance with its original account ledger.
   if (runId === '17c5dbdf-641b-465b-80cc-12b7691af7b7' && rows.length &&
       Date.now() < Date.parse('2026-11-19T15:11:42Z')) {
@@ -15,6 +17,9 @@ async function readReport() {
     rows.push(...earlier.filter(item => item.pilotAudit.startUtc === rows[0].pilotAudit.startUtc));
   }
   const summary = summarize(rows);
+  const latestSlot = Math.floor(Date.parse(summary.report.last.at)/600000)*600000;
+  summary.comparison = comparisons.filter(row => Date.parse(row.at) <= latestSlot)
+    .sort((a,b) => Date.parse(b.at)-Date.parse(a.at))[0] ?? null;
   summary.krakenUsd = decisionUsdClose(usdBars, summary.report.last.at);
   return summary;
 }
@@ -60,11 +65,23 @@ async function readRun(runId, token) {
     let item;
     try { item = JSON.parse(log.slice(start)); } catch { continue; }
     const {report, pilotAudit} = item || {};
+    if (!report && validComparison(pilotAudit?.comparison)) {
+      rows.push(item);
+      continue;
+    }
     if (report?.schema === 'MERIDIAN_ADVISOR_V1' && Number.isFinite(Date.parse(report.last?.at)) &&
         Number.isFinite(Date.parse(report.asOf)) && Number.isInteger(pilotAudit?.completedSlots) &&
         typeof report.last.reason === 'string' && typeof report.last.execution === 'string') rows.push(item);
   }
   return rows;
+}
+
+export function validComparison(row) {
+  if (!row || !Number.isFinite(Date.parse(row.start)) || !Number.isFinite(Date.parse(row.at)) ||
+      Date.parse(row.start) > Date.parse(row.at) || Date.parse(row.at) % 600000 !== 0) return false;
+  return [row.v1, row.v2].every(arm => arm && ['BUY','SELL','HOLD','SKIPPED'].includes(arm.action) &&
+    (arm.equity === null || Number.isFinite(arm.equity) && arm.equity >= 0) &&
+    (arm.change === null || Number.isFinite(arm.change)));
 }
 
 export function summarize(rows) {
