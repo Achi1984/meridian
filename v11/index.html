@@ -358,10 +358,10 @@
     @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{letter-spacing:-.03em}}
     @media(forced-colors:active){.strategy-family,.strategy-candidate,.arena-model-card,.strategy-progression li{border-color:CanvasText}}
 
-    #paper-advisor {font-variant-numeric:tabular-nums}
+    #paper-advisor {font-variant-numeric:tabular-nums;--muted:#b4c4d7;--positive:#70e5b4;--critical:#ff9ba4;--attention:#ffd18a;--brand:#91d8ff;border-color:#3d5874;background:linear-gradient(155deg,#172b41,#111d2e 56%)}
     #paper-advisor > summary {font-size:15px;letter-spacing:0}
     #paper-advisor [data-advisor-status] {font-size:12px;margin:0 0 12px}
-    #paper-advisor [data-state="fresh"]::before {content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:var(--positive)}
+    #paper-advisor [data-state="fresh"]::before {content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:var(--brand)}
     #paper-advisor [data-state="warning"] {color:var(--attention)}
     .advisor-headline {display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 0;border-block:1px solid var(--line)}
     .advisor-headline > div {min-width:0}
@@ -383,6 +383,16 @@
     .advisor-detail dl {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px 10px;margin:8px 0;font-size:13px}
     .advisor-detail dt {color:var(--muted)} .advisor-detail dd {margin:0;text-align:right}
     #paper-advisor [data-advisor-live] {min-height:44px;padding:8px 12px;color:var(--brand);border:1px solid var(--line);border-radius:10px;background:var(--brand-dim);cursor:pointer}
+    .advisor-headline h3 {color:#d7e2ee}
+    .advisor-headline [data-action="BUY"] {color:var(--positive)}
+    .advisor-headline [data-action="SELL"] {color:#e4b9ff}
+    .advisor-headline strong,.advisor-accounts tbody tr:first-child th {color:var(--brand)}
+    .advisor-accounts tbody tr:first-child {background:#1b3148}
+    .advisor-accounts tbody tr:first-child th {box-shadow:inset 3px 0 var(--brand);padding-left:8px}
+    .advisor-accounts tbody tr:first-child td:last-child {padding-right:4px}
+    .advisor-headline .advisor-caution {color:var(--attention);background:#382e24;border-inline-start:3px solid currentColor;padding:5px 8px;border-radius:3px}
+    #paper-advisor [data-advisor-live] {background:#203f59;border-color:#527995}
+    #paper-advisor input::file-selector-button {background:#233447;color:#e0eaf3;border:1px solid #60758b;border-radius:6px;padding:4px 8px}
     #paper-advisor > label {display:block;margin-top:10px;color:var(--muted);font-size:12px}
     #paper-advisor input[type=file] {max-width:100%;display:block;margin-top:4px}
   </style>
