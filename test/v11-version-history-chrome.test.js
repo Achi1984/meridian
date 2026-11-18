@@ -49,7 +49,8 @@ test('version history: native keyboard, focus and compact viewport at five width
    assert.ok(header.status.top>=header.strategy.bottom+7,'status is separated from navigation');
    assert.ok(header.root<=width+1,'header does not introduce horizontal scrolling');
    if(width<=600){
-    assert.ok(header.version.top>=header.identity.bottom+15,'mobile identity occupies its own row');
+    if(width<390) assert.ok(header.version.top>=header.identity.bottom+15,'narrow mobile identity occupies its own row');
+    else assert.ok(header.identity.right<=header.version.left && header.identity.top<header.version.bottom,'compact mobile header fits one row');
     assert.ok(header.strategy.width>=width-33,'mobile strategy action uses available width');
    }
    const before=await evaluate(`JSON.stringify({value:document.querySelector('.portfolio-value').textContent,sources:[...document.querySelectorAll('.trust-cell span')].map(x=>x.textContent),decision:document.querySelector('[data-decision-owner]').textContent})`);
