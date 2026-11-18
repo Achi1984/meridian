@@ -357,6 +357,34 @@
     @media(max-width:560px){.strategy-summary{grid-template-columns:1fr}.strategy-progression{grid-template-columns:1fr 1fr}.arena-toolbar{grid-template-columns:1fr}.arena-model-card{padding:11px}}
     @media(max-width:350px){#nav button[data-v="strategies"] span:last-child{letter-spacing:-.03em}}
     @media(forced-colors:active){.strategy-family,.strategy-candidate,.arena-model-card,.strategy-progression li{border-color:CanvasText}}
+
+    #paper-advisor {font-variant-numeric:tabular-nums}
+    #paper-advisor > summary {font-size:15px;letter-spacing:0}
+    #paper-advisor [data-advisor-status] {font-size:12px;margin:0 0 12px}
+    #paper-advisor [data-state="fresh"]::before {content:"";display:inline-block;width:7px;height:7px;margin-right:7px;border-radius:50%;background:var(--positive)}
+    #paper-advisor [data-state="warning"] {color:var(--attention)}
+    .advisor-headline {display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:14px 0;border-block:1px solid var(--line)}
+    .advisor-headline > div {min-width:0}
+    .advisor-headline > div + div {padding-left:12px;border-left:1px solid var(--line)}
+    .advisor-headline small {display:block;color:var(--muted);font-size:12px}
+    .advisor-headline h3,.advisor-headline strong {display:block;margin:4px 0;font-size:clamp(19px,4vw,26px);line-height:1.25;letter-spacing:-.025em}
+    .advisor-headline p {font-size:13px;color:var(--text)}
+    .advisor-accounts {width:100%;border-collapse:collapse;margin:12px 0;font-size:clamp(12px,2.7vw,14px)}
+    .advisor-accounts th,.advisor-accounts td {padding:9px 2px;text-align:right;border-bottom:1px solid var(--line)}
+    .advisor-accounts th:first-child {text-align:left}
+    .advisor-accounts thead th {font-weight:500;color:var(--muted)}
+    .advisor-accounts td {white-space:nowrap}
+    .advisor-gain {color:var(--positive)} .advisor-loss {color:var(--critical)}
+    .advisor-detail {margin:6px 0 12px}
+    .advisor-detail summary {letter-spacing:0;font-size:13px}
+    .advisor-detail summary::after {content:"+"} .advisor-detail[open] summary::after {content:"−"}
+    .advisor-detail > div {padding:0 14px 12px}
+    .advisor-detail h4 {margin:12px 0 4px}
+    .advisor-detail dl {display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:5px 10px;margin:8px 0;font-size:13px}
+    .advisor-detail dt {color:var(--muted)} .advisor-detail dd {margin:0;text-align:right}
+    #paper-advisor [data-advisor-live] {min-height:44px;padding:8px 12px;color:var(--brand);border:1px solid var(--line);border-radius:10px;background:var(--brand-dim);cursor:pointer}
+    #paper-advisor > label {display:block;margin-top:10px;color:var(--muted);font-size:12px}
+    #paper-advisor input[type=file] {max-width:100%;display:block;margin-top:4px}
   </style>
   <style id="m11-compact-nav">
     @media(max-width:430px){#nav{grid-template-columns:repeat(4,minmax(44px,1fr)) minmax(44px,1.3fr)}}

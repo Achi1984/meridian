@@ -50,9 +50,18 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
   })).toString('base64');
   let reads=0,host8hReads=0,pairedReads=0,pairedSettled=0;
   let progressReads=0,progressSettled=0,failure=null,verificationOwned=false;
+  const asOf = new Date().toISOString();
+  const cash = {cashEur:1000, btc:0, equityEur:1000, lives:1};
+  const pilot = {
+    report:{schema:'MERIDIAN_ADVISOR_V1', asOf, model:'test', apiCostEur:null,
+      last:{at:asOf, action:'BUY', reason:'Testsignal', execution:'PAPER_BUY'},
+      arms:{model:{cashEur:900, btc:0.0017, equityEur:998.81, lives:0.99881}, reference:cash, cash}},
+    pilotAudit:{closedModelTrades:0, maxObservedDrawdownPct:0.119, modeledApiUsd:0.001,
+      apiBudgetUsd:3, unresolvedReserveUsd:0}
+  };
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
-      if (await servePilotFixture(call, event)) return;
+      if (await servePilotFixture(call, event, pilot)) return;
       if(new URL(event.request.url).origin===localOrigin){
         await call('Fetch.continueRequest',{requestId:event.requestId});
         return;
@@ -200,6 +209,26 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           'authenticated active Strategies entry performs exactly one progress read');
         assert.equal(intercepted.progressSettled(),1,
           'the initial bounded progress response settles through its exact-route fixture');
+        for (let attempt=0;attempt<150;attempt++) {
+          if (await evaluate(`Boolean(document.querySelector('#paper-advisor .advisor-headline'))`)) break;
+          await new Promise(resolve=>setTimeout(resolve,10));
+        }
+        const tile = await evaluate(`(()=>{
+          const root=document.querySelector('#paper-advisor');
+          return {overflow:root.scrollWidth>root.clientWidth+1, title:root.querySelector('.advisor-headline h3')?.textContent,
+            loss:root.querySelector('.advisor-loss')?.textContent, detailsOpen:root.querySelector('.advisor-detail')?.open};
+        })()`);
+        assert.equal(tile.title,'Kaufen');
+        assert.match(tile.loss,/-.*1,19/);
+        assert.equal(tile.detailsOpen,false);
+        assert.equal(tile.overflow,false,'pilot comparison fits the viewport at '+size.width);
+        const pilotEvidence = evidence || process.env.V11_A2_EVIDENCE_DIR;
+        if (pilotEvidence && size.width === 390) {
+          mkdirSync(pilotEvidence,{recursive:true});
+          await evaluate(`document.querySelector('#paper-advisor').scrollIntoView({block:'start'})`);
+          const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+          writeFileSync(join(pilotEvidence,'paper-advisor-390.png'),Buffer.from(image.data,'base64'));
+        }
         assert.match(await evaluate(`document.querySelector('#paired-paper-report-root').textContent`),
           /Checkpoint nicht verfügbar — NOT_FOUND/);
         for(let attempt=0;attempt<150;attempt++){

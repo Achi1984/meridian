@@ -1,6 +1,7 @@
 import {appAccess} from './app-access.js?v=B16-M11-FIX17';
 
 const NUMBER = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 8});
+const PERCENT = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 2});
 const EURO = new Intl.NumberFormat('de-AT', {style: 'currency', currency: 'EUR'});
 const DATE = new Intl.DateTimeFormat('de-AT', {
   dateStyle: 'medium', timeStyle: 'long', timeZone: 'Europe/Vienna'
@@ -37,34 +38,72 @@ export function renderAdvisorReport(root, report, audit) {
     add(list, 'dd', value);
   }
   const actions = {BUY: 'Kaufen', SELL: 'Verkaufen', HOLD: 'Halten'};
-  add(content, 'h3', actions[report.last.action] || report.last.action);
-  const meta = add(content, 'dl', '');
+  const executions = {
+    PAPER_BUY: 'Paper-Kauf ausgeführt', PAPER_SELL: 'Paper-Verkauf ausgeführt',
+    HOLD: 'Keine Order', POSITION_UNCHANGED: 'Position unverändert',
+    NO_FRESH_BOOK: 'Orderbuch veraltet', DECISION_WINDOW_EXPIRED: 'Entscheidungsfenster verpasst',
+    INSUFFICIENT_ASK_SIZE: 'Angebotsvolumen zu gering', INSUFFICIENT_BID_SIZE: 'Nachfragevolumen zu gering'
+  };
+  const reasons = {
+    DECISION_WINDOW_EXPIRED: 'Entscheidungsfenster verpasst',
+    MARKET_UNAVAILABLE: 'Marktdaten fehlen', DAY_CLOSE: 'Handelstag beendet'
+  };
+  const hero = add(content, 'div', '');
+  hero.className = 'advisor-headline';
+  const signal = add(hero, 'div', '');
+  add(signal, 'small', 'Entscheidung');
+  add(signal, 'h3', actions[report.last.action] || report.last.action);
+  const execution = add(signal, 'p', executions[report.last.execution] || report.last.execution);
+  if (reasons[report.last.reason] && report.last.execution === 'HOLD') {
+    execution.textContent += ' · ' + reasons[report.last.reason];
+  }
+  const balance = add(hero, 'div', '');
+  add(balance, 'small', 'Modellkonto');
+  const equity = report.arms.model.equityEur;
+  add(balance, 'strong', equity === null ? 'Ausstehend' : EURO.format(equity));
+
+  const table = add(content, 'table', '');
+  table.className = 'advisor-accounts';
+  const head = add(add(table, 'thead', ''), 'tr', '');
+  for (const title of ['Konto', 'Wert', 'Seit Start']) add(head, 'th', title).scope = 'col';
+  const body = add(table, 'tbody', '');
+  for (const [key, label] of Object.entries(labels)) {
+    const value = report.arms[key].equityEur;
+    const row = add(body, 'tr', '');
+    add(row, 'th', label).scope = 'row';
+    add(row, 'td', value === null ? 'Ausstehend' : EURO.format(value));
+    const pnl = value === null ? null : Math.round((value - 1000) * 100) / 100;
+    const cell = add(row, 'td', pnl === null ? '—' : (pnl > 0 ? '+' : '') + EURO.format(pnl || 0));
+    if (pnl) cell.className = pnl > 0 ? 'advisor-gain' : 'advisor-loss';
+  }
+  const old = root.querySelector('.advisor-detail');
+  const restoreFocus = old && old.querySelector('summary') === doc.activeElement;
+  const detail = add(content, 'details', '');
+  detail.className = 'advisor-detail';
+  detail.open = Boolean(old?.open);
+  const toggle = add(detail, 'summary', 'Begründung und Kennzahlen');
+  const inside = add(detail, 'div', '');
+  add(inside, 'p', reasons[report.last.reason] || report.last.reason);
+  const meta = add(inside, 'dl', '');
   fact(meta, 'Entscheidung', DATE.format(new Date(report.last.at)));
-  fact(meta, 'Grund', report.last.reason === 'DECISION_WINDOW_EXPIRED'
-    ? 'Entscheidungsfenster verpasst' : report.last.reason);
-  fact(meta, 'Paper-Ausführung', report.last.execution);
-  fact(meta, 'Modell', report.model);
   if (audit) {
     fact(meta, 'Geschlossene Trades', audit.closedModelTrades);
-    fact(meta, 'Größter Rückgang', NUMBER.format(audit.maxObservedDrawdownPct) + ' %');
+    fact(meta, 'Größter Rückgang', PERCENT.format(audit.maxObservedDrawdownPct) + ' %');
     fact(meta, 'API-Verbrauch (geschätzt)', NUMBER.format(audit.modeledApiUsd) + ' / ' + audit.apiBudgetUsd + ' USD');
     fact(meta, 'Offene Kostenreserve', NUMBER.format(audit.unresolvedReserveUsd) + ' USD');
   }
-  fact(meta, 'API-Kosten', report.apiCostEur === null ? 'Unbekannt' : EURO.format(report.apiCostEur));
-  const cards = add(content, 'div', '');
-  cards.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,12rem),1fr));gap:1rem';
+  fact(meta, 'API-Kosten in Euro', report.apiCostEur === null ? 'Unbekannt' : EURO.format(report.apiCostEur));
+  fact(meta, 'Modell', report.model);
   for (const [key, label] of Object.entries(labels)) {
     const arm = report.arms[key];
-    const card = add(cards, 'section', '');
-    add(card, 'h4', label);
-    const list = add(card, 'dl', '');
-    fact(list, 'Leben', arm.lives === null ? 'Unbekannt' : NUMBER.format(arm.lives));
-    fact(list, 'Eigenkapital', arm.equityEur === null ? 'Bewertung ausstehend' : EURO.format(arm.equityEur));
-    fact(list, 'Ergebnis seit Start', arm.equityEur === null ? 'Ausstehend' : EURO.format(arm.equityEur - 1000));
+    add(inside, 'h4', label);
+    const list = add(inside, 'dl', '');
     fact(list, 'Cash', EURO.format(arm.cashEur));
     fact(list, 'BTC', NUMBER.format(arm.btc));
+    fact(list, 'Leben', arm.lives === null ? 'Unbekannt' : NUMBER.format(arm.lives));
   }
   root.replaceChildren(content);
+  if (restoreFocus) toggle.focus({preventScroll:true});
 }
 
 export function mountAdvisor(root, access = appAccess) {
@@ -77,6 +116,8 @@ export function mountAdvisor(root, access = appAccess) {
     generation++;
     fileInput.value = '';
     result.replaceChildren();
+    delete result.dataset.asOf;
+    delete status.dataset.state;
     status.textContent = 'Kein Bericht geladen.';
   }
   const doc = root.ownerDocument;
@@ -106,10 +147,16 @@ export function mountAdvisor(root, access = appAccess) {
         throw new Error('Invalid report');
       }
       renderAdvisorReport(result, report, pilotAudit);
+      result.dataset.asOf = report.asOf;
       const stale = Date.now() - Date.parse(report.asOf) > 15 * 60 * 1000;
+      status.dataset.state = stale ? 'warning' : 'fresh';
       status.textContent = (stale ? 'Veralteter Datenstand · ' : 'Datenstand · ') + DATE.format(new Date(report.asOf));
     } catch {
-      if (controller === request && access.isUnlocked()) status.textContent = 'Live-Daten derzeit nicht abrufbar.';
+      if (controller === request && access.isUnlocked()) {
+        status.dataset.state = 'warning';
+        const last = result.dataset.asOf;
+        status.textContent = 'Abruf fehlgeschlagen.' + (last ? ' Letzter Stand · ' + DATE.format(new Date(last)) : '');
+      }
     } finally {
       clearTimeout(timeout);
       if (controller === request) {
