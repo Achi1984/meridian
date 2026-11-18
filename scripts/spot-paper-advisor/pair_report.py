@@ -14,7 +14,9 @@ def skip_cause(reason, market_status):
     if reason == 'MARKET_UNAVAILABLE':
         if market_status in ('EMPTY_OHLC', 'INCOMPLETE_OHLC', 'INVALID_OHLC', 'OHLC_GAP_OR_INVALID_RANGE'):
             return 'CANDLES'
-        if market_status in ('SLOW_BOOK', 'EMPTY_BOOK', 'INVALID_BOOK', 'BOOK_TIME_INVALID', 'CROSSED_BOOK'):
+        if market_status == 'BOOK_TIME_INVALID':
+            return 'BOOK_TIME'
+        if market_status in ('SLOW_BOOK', 'EMPTY_BOOK', 'INVALID_BOOK', 'CROSSED_BOOK'):
             return 'BOOK'
         if market_status == 'HTTP_429':
             return 'RATE_LIMIT'
