@@ -816,6 +816,10 @@ function restoreDashboardClarity(source){
   return source;
 }
 function restoreB2(source){
+  const advisorStyles = source.match(/\n    #paper-advisor \{[^]*?    #paper-advisor input\[type=file\][^\n]*\n/)?.[0];
+  assert.ok(advisorStyles, 'live pilot styles present');
+  assert.equal(gitBlob(advisorStyles), '44e3456440160341ce5c98dd476450144f23f4e6', 'exact scoped live pilot style addition');
+  source = source.replace(advisorStyles, '');
   source=restoreDashboardClarity(source);
   const ledgerManualCss='    .ledger-manual{margin-top:24px;overflow-wrap:anywhere}\n    .ledger-manual label{display:block;margin:12px 0}\n    .ledger-manual input,.ledger-manual textarea{display:block;box-sizing:border-box;width:100%;max-width:100%;padding:10px;color:inherit;background:#111e2d;border:1px solid #54799a;border-radius:8px}\n    .ledger-manual button{max-width:100%;white-space:normal}\n    .ledger-manual li{margin:8px 0}\n';
   assert.equal(source.split(ledgerManualCss).length-1,1,'one exact FIX11 manual Ledger CSS addition');
