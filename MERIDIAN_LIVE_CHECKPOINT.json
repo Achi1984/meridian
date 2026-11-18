@@ -101,6 +101,7 @@
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
+    "paperAdvisorPilot20261118": {"base": "d9d15fd085c73d991749d3b03456e82d2a913ed8", "scope": "Seven-day paper-only worker, persistent epoch, 3 USD model-call ceiling; hosted start and verified persistence tracked separately"},
     "paperAdvisorDiagnostics20261118": {"base": "69d7d1f41b1f805c963f5de93ebe2ec104b04dd5", "firstRun": "MODEL_UNAVAILABLE", "scope": "Source diagnostics only; no hosted retry", "result": "Pending source integration"},
     "latestDelivery20261031": {
       "recordedDate": "2026-10-31",
