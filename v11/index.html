@@ -430,6 +430,19 @@
     #paper-bot-overview-root button:disabled{color:#aab6c5;background:#202c3b;border-color:#475666}
     #view-market .view-placeholder{gap:8px}
     #view-market .view-placeholder p{max-width:64ch;margin-top:0}
+    .view .eyebrow,.section-intro .sub{display:none}
+    .view h1{margin:0 0 10px;font-size:clamp(25px,5vw,32px)}
+    .view .section-intro{margin-bottom:0}
+    .view .section-intro h1{margin-bottom:10px}
+    .view>.sub{margin-bottom:8px}
+    @media(min-width:376px) and (max-width:600px){
+      .topbar .header-inner{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:8px}
+      .topbar .header-actions{display:flex;gap:12px;margin-left:auto}
+      .topbar .brand{font-size:14px}
+      .topbar .identity .mark{display:none}
+      .topbar .brand small{letter-spacing:.08em}
+      .topbar .version-toggle,.topbar .app-access-lock{padding-inline:8px}
+    }
     .view .portfolio-value,.view .depot-total,.view td{font-variant-numeric:tabular-nums}
     @media(min-width:900px){
       .v11-shell{--container:920px}
@@ -542,7 +555,7 @@
       </section>
       <section class="card command-strategies" aria-labelledby="command-strategies-heading">
         <div class="card-head"><h2 id="command-strategies-heading">Paper &amp; Forschung</h2><span class="limited">Nur lesend</span></div>
-        <p>Paper-Status und Kennzahlen findest du unter Strategien. Die Forschungsmodelle werden dort getrennt vom Paper-Test angezeigt; ihr Entwicklungsstand beschreibt nicht den aktuellen Bot-Betrieb.</p>
+        <p>Live-Paperbot und Forschungsberichte findest du unter Strategien.</p>
       </section>
       <details class="command-context-details">
         <summary><span>Einordnung &amp; Grenzen</span><span aria-hidden="true">+</span></summary>
@@ -600,7 +613,7 @@
     </section>
     <section id="view-strategies" class="view" aria-labelledby="strategies-heading" hidden>
       <div class="eyebrow">HYPOTHESEN · EVIDENZ · BLOCKER</div><h1 id="strategies-heading">Strategien</h1>
-      <p class="sub">Paper-Test und Forschungsmodelle sind getrennte Bereiche. Hier siehst du Berichte; deine Pionex-Bots findest du unter Bots. Diese Ansicht startet oder stoppt keinen Handel.</p>
+      <p class="sub">Paper-Trading und Forschung · Simulierte Konten</p>
       <p id="strategy-load-status" class="strategy-load-status" role="status" aria-live="polite">Das lokale Register wird erst beim Öffnen dieser Ansicht gelesen.</p>
       <div id="strategy-catalog" aria-busy="false"></div>
       <div id="strategy-arena-root"></div>

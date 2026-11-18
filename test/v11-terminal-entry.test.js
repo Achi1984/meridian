@@ -797,7 +797,7 @@ const dashboardClarityDeltas=[
   ],
   [
     "12 Hypothesen · 4 Arena-Modelle · H9 blockiert · B1-7 ohne Ergebnisse. Kein laufender Paper-Betrieb, keine Handelsaktivität.",
-    "Paper-Status und Kennzahlen findest du unter Strategien. Die Forschungsmodelle werden dort getrennt vom Paper-Test angezeigt; ihr Entwicklungsstand beschreibt nicht den aktuellen Bot-Betrieb."
+    "Live-Paperbot und Forschungsberichte findest du unter Strategien."
   ],
   [
     "MERIDIAN 11 · DESIGN-SCAFFOLD · NICHT PRODUKTIV",
@@ -805,7 +805,7 @@ const dashboardClarityDeltas=[
   ],
   [
     "Strategieforschung in M11 ist getrennt von den Exchange-Bots im Bots-Tab. Keine automatische Promotion, Paper-Ausführung oder Handelsfreigabe.",
-    "Paper-Test und Forschungsmodelle sind getrennte Bereiche. Hier siehst du Berichte; deine Pionex-Bots findest du unter Bots. Diese Ansicht startet oder stoppt keinen Handel."
+    "Paper-Trading und Forschung · Simulierte Konten"
   ]
 ];
 function restoreDashboardClarity(source){
@@ -818,7 +818,7 @@ function restoreDashboardClarity(source){
 function restoreB2(source){
   const palette = source.match(/  <style id="m11-dashboard-palette">[^]*?<\/style>\n/)?.[0];
   assert.ok(palette, 'dashboard palette present');
-  assert.equal(gitBlob(palette), '666451c72b4e4472bf5cb421a21cf76cf8401f82', 'reviewed dashboard layout and colors');
+  assert.equal(gitBlob(palette), 'f679ce9e41e2936e6746f1ec95623089e778674d', 'reviewed dashboard layout and colors');
   source = source.replace(palette, '');
   const advisorStyles = source.match(/\n    #paper-advisor \{[^]*?    #paper-advisor input\[type=file\][^\n]*\n/)?.[0];
   assert.ok(advisorStyles, 'live pilot styles present');
