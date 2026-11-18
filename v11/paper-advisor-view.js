@@ -81,6 +81,7 @@ export function mountAdvisor(root, access = appAccess) {
   }
   const doc = root.ownerDocument;
   let timer, controller, manual = false;
+  let active = false;
   function stop() {
     clearTimeout(timer);
     controller?.abort();
@@ -88,7 +89,7 @@ export function mountAdvisor(root, access = appAccess) {
   }
   async function refresh() {
     stop();
-    if (doc.hidden || manual || !access.isUnlocked()) return;
+    if (!active || doc.hidden || manual || !access.isUnlocked()) return;
     const request = new AbortController();
     controller = request;
     const timeout = setTimeout(() => request.abort(), 10000);
@@ -148,6 +149,11 @@ export function mountAdvisor(root, access = appAccess) {
       if (current === generation) status.textContent = 'Datei unlesbar oder kein gültiger Meridian-Modellbericht.';
     }
   });
+  return {setActive(value) {
+    if (active === value) return;
+    active = value;
+    refresh();
+  }};
 }
 
 export function createAdvisorSection(section) {
@@ -171,5 +177,5 @@ export function createAdvisorSection(section) {
   live.textContent = 'Live-Daten aktualisieren';
   live.setAttribute('data-advisor-live', '');
   section.append(status, result, live, label);
-  mountAdvisor(section);
+  return mountAdvisor(section);
 }
