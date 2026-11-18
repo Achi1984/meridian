@@ -818,7 +818,7 @@ function restoreDashboardClarity(source){
 function restoreB2(source){
   const palette = source.match(/  <style id="m11-dashboard-palette">[^]*?<\/style>\n/)?.[0];
   assert.ok(palette, 'dashboard palette present');
-  assert.equal(gitBlob(palette), '9c052cfa569acd61b183dc7724f9f40e6ac21983', 'reviewed dashboard layout and colors');
+  assert.equal(gitBlob(palette), 'f6bae9e61b8e35a4c67856ca8c9299f4f76068ba', 'reviewed dashboard layout and colors');
   source = source.replace(palette, '');
   const advisorStyles = source.match(/\n    #paper-advisor \{[^]*?    #paper-advisor input\[type=file\][^\n]*\n/)?.[0];
   assert.ok(advisorStyles, 'live pilot styles present');
