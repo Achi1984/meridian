@@ -1,6 +1,6 @@
-import {createSpotPaperThreeWayAdapter, presentSpotPaperThreeWayReport} from './spot-paper-three-way-model.js?v=B16-M11-FIX17';
-import {createOfflineThreeWayReportReader} from './spot-paper-three-way-reader.js?v=B16-M11-FIX17';
-import {renderSpotPaperThreeWay} from './spot-paper-three-way-view.js?v=B16-M11-FIX17';
+import {createSpotPaperThreeWayAdapter, presentSpotPaperThreeWayReport} from './spot-paper-three-way-model.js?v=B17-M11';
+import {createOfflineThreeWayReportReader} from './spot-paper-three-way-reader.js?v=B17-M11';
+import {renderSpotPaperThreeWay} from './spot-paper-three-way-view.js?v=B17-M11';
 
 export function mountSpotPaperThreeWayResearch(root, document = root?.ownerDocument,
   {readReport, readText, now = () => Date.now(), staleAfterMs = 15 * 60 * 1000} = {}) {

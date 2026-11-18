@@ -1,4 +1,4 @@
-import {appAccess} from './app-access.js?v=B16-M11-FIX17';
+import {appAccess} from './app-access.js?v=B17-M11';
 
 const NUMBER = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 8});
 const PERCENT = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 2});
