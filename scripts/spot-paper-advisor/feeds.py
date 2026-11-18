@@ -16,6 +16,7 @@ class FeedError(RuntimeError):
 
 _MODEL_FAILURES = {
     'REQUEST_FAILED', 'RESPONSE_TOO_LARGE', 'INVALID_JSON', 'INVALID_RESPONSE',
+    'PILOT_BUDGET_LIMIT', 'PILOT_EXPIRED_OR_MODEL_INVALID', 'PILOT_TARIFF_UNVERIFIED',
     'MODEL_TIMEOUT', 'MODEL_SNAPSHOT_MISMATCH', 'MODEL_INCOMPLETE',
     'MODEL_USAGE_MISSING', 'MODEL_REFUSAL', 'MODEL_OUTPUT_INVALID',
 }
@@ -198,19 +199,23 @@ def _usage(response):
     return counts
 
 
-def decide(context, model, key):
+def decide(context, model, key, *, service_tier=None):
     if not key or not model:
         raise FeedError('MODEL_NOT_CONFIGURED')
     body = dict(model=model, store=False, instructions=_POLICY, input=json.dumps(context,allow_nan=False),
                 max_output_tokens=1024, text={'format':{'type':'json_schema','name':'paper_decision',
                 'strict':True,'schema':_SCHEMA}})
+    if service_tier is not None:
+        body['service_tier'] = service_tier
     start = time.monotonic()
     response = _request(_OPENAI, body=json.dumps(body).encode(), key=key, timeout=30)
     usage = _usage(response)
-    if time.monotonic()-start>30:
-        raise FeedError('MODEL_TIMEOUT', usage)
     if response.get('model') != model:
         raise FeedError('MODEL_SNAPSHOT_MISMATCH', usage)
+    if service_tier is not None and response.get('service_tier') != service_tier:
+        raise FeedError('PILOT_TARIFF_UNVERIFIED')
+    if time.monotonic()-start>30:
+        raise FeedError('MODEL_TIMEOUT', usage)
     if response.get('status') != 'completed':
         raise FeedError('MODEL_INCOMPLETE', usage)
     if usage is None:
