@@ -1,3 +1,4 @@
+import {servePilotFixture, pilotEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
@@ -201,6 +202,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
         let failure = null;
         const off = call.onEvent('Fetch.requestPaused', event => {
           void (async () => {
+            if (await servePilotFixture(call, event)) return;
             if (event.request.url === VERIFY_ENDPOINT) return;
             if (![SPOT_PAPER_REPORT_ENDPOINT, SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
               SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]
@@ -306,7 +308,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             }
           })().catch(error => { failure = error; });
         });
-        await call('Fetch.enable', {patterns: [
+        await call('Fetch.enable', {patterns: [{urlPattern: pilotEndpoint, requestStage: 'Request'},
           {urlPattern: SPOT_PAPER_REPORT_ENDPOINT, requestStage: 'Request'},
           {urlPattern: SPOT_PAPER_PAIRED_REPORT_ENDPOINT, requestStage: 'Request'},
           {urlPattern: SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT, requestStage: 'Request'}

@@ -1,3 +1,4 @@
+import {servePilotFixture} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -51,6 +52,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
   let progressReads=0,progressSettled=0,failure=null,verificationOwned=false;
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
+      if (await servePilotFixture(call, event)) return;
       if(new URL(event.request.url).origin===localOrigin){
         await call('Fetch.continueRequest',{requestId:event.requestId});
         return;

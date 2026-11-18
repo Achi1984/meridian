@@ -1,3 +1,4 @@
+import {servePilotFixture} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
@@ -263,6 +264,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         let fetchFailure=null;
         const stopPairedIntercept=call.onEvent('Fetch.requestPaused',event=>{
           void (async()=>{
+            if (await servePilotFixture(call, event)) return;
             const url=new URL(event.request.url);
             if(url.origin===new URL(hosted.url).origin){
               await call('Fetch.continueRequest',{requestId:event.requestId});
