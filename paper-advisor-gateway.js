@@ -7,14 +7,39 @@ async function readReport() {
   if (!token) throw new Error('Missing pilot log access');
   const runId = process.env.MERIDIAN_PILOT_RUN_ID;
   if (!/^[a-f0-9-]{36}$/i.test(runId || '')) throw new Error('Missing pilot run');
-  const rows = await readRun(runId, token);
+  const [rows, usdBars] = await Promise.all([readRun(runId, token), readUsdBars()]);
   // This pilot moved to a new job instance with its original account ledger.
   if (runId === '17c5dbdf-641b-465b-80cc-12b7691af7b7' && rows.length &&
       Date.now() < Date.parse('2026-11-19T15:11:42Z')) {
     const earlier = await readRun('f68a62a4-5446-481a-9aef-df1241b1e959', token).catch(() => []);
     rows.push(...earlier.filter(item => item.pilotAudit.startUtc === rows[0].pilotAudit.startUtc));
   }
-  return summarize(rows);
+  const summary = summarize(rows);
+  summary.krakenUsd = decisionUsdClose(usdBars, summary.report.last.at);
+  return summary;
+}
+
+async function readUsdBars() {
+  try {
+    const response = await fetch('https://api.kraken.com/0/public/OHLC?pair=XBTUSD&interval=1', {
+      redirect: 'error', signal: AbortSignal.timeout(2500)
+    });
+    if (!response.ok) return null;
+    const data = await response.json();
+    return Array.isArray(data.error) && data.error.length === 0 ? data.result?.XXBTZUSD : null;
+  } catch {
+    return null;
+  }
+}
+
+export function decisionUsdClose(bars, decisionAt) {
+  if (!Array.isArray(bars)) return null;
+  const end = Math.floor(Date.parse(decisionAt) / 600000) * 600;
+  // Kraken's final row is provisional, including during a delayed rollover.
+  const row = bars.slice(0, -1).find(bar => Array.isArray(bar) && bar[0] === end - 60);
+  if (typeof row?.[4] !== 'string' || !/^\d+(?:\.\d+)?$/.test(row[4])) return null;
+  const close = Number(row[4]);
+  return Number.isFinite(close) && close > 0 ? {close, at: new Date(end * 1000).toISOString()} : null;
 }
 
 async function readRun(runId, token) {

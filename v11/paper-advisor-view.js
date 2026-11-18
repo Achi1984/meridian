@@ -24,7 +24,7 @@ export function validAdvisorReport(report) {
   });
 }
 
-export function renderAdvisorReport(root, report, audit, decisions, trades) {
+export function renderAdvisorReport(root, report, audit, decisions, trades, krakenUsd) {
   const doc = root.ownerDocument;
   const content = doc.createDocumentFragment();
   function add(parent, tag, value) {
@@ -84,6 +84,13 @@ export function renderAdvisorReport(root, report, audit, decisions, trades) {
     const comparison = cents === 0 ? 'Gleichauf mit Referenz' :
       EURO.format(Math.abs(cents) / 100) + (cents > 0 ? ' vor Referenz' : ' hinter Referenz');
     add(balance, 'p', comparison);
+  }
+
+  if (audit) {
+    const valid = Number.isFinite(krakenUsd?.close) && krakenUsd.close > 0 &&
+      timestamp(krakenUsd.at) && Date.parse(krakenUsd.at) === Math.floor(Date.parse(report.last.at) / 600000) * 600000;
+    const price = valid ? PERCENT.format(krakenUsd.close) + ' USD' : 'Kurs fehlt';
+    add(content, 'p', 'Kraken BTC/USD · ' + price + ' · Minutenschluss vor Entscheidung');
   }
 
   const table = add(content, 'table', '');
@@ -203,13 +210,13 @@ export function mountAdvisor(root, access = appAccess) {
         cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', signal: request.signal
       });
       if (!response.ok) throw new Error('Report unavailable');
-      const {report, pilotAudit, decisions, trades} = await response.json();
+      const {report, pilotAudit, decisions, trades, krakenUsd} = await response.json();
       if (controller !== request || !access.isUnlocked()) return;
       if (!validAdvisorReport(report) || !pilotAudit ||
           !['closedModelTrades','maxObservedDrawdownPct','modeledApiUsd','apiBudgetUsd','unresolvedReserveUsd'].every(key => nonnegative(pilotAudit[key]))) {
         throw new Error('Invalid report');
       }
-      renderAdvisorReport(result, report, pilotAudit, decisions, trades);
+      renderAdvisorReport(result, report, pilotAudit, decisions, trades, krakenUsd);
       result.dataset.asOf = report.asOf;
       const stale = Date.now() - Date.parse(report.asOf) > 15 * 60 * 1000;
       status.dataset.state = stale ? 'warning' : 'fresh';
