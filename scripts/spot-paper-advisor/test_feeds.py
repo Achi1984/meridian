@@ -1,4 +1,6 @@
+import io
 import json
+from urllib.error import HTTPError
 import unittest
 from unittest.mock import patch
 
@@ -6,6 +8,17 @@ import feeds
 
 
 class FeedTests(unittest.TestCase):
+    def test_http_errors_keep_only_status_and_known_codes(self):
+        for body, expected in [(b'{"error":{"code":"insufficient_quota","message":"private"}}', 'HTTP_429:insufficient_quota'),
+                               (b'{"error":{"code":"private"}}', 'HTTP_429'),
+                               (b'invalid', 'HTTP_429')]:
+            error = HTTPError(feeds._OPENAI, 429, 'private', {}, io.BytesIO(body))
+            with patch.object(feeds._HTTP, 'open', side_effect=error) as post:
+                with self.assertRaises(feeds.FeedError) as failure:
+                    feeds._request(feeds._OPENAI, key='test', body=b'{}')
+                self.assertEqual(feeds.model_failure(failure.exception), expected)
+                post.assert_called_once()
+
     def test_market_uses_closed_contiguous_windows(self):
         slot = 3600*100+1200
         def fetch(path):
@@ -53,4 +66,5 @@ class FeedTests(unittest.TestCase):
             part['type']='refusal'
             with self.assertRaises(feeds.FeedError) as failure:
                 feeds.decide({},'model','key')
+            self.assertEqual(str(failure.exception), 'MODEL_REFUSAL')
             self.assertEqual(failure.exception.usage['output'],20)

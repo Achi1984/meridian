@@ -101,6 +101,7 @@
   "quickCommand": "Go Meridian",
   "bootstrapFile": "MERIDIAN_GO.md",
   "currentWork": {
+    "paperAdvisorDiagnostics20261118": {"base": "69d7d1f41b1f805c963f5de93ebe2ec104b04dd5", "firstRun": "MODEL_UNAVAILABLE", "scope": "Source diagnostics only; no hosted retry", "result": "Pending source integration"},
     "latestDelivery20261031": {
       "recordedDate": "2026-10-31",
       "scope": "SOURCE_STATUS_ONLY_NO_ROUTING_OR_AUTHORITY_CHANGE",

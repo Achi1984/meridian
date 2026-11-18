@@ -2,6 +2,7 @@
 import hashlib
 import json
 import math
+import re
 import time
 from urllib.error import HTTPError, URLError
 from urllib.request import HTTPRedirectHandler, Request, build_opener
@@ -11,6 +12,27 @@ class FeedError(RuntimeError):
     def __init__(self, code, usage=None):
         super().__init__(code)
         self.usage = usage
+
+
+_MODEL_FAILURES = {
+    'REQUEST_FAILED', 'RESPONSE_TOO_LARGE', 'INVALID_JSON', 'INVALID_RESPONSE',
+    'MODEL_TIMEOUT', 'MODEL_SNAPSHOT_MISMATCH', 'MODEL_INCOMPLETE',
+    'MODEL_USAGE_MISSING', 'MODEL_REFUSAL', 'MODEL_OUTPUT_INVALID',
+}
+_PROVIDER_CODES = {'insufficient_quota', 'rate_limit_exceeded', 'invalid_api_key',
+                   'model_not_found', 'insufficient_permissions'}
+
+
+def model_failure(exc):
+    if isinstance(exc, FeedError):
+        code = str(exc)
+        if code in _MODEL_FAILURES or re.fullmatch(r'HTTP_[1-5][0-9]{2}', code):
+            return code
+        if code.startswith('HTTP_') and code.partition(':')[2] in _PROVIDER_CODES:
+            status = code.partition(':')[0]
+            if re.fullmatch(r'HTTP_[1-5][0-9]{2}', status):
+                return code
+    return 'UNCLASSIFIED'
 
 
 class _NoRedirect(HTTPRedirectHandler):
@@ -48,8 +70,17 @@ def _request(url, *, body=None, key=None, timeout=5):
         with _HTTP.open(request, timeout=timeout) as response:
             raw = response.read(512 * 1024 + 1)
     except HTTPError as exc:
-        exc.close()
-        raise FeedError(f'HTTP_{exc.code}') from None
+        status = f'HTTP_{exc.code}'
+        with exc:
+            if url == _OPENAI:
+                try:
+                    payload = json.loads(exc.read(8192))
+                    code = payload['error']['code']
+                    if isinstance(code, str) and code in _PROVIDER_CODES:
+                        status += ':' + code
+                except (ValueError, TypeError, KeyError, OSError, RecursionError):
+                    pass
+        raise FeedError(status) from None
     except (URLError, TimeoutError, OSError) as exc:
         raise FeedError('REQUEST_FAILED') from None
     if len(raw) > 512 * 1024:
@@ -180,13 +211,17 @@ def decide(context, model, key):
         raise FeedError('MODEL_TIMEOUT', usage)
     if response.get('model') != model:
         raise FeedError('MODEL_SNAPSHOT_MISMATCH', usage)
-    if response.get('status') != 'completed' or usage is None:
-        raise FeedError('MODEL_INCOMPLETE_OR_USAGE_MISSING',usage)
+    if response.get('status') != 'completed':
+        raise FeedError('MODEL_INCOMPLETE', usage)
+    if usage is None:
+        raise FeedError('MODEL_USAGE_MISSING')
     try:
         messages = [x for x in response['output'] if x['type']=='message']
         if len(messages)!=1 or messages[0]['role']!='assistant':
             raise ValueError()
         parts = messages[0]['content']
+        if any(isinstance(part, dict) and part.get('type') == 'refusal' for part in parts):
+            raise FeedError('MODEL_REFUSAL', usage)
         if len(parts)!=1 or parts[0]['type']!='output_text':
             raise ValueError()
         result = json.loads(parts[0]['text'])
