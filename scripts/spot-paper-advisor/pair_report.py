@@ -42,6 +42,10 @@ def describe(raw, initial):
     cause = skip_cause(last['reason'], record.get('marketStatus'))
     change = None if equity is None or initial is None else round(equity-initial, 2)
     arm = dict(action='SKIPPED' if cause else last['action'], equity=equity, change=change)
+    execution = last.get('execution')
+    if execution in ('PAPER_BUY', 'PAPER_SELL', 'HOLD', 'POSITION_UNCHANGED', 'NO_FRESH_BOOK',
+                     'DECISION_WINDOW_EXPIRED', 'INSUFFICIENT_ASK_SIZE', 'INSUFFICIENT_BID_SIZE'):
+        arm['execution'] = execution
     if cause:
         arm['skipCause'] = cause
     return arm
