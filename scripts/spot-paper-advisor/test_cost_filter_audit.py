@@ -210,6 +210,34 @@ class CostFilterAuditTest(unittest.TestCase):
         self.assertEqual(study['groups']['unknown']['pending'], 1)
         self.assertEqual(study['samples'][0]['exitAt'], study['samples'][1]['entryAt'])
 
+    def test_delayed_entry_compares_same_exit_and_keeps_skips_distinct_from_missing(self):
+        slot = EXPANSION_START
+        for at, bid in [(slot, 10000), (slot+STEP, 10100), (slot+HOUR, 10300)]:
+            self.record(at, 'model', bid)
+        def inputs(at, **values):
+            raw, = self.db.execute('SELECT record FROM slots WHERE slot=?', (at,)).fetchone()
+            self.db.execute('UPDATE slots SET record=? WHERE slot=?', (json.dumps(dict(json.loads(raw), inputs=values)), at))
+        hour = [[slot-k*HOUR, 100, 102, 99, 101] for k in range(7, 0, -1)]
+        hour[-1][2] = 105
+        inputs(slot, hour=hour)
+        for timestamp, finish, status in [(slot+STEP, 104, 'CONFIRMATION_UNAVAILABLE'),
+                                          (slot, 101, 'SKIPPED'), (slot, 104, 'MEASURED')]:
+            inputs(slot+STEP, ten=[[timestamp, 101, 105, 99, finish]])
+            study = audit(self.db)['hourlyExpansion']
+            sample = study['samples'][0]
+            delayed = sample['confirmed10m']
+            self.assertEqual(delayed['status'], status)
+            if status == 'CONFIRMATION_UNAVAILABLE':
+                self.assertEqual(study['confirmationPairs'], 0)
+            else:
+                self.assertEqual(study['confirmationPairs'], 1)
+                self.assertEqual(Decimal(study['meanConfirmationDeltaEur']),
+                                 Decimal(delayed['netEur']) - Decimal(sample['netEur']))
+                if status == 'SKIPPED':
+                    self.assertEqual(delayed['netEur'], '0')
+                else:
+                    self.assertLess(Decimal(delayed['netEur']), Decimal(sample['netEur']))
+
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
         self.record(DAY-3*STEP, reason, 10000)
