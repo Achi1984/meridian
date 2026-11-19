@@ -24,6 +24,36 @@ export function validAdvisorReport(report) {
   });
 }
 
+const actions = {BUY: 'Kaufen', SELL: 'Verkaufen', HOLD: 'Halten'};
+const executions = {
+  PAPER_BUY: 'Paper-Kauf ausgeführt', PAPER_SELL: 'Paper-Verkauf ausgeführt',
+  HOLD: 'Keine Order', POSITION_UNCHANGED: 'Position unverändert',
+  NO_FRESH_BOOK: 'Orderbuch veraltet', DECISION_WINDOW_EXPIRED: 'Entscheidungsfenster verpasst',
+  INSUFFICIENT_ASK_SIZE: 'Angebotsvolumen zu gering', INSUFFICIENT_BID_SIZE: 'Nachfragevolumen zu gering'
+};
+const reasons = {
+  DECISION_WINDOW_EXPIRED: 'Entscheidungsfenster verpasst',
+  MARKET_UNAVAILABLE: 'Marktdaten fehlen', DAY_CLOSE: 'Handelstag beendet'
+};
+
+const breakoutReasons = {
+  WAIT_FIRST_CLOSE: 'Erste 10-Minuten-Kerze steht aus',
+  CANDLES_UNAVAILABLE: 'Kerzendaten fehlen oder sind veraltet',
+  NO_COMPRESSION: 'Stundenspanne zu breit',
+  WAIT_BREAKOUT: 'Schlusskurs noch unter oder am Stundenhoch',
+  BREAKOUT: 'Ausbruch über das Stundenhoch',
+  POSITION_OPEN: 'Position innerhalb der Haltedauer',
+  TIME_EXIT: 'Haltedauer von 60 Minuten erreicht',
+  DAY_CLOSE: 'Tagesschluss', HOUR_USED: 'Einstieg dieser Stunde bereits genutzt'
+};
+
+const usdReasons = {
+  ...breakoutReasons, ...reasons,
+  COST_FILTER: 'Die Handelsspanne deckt die geschätzten Handelskosten nicht.',
+  EXECUTION_COST_FILTER: 'Die Gewinnschwelle liegt beim aktuellen Orderbuch außerhalb der Handelsspanne.',
+  PILOT_BUDGET_LIMIT: 'Modellbudget für weitere Anfragen ausgeschöpft.'
+};
+
 function renderUsdRound(root, round) {
   const doc = root.ownerDocument;
   const table = doc.createElement('table');
@@ -37,6 +67,7 @@ function renderUsdRound(root, round) {
       cell.textContent = value;
       tr.append(cell);
     });
+    return tr;
   }
   const title = doc.createElement('h3');
   title.textContent = 'BTC/USD · 1.000 USD je Paper-Konto';
@@ -45,9 +76,12 @@ function renderUsdRound(root, round) {
   const body = table.createTBody();
   for (const [key, name] of Object.entries({v3:'V3', v4:'V4 · Ausbruch', cash:'USD halten', btcHold:'BTC halten'})) {
     const arm = round.arms[key];
-    row(body, [name, Number.isFinite(arm.equityUsd) ? usd.format(arm.equityUsd) : '—',
+    const tr = row(body, [name, Number.isFinite(arm.equityUsd) ? usd.format(arm.equityUsd) : '—',
       Number.isFinite(arm.netUsd) ? usd.format(arm.netUsd) : '—', arm.closed, arm.activeDays,
-      PERCENT.format(arm.maxDrawdownPct) + ' %']);
+      nonnegative(arm.maxDrawdownPct) ? PERCENT.format(arm.maxDrawdownPct) + ' %' : '—']);
+    if (Number.isFinite(arm.netUsd) && Math.round(100 * Math.abs(arm.netUsd)) > 0) {
+      tr.cells[2].className = arm.netUsd > 0 ? 'advisor-gain' : 'advisor-loss';
+    }
   }
   const scroll = doc.createElement('div');
   scroll.style.overflowX = 'auto';
@@ -58,7 +92,26 @@ function renderUsdRound(root, round) {
     costs.textContent += ' V3-Modellkosten separat: ' + usd.format(round.modelCostUsd) +
       ' · Offene Reserve: ' + usd.format(round.modelReserveUsd);
   }
-  root.replaceChildren(title, scroll, costs);
+  const slot = doc.createElement('h4');
+  const time = doc.createElement('time');
+  time.dateTime = round.at;
+  time.textContent = DATE.format(new Date(round.at));
+  slot.append('Letzte Entscheidung · ', time);
+  const decisions = doc.createElement('dl');
+  for (const [key, name] of [['v3', 'V3'], ['v4', 'V4']]) {
+    const {action, reason, execution} = round.arms[key];
+    const decision = doc.createElement('dt');
+    decision.textContent = name + ' · ' + (Object.hasOwn(actions, action) ? actions[action] : 'Keine Angabe');
+    const detail = doc.createElement('dd');
+    const details = [];
+    if (action === 'BUY' || action === 'SELL') {
+      details.push(Object.hasOwn(executions, execution) ? executions[execution] : 'Ausführung nicht gemeldet');
+    }
+    if (text(reason)) details.push(Object.hasOwn(usdReasons, reason) ? usdReasons[reason] : reason);
+    detail.textContent = details.join(' · ') || 'Begründung fehlt';
+    decisions.append(decision, detail);
+  }
+  root.replaceChildren(title, scroll, costs, slot, decisions);
 }
 
 export function renderAdvisorReport(root, report, audit, decisions, trades, krakenUsd, comparison) {
@@ -74,17 +127,6 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
     add(list, 'dt', label);
     add(list, 'dd', value);
   }
-  const actions = {BUY: 'Kaufen', SELL: 'Verkaufen', HOLD: 'Halten'};
-  const executions = {
-    PAPER_BUY: 'Paper-Kauf ausgeführt', PAPER_SELL: 'Paper-Verkauf ausgeführt',
-    HOLD: 'Keine Order', POSITION_UNCHANGED: 'Position unverändert',
-    NO_FRESH_BOOK: 'Orderbuch veraltet', DECISION_WINDOW_EXPIRED: 'Entscheidungsfenster verpasst',
-    INSUFFICIENT_ASK_SIZE: 'Angebotsvolumen zu gering', INSUFFICIENT_BID_SIZE: 'Nachfragevolumen zu gering'
-  };
-  const reasons = {
-    DECISION_WINDOW_EXPIRED: 'Entscheidungsfenster verpasst',
-    MARKET_UNAVAILABLE: 'Marktdaten fehlen', DAY_CLOSE: 'Handelstag beendet'
-  };
   function skippedReason(reason) {
     if (reason === 'MODEL_KEY_UNAVAILABLE') return 'Modellzugang fehlt';
     if (reason.startsWith('MODEL_UNAVAILABLE')) return 'Modellantwort fehlt';
@@ -266,19 +308,9 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
         add(row, 'td', money(arm.netPerTradeEur));
         add(row, 'td', num(arm.maxDrawdownPct) + ' %');
         const cell = add(row, 'td', executions[arm.last] || 'Keine Ausführung');
-        const explanations = {
-          WAIT_FIRST_CLOSE: 'Erste 10-Minuten-Kerze steht aus',
-          CANDLES_UNAVAILABLE: 'Kerzendaten fehlen oder sind veraltet',
-          NO_COMPRESSION: 'Stundenspanne zu breit',
-          WAIT_BREAKOUT: 'Schlusskurs noch unter oder am Stundenhoch',
-          BREAKOUT: 'Ausbruch über das Stundenhoch',
-          POSITION_OPEN: 'Position innerhalb der Haltedauer',
-          TIME_EXIT: 'Haltedauer von 60 Minuten erreicht',
-          DAY_CLOSE: 'Tagesschluss', HOUR_USED: 'Einstieg dieser Stunde bereits genutzt'
-        };
-        if (arm === duel.v4 && Object.hasOwn(explanations, arm.reason)) {
+        if (arm === duel.v4 && Object.hasOwn(breakoutReasons, arm.reason)) {
           cell.append(doc.createElement('br'));
-          add(cell, 'small', explanations[arm.reason]);
+          add(cell, 'small', breakoutReasons[arm.reason]);
         }
       }
       const extra = duel.onlyV4;
