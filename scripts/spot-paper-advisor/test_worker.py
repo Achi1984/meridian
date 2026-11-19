@@ -71,6 +71,19 @@ class PaperTest(unittest.TestCase):
         self.feed.book.side_effect=lambda:dict(self.quote,received=self.now-1,bidAt=self.now-5.2,askAt=self.now-2)
         self.assertEqual(self.run_slot()['last']['execution'],'NO_FRESH_BOOK')
 
+        raw, = self.db.execute('SELECT record FROM slots').fetchone()
+        self.assertEqual(json.loads(raw)['executionBookStatus'], 'BOOK_TIME_INVALID_AT_FILL')
+
+    def test_book_failure_records_only_known_codes(self):
+        for error, code in [(FeedError('STALE_BOOK'), 'STALE_BOOK'), (FeedError('HTTP_503'), 'HTTP_503'),
+                            (ValueError('private'), 'UNCLASSIFIED')]:
+            self.feed.book.side_effect = error
+            self.assertEqual(self.run_slot()['last']['execution'], 'NO_FRESH_BOOK')
+            raw, = self.db.execute('SELECT record FROM slots WHERE slot=?', (self.slot,)).fetchone()
+            self.assertEqual(json.loads(raw)['executionBookStatus'], code)
+            self.slot += STEP
+            self.now += STEP
+
     def test_unresolved_reservation(self):
         self.db.execute('INSERT INTO slots VALUES (?,NULL)',(self.slot-STEP,))
         self.db.commit()
