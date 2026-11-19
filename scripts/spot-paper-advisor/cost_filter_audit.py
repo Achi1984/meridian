@@ -123,22 +123,35 @@ def replay_exit(records, latest, exit_slot, close, bought, initial_cash, entry_b
 
 def first_covered_exit(slot, exit_slot, latest, outcome, fixed):
     """Exit at the first observable, executable nonnegative net return, else at deadline."""
-    skipped = 0
+    skipped = []
     for check in range(slot + STEP, min(latest + 1, exit_slot), STEP):
         result = outcome(check)
         if result['status'] != 'MEASURED':
-            skipped += 1
+            skipped.append(dict(at=iso(check), reason=result['status']))
             continue
         net = Decimal(result['netEur'])
         if net >= 0:
             delta = net - Decimal(fixed['netEur']) if fixed['status'] == 'MEASURED' else None
             return dict(status='EARLY_EXIT', exitAt=iso(check), netEur=str(net),
                         deltaVsFixedEur=str(delta) if delta is not None else None,
-                        skippedChecks=skipped)
+                        skippedChecks=len(skipped), skippedObservations=skipped)
     measured = fixed['status'] == 'MEASURED'
     return dict(status='DEADLINE_EXIT' if measured else fixed['status'],
                 exitAt=iso(exit_slot) if measured else None, netEur=fixed.get('netEur'),
-                deltaVsFixedEur='0' if measured else None, skippedChecks=skipped)
+                deltaVsFixedEur='0' if measured else None, skippedChecks=len(skipped), skippedObservations=skipped)
+
+
+def observation_gaps(samples):
+    """Group unavailable intermediate exits across hypothetical positions by timestamp."""
+    gaps = {}
+    for sample in samples:
+        early = sample.get('exploratoryFirstCoveredExit', {})
+        for skipped in early.get('skippedObservations', []):
+            reasons = gaps.setdefault(skipped['at'], {})
+            reason = skipped['reason']
+            reasons[reason] = reasons.get(reason, 0) + 1
+    return [dict(at=at, affectedWindows=sum(reasons.values()), reasons=reasons)
+            for at, reasons in sorted(gaps.items())]
 
 
 def audit(db):
@@ -179,7 +192,8 @@ def audit(db):
                 pair['extraNetFromHoldingEur'] = str(Decimal(sample['netEur']) - Decimal(early['netEur']))
             sample['exploratory30m'] = pair
     return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples),
-                forwardVetoOutcomes60m=veto_outcomes(samples))
+                forwardVetoOutcomes60m=veto_outcomes(samples),
+                intermediateExitGaps=observation_gaps(samples))
 
 
 if __name__ == '__main__':
