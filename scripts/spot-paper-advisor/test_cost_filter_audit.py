@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from decimal import Decimal
 
-from cost_filter_audit import STAGES, audit, confirmed_breakout
+from cost_filter_audit import FORWARD_START, STAGES, audit, confirmed_breakout, entry_signals, forward_comparison
 from feeds import COST_VERSION
 from worker import DAY, STEP, iso
 
@@ -42,6 +42,31 @@ class CostFilterAuditTest(unittest.TestCase):
         bars[-1][0] = slot
         self.assertIsNone(confirmed_breakout(record, slot))
         self.assertIsNone(confirmed_breakout({}, slot))
+
+    def test_retest_and_failed_breakdown(self):
+        slot = 8*STEP
+        bars = [[i*STEP, 100, 102, 98, 100] for i in range(8)]
+        record = {'inputs': {'ten': bars}}
+        bars[-2][1:] = [100, 104, 99, 103]
+        bars[-1][1:] = [103, 104, 102, 103]
+        self.assertTrue(entry_signals(record, slot)['breakoutRetest'])
+        bars[-1][3] = 103
+        self.assertFalse(entry_signals(record, slot)['breakoutRetest'])
+        bars[-2][1:] = [99, 101, 97, 99]
+        self.assertTrue(entry_signals(record, slot)['failedBreakdown'])
+        bars[-1][1:] = [100, 102, 99, 101]
+        self.assertFalse(entry_signals(record, slot)['failedBreakdown'])
+
+    def test_forward_comparison_excludes_development_period_and_pending_pnl(self):
+        def sample(offset, signal, status):
+            return dict(entryAt=iso(FORWARD_START+offset), breakoutRetest=signal,
+                        failedBreakdown=False, status=status, netEur='1.25')
+        groups = forward_comparison([sample(-STEP, True, 'MEASURED'), sample(0, True, 'MEASURED'),
+                                     sample(STEP, True, 'PENDING_EXIT'), sample(2*STEP, None, 'EXIT_MISSING_RECORD')])['groups']
+        self.assertEqual(groups['breakoutRetest']['signal'],
+                         dict(total=2, measured=1, pending=1, unavailable=0, meanNetEur='1.25'))
+        self.assertEqual(groups['breakoutRetest']['unknown']['unavailable'], 1)
+        self.assertIsNone(groups['breakoutRetest']['noSignal']['meanNetEur'])
 
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
