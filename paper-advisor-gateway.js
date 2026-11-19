@@ -45,14 +45,38 @@ export async function resolvePilotRun(token, fallback, request = fetch) {
   throw new Error('Missing pilot run');
 }
 
+export function usdActivity(rows, latest) {
+  const end = Date.parse(latest.at);
+  const step = 600000;
+  const start = Math.max(Date.parse(latest.start), end - 143 * step);
+  const seen = new Set();
+  const arms = {v3: {signals: 0, buys: 0, sells: 0}, v4: {signals: 0, buys: 0, sells: 0}};
+  for (const row of rows) {
+    const slot = Date.parse(row.at);
+    if (row.start !== latest.start || !Number.isFinite(slot) || slot % step ||
+        slot < start || slot > end || seen.has(slot)) continue;
+    if (!Object.keys(arms).every(key => ['BUY','SELL','HOLD'].includes(row.arms?.[key]?.action) &&
+        typeof row.arms[key].execution === 'string')) continue;
+    seen.add(slot);
+    for (const [key, counts] of Object.entries(arms)) {
+      const arm = row.arms[key];
+      if (arm.action === 'BUY') counts.signals++;
+      if (arm.execution === 'PAPER_BUY') counts.buys++;
+      if (arm.execution === 'PAPER_SELL') counts.sells++;
+    }
+  }
+  return {observed: seen.size, expected: 1 + Math.floor((end - start) / step), arms};
+}
+
 async function readReport() {
   const token = process.env.MERIDIAN_PILOT_LOG_READ_TOKEN;
   if (!token) throw new Error('Missing pilot log access');
   const runId = await resolvePilotRun(token, process.env.MERIDIAN_PILOT_RUN_ID);
   const items = await readRun(runId, token);
-  const usd = items.filter(item => item.usdRound).map(item => item.usdRound)
+  const usdRows = items.filter(item => item.usdRound).map(item => item.usdRound);
+  const usd = usdRows
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
-  if (usd) return {usdRound: usd};
+  if (usd) return {usdRound: {...usd, activity: usdActivity(usdRows, usd)}};
   const rows = items.filter(item => item.report);
   const comparisons = items.map(item => item.pilotAudit?.comparison).filter(Boolean);
   // This pilot moved to a new job instance with its original account ledger.
