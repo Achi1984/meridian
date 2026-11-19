@@ -26,7 +26,7 @@ def initial():
     return dict(cash='1000', btc='0', opened=None)
 
 
-def execute(state, action, book, slot):
+def execute(state, action, book, slot, *, entry_budget=D(100)):
     cash, btc = D(state['cash']), D(state['btc'])
     if action == 'HOLD':
         return 'HOLD'
@@ -36,7 +36,7 @@ def execute(state, action, book, slot):
         return 'NO_FRESH_BOOK'
     if action == 'BUY':
         price = D(str(book['ask']))*(1+SLIP)*(1+FEE)
-        qty = (min(D(100),cash)/price).quantize(D('.00000001'), rounding=ROUND_DOWN)
+        qty = (min(entry_budget,cash)/price).quantize(D('.00000001'), rounding=ROUND_DOWN)
         if qty <= 0 or qty > D(str(book['askSize'])):
             return 'INSUFFICIENT_ASK_SIZE'
         state.update(cash=str(cash-qty*price),btc=str(qty),opened=slot)
