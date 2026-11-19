@@ -112,6 +112,26 @@ class CostFilterAuditTest(unittest.TestCase):
         self.assertEqual(Decimal(early['extraNetFromHoldingEur']),
                          Decimal(sample['netEur']) - Decimal(early['netEur']))
 
+    def test_forward_veto_outcomes_count_unique_full_hours_and_stage(self):
+        before, after = STAGES
+        slot = FORWARD_START
+        self.record(slot-STEP, before, 10000)
+        self.record(slot, before, 10000)
+        self.record(slot+STEP, after, 10000)
+        self.record(slot+2*STEP, before, 10000)
+        self.record(slot+6*STEP, 'model', 11000)
+        self.record(slot+7*STEP, 'model', 9900)
+        close = slot-slot%DAY+DAY-STEP
+        self.record(close-STEP, after, 10000)
+        self.record(close+STEP, before, 10000)
+        counts = audit(self.db)['forwardVetoOutcomes60m']
+        self.assertEqual(counts['shortenedAtClose'], 1)
+        self.assertEqual([counts['all'][key] for key in
+                          ('total','measured','profitable','loss','flat','pending','unavailable')],
+                         [4, 2, 1, 1, 0, 1, 1])
+        self.assertEqual(counts['disjointWindows']['total'], 2)
+        self.assertEqual(counts['byStage']['afterBuySignal']['loss'], 1)
+
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
         self.record(DAY-3*STEP, reason, 10000)
