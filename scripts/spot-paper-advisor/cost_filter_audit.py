@@ -79,6 +79,24 @@ def forward_comparison(samples):
     return dict(fromUtc=iso(FORWARD_START), groups=comparison)
 
 
+def veto_outcomes(samples):
+    """Count complete scheduled one-hour windows from the prospective period."""
+    forward = [row for row in samples if row['entryAt'] >= iso(FORWARD_START)]
+    full_hour = [row for row in forward if (datetime.fromisoformat(row['exitAt']) -
+                 datetime.fromisoformat(row['entryAt'])).total_seconds() == 3600]
+
+    def outcomes(rows):
+        summary = summarize_windows(rows)
+        measured = [Decimal(row['netEur']) for row in rows if row['status'] == 'MEASURED']
+        return dict(**summary, profitable=sum(net > 0 for net in measured),
+                    loss=sum(net < 0 for net in measured), flat=sum(net == 0 for net in measured))
+
+    return dict(fromUtc=iso(FORWARD_START), shortenedAtClose=len(forward)-len(full_hour),
+                all=outcomes(full_hour), disjointWindows=outcomes(disjoint_windows(full_hour)),
+                byStage={stage: outcomes([row for row in full_hour if row['stage'] == stage])
+                         for stage in STAGES.values()})
+
+
 def pnl_components(quantity, entry_book, exit_book, net):
     """Reconcile the midpoint move to both simulated fills for the same BTC quantity."""
     entry_bid, entry_ask = (Decimal(str(entry_book[k])) for k in ('bid', 'ask'))
@@ -138,7 +156,8 @@ def audit(db):
             if early_exit != exit_slot and early['status'] == sample['status'] == 'MEASURED':
                 pair['extraNetFromHoldingEur'] = str(Decimal(sample['netEur']) - Decimal(early['netEur']))
             sample['exploratory30m'] = pair
-    return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples))
+    return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples),
+                forwardVetoOutcomes60m=veto_outcomes(samples))
 
 
 if __name__ == '__main__':
