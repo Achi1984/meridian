@@ -59,14 +59,25 @@ class CostFilterAuditTest(unittest.TestCase):
 
     def test_forward_comparison_excludes_development_period_and_pending_pnl(self):
         def sample(offset, signal, status):
-            return dict(entryAt=iso(FORWARD_START+offset), breakoutRetest=signal,
+            return dict(entryAt=iso(FORWARD_START+offset), exitAt=iso(FORWARD_START+offset+6*STEP), breakoutRetest=signal,
                         failedBreakdown=False, status=status, netEur='1.25')
         groups = forward_comparison([sample(-STEP, True, 'MEASURED'), sample(0, True, 'MEASURED'),
                                      sample(STEP, True, 'PENDING_EXIT'), sample(2*STEP, None, 'EXIT_MISSING_RECORD')])['groups']
         self.assertEqual(groups['breakoutRetest']['signal'],
-                         dict(total=2, measured=1, pending=1, unavailable=0, meanNetEur='1.25'))
+                         dict(total=2, measured=1, pending=1, unavailable=0, meanNetEur='1.25',
+                              disjointWindows=dict(total=1, measured=1, pending=0, unavailable=0, meanNetEur='1.25')))
         self.assertEqual(groups['breakoutRetest']['unknown']['unavailable'], 1)
         self.assertIsNone(groups['breakoutRetest']['noSignal']['meanNetEur'])
+
+    def test_disjoint_comparison_selects_before_outcomes_and_accepts_touching_windows(self):
+        def row(t, status, pnl=None):
+            return dict(entryAt=iso(FORWARD_START+t*STEP), exitAt=iso(FORWARD_START+(t+6)*STEP),
+                        breakoutRetest=True, failedBreakdown=False, status=status, netEur=pnl)
+        samples = [row(6, 'MEASURED', '-1'), row(1, 'MEASURED', '9'), row(0, 'EXIT_MISSING_RECORD')]
+        summary = forward_comparison(samples)['groups']['breakoutRetest']['signal']
+        self.assertEqual(summary['meanNetEur'], '4')
+        self.assertEqual(summary['disjointWindows'],
+                         dict(total=2, measured=1, pending=0, unavailable=1, meanNetEur='-1'))
 
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
