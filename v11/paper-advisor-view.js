@@ -211,7 +211,7 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
       const table = add(scroll, 'table', '');
       table.className = 'advisor-accounts';
       const head = add(add(table, 'thead', ''), 'tr', '');
-      for (const title of ['Strategie', 'Netto', 'Trades/Tag', 'Netto/Trade', 'Max. Rückgang', 'Letzter Takt']) {
+      for (const title of ['Strategie', 'Netto', 'Abgeschlossene Trades', 'Netto/Trade', 'Max. Rückgang', 'Letzter Takt']) {
         add(head, 'th', title).scope = 'col';
       }
       const body = add(table, 'tbody', '');
@@ -220,7 +220,12 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
         add(row, 'th', name).scope = 'row';
         const net = add(row, 'td', money(arm.netEur));
         if (arm.netEur) net.className = arm.netEur > 0 ? 'advisor-gain' : 'advisor-loss';
-        add(row, 'td', num(arm.tradesPerDay) + ' (' + arm.closed + ' gesamt)');
+        const count = Number.isSafeInteger(arm.closed) && arm.closed >= 0;
+        const activity = add(row, 'td', count ? NUMBER.format(arm.closed) : '—');
+        if (count && nonnegative(arm.tradesPerDay)) {
+          activity.append(doc.createElement('br'));
+          add(activity, 'small', num(arm.tradesPerDay) + '/Tag (hochgerechnet)');
+        }
         add(row, 'td', money(arm.netPerTradeEur));
         add(row, 'td', num(arm.maxDrawdownPct) + ' %');
         const cell = add(row, 'td', executions[arm.last] || 'Keine Ausführung');
@@ -240,7 +245,7 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
         }
       }
       const extra = duel.onlyV4;
-      add(panel, 'p', 'Nur V4 hat gehandelt · ' + extra.closed + ' abgeschlossene Trades · ' +
+      add(panel, 'p', 'V4-Trades mit Einstieg ohne offene V3-Position oder V3-Order im selben Takt · ' + extra.closed + ' abgeschlossen · ' +
         money(extra.netEur) + ' netto · davon bereits abgezogen: ' + money(extra.costsEur) + ' Handelskosten');
       add(panel, 'small', 'Handelskosten enthalten. Modellkosten separat. Fehlende Takte: ' + duel.missingSlots);
     } else {
