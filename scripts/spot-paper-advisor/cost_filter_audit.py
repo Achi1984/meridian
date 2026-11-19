@@ -121,6 +121,26 @@ def replay_exit(records, latest, exit_slot, close, bought, initial_cash, entry_b
                                           records[exit_slot]['executionBook'], pnl))
 
 
+def first_covered_exit(slot, exit_slot, latest, outcome, fixed):
+    """Exit at the first observable, executable nonnegative net return, else at deadline."""
+    skipped = 0
+    for check in range(slot + STEP, min(latest + 1, exit_slot), STEP):
+        result = outcome(check)
+        if result['status'] != 'MEASURED':
+            skipped += 1
+            continue
+        net = Decimal(result['netEur'])
+        if net >= 0:
+            delta = net - Decimal(fixed['netEur']) if fixed['status'] == 'MEASURED' else None
+            return dict(status='EARLY_EXIT', exitAt=iso(check), netEur=str(net),
+                        deltaVsFixedEur=str(delta) if delta is not None else None,
+                        skippedChecks=skipped)
+    measured = fixed['status'] == 'MEASURED'
+    return dict(status='DEADLINE_EXIT' if measured else fixed['status'],
+                exitAt=iso(exit_slot) if measured else None, netEur=fixed.get('netEur'),
+                deltaVsFixedEur='0' if measured else None, skippedChecks=skipped)
+
+
 def audit(db):
     records = {slot: json.loads(raw) if raw else None
                for slot, raw in db.execute('SELECT slot, record FROM slots ORDER BY slot')}
@@ -148,6 +168,8 @@ def audit(db):
                                record['executionBook'])
 
         sample.update(outcome(exit_slot))
+        if slot >= FORWARD_START and entry == 'PAPER_BUY':
+            sample['exploratoryFirstCoveredExit'] = first_covered_exit(slot, exit_slot, latest, outcome, sample)
         if slot >= FORWARD_START and any(sample[key] for key in NEW_SIGNALS):
             early_exit = min(slot + 3 * STEP, close)
             early = outcome(early_exit) if early_exit != exit_slot else sample

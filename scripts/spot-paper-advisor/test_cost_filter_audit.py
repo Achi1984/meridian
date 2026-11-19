@@ -132,6 +132,36 @@ class CostFilterAuditTest(unittest.TestCase):
         self.assertEqual(counts['disjointWindows']['total'], 2)
         self.assertEqual(counts['byStage']['afterBuySignal']['loss'], 1)
 
+    def test_first_covered_exit_uses_earliest_executable_quote(self):
+        slot = FORWARD_START
+        self.record(slot, next(iter(STAGES)), 10000)
+        self.record(slot+STEP, 'model', 10200, size=0)
+        self.record(slot+2*STEP, 'model', 10200)
+        self.record(slot+3*STEP, 'model', 10500)
+        def report():
+            sample, = audit(self.db)['samples']
+            return sample, sample['exploratoryFirstCoveredExit']
+        sample, early = report()
+        self.assertEqual(early['exitAt'], iso(slot+2*STEP))
+        self.assertEqual(early['skippedChecks'], 1)
+        self.assertIsNone(early['deltaVsFixedEur'])
+        self.record(slot+6*STEP, 'model', 9900)
+        sample, early = report()
+        self.assertEqual(early['status'], 'EARLY_EXIT')
+        self.assertGreater(Decimal(early['netEur']), 0)
+        self.assertEqual(Decimal(early['deltaVsFixedEur']),
+                         Decimal(early['netEur']) - Decimal(sample['netEur']))
+
+    def test_first_covered_exit_falls_back_to_fixed_deadline(self):
+        slot = FORWARD_START
+        self.record(slot, next(iter(STAGES)), 10000)
+        self.record(slot+STEP, 'model', 10001)
+        self.record(slot+6*STEP, 'model', 9950)
+        sample, = audit(self.db)['samples']
+        early = sample['exploratoryFirstCoveredExit']
+        self.assertEqual(early, dict(status='DEADLINE_EXIT', exitAt=sample['exitAt'],
+                                     netEur=sample['netEur'], deltaVsFixedEur='0', skippedChecks=4))
+
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
         self.record(DAY-3*STEP, reason, 10000)
