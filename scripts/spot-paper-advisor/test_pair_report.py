@@ -6,11 +6,39 @@ import unittest
 
 from unittest.mock import patch
 
-from pair_report import comparison, describe, iso
+from pair_report import BREAKOUT_START, breakout_duel, breakout_signal, comparison, describe, iso
+from feeds import COST_VERSION
 from pilot import publish_pair
 
 
 class PairReportTest(unittest.TestCase):
+    def test_breakout_duel_uses_closed_bars_costs_and_one_position(self):
+        start = BREAKOUT_START
+        bars = [[start-i*3600, 100, 108, 90, 100] for i in (4, 3, 2, 1)]
+        bars[-1][2:4] = [102, 98]
+        with sqlite3.connect(':memory:') as db:
+            db.execute("ATTACH DATABASE ':memory:' AS v3")
+            db.execute('CREATE TABLE v3.slots(slot, record)')
+            for i in range(-1, 8):
+                slot = start+i*600
+                book = dict(bid=100 if i<7 else 110, ask=101 if i<7 else 111, bidSize=5, askSize=5)
+                row = dict(promptVersion=COST_VERSION, executionBook=book,
+                           states={'model': dict(cash='1000', btc='0')},
+                           inputs=dict(hour=bars, ten=[[slot-600,100,104,99,103]]),
+                           report=dict(last=dict(at=iso(slot+2), execution='HOLD'),
+                                       arms={'model': dict(equityEur=1000)}))
+                db.execute('INSERT INTO v3.slots VALUES(?,?)', (slot,json.dumps(row)))
+            result = breakout_duel(db, slot)
+            self.assertEqual(result['v4']['closed'], 1)
+            self.assertGreater(result['v4']['netEur'], 0)
+            self.assertEqual(result['onlyV4']['closed'], 1)
+            self.assertGreater(result['onlyV4']['costsEur'], 0)
+            self.assertEqual(result['v3']['netEur'], 0)
+            db.execute('DELETE FROM v3.slots WHERE slot=?', (start+1200,))
+            self.assertEqual(breakout_duel(db, slot)['onlyV4']['closed'], 0)
+            self.assertFalse(breakout_signal(row, slot))
+            self.assertIsNone(breakout_duel(db, start-600))
+
     def test_latest_common_slot_and_independent_opening_values(self):
         start = 1200
         with tempfile.TemporaryDirectory() as tmp:

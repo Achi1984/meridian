@@ -8,7 +8,7 @@ import time
 from pathlib import Path
 
 import feeds
-from pair_report import comparison
+from pair_report import breakout_duel, comparison
 from worker import DAY, STEP, connect, cycle, iso
 
 MODEL = 'gpt-4.1-mini-2025-04-14'
@@ -95,6 +95,8 @@ def publish(db, directory, start, slot, report=None, *, end=None):
         row = db.execute('SELECT record FROM slots WHERE record IS NOT NULL ORDER BY slot DESC LIMIT 1').fetchone()
         report = json.loads(row[0])['report'] if row else None
     summary = audit(db, start, slot, end=end)
+    if directory.name == 'challenger-v3':
+        summary['duel'] = breakout_duel(db, slot, standalone=True)
     payload = dict(pilotAudit=summary, report=report)
     for name, value in (('report', report), ('audit', payload)):
         tmp = directory/f'pilot-{name}.tmp'
