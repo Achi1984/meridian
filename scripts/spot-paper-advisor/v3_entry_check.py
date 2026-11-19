@@ -10,7 +10,7 @@ import re
 import sqlite3
 
 from usd_pullback import closed_bars, target_covers_cost, usable_book
-from worker import DAY, STEP, iso
+from worker import DAY, STEP, execute, forced, iso
 
 
 def entry_check(reason, snapshot, slot):
@@ -96,11 +96,33 @@ def filter_outcomes(entries):
     return groups
 
 
+def delayed_exit(state, record, slot, original_cash):
+    """Value the same lot at the next observed execution book, after all paper costs."""
+    report = record['report']
+    if report['arms']['v3']['execution'] == 'PAPER_BUY':
+        return dict(status='REENTRY_CONFLICT')
+    published = datetime.fromisoformat(report['publishedAt'])
+    if published.tzinfo is None:
+        return dict(status='UNKNOWN_EXECUTION_TIME')
+    now = published.timestamp()
+    if not slot <= now < slot+90:
+        return dict(status='OUTSIDE_EXECUTION_WINDOW')
+    book = usable_book(record.get('fillBook'), now, slot)
+    candidate = state.copy()
+    execution = execute(candidate, 'SELL', book, slot)
+    if execution != 'PAPER_SELL':
+        return dict(status=execution)
+    cash = Decimal(candidate['cash'])
+    return dict(status='PRICED', at=iso(slot), bidUsd=book['bid'],
+                realizedUsd=float(cash-Decimal(state['cash'])-Decimal(state['entryCostUsd'])),
+                differenceUsd=float(cash-original_cash))
+
+
 def audit(db, *, first_day=False):
     start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
     entries = []
     totals = Counter()
-    opened = None
+    opened = pending_exit = None
     missing = observed = 0
     next_slot = start
     end = start + (DAY if first_day else 7*DAY)
@@ -110,11 +132,11 @@ def audit(db, *, first_day=False):
             raise ValueError('off-grid slot')
         missing += (slot-next_slot)//STEP
         if slot != next_slot:
-            opened = None
+            opened = pending_exit = None
         next_slot = slot+STEP
         if raw is None:
             missing += 1
-            opened = None
+            opened = pending_exit = None
             continue
         record = json.loads(raw)
         report = record['report']
@@ -123,17 +145,26 @@ def audit(db, *, first_day=False):
             raise ValueError('unexpected round')
         observed += 1
         arm = report['arms']['v3']
+        if pending_exit:
+            item, state, actual_cash = pending_exit
+            item['delayedExit'] = delayed_exit(state, record, slot, actual_cash)
+            pending_exit = None
         if arm['execution'] == 'PAPER_BUY':
             verdict, cause = entry_check(arm['reason'], record.get('snapshot'), slot)
             state = record['states']['v3']
             before = Decimal(state['cash']) + Decimal(state['entryCostUsd'])
             item = dict(at=iso(slot), verdict=verdict, reason=cause, realizedUsd=None)
             entries.append(item)
-            opened = item, before
+            opened = item, before, state
         elif arm['execution'] == 'PAPER_SELL' and opened:
-            item, before = opened
+            item, before, state = opened
             pnl = Decimal(record['states']['v3']['cash'])-before
             item['realizedUsd'] = float(pnl)
+            if forced(state, slot):
+                item['delayedExit'] = dict(status='MANDATORY_EXIT')
+            else:
+                item['delayedExit'] = dict(status='NEXT_SLOT_UNAVAILABLE')
+                pending_exit = item, state, Decimal(record['states']['v3']['cash'])
             totals[item['verdict']] += pnl
             opened = None
     return dict(observedSlots=observed, missingSlots=missing, entries=entries,
