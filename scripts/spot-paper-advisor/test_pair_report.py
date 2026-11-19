@@ -79,6 +79,26 @@ class PairReportTest(unittest.TestCase):
         self.assertEqual(breakout_reason(row, hour+600), 'BREAKOUT')
         self.assertEqual(breakout_reason(row, hour+1200), 'CANDLES_UNAVAILABLE')
 
+    def test_breakout_rejects_unusable_replay_candles(self):
+        hour = BREAKOUT_START
+        slot = hour + 600
+        bars = [[hour-i*3600, 100, 108, 90, 100] for i in (4, 3, 2, 1)]
+        bars[-1][2:4] = [102, 98]
+        ten = [[hour, 100, 105, 99, 103]]
+        self.assertTrue(breakout_signal(dict(inputs=dict(hour=bars, ten=ten)), slot))
+        for malformed in (None, [], [hour, 100, 102, 99, 103],
+                          [hour, 100, 105, 101, 103], [hour, 100, 105, 0, 103],
+                          [hour, 100, 105, 99, float('nan')], [hour, 100, float('inf'), 99, 103],
+                          [hour, 100, 10**400, 99, 103], [hour, False, 105, 99, 103],
+                          [slot, 100, 105, 99, 103]):
+            with self.subTest(bar=malformed):
+                self.assertEqual(breakout_reason(dict(inputs=dict(hour=bars, ten=[malformed])), slot),
+                                 'CANDLES_UNAVAILABLE')
+        for inputs in (None, [], {'hour': None, 'ten': ten}, {'hour': bars, 'ten': 1},
+                       {'hour': bars[:-1] + [None], 'ten': ten}):
+            with self.subTest(inputs=inputs):
+                self.assertEqual(breakout_reason(dict(inputs=inputs), slot), 'CANDLES_UNAVAILABLE')
+
     def test_latest_common_slot_and_independent_opening_values(self):
         start = 1200
         with tempfile.TemporaryDirectory() as tmp:
