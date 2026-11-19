@@ -177,6 +177,32 @@ def hourly_regime(record, slot):
     return 'risingExpansion' if ranges[-1] > median(ranges[:-1]) else 'risingControl'
 
 
+def hourly_trade(records, latest, slot, end, close):
+    state = initial()
+    cash = Decimal(state['cash'])
+    record = records.get(slot)
+    entry = replay_fill(state, 'BUY', slot, record)
+    if entry != 'PAPER_BUY':
+        return dict(status='ENTRY_' + entry)
+    return replay_exit(records, latest, end, close, state, cash, record['executionBook'])
+
+
+def confirmed_hourly_entry(records, latest, slot, end, close):
+    check = slot+STEP
+    if check > latest:
+        return dict(status='PENDING_CONFIRMATION')
+    follow = records.get(check) or {}
+    bars = (follow.get('inputs') or {}).get('ten', [])
+    if follow.get('promptVersion') != COST_VERSION or not bars or len(bars[-1]) != 5 or bars[-1][0] != slot:
+        return dict(status='CONFIRMATION_UNAVAILABLE')
+    at = datetime.fromisoformat(follow['report']['last']['at']).timestamp()
+    if not check <= at < check+90:
+        return dict(status='CONFIRMATION_OUTSIDE_WINDOW')
+    if bars[-1][4] <= records[slot]['inputs']['hour'][-1][4]:
+        return dict(status='SKIPPED', netEur='0')
+    return hourly_trade(records, latest, check, end, close)
+
+
 def hourly_expansion_study(records):
     latest = max(records, default=-1)
     samples = []
@@ -190,17 +216,19 @@ def hourly_expansion_study(records):
             continue
         regime = hourly_regime(record or {}, slot)
         sample = dict(entryAt=iso(slot), exitAt=iso(end), regime=regime)
-        state = initial()
-        cash = Decimal(state['cash'])
-        entry = replay_fill(state, 'BUY', slot, record)
-        if entry == 'PAPER_BUY':
-            sample.update(replay_exit(records, latest, end, close, state, cash, record['executionBook']))
-        else:
-            sample['status'] = 'ENTRY_' + entry
+        sample.update(hourly_trade(records, latest, slot, end, close))
+        if regime == 'risingExpansion':
+            delayed = confirmed_hourly_entry(records, latest, slot, end, close)
+            sample['confirmed10m'] = delayed
+            if sample['status'] == 'MEASURED' and delayed['status'] in ('SKIPPED', 'MEASURED'):
+                delayed['deltaVsImmediateEur'] = str(Decimal(delayed['netEur']) - Decimal(sample['netEur']))
         samples.append(sample)
     groups = {name: summarize_windows([row for row in samples if row['regime'] == name])
               for name in ('risingExpansion', 'risingControl', 'nonRising', 'unknown')}
-    return dict(fromUtc=iso(EXPANSION_START), samples=samples, groups=groups)
+    deltas = [Decimal(row['confirmed10m']['deltaVsImmediateEur']) for row in samples
+              if 'deltaVsImmediateEur' in row.get('confirmed10m', {})]
+    return dict(fromUtc=iso(EXPANSION_START), samples=samples, groups=groups,
+                confirmationPairs=len(deltas), meanConfirmationDeltaEur=str(sum(deltas)/len(deltas)) if deltas else None)
 
 
 def audit(db):
