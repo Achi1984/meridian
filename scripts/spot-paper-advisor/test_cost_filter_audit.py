@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from decimal import Decimal
 
-from cost_filter_audit import ai_veto, EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, confirmed_breakout, entry_signals, forward_comparison
+from cost_filter_audit import ai_veto, EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, confirmation_results, confirmed_breakout, entry_signals, forward_comparison
 from feeds import COST_VERSION
 from worker import DAY, FEE, SLIP, STEP, iso
 
@@ -237,6 +237,21 @@ class CostFilterAuditTest(unittest.TestCase):
                     self.assertEqual(delayed['netEur'], '0')
                 else:
                     self.assertLess(Decimal(delayed['netEur']), Decimal(sample['netEur']))
+
+    def test_confirmation_totals_reconcile_skips_and_delayed_entries(self):
+        samples = []
+        for status, baseline, net in [('SKIPPED', -4, 0), ('SKIPPED', 2, 0),
+                                      ('MEASURED', 1, 4), ('MEASURED', 0, -1)]:
+            delayed = dict(status=status, netEur=str(net), deltaVsImmediateEur=str(net-baseline))
+            samples.append(dict(regime='risingExpansion', netEur=str(baseline), confirmed10m=delayed))
+        samples.extend([dict(regime='risingExpansion', confirmed10m={'status': 'PENDING_CONFIRMATION'}),
+                        dict(regime='risingControl')])
+        totals = confirmation_results(samples)
+        self.assertEqual(totals, dict(paired=4, unmatched=1, skipped=2, entered=2,
+                                      immediateNetEur='-1', confirmedNetEur='3', avoidedLossEur='4',
+                                      missedGainEur='2', entryTimingDeltaEur='2', netDeltaEur='4',
+                                      meanDeltaEur='1'))
+        self.assertIsNone(confirmation_results(samples[-2:])['netDeltaEur'])
 
     def test_only_model_decisions_and_known_costs_enter_ai_comparison(self):
         last = dict(action='HOLD', reason='wait', execution='HOLD')
