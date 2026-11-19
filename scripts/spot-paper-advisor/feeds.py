@@ -19,6 +19,7 @@ _MODEL_FAILURES = {
     'PILOT_BUDGET_LIMIT', 'PILOT_EXPIRED_OR_MODEL_INVALID', 'PILOT_TARIFF_UNVERIFIED',
     'MODEL_TIMEOUT', 'MODEL_SNAPSHOT_MISMATCH', 'MODEL_INCOMPLETE',
     'MODEL_USAGE_MISSING', 'MODEL_REFUSAL', 'MODEL_OUTPUT_INVALID',
+    'MODEL_REASON_LENGTH', 'MODEL_DECISION_FIELDS', 'MODEL_JSON_INVALID',
 }
 _PROVIDER_CODES = {'insufficient_quota', 'rate_limit_exceeded', 'invalid_api_key',
                    'model_not_found', 'insufficient_permissions'}
@@ -72,6 +73,15 @@ Do not wait for break-even if the thesis fails. Do not force a trade to meet a q
 Explain the decisive observation in German; when flat and holding, name the
 observable change needed for entry. Use the supplied execution arithmetic."""
 CHALLENGER_DIGEST = hashlib.sha256((_CHALLENGER + json.dumps(_SCHEMA, sort_keys=True)).encode()).hexdigest()
+
+
+COST_VERSION = 'btc-eur-spot-intraday-v3'
+_COST_POLICY = _CHALLENGER + """
+The entry filter requires the most recent six closed ten-minute bars to span more
+than the current round-trip break-even distance. Passing this filter alone does
+not justify buying. When long, use the actual entry cost, elapsed minutes and
+liquidation P&L. Sell when the thesis fails. Keep the German reason under 200 characters."""
+COST_DIGEST = hashlib.sha256((_COST_POLICY + json.dumps(_SCHEMA, sort_keys=True)).encode()).hexdigest()
 
 
 def _request(url, *, body=None, key=None, timeout=5):
@@ -242,7 +252,8 @@ def _usage(response):
 def decide(context, model, key, *, service_tier=None):
     if not key or not model:
         raise FeedError('MODEL_NOT_CONFIGURED')
-    body = dict(model=model, store=False, instructions=(_CHALLENGER if context.get("policy") == CHALLENGER_VERSION else _POLICY), input=json.dumps(context,allow_nan=False),
+    instructions = {CHALLENGER_VERSION: _CHALLENGER, COST_VERSION: _COST_POLICY}.get(context.get("policy"), _POLICY)
+    body = dict(model=model, store=False, instructions=instructions, input=json.dumps(context,allow_nan=False),
                 max_output_tokens=1024, text={'format':{'type':'json_schema','name':'paper_decision',
                 'strict':True,'schema':_SCHEMA}})
     if service_tier is not None:
@@ -270,11 +281,15 @@ def decide(context, model, key, *, service_tier=None):
         if len(parts)!=1 or parts[0]['type']!='output_text':
             raise ValueError()
         result = json.loads(parts[0]['text'])
-        if set(result)!={'action','reason'} or result['action'] not in ('BUY','HOLD','SELL'):
-            raise ValueError()
+        if not isinstance(result, dict) or set(result)!={'action','reason'} or result['action'] not in ('BUY','HOLD','SELL'):
+            raise FeedError('MODEL_DECISION_FIELDS', usage)
+        if not isinstance(result['reason'], str):
+            raise FeedError('MODEL_DECISION_FIELDS', usage)
         reason = result['reason'].strip()
         if not 1 <= len(reason) <= 500:
-            raise ValueError()
+            raise FeedError('MODEL_REASON_LENGTH', usage)
         return result['action'],reason,usage
+    except json.JSONDecodeError:
+        raise FeedError('MODEL_JSON_INVALID', usage) from None
     except (IndexError,KeyError,TypeError,AttributeError,ValueError):
         raise FeedError('MODEL_OUTPUT_INVALID',usage) from None

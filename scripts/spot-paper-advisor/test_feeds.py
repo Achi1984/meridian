@@ -114,3 +114,17 @@ class FeedTests(unittest.TestCase):
                 feeds.decide({},'model','key')
             self.assertEqual(str(failure.exception), 'MODEL_REFUSAL')
             self.assertEqual(failure.exception.usage['output'],20)
+
+    def test_invalid_decision_reports_bounded_cause_and_usage(self):
+        part = {'type':'output_text'}
+        response = dict(model='fixed', status='completed', output=[
+            dict(type='message', role='assistant', content=[part])],
+            usage=dict(input_tokens=10, input_tokens_details={'cached_tokens':0}, output_tokens=5))
+        for payload, expected in [('?', 'MODEL_JSON_INVALID'), ('{}', 'MODEL_DECISION_FIELDS'),
+                                  (json.dumps(dict(action='HOLD', reason='x'*501)), 'MODEL_REASON_LENGTH')]:
+            part['text'] = payload
+            with self.subTest(expected=expected), patch.object(feeds, '_request', return_value=response):
+                with self.assertRaises(feeds.FeedError) as error:
+                    feeds.decide({}, 'fixed', 'key')
+                self.assertEqual(feeds.model_failure(error.exception), expected)
+                self.assertEqual(error.exception.usage['output'], 5)
