@@ -187,7 +187,7 @@ def hourly_trade(records, latest, slot, end, close):
     return replay_exit(records, latest, end, close, state, cash, record['executionBook'])
 
 
-def confirmed_hourly_entry(records, latest, slot, end, close):
+def confirmed_hourly_entry(records, latest, slot, unconditional):
     check = slot+STEP
     if check > latest:
         return dict(status='PENDING_CONFIRMATION')
@@ -200,7 +200,7 @@ def confirmed_hourly_entry(records, latest, slot, end, close):
         return dict(status='CONFIRMATION_OUTSIDE_WINDOW')
     if bars[-1][4] <= records[slot]['inputs']['hour'][-1][4]:
         return dict(status='SKIPPED', netEur='0')
-    return hourly_trade(records, latest, check, end, close)
+    return dict(unconditional)
 
 
 def ai_veto(record, immediate, settled_usd, eur_per_usd):
@@ -258,6 +258,26 @@ def confirmation_results(samples, regime='risingExpansion'):
                 **{key: str(value) if paired else None for key, value in totals.items()})
 
 
+def delay_attribution(samples, regime):
+    complete = incomplete = 0
+    waiting = selection = Decimal(0)
+    for sample in samples:
+        if sample['regime'] != regime:
+            continue
+        unconditional = sample['unconditional10m']
+        confirmed = sample['confirmed10m']
+        if sample['status'] != 'MEASURED' or unconditional['status'] != 'MEASURED' or confirmed['status'] not in ('MEASURED', 'SKIPPED'):
+            incomplete += 1
+            continue
+        complete += 1
+        delayed_net = Decimal(unconditional['netEur'])
+        waiting += delayed_net - Decimal(sample['netEur'])
+        selection += Decimal(confirmed['netEur']) - delayed_net
+    return dict(complete=complete, incomplete=incomplete,
+                waitOnlyDeltaEur=str(waiting) if complete else None,
+                signalDeltaAfterWaitEur=str(selection) if complete else None)
+
+
 def hourly_expansion_study(records, charges, eur_per_usd):
     latest = max(records, default=-1)
     samples = []
@@ -275,7 +295,16 @@ def hourly_expansion_study(records, charges, eur_per_usd):
         if regime == 'risingExpansion':
             sample['aiVeto'] = ai_veto(record, sample, charges.get(slot), eur_per_usd)
         if regime in ('risingExpansion', 'risingControl'):
-            delayed = confirmed_hourly_entry(records, latest, slot, end, close)
+            check = slot + STEP
+            follow = records.get(check)
+            if check > latest:
+                unconditional = dict(status='PENDING_ENTRY')
+            elif follow and follow.get('promptVersion') != COST_VERSION:
+                unconditional = dict(status='ENTRY_VERSION_MISMATCH')
+            else:
+                unconditional = hourly_trade(records, latest, check, end, close)
+            sample['unconditional10m'] = unconditional
+            delayed = confirmed_hourly_entry(records, latest, slot, unconditional)
             sample['confirmed10m'] = delayed
             if sample['status'] == 'MEASURED' and delayed['status'] in ('SKIPPED', 'MEASURED'):
                 delayed['deltaVsImmediateEur'] = str(Decimal(delayed['netEur']) - Decimal(sample['netEur']))
@@ -291,6 +320,8 @@ def hourly_expansion_study(records, charges, eur_per_usd):
                  if row.get('aiVeto', {}).get('deltaAfterApiEur') is not None]
     return dict(aiPricedPairs=len(ai_deltas), sumPairedAiDeltaEur=str(sum(ai_deltas)) if ai_deltas else None,
                 eurPerUsd=str(eur_per_usd) if eur_per_usd is not None else None, fromUtc=iso(EXPANSION_START), samples=samples, groups=groups,
+                delayAttribution={name: delay_attribution(samples, name)
+                                  for name in ('risingExpansion', 'risingControl')},
                 risingControlConfirmationResults=control,
                 expansionMinusControlMeanDeltaEur=difference,
                 confirmationResults=confirmation, confirmationPairs=confirmation['paired'],
