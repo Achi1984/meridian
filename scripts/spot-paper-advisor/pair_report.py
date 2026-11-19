@@ -3,6 +3,7 @@ from contextlib import closing
 from datetime import datetime, timezone
 import json
 import sqlite3
+from sys import float_info
 from decimal import Decimal
 
 from feeds import COST_VERSION
@@ -59,20 +60,31 @@ def describe(raw, initial):
 BREAKOUT_START = int(datetime.fromisoformat('2026-11-19T17:00:00+00:00').timestamp())
 
 
+def valid_replay_candle(bar, expected_start):
+    if not isinstance(bar, list) or len(bar) != 5:
+        return False
+    start, opening, high, low, close = bar
+    return (type(start) is int and start == expected_start
+            and all(type(value) in (int, float) and 0 < value <= float_info.max
+                    for value in bar[1:])
+            and low <= opening <= high and low <= close <= high)
+
+
 def breakout_reason(record, slot):
     hour = slot - slot % 3600
-    inputs = record.get('inputs') or {}
-    bars = inputs.get('hour', [])[-4:]
-    ten = inputs.get('ten', [])
     if slot == hour:
         return 'WAIT_FIRST_CLOSE'
-    if len(bars) != 4 or not ten:
+    inputs = record.get('inputs')
+    if not isinstance(inputs, dict):
         return 'CANDLES_UNAVAILABLE'
-    if any(len(bar) != 5 or bar[0] != hour-(4-i)*3600 or bar[1] <= 0
-           for i, bar in enumerate(bars)):
+    bars = inputs.get('hour')
+    ten = inputs.get('ten')
+    if not isinstance(bars, list) or len(bars) < 4 or not isinstance(ten, list) or not ten:
         return 'CANDLES_UNAVAILABLE'
+    bars = bars[-4:]
     candle = ten[-1]
-    if len(candle) != 5 or candle[0] != slot-STEP:
+    if (not valid_replay_candle(candle, slot-STEP)
+            or any(not valid_replay_candle(bar, hour-(4-i)*3600) for i, bar in enumerate(bars))):
         return 'CANDLES_UNAVAILABLE'
     ranges = [(bar[2]-bar[3])/bar[1] for bar in bars]
     if ranges[-1] >= min(ranges[:-1]):
