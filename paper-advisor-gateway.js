@@ -45,6 +45,9 @@ async function readReport() {
   if (!token) throw new Error('Missing pilot log access');
   const runId = await resolvePilotRun(token, process.env.MERIDIAN_PILOT_RUN_ID);
   const [items, usdBars] = await Promise.all([readRun(runId, token), readUsdBars()]);
+  const usd = items.filter(item => item.usdRound).map(item => item.usdRound)
+    .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
+  if (usd) return {usdRound: usd};
   const rows = items.filter(item => item.report);
   const comparisons = items.map(item => item.pilotAudit?.comparison).filter(Boolean);
   // This pilot moved to a new job instance with its original account ledger.
@@ -102,6 +105,13 @@ async function readRun(runId, token) {
     let item;
     try { item = JSON.parse(log.slice(start)); } catch { continue; }
     const {report, pilotAudit} = item || {};
+    const usd = pilotAudit?.usdRound;
+    if (usd?.schema === 'MERIDIAN_USD_ROUND_V1' && usd.pair === 'BTC/USD' &&
+        Number.isFinite(Date.parse(usd.at)) && Number.isFinite(Date.parse(usd.start)) &&
+        ['v3','v4','cash','btcHold'].every(name => usd.arms?.[name])) {
+      rows.push({usdRound: usd});
+      continue;
+    }
     if (!report && validComparison(pilotAudit?.comparison)) {
       rows.push(item);
       continue;
