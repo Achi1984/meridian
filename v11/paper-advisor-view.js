@@ -223,7 +223,21 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
         add(row, 'td', num(arm.tradesPerDay) + ' (' + arm.closed + ' gesamt)');
         add(row, 'td', money(arm.netPerTradeEur));
         add(row, 'td', num(arm.maxDrawdownPct) + ' %');
-        add(row, 'td', executions[arm.last] || 'Keine Ausführung');
+        const cell = add(row, 'td', executions[arm.last] || 'Keine Ausführung');
+        const explanations = {
+          WAIT_FIRST_CLOSE: 'Erste 10-Minuten-Kerze steht aus',
+          CANDLES_UNAVAILABLE: 'Kerzendaten fehlen oder sind veraltet',
+          NO_COMPRESSION: 'Stundenspanne zu breit',
+          WAIT_BREAKOUT: 'Schlusskurs noch unter oder am Stundenhoch',
+          BREAKOUT: 'Ausbruch über das Stundenhoch',
+          POSITION_OPEN: 'Position innerhalb der Haltedauer',
+          TIME_EXIT: 'Haltedauer von 60 Minuten erreicht',
+          DAY_CLOSE: 'Tagesschluss', HOUR_USED: 'Einstieg dieser Stunde bereits genutzt'
+        };
+        if (arm === duel.v4 && Object.hasOwn(explanations, arm.reason)) {
+          cell.append(doc.createElement('br'));
+          add(cell, 'small', explanations[arm.reason]);
+        }
       }
       const extra = duel.onlyV4;
       add(panel, 'p', 'Nur V4 hat gehandelt · ' + extra.closed + ' abgeschlossene Trades · ' +

@@ -59,21 +59,29 @@ def describe(raw, initial):
 BREAKOUT_START = int(datetime.fromisoformat('2026-11-19T17:00:00+00:00').timestamp())
 
 
-def breakout_signal(record, slot):
+def breakout_reason(record, slot):
     hour = slot - slot % 3600
     inputs = record.get('inputs') or {}
     bars = inputs.get('hour', [])[-4:]
     ten = inputs.get('ten', [])
-    if slot == hour or len(bars) != 4 or not ten:
-        return False
+    if slot == hour:
+        return 'WAIT_FIRST_CLOSE'
+    if len(bars) != 4 or not ten:
+        return 'CANDLES_UNAVAILABLE'
     if any(len(bar) != 5 or bar[0] != hour-(4-i)*3600 or bar[1] <= 0
            for i, bar in enumerate(bars)):
-        return False
+        return 'CANDLES_UNAVAILABLE'
     candle = ten[-1]
     if len(candle) != 5 or candle[0] != slot-STEP:
-        return False
+        return 'CANDLES_UNAVAILABLE'
     ranges = [(bar[2]-bar[3])/bar[1] for bar in bars]
-    return ranges[-1] < min(ranges[:-1]) and candle[4] > bars[-1][2]
+    if ranges[-1] >= min(ranges[:-1]):
+        return 'NO_COMPRESSION'
+    return 'BREAKOUT' if candle[4] > bars[-1][2] else 'WAIT_BREAKOUT'
+
+
+def breakout_signal(record, slot):
+    return breakout_reason(record, slot) == 'BREAKOUT'
 
 
 def breakout_duel(db, end, *, standalone=False):
@@ -127,14 +135,25 @@ def breakout_duel(db, end, *, standalone=False):
         book = record.get('executionBook') if slot <= now < slot+(STEP if mandatory else 90) else None
         opened = state['opened']
         action = 'HOLD'
-        if opened is not None and (mandatory or slot-opened >= 3600):
-            action = 'SELL'
-        elif opened is None and not mandatory and last_entry_hour != slot//3600 and breakout_signal(record, slot):
-            action = 'BUY'
+        if mandatory:
+            reason = 'DAY_CLOSE'
+            if opened is not None:
+                action = 'SELL'
+        elif opened is not None:
+            reason = 'POSITION_OPEN'
+            if slot-opened >= 3600:
+                action, reason = 'SELL', 'TIME_EXIT'
+        elif last_entry_hour == slot//3600:
+            reason = 'HOUR_USED'
+        else:
+            reason = breakout_reason(record, slot)
+            if reason == 'BREAKOUT':
+                action = 'BUY'
         before = Decimal(state['cash'])
         result = execute(state, action, book, slot)
         shadow = metrics['v4']
         shadow['last'] = result
+        shadow['reason'] = reason
         if result == 'PAPER_BUY':
             last_entry_hour = slot//3600
             exclusive = flat
