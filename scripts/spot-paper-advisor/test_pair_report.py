@@ -58,6 +58,14 @@ class PairReportTest(unittest.TestCase):
             _, row = comparison(volume)
             self.assertEqual((row['at'], row['start']), (iso(1800), iso(1800)))
             self.assertEqual([row[k]['change'] for k in ('v1','v2','v3')], [1,-2,3])
+            for path in (volume/'pilot.sqlite', volume/'challenger-v3'/'pilot.sqlite'):
+                with sqlite3.connect(path) as db:
+                    db.execute('INSERT INTO slots SELECT 2400,record FROM slots WHERE slot=1800')
+            _, row = comparison(volume)
+            self.assertEqual(row['at'], iso(2400))
+            self.assertEqual(row['start'], iso(1800))
+            self.assertNotIn('v2', row)
+            self.assertEqual((row['v1']['change'], row['v3']['change']), (1, 3))
 
     def test_later_challenger_commit_publishes_once_without_next_cycle(self):
         old, current = ({'at': iso(slot)} for slot in (1200, 1800))

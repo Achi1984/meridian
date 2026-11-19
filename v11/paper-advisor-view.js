@@ -110,15 +110,15 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
   if (audit) {
     const pair = add(content, 'table', '');
     pair.className = 'advisor-accounts';
-    add(pair, 'caption', comparison?.v3 ? 'V1, V2 und V3 · gemeinsamer Vergleich' : 'V1 und V2 · gemeinsamer Vergleich');
-    if (comparison?.v1 && comparison?.v2 && timestamp(comparison.at) && timestamp(comparison.start)) {
+    const models = [['V1',comparison?.v1], ['V2',comparison?.v2], ['V3',comparison?.v3]].filter(([,arm]) => arm);
+    const caption = models.length === 3 ? 'V1, V2 und V3' : comparison?.v3 ? 'V1 und V3' : 'V1 und V2';
+    add(pair, 'caption', caption + ' · gemeinsamer Vergleich');
+    if (comparison?.v1 && models.length >= 2 && timestamp(comparison.at) && timestamp(comparison.start)) {
       const header = add(add(pair,'thead',''),'tr','');
       for (const label of ['Modell','Entscheidung','Kontowert','Seit Vergleichsstart']) add(header,'th',label).scope='col';
       const body = add(pair,'tbody','');
       const latestSlot = Math.floor(Date.parse(report.last.at) / 600000) * 600000;
       const sameSlot = Date.parse(comparison.at) === latestSlot;
-      const models = [['V1',comparison.v1],['V2',comparison.v2]];
-      if (comparison.v3) models.push(['V3',comparison.v3]);
       for (const [label, arm] of models) {
         const row = add(body,'tr','');
         add(row,'th',label).scope='row';
