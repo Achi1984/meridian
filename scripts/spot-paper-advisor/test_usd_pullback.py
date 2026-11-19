@@ -2,7 +2,7 @@ import json
 import sqlite3
 import unittest
 
-from usd_pullback import iso, paper_slot, replay, signal
+from usd_pullback import iso, paper_slot, pnl_parts, replay, signal
 from worker import DAY, STEP, initial
 
 
@@ -95,6 +95,8 @@ class PullbackTest(unittest.TestCase):
         self.assertEqual(result['through'], iso(START+4200))
         self.assertEqual(result['activeDays'], 1)
         self.assertLess(result['equityUsd'], 1000)
+        self.assertAlmostEqual(result['realizedUsd'], result['netUsd'])
+        self.assertEqual(result['openPnlUsd'], 0)
         self.assertGreater(result['maxObservedDrawdownPct'], 0)
         self.assertEqual(result['sameSlotBaselineEquityUsd']['v3'], 1000)
 
@@ -120,3 +122,11 @@ class PullbackTest(unittest.TestCase):
         self.assertEqual(report['arms']['v3']['buys'], 1)
         self.assertIsNone(report['arms']['v3']['equityUsd'])
         self.assertIsNone(report['v5Replay']['equityUsd'])
+
+    def test_realized_and_open_pnl_after_reentry_and_with_missing_quote(self):
+        state = dict(cash='905.25', btc='0.001', entryCostUsd='99.75')
+        self.assertEqual(pnl_parts(state, 1003.5), dict(realizedUsd=5.0, openPnlUsd=-1.5))
+        self.assertEqual(pnl_parts(state, None), dict(realizedUsd=5.0, openPnlUsd=None))
+        self.assertEqual(pnl_parts(dict(cash='1003.5', btc='0', entryCostUsd='99.75'), 1003.5),
+                         dict(realizedUsd=3.5, openPnlUsd=0.0))
+        self.assertEqual(pnl_parts(None, 1000), dict(realizedUsd=None, openPnlUsd=None))
