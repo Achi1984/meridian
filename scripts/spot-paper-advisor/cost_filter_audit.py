@@ -25,16 +25,44 @@ def replay_fill(state, action, slot, record, *, mandatory=False):
     return execute(state, action, record.get('executionBook'), slot)
 
 
-def confirmed_breakout(record, slot):
-    """Two completed ten-minute closes above the preceding six-bar high."""
+# Freeze the two new hypotheses before the first prospective decision.
+FORWARD_START = int(datetime.fromisoformat('2026-11-19T09:00:00+00:00').timestamp())
+NEW_SIGNALS = ('breakoutRetest', 'failedBreakdown')
+
+
+def entry_signals(record, slot):
     bars = (record.get('inputs') or {}).get('ten', [])[-8:]
-    if len(bars) != 8:
-        return None
-    for i, bar in enumerate(bars):
-        if len(bar) != 5 or bar[0] != slot - (8-i)*STEP:
-            return None
+    if len(bars) != 8 or any(len(bar) != 5 or bar[0] != slot - (8-i)*STEP
+                             for i, bar in enumerate(bars)):
+        return dict.fromkeys(('confirmedBreakout', *NEW_SIGNALS))
     resistance = max(bar[2] for bar in bars[:6])
-    return bars[6][4] > resistance and bars[7][4] > resistance
+    support = min(bar[3] for bar in bars[:6])
+    first, second = bars[-2:]
+    return dict(
+        confirmedBreakout=first[4] > resistance and second[4] > resistance,
+        breakoutRetest=first[4] > resistance and second[3] <= resistance < second[4],
+        failedBreakdown=first[3] < support < first[4] and second[4] > first[2],
+    )
+
+
+def confirmed_breakout(record, slot):
+    return entry_signals(record, slot)['confirmedBreakout']
+
+
+def forward_comparison(samples):
+    comparison = {}
+    for signal in NEW_SIGNALS:
+        groups = {}
+        for value, name in ((True, 'signal'), (False, 'noSignal'), (None, 'unknown')):
+            subset = [sample for sample in samples if sample['entryAt'] >= iso(FORWARD_START)
+                      and sample[signal] is value]
+            pnl = [Decimal(sample['netEur']) for sample in subset if sample['status'] == 'MEASURED']
+            pending = sum(sample['status'] == 'PENDING_EXIT' for sample in subset)
+            groups[name] = dict(total=len(subset), measured=len(pnl), pending=pending,
+                                unavailable=len(subset)-len(pnl)-pending,
+                                meanNetEur=str(sum(pnl)/len(pnl)) if pnl else None)
+        comparison[signal] = groups
+    return dict(fromUtc=iso(FORWARD_START), groups=comparison)
 
 
 def audit(db):
@@ -53,7 +81,7 @@ def audit(db):
         close = slot - slot % DAY + DAY - STEP
         exit_slot = min(slot + 6 * STEP, close)
         sample = dict(entryAt=iso(slot), exitAt=iso(exit_slot), stage=stage,
-                      confirmedBreakout=confirmed_breakout(record, slot))
+                      **entry_signals(record, slot))
         samples.append(sample)
         state = dict(model)
         entry = replay_fill(state, 'BUY', slot, record)
@@ -68,7 +96,7 @@ def audit(db):
                 continue
             pnl = Decimal(state['cash']) - Decimal(model['cash'])
             sample.update(status='MEASURED', netEur=str(pnl))
-    return dict(horizonMinutes=60, samples=samples)
+    return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples))
 
 
 if __name__ == '__main__':
