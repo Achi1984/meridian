@@ -79,6 +79,20 @@ def signal(state, snapshot, slot):
     return 'BUY', 'PULLBACK_RECOVERY', pullback[3], target
 
 
+def pnl_parts(state, equity):
+    """Attribute net PnL using the recorded cash cost of the open BTC lot."""
+    if not state or 'cash' not in state or 'btc' not in state:
+        return dict(realizedUsd=None, openPnlUsd=None)
+    cash = Decimal(state['cash'])
+    if not Decimal(state['btc']):
+        return dict(realizedUsd=float(cash-1000), openPnlUsd=0.0)
+    if state.get('entryCostUsd') is None:
+        return dict(realizedUsd=None, openPnlUsd=None)
+    basis = cash + Decimal(state['entryCostUsd'])
+    return dict(realizedUsd=float(basis-1000),
+                openPnlUsd=None if equity is None else float(Decimal(str(equity))-basis))
+
+
 def paper_slot(state, snapshot, fill_book, slot, observed):
     action, reason, stop, target = signal(state, snapshot, slot)
     book = usable_book(fill_book, observed, slot)
@@ -86,12 +100,13 @@ def paper_slot(state, snapshot, fill_book, slot, observed):
         action, reason = 'HOLD', 'SIGNAL_AFTER_FILL_BOOK'
     if action == 'BUY' and book and not target_covers_cost(book['ask'], target):
         action, reason = 'HOLD', 'EXECUTION_COST_FILTER'
+    cash_before = Decimal(state['cash'])
     if action != 'HOLD' and observed >= slot+90 and not forced(state, slot):
         execution = 'DECISION_WINDOW_EXPIRED'
     else:
         execution = execute(state, action, book, slot)
     if execution == 'PAPER_BUY':
-        state.update(stop=stop, target=target)
+        state.update(stop=stop, target=target, entryCostUsd=str(cash_before-Decimal(state['cash'])))
     equity = mark(state, book)['equityEur']
     return dict(action=action, reason=reason, execution=execution, equityUsd=equity)
 
@@ -151,7 +166,7 @@ def replay(db, *, duration=7*DAY):
     return dict(schema='MERIDIAN_USD_PULLBACK_V1', mode='REPLAY', pair='BTC/USD', start=iso(start),
                 through=iso(previous), modeledSlots=modeled, missingSlots=missing, last=latest,
                 equityUsd=equity, netUsd=None if equity is None else equity-1000, closed=closed,
-                activeDays=len(active_days), maxObservedDrawdownPct=drawdown,
+                **pnl_parts(state, equity), activeDays=len(active_days), maxObservedDrawdownPct=drawdown,
                 signalReasonCounts=reasons, executionCounts=executions, sameSlotBaselineEquityUsd=baseline)
 
 
@@ -162,12 +177,13 @@ def first_day(db, now):
     start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
     expected = max(0, min(DAY, int(now)-start)) // STEP
     end = start + expected*STEP
-    arms = {key: dict(buySignals=0, buys=0, sells=0, equityUsd=None, netUsd=None,
+    arms = {key: dict(buySignals=0, buys=0, sells=0, equityUsd=None, netUsd=None, realizedUsd=None, openPnlUsd=None,
                       reasons=Counter()) for key in ('v3', 'v4', 'cash', 'btcHold')}
     observed = 0
     for slot, raw in db.execute('SELECT slot, record FROM slots WHERE slot>=? AND slot<? '
                                 'AND record IS NOT NULL ORDER BY slot', (start, end)):
-        report = json.loads(raw)['report']
+        record = json.loads(raw)
+        report = record['report']
         if (slot % STEP or report.get('schema') != 'MERIDIAN_USD_ROUND_V1' or
                 report.get('pair') != 'BTC/USD' or report.get('at') != iso(slot) or
                 report.get('start') != iso(start)):
@@ -180,7 +196,8 @@ def first_day(db, now):
             summary['sells'] += arm['execution'] == 'PAPER_SELL'
             summary['reasons'][arm['reason']] += 1
             if slot == end-STEP:
-                summary.update(equityUsd=arm['equityUsd'], netUsd=arm['netUsd'])
+                summary.update(equityUsd=arm['equityUsd'], netUsd=arm['netUsd'],
+                               **pnl_parts(record.get('states', {}).get(key), arm['equityUsd']))
     spent, reserved = db.execute('SELECT coalesce(sum(charge*settled),0), '
                                  'coalesce(sum(charge*(1-settled)),0) FROM calls '
                                  'WHERE slot>=? AND slot<?', (start, end)).fetchone()
@@ -188,9 +205,10 @@ def first_day(db, now):
     if v5:
         summary = dict(buySignals=sum(v5['signalReasonCounts']['BUY'].values()),
                        buys=v5['executionCounts']['PAPER_BUY'], sells=v5['closed'],
-                       equityUsd=None, netUsd=None, reasons=v5['signalReasonCounts'])
+                       equityUsd=None, netUsd=None, realizedUsd=None, openPnlUsd=None, reasons=v5['signalReasonCounts'])
         if v5['last']['at'] == iso(end-STEP):
-            summary.update(equityUsd=v5['equityUsd'], netUsd=v5['netUsd'])
+            summary.update(equityUsd=v5['equityUsd'], netUsd=v5['netUsd'],
+                           realizedUsd=v5['realizedUsd'], openPnlUsd=v5['openPnlUsd'])
         v5 = summary
     return dict(start=iso(start), endExclusive=iso(end), targetSlots=DAY//STEP,
                 expectedSlots=expected, observedSlots=observed, missingSlots=expected-observed,
