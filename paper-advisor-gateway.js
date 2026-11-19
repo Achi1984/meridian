@@ -11,6 +11,7 @@ export async function resolvePilotRun(token, fallback, request = fetch) {
   const signal = AbortSignal.timeout(3000);
   const seen = new Set();
   let newest;
+  let completed;
   try {
     for (;;) {
       const response = await request(endpoint, {
@@ -19,9 +20,13 @@ export async function resolvePilotRun(token, fallback, request = fetch) {
       if (!response.ok) throw new Error('Pilot run lookup unavailable');
       const {data, pagination} = await response.json();
       for (const run of data.runs) {
-        if (run?.status !== 'RUNNING' || run.active !== 1 || run.concluded !== false ||
-            !runIdPattern.test(run.id) || !Number.isFinite(Date.parse(run.startedAt))) continue;
-        if (!newest || Date.parse(run.startedAt) > Date.parse(newest.startedAt)) newest = run;
+        if (!run || !runIdPattern.test(run.id) || !Number.isFinite(Date.parse(run.startedAt))) continue;
+        if (run.status === 'RUNNING' && run.active === 1 && run.concluded === false) {
+          if (!newest || Date.parse(run.startedAt) > Date.parse(newest.startedAt)) newest = run;
+        } else if (run.status === 'SUCCESS' && run.concluded === true &&
+            (!completed || Date.parse(run.startedAt) > Date.parse(completed.startedAt))) {
+          completed = run;
+        }
       }
       if (!pagination.hasNextPage) break;
       const cursor = pagination.cursor;
@@ -35,7 +40,7 @@ export async function resolvePilotRun(token, fallback, request = fetch) {
     throw error;
   }
   if (newest) return newest.id;
-  // Preserve the final timestamped report after the pilot has stopped.
+  if (completed) return completed.id;
   if (runIdPattern.test(fallback)) return fallback;
   throw new Error('Missing pilot run');
 }
@@ -44,7 +49,7 @@ async function readReport() {
   const token = process.env.MERIDIAN_PILOT_LOG_READ_TOKEN;
   if (!token) throw new Error('Missing pilot log access');
   const runId = await resolvePilotRun(token, process.env.MERIDIAN_PILOT_RUN_ID);
-  const [items, usdBars] = await Promise.all([readRun(runId, token), readUsdBars()]);
+  const items = await readRun(runId, token);
   const usd = items.filter(item => item.usdRound).map(item => item.usdRound)
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
   if (usd) return {usdRound: usd};
@@ -60,7 +65,7 @@ async function readReport() {
   const latestSlot = Math.floor(Date.parse(summary.report.last.at)/600000)*600000;
   summary.comparison = comparisons.filter(row => Date.parse(row.at) <= latestSlot)
     .sort((a,b) => Date.parse(b.at)-Date.parse(a.at) || Number(Boolean(b.v3))-Number(Boolean(a.v3)) || Number(Boolean(b.v2))-Number(Boolean(a.v2)))[0] ?? null;
-  summary.krakenUsd = decisionUsdClose(usdBars, summary.report.last.at);
+  summary.krakenUsd = decisionUsdClose(await readUsdBars(), summary.report.last.at);
   return summary;
 }
 
