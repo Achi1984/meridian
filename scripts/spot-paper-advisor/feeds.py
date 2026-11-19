@@ -25,6 +25,16 @@ _PROVIDER_CODES = {'insufficient_quota', 'rate_limit_exceeded', 'invalid_api_key
                    'model_not_found', 'insufficient_permissions'}
 
 
+def book_failure(exc):
+    if isinstance(exc, FeedError):
+        code = str(exc)
+        if code in {'SLOW_BOOK', 'STALE_BOOK', 'EMPTY_BOOK', 'INVALID_BOOK', 'BOOK_TIME_INVALID',
+                    'CROSSED_BOOK', 'INVALID_MARKET_NUMBER', 'KRAKEN_RESPONSE_INVALID', 'REQUEST_FAILED',
+                    'INVALID_JSON', 'INVALID_RESPONSE', 'RESPONSE_TOO_LARGE'} or re.fullmatch(r'HTTP_[1-5][0-9]{2}', code):
+            return code
+    return 'UNCLASSIFIED'
+
+
 def model_failure(exc):
     if isinstance(exc, FeedError):
         code = str(exc)

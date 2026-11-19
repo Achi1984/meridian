@@ -175,6 +175,18 @@ class CostFilterAuditTest(unittest.TestCase):
         self.assertEqual(gaps, [dict(at=iso(slot+2*STEP), affectedWindows=2,
                                      reasons={'EXIT_OUTSIDE_WINDOW': 2})])
 
+    def test_missing_book_reason_with_legacy_and_new_journal_records(self):
+        slot = FORWARD_START
+        self.record(slot, next(iter(STAGES)), 10000)
+        for offset, extra in [(1, {}), (2, {'executionBookStatus': 'STALE_BOOK'})]:
+            check = slot+offset*STEP
+            self.record(check, 'model', 10000)
+            raw, = self.db.execute('SELECT record FROM slots WHERE slot=?', (check,)).fetchone()
+            row = dict(json.loads(raw), executionBook=None, **extra)
+            self.db.execute('UPDATE slots SET record=? WHERE slot=?', (json.dumps(row), check))
+        gaps = audit(self.db)['intermediateExitGaps']
+        self.assertEqual([gap['executionBookStatus'] for gap in gaps], ['NOT_RECORDED', 'STALE_BOOK'])
+
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
         self.record(DAY-3*STEP, reason, 10000)

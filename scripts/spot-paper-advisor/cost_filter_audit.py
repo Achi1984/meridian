@@ -141,7 +141,7 @@ def first_covered_exit(slot, exit_slot, latest, outcome, fixed):
                 deltaVsFixedEur='0' if measured else None, skippedChecks=len(skipped), skippedObservations=skipped)
 
 
-def observation_gaps(samples):
+def observation_gaps(samples, records):
     """Group unavailable intermediate exits across hypothetical positions by timestamp."""
     gaps = {}
     for sample in samples:
@@ -150,8 +150,14 @@ def observation_gaps(samples):
             reasons = gaps.setdefault(skipped['at'], {})
             reason = skipped['reason']
             reasons[reason] = reasons.get(reason, 0) + 1
-    return [dict(at=at, affectedWindows=sum(reasons.values()), reasons=reasons)
-            for at, reasons in sorted(gaps.items())]
+    result = []
+    for at, reasons in sorted(gaps.items()):
+        gap = dict(at=at, affectedWindows=sum(reasons.values()), reasons=reasons)
+        if 'EXIT_NO_FRESH_BOOK' in reasons:
+            record = records[int(datetime.fromisoformat(at).timestamp())]
+            gap['executionBookStatus'] = record.get('executionBookStatus', 'NOT_RECORDED')
+        result.append(gap)
+    return result
 
 
 def audit(db):
@@ -193,7 +199,7 @@ def audit(db):
             sample['exploratory30m'] = pair
     return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples),
                 forwardVetoOutcomes60m=veto_outcomes(samples),
-                intermediateExitGaps=observation_gaps(samples))
+                intermediateExitGaps=observation_gaps(samples, records))
 
 
 if __name__ == '__main__':
