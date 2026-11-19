@@ -203,7 +203,34 @@ def confirmed_hourly_entry(records, latest, slot, end, close):
     return hourly_trade(records, latest, check, end, close)
 
 
-def hourly_expansion_study(records):
+def ai_veto(record, immediate, settled_usd, eur_per_usd):
+    last = record['report']['last']
+    if last['reason'].startswith('MODEL_UNAVAILABLE'):
+        return dict(status='MODEL_FAILURE')
+    if not record.get('usage'):
+        return dict(status='NO_MODEL_DECISION')
+    # A post-model cost veto is emitted only after a BUY. Existing-position
+    # decisions are outside this flat-account entry comparison.
+    buy = last['action'] == 'BUY' or STAGES.get(last['reason']) == 'afterBuySignal'
+    if last['execution'] != 'PAPER_BUY' and Decimal(record['states']['model']['btc']):
+        return dict(status='POSITION_INELIGIBLE')
+    if last['action'] == 'SELL':
+        return dict(status='POSITION_INELIGIBLE')
+    if immediate['status'] != 'MEASURED':
+        return dict(status=immediate['status'])
+    delta = Decimal(0) if buy else -Decimal(immediate['netEur'])
+    cost = record.get('slotApiCostEur')
+    if cost is not None:
+        cost = Decimal(str(cost))
+    elif settled_usd is not None and eur_per_usd is not None:
+        cost = settled_usd * eur_per_usd
+    return dict(status='ALLOW' if buy else 'VETO', tradingDeltaEur=str(delta),
+                settledApiUsd=str(settled_usd) if settled_usd is not None else None,
+                apiCostEur=str(cost) if cost is not None else None,
+                deltaAfterApiEur=str(delta-cost) if cost is not None else None)
+
+
+def hourly_expansion_study(records, charges, eur_per_usd):
     latest = max(records, default=-1)
     samples = []
     for slot in range(EXPANSION_START, latest+1, HOUR):
@@ -218,6 +245,7 @@ def hourly_expansion_study(records):
         sample = dict(entryAt=iso(slot), exitAt=iso(end), regime=regime)
         sample.update(hourly_trade(records, latest, slot, end, close))
         if regime == 'risingExpansion':
+            sample['aiVeto'] = ai_veto(record, sample, charges.get(slot), eur_per_usd)
             delayed = confirmed_hourly_entry(records, latest, slot, end, close)
             sample['confirmed10m'] = delayed
             if sample['status'] == 'MEASURED' and delayed['status'] in ('SKIPPED', 'MEASURED'):
@@ -227,11 +255,22 @@ def hourly_expansion_study(records):
               for name in ('risingExpansion', 'risingControl', 'nonRising', 'unknown')}
     deltas = [Decimal(row['confirmed10m']['deltaVsImmediateEur']) for row in samples
               if 'deltaVsImmediateEur' in row.get('confirmed10m', {})]
-    return dict(fromUtc=iso(EXPANSION_START), samples=samples, groups=groups,
+    ai_deltas = [Decimal(row['aiVeto']['deltaAfterApiEur']) for row in samples
+                 if row.get('aiVeto', {}).get('deltaAfterApiEur') is not None]
+    return dict(aiPricedPairs=len(ai_deltas), sumPairedAiDeltaEur=str(sum(ai_deltas)) if ai_deltas else None,
+                eurPerUsd=str(eur_per_usd) if eur_per_usd is not None else None, fromUtc=iso(EXPANSION_START), samples=samples, groups=groups,
                 confirmationPairs=len(deltas), meanConfirmationDeltaEur=str(sum(deltas)/len(deltas)) if deltas else None)
 
 
-def audit(db):
+def audit(db, eur_per_usd=None):
+    if eur_per_usd is not None and (not eur_per_usd.is_finite() or eur_per_usd <= 0):
+        raise ValueError('eur_per_usd must be finite and positive')
+    charges = {}
+    if db.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='calls'").fetchone():
+        from pilot import UNIT
+        charges = {slot: Decimal(charge)/UNIT for slot, charge in
+                   db.execute('SELECT slot, charge FROM calls WHERE settled=1')}
+
     records = {slot: json.loads(raw) if raw else None
                for slot, raw in db.execute('SELECT slot, record FROM slots ORDER BY slot')}
     latest = max(records, default=-1)
@@ -271,12 +310,13 @@ def audit(db):
     return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples),
                 forwardVetoOutcomes60m=veto_outcomes(samples),
                 intermediateExitGaps=observation_gaps(samples, records),
-                hourlyExpansion=hourly_expansion_study(records))
+                hourlyExpansion=hourly_expansion_study(records, charges, eur_per_usd))
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('journal', type=Path)
+    parser.add_argument('--eur-per-usd', type=Decimal, help='EUR value of one USD for settled API charges')
     args = parser.parse_args()
     with closing(sqlite3.connect(args.journal.resolve().as_uri() + '?mode=ro', uri=True)) as journal:
-        print(json.dumps(audit(journal), indent=2))
+        print(json.dumps(audit(journal, args.eur_per_usd), indent=2))
