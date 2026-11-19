@@ -25,6 +25,18 @@ def replay_fill(state, action, slot, record, *, mandatory=False):
     return execute(state, action, record.get('executionBook'), slot)
 
 
+def confirmed_breakout(record, slot):
+    """Two completed ten-minute closes above the preceding six-bar high."""
+    bars = (record.get('inputs') or {}).get('ten', [])[-8:]
+    if len(bars) != 8:
+        return None
+    for i, bar in enumerate(bars):
+        if len(bar) != 5 or bar[0] != slot - (8-i)*STEP:
+            return None
+    resistance = max(bar[2] for bar in bars[:6])
+    return bars[6][4] > resistance and bars[7][4] > resistance
+
+
 def audit(db):
     records = {slot: json.loads(raw) if raw else None
                for slot, raw in db.execute('SELECT slot, record FROM slots ORDER BY slot')}
@@ -40,7 +52,8 @@ def audit(db):
             continue
         close = slot - slot % DAY + DAY - STEP
         exit_slot = min(slot + 6 * STEP, close)
-        sample = dict(entryAt=iso(slot), exitAt=iso(exit_slot), stage=stage)
+        sample = dict(entryAt=iso(slot), exitAt=iso(exit_slot), stage=stage,
+                      confirmedBreakout=confirmed_breakout(record, slot))
         samples.append(sample)
         state = dict(model)
         entry = replay_fill(state, 'BUY', slot, record)
