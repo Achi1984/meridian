@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from decimal import Decimal
 
-from cost_filter_audit import STAGES, audit
+from cost_filter_audit import STAGES, audit, confirmed_breakout
 from feeds import COST_VERSION
 from worker import DAY, STEP, iso
 
@@ -28,6 +28,20 @@ class CostFilterAuditTest(unittest.TestCase):
         self.assertEqual(sample['stage'], 'beforeModel')
         self.assertEqual(sample['status'], 'MEASURED')
         self.assertLess(Decimal(sample['netEur']), 0)
+
+    def test_breakout_uses_two_closed_bars_and_one_prior_resistance(self):
+        slot = 8 * STEP
+        bars = [[i*STEP, 100, 102, 99, 101] for i in range(8)]
+        record = {'inputs': {'ten': bars}}
+        bars[-1][2:] = [110, 99, 105]
+        self.assertFalse(confirmed_breakout(record, slot))
+        bars[-2][2:] = [111, 99, 102]
+        self.assertFalse(confirmed_breakout(record, slot))
+        bars[-2][4] = 103
+        self.assertTrue(confirmed_breakout(record, slot))
+        bars[-1][0] = slot
+        self.assertIsNone(confirmed_breakout(record, slot))
+        self.assertIsNone(confirmed_breakout({}, slot))
 
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
