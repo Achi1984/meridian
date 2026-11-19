@@ -8,7 +8,7 @@ from pathlib import Path
 import sqlite3
 
 from feeds import COST_VERSION
-from worker import DAY, STEP, execute, iso
+from worker import DAY, SLIP, STEP, execute, iso
 
 STAGES = {
     'Stundenbandbreite deckt die Handelskosten nicht.': 'beforeModel',
@@ -79,6 +79,17 @@ def forward_comparison(samples):
     return dict(fromUtc=iso(FORWARD_START), groups=comparison)
 
 
+def pnl_components(quantity, entry_book, exit_book, net):
+    """Reconcile the midpoint move to both simulated fills for the same BTC quantity."""
+    entry_bid, entry_ask = (Decimal(str(entry_book[k])) for k in ('bid', 'ask'))
+    exit_bid, exit_ask = (Decimal(str(exit_book[k])) for k in ('bid', 'ask'))
+    quoted = quantity * (exit_bid - entry_ask)
+    spread = quantity * ((entry_ask - entry_bid) + (exit_ask - exit_bid)) / 2
+    slippage = quantity * (entry_ask + exit_bid) * SLIP
+    return dict(midpointMoveEur=str(quoted + spread), spreadEur=str(spread),
+                slippageEur=str(slippage), feesEur=str(quoted - slippage - net))
+
+
 def audit(db):
     records = {slot: json.loads(raw) if raw else None
                for slot, raw in db.execute('SELECT slot, record FROM slots ORDER BY slot')}
@@ -104,12 +115,15 @@ def audit(db):
         elif exit_slot > latest:
             sample['status'] = 'PENDING_EXIT'
         else:
+            quantity = Decimal(state['btc'])
             sale = replay_fill(state, 'SELL', exit_slot, records.get(exit_slot), mandatory=exit_slot == close)
             if sale != 'PAPER_SELL':
                 sample['status'] = 'EXIT_' + sale
                 continue
             pnl = Decimal(state['cash']) - Decimal(model['cash'])
-            sample.update(status='MEASURED', netEur=str(pnl))
+            sample.update(status='MEASURED', netEur=str(pnl),
+                          components=pnl_components(quantity, record['executionBook'],
+                                                    records[exit_slot]['executionBook'], pnl))
     return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples))
 
 

@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from cost_filter_audit import FORWARD_START, STAGES, audit, confirmed_breakout, entry_signals, forward_comparison
 from feeds import COST_VERSION
-from worker import DAY, STEP, iso
+from worker import DAY, FEE, SLIP, STEP, iso
 
 
 class CostFilterAuditTest(unittest.TestCase):
@@ -28,6 +28,19 @@ class CostFilterAuditTest(unittest.TestCase):
         self.assertEqual(sample['stage'], 'beforeModel')
         self.assertEqual(sample['status'], 'MEASURED')
         self.assertLess(Decimal(sample['netEur']), 0)
+
+    def test_midpoint_gain_consumed_by_execution_costs(self):
+        self.record(0, next(iter(STAGES)), 10000)
+        self.record(6*STEP, 'model', 10100)
+        sample, = audit(self.db)['samples']
+        parts = {key: Decimal(value) for key, value in sample['components'].items()}
+        qty = parts['midpointMoveEur'] / 100
+        self.assertGreater(qty, 0)
+        self.assertEqual(parts['spreadEur'], qty)
+        self.assertEqual(parts['slippageEur'], qty*(10001+10100)*SLIP)
+        self.assertEqual(parts['feesEur'], qty*(10001*(1+SLIP)+10100*(1-SLIP))*FEE)
+        self.assertEqual(Decimal(sample['netEur']), parts['midpointMoveEur'] - parts['spreadEur']
+                         - parts['slippageEur'] - parts['feesEur'])
 
     def test_breakout_uses_two_closed_bars_and_one_prior_resistance(self):
         slot = 8 * STEP
