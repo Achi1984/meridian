@@ -245,9 +245,13 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
         }
       }
       const extra = duel.onlyV4;
-      add(panel, 'p', 'V4-Trades mit Einstieg ohne offene V3-Position oder V3-Order im selben Takt · ' + extra.closed + ' abgeschlossen · ' +
+      add(panel, 'p', 'V4-Trades, während derer V3 durchgehend ohne Position und Order blieb · ' + extra.closed + ' abgeschlossen · ' +
         money(extra.netEur) + ' netto · davon bereits abgezogen: ' + money(extra.costsEur) + ' Handelskosten');
-      add(panel, 'small', 'Handelskosten enthalten. Modellkosten separat. Fehlende Takte: ' + duel.missingSlots);
+      if (duel.missingSlots > 0) {
+        add(panel, 'p', 'Fehlende 10-Minuten-Takte: ' + duel.missingSlots +
+          '. In diesen Lücken können V3-Abschlüsse und V4-Signale fehlen.');
+      }
+      add(panel, 'small', 'Handelskosten enthalten. Modellkosten separat.');
     } else {
       add(panel, 'p', 'Für V3 und V4 liegt noch kein gemeinsamer Vergleichsbericht vor.');
     }
