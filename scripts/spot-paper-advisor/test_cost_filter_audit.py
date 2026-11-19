@@ -144,6 +144,8 @@ class CostFilterAuditTest(unittest.TestCase):
         sample, early = report()
         self.assertEqual(early['exitAt'], iso(slot+2*STEP))
         self.assertEqual(early['skippedChecks'], 1)
+        self.assertEqual(early['skippedObservations'], [
+            dict(at=iso(slot+STEP), reason='EXIT_INSUFFICIENT_BID_SIZE')])
         self.assertIsNone(early['deltaVsFixedEur'])
         self.record(slot+6*STEP, 'model', 9900)
         sample, early = report()
@@ -160,7 +162,18 @@ class CostFilterAuditTest(unittest.TestCase):
         sample, = audit(self.db)['samples']
         early = sample['exploratoryFirstCoveredExit']
         self.assertEqual(early, dict(status='DEADLINE_EXIT', exitAt=sample['exitAt'],
-                                     netEur=sample['netEur'], deltaVsFixedEur='0', skippedChecks=4))
+                                     netEur=sample['netEur'], deltaVsFixedEur='0', skippedChecks=4,
+                                     skippedObservations=[dict(at=iso(slot+i*STEP), reason='EXIT_MISSING_RECORD')
+                                                          for i in range(2, 6)]))
+
+    def test_same_late_quote_counts_once_across_overlapping_windows(self):
+        slot = FORWARD_START
+        self.record(slot, next(iter(STAGES)), 10000)
+        self.record(slot+STEP, next(iter(STAGES)), 10000)
+        self.record(slot+2*STEP, 'model', 10000, delay=90)
+        gaps = audit(self.db)['intermediateExitGaps']
+        self.assertEqual(gaps, [dict(at=iso(slot+2*STEP), affectedWindows=2,
+                                     reasons={'EXIT_OUTSIDE_WINDOW': 2})])
 
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
