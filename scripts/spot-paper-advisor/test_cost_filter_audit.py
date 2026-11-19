@@ -92,6 +92,26 @@ class CostFilterAuditTest(unittest.TestCase):
         self.assertEqual(summary['disjointWindows'],
                          dict(total=2, measured=1, pending=0, unavailable=1, meanNetEur='-1'))
 
+    def test_paired_exits_use_same_entry_and_preserve_missing_early_quote(self):
+        slot = FORWARD_START
+        self.record(slot, next(iter(STAGES)), 10000)
+        bars = [[slot-(8-i)*STEP, 100, 102, 98, 100] for i in range(8)]
+        bars[-2][3] = 97
+        bars[-1][2:] = [105, 99, 103]
+        raw, = self.db.execute('SELECT record FROM slots').fetchone()
+        self.db.execute('UPDATE slots SET record=?', (json.dumps(dict(json.loads(raw), inputs={'ten': bars})),))
+        self.record(slot+6*STEP, 'model', 10100)
+        sample, = audit(self.db)['samples']
+        self.assertEqual(sample['exploratory30m']['status'], 'EXIT_MISSING_RECORD')
+        self.assertIsNone(sample['exploratory30m']['extraNetFromHoldingEur'])
+        self.record(slot+3*STEP, 'model', 10200)
+        sample, = audit(self.db)['samples']
+        early = sample['exploratory30m']
+        self.assertEqual(early['exitAt'], iso(slot+3*STEP))
+        self.assertGreater(Decimal(early['netEur']), Decimal(sample['netEur']))
+        self.assertEqual(Decimal(early['extraNetFromHoldingEur']),
+                         Decimal(sample['netEur']) - Decimal(early['netEur']))
+
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
         self.record(DAY-3*STEP, reason, 10000)
