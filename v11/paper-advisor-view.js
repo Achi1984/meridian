@@ -199,6 +199,40 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
     if (existing && existing.firstElementChild === doc.activeElement) historyFocus = summary;
     return section;
   }
+  if (audit) {
+    const duel = audit.duel ?? comparison?.duel;
+    const panel = disclosure(content, 'v4-duel', 'V3 gegen V4 · Paper-Vergleich');
+    if (duel?.v3 && duel.v4 && duel.onlyV4 && timestamp(duel.start) && timestamp(duel.at)) {
+      const money = n => Number.isFinite(n) ? EURO.format(n) : '—';
+      const num = n => Number.isFinite(n) ? PERCENT.format(n) : '—';
+      add(panel, 'p', DATE.format(new Date(duel.start)) + ' bis ' + DATE.format(new Date(duel.at)));
+      const scroll = add(panel, 'div', '');
+      scroll.style.overflowX = 'auto';
+      const table = add(scroll, 'table', '');
+      table.className = 'advisor-accounts';
+      const head = add(add(table, 'thead', ''), 'tr', '');
+      for (const title of ['Strategie', 'Netto', 'Trades/Tag', 'Netto/Trade', 'Max. Rückgang', 'Letzter Takt']) {
+        add(head, 'th', title).scope = 'col';
+      }
+      const body = add(table, 'tbody', '');
+      for (const [name, arm] of [['V3 · Paper-Bot', duel.v3], ['V4 · Ausbruch (Replay)', duel.v4]]) {
+        const row = add(body, 'tr', '');
+        add(row, 'th', name).scope = 'row';
+        const net = add(row, 'td', money(arm.netEur));
+        if (arm.netEur) net.className = arm.netEur > 0 ? 'advisor-gain' : 'advisor-loss';
+        add(row, 'td', num(arm.tradesPerDay) + ' (' + arm.closed + ' gesamt)');
+        add(row, 'td', money(arm.netPerTradeEur));
+        add(row, 'td', num(arm.maxDrawdownPct) + ' %');
+        add(row, 'td', executions[arm.last] || 'Keine Ausführung');
+      }
+      const extra = duel.onlyV4;
+      add(panel, 'p', 'Nur V4 hat gehandelt · ' + extra.closed + ' abgeschlossene Trades · ' +
+        money(extra.netEur) + ' netto · davon bereits abgezogen: ' + money(extra.costsEur) + ' Handelskosten');
+      add(panel, 'small', 'Handelskosten enthalten. Modellkosten separat. Fehlende Takte: ' + duel.missingSlots);
+    } else {
+      add(panel, 'p', 'Für V3 und V4 liegt noch kein gemeinsamer Vergleichsbericht vor.');
+    }
+  }
   if (Array.isArray(decisions)) {
     const modelCount = decisions.filter(row => row.reason !== 'DAY_CLOSE' && !skippedReason(row.reason) && !costFilter(row)).length;
     const title = decisions.length ? 'Verlauf · Modell entschied bei ' + modelCount + ' von ' +
