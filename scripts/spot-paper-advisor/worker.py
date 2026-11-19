@@ -1,6 +1,6 @@
 """Single-writer, ten-minute BTC/EUR paper advisor. No exchange order client."""
 import argparse
-from feeds import COST_VERSION, COST_DIGEST, CHALLENGER_DIGEST, CHALLENGER_VERSION, POLICY_DIGEST, POLICY_VERSION, model_failure
+from feeds import COST_VERSION, COST_DIGEST, CHALLENGER_DIGEST, CHALLENGER_VERSION, POLICY_DIGEST, POLICY_VERSION, book_failure, model_failure
 import fcntl
 import json
 import math
@@ -189,11 +189,14 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
     # Always obtain a new executable book after the decision, independently of the signal feed.
     try:
         book=feeds.book()
-    except Exception:
+        book_status = 'OK' if book else 'NO_BOOK'
+    except Exception as exc:
         book=None
+        book_status = book_failure(exc)
     now=clock()
     if book and any(not 0 <= now-book[field] <= 5 for field in ('received','bidAt','askAt')):
         book=None
+        book_status = 'BOOK_TIME_INVALID_AT_FILL'
     in_slot=slot <= now < slot+STEP
     executable=book if in_slot else None
     def fill(name, desired):
@@ -217,6 +220,7 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
     report=dict(schema='MERIDIAN_ADVISOR_V1',asOf=iso(now),model=model,arms={k:mark(v,book) for k,v in states.items()},
                 last=last,apiCostEur=total)
     record=dict(version=VERSION,promptVersion=policy,promptDigest=digest,marketStatus=market_status,slot=slot,states=states,report=report,inputs=snapshot,executionBook=book,
+                executionBookStatus=book_status,
                 referenceAction=ref,referenceExecution=ref_execution,usage=usage,slotApiCostEur=cost,pendingSlots=pending)
     with db:
         db.execute('UPDATE slots SET record=? WHERE slot=?',(json.dumps(record,allow_nan=False),slot))
