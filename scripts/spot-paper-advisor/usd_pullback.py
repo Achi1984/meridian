@@ -7,6 +7,7 @@ from decimal import Decimal
 import json
 from pathlib import Path
 import sqlite3
+import time
 from sys import float_info
 
 from pair_report import valid_replay_candle
@@ -95,12 +96,12 @@ def paper_slot(state, snapshot, fill_book, slot, observed):
     return dict(action=action, reason=reason, execution=execution, equityUsd=equity)
 
 
-def replay(db):
+def replay(db, *, duration=7*DAY):
     # Keep the pilot epoch, slots and endpoint baselines on one SQLite snapshot.
     with closing(db.cursor()) as cursor:
         rows = cursor.execute("""SELECT p.start, s.slot, s.record FROM pilot p
                                  LEFT JOIN slots s ON s.slot >= p.start
-                                 AND s.slot < p.start + ? WHERE p.id=1 ORDER BY s.slot""", (7*DAY,))
+                                 AND s.slot < p.start + ? WHERE p.id=1 ORDER BY s.slot""", (duration,))
         state = initial()
         latest = baseline = start = previous = None
         missing = closed = modeled = 0
@@ -154,9 +155,55 @@ def replay(db):
                 signalReasonCounts=reasons, executionCounts=executions, sameSlotBaselineEquityUsd=baseline)
 
 
+def first_day(db, now):
+    """Report closed ten-minute intervals of day one on the caller's read snapshot."""
+    from pilot import UNIT
+
+    start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
+    expected = max(0, min(DAY, int(now)-start)) // STEP
+    end = start + expected*STEP
+    arms = {key: dict(buySignals=0, buys=0, sells=0, equityUsd=None, netUsd=None,
+                      reasons=Counter()) for key in ('v3', 'v4', 'cash', 'btcHold')}
+    observed = 0
+    for slot, raw in db.execute('SELECT slot, record FROM slots WHERE slot>=? AND slot<? '
+                                'AND record IS NOT NULL ORDER BY slot', (start, end)):
+        report = json.loads(raw)['report']
+        if (slot % STEP or report.get('schema') != 'MERIDIAN_USD_ROUND_V1' or
+                report.get('pair') != 'BTC/USD' or report.get('at') != iso(slot) or
+                report.get('start') != iso(start)):
+            raise ValueError('unexpected USD round or slot')
+        observed += 1
+        for key, summary in arms.items():
+            arm = report['arms'][key]
+            summary['buySignals'] += arm['action'] == 'BUY'
+            summary['buys'] += arm['execution'] == 'PAPER_BUY'
+            summary['sells'] += arm['execution'] == 'PAPER_SELL'
+            summary['reasons'][arm['reason']] += 1
+            if slot == end-STEP:
+                summary.update(equityUsd=arm['equityUsd'], netUsd=arm['netUsd'])
+    spent, reserved = db.execute('SELECT coalesce(sum(charge*settled),0), '
+                                 'coalesce(sum(charge*(1-settled)),0) FROM calls '
+                                 'WHERE slot>=? AND slot<?', (start, end)).fetchone()
+    v5 = replay(db, duration=end-start) if observed else None
+    if v5:
+        summary = dict(buySignals=sum(v5['signalReasonCounts']['BUY'].values()),
+                       buys=v5['executionCounts']['PAPER_BUY'], sells=v5['closed'],
+                       equityUsd=None, netUsd=None, reasons=v5['signalReasonCounts'])
+        if v5['last']['at'] == iso(end-STEP):
+            summary.update(equityUsd=v5['equityUsd'], netUsd=v5['netUsd'])
+        v5 = summary
+    return dict(start=iso(start), endExclusive=iso(end), targetSlots=DAY//STEP,
+                expectedSlots=expected, observedSlots=observed, missingSlots=expected-observed,
+                arms=arms, v5Replay=v5, modelCostUsd=spent/UNIT, modelReserveUsd=reserved/UNIT)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ledger', type=Path, required=True, help='Existing USD round.sqlite file')
+    parser.add_argument('--first-day', action='store_true',
+                        help='Compare closed intervals of the first 24 hours, including recorded model costs')
     args = parser.parse_args()
     with closing(sqlite3.connect(args.ledger.resolve().as_uri() + '?mode=ro', uri=True)) as db:
-        print(json.dumps(replay(db), allow_nan=False))
+        db.execute('BEGIN')
+        result = first_day(db, time.time()) if args.first_day else replay(db)
+        print(json.dumps(result, allow_nan=False))
