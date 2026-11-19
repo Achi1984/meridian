@@ -6,7 +6,7 @@ import unittest
 
 from unittest.mock import patch
 
-from pair_report import BREAKOUT_START, breakout_duel, breakout_signal, comparison, describe, iso
+from pair_report import BREAKOUT_START, breakout_duel, breakout_reason, breakout_signal, comparison, describe, iso
 from feeds import COST_VERSION
 from pilot import publish_pair
 
@@ -30,6 +30,7 @@ class PairReportTest(unittest.TestCase):
                 db.execute('INSERT INTO v3.slots VALUES(?,?)', (slot,json.dumps(row)))
             result = breakout_duel(db, slot)
             self.assertEqual(result['v4']['closed'], 1)
+            self.assertEqual(result['v4']['reason'], 'TIME_EXIT')
             self.assertGreater(result['v4']['netEur'], 0)
             self.assertEqual(result['onlyV4']['closed'], 1)
             self.assertGreater(result['onlyV4']['costsEur'], 0)
@@ -38,6 +39,19 @@ class PairReportTest(unittest.TestCase):
             self.assertEqual(breakout_duel(db, slot)['onlyV4']['closed'], 0)
             self.assertFalse(breakout_signal(row, slot))
             self.assertIsNone(breakout_duel(db, start-600))
+
+    def test_v4_wait_reasons_and_strict_breakout(self):
+        hour = BREAKOUT_START
+        bars = [[hour-i*3600,100,106,94,100] for i in (4,3,2,1)]
+        ten = [[hour,100,106,99,106]]
+        row = dict(inputs=dict(hour=bars, ten=ten))
+        self.assertEqual(breakout_reason(row, hour), 'WAIT_FIRST_CLOSE')
+        self.assertEqual(breakout_reason(row, hour+600), 'NO_COMPRESSION')
+        bars[-1][3] = 98
+        self.assertEqual(breakout_reason(row, hour+600), 'WAIT_BREAKOUT')
+        ten[-1][2] = ten[-1][4] = 107
+        self.assertEqual(breakout_reason(row, hour+600), 'BREAKOUT')
+        self.assertEqual(breakout_reason(row, hour+1200), 'CANDLES_UNAVAILABLE')
 
     def test_latest_common_slot_and_independent_opening_values(self):
         start = 1200
