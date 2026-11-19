@@ -107,7 +107,7 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
     const cell = add(row, 'td', pnl === null ? '—' : (pnl > 0 ? '+' : '') + EURO.format(pnl || 0));
     if (pnl) cell.className = pnl > 0 ? 'advisor-gain' : 'advisor-loss';
   }
-  if (audit) {
+  if (audit && comparison) {
     const pair = add(content, 'table', '');
     pair.className = 'advisor-accounts';
     const models = [['V1',comparison?.v1], ['V2',comparison?.v2], ['V3',comparison?.v3]].filter(([,arm]) => arm);
