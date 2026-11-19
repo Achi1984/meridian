@@ -226,7 +226,17 @@ class CostFilterAuditTest(unittest.TestCase):
             study = audit(self.db)['hourlyExpansion']
             sample = study['samples'][0]
             delayed = sample['confirmed10m']
+            attribution = study['delayAttribution']['risingExpansion']
+            always = Decimal(sample['unconditional10m']['netEur'])
             self.assertEqual(delayed['status'], status)
+            if status == 'CONFIRMATION_UNAVAILABLE':
+                self.assertEqual(attribution['incomplete'], 1)
+                self.assertIsNone(attribution['signalDeltaAfterWaitEur'])
+            else:
+                self.assertEqual(attribution['complete'], 1)
+                self.assertEqual(Decimal(attribution['waitOnlyDeltaEur']), always - Decimal(sample['netEur']))
+                expected = -always if status == 'SKIPPED' else Decimal(0)
+                self.assertEqual(Decimal(attribution['signalDeltaAfterWaitEur']), expected)
             if status == 'CONFIRMATION_UNAVAILABLE':
                 self.assertEqual(study['confirmationPairs'], 0)
             else:
