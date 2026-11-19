@@ -49,6 +49,23 @@ def confirmed_breakout(record, slot):
     return entry_signals(record, slot)['confirmedBreakout']
 
 
+def summarize_windows(samples):
+    pnl = [Decimal(sample['netEur']) for sample in samples if sample['status'] == 'MEASURED']
+    pending = sum(sample['status'] == 'PENDING_EXIT' for sample in samples)
+    return dict(total=len(samples), measured=len(pnl), pending=pending,
+                unavailable=len(samples)-len(pnl)-pending,
+                meanNetEur=str(sum(pnl)/len(pnl)) if pnl else None)
+
+
+def disjoint_windows(samples):
+    """Select the earliest eligible interval without looking at its eventual outcome."""
+    selected = []
+    for sample in sorted(samples, key=lambda row: row['entryAt']):
+        if not selected or sample['entryAt'] >= selected[-1]['exitAt']:
+            selected.append(sample)
+    return selected
+
+
 def forward_comparison(samples):
     comparison = {}
     for signal in NEW_SIGNALS:
@@ -56,11 +73,8 @@ def forward_comparison(samples):
         for value, name in ((True, 'signal'), (False, 'noSignal'), (None, 'unknown')):
             subset = [sample for sample in samples if sample['entryAt'] >= iso(FORWARD_START)
                       and sample[signal] is value]
-            pnl = [Decimal(sample['netEur']) for sample in subset if sample['status'] == 'MEASURED']
-            pending = sum(sample['status'] == 'PENDING_EXIT' for sample in subset)
-            groups[name] = dict(total=len(subset), measured=len(pnl), pending=pending,
-                                unavailable=len(subset)-len(pnl)-pending,
-                                meanNetEur=str(sum(pnl)/len(pnl)) if pnl else None)
+            groups[name] = summarize_windows(subset)
+            groups[name]['disjointWindows'] = summarize_windows(disjoint_windows(subset))
         comparison[signal] = groups
     return dict(fromUtc=iso(FORWARD_START), groups=comparison)
 
