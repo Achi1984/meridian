@@ -1,4 +1,4 @@
-"""Publish a bounded, read-only comparison of the two co-located paper ledgers."""
+"""Publish a bounded, read-only comparison of the co-located paper ledgers."""
 from contextlib import closing
 from datetime import datetime, timezone
 import json
@@ -56,6 +56,10 @@ def comparison(volume):
     challenger = (volume/'challenger-v2'/'pilot.sqlite').as_uri() + '?mode=ro'
     with closing(sqlite3.connect(base, uri=True)) as db:
         db.execute('ATTACH DATABASE ? AS v2', (challenger,))
+        third = volume/'challenger-v3'/'pilot.sqlite'
+        has_third = third.is_file()
+        if has_third:
+            db.execute('ATTACH DATABASE ? AS v3', (third.as_uri() + '?mode=ro',))
         db.execute('BEGIN')
         start, = db.execute('SELECT start FROM v2.pilot WHERE id=1').fetchone()
         end, = db.execute('SELECT start+604800 FROM main.pilot WHERE id=1').fetchone()
@@ -65,8 +69,29 @@ def comparison(volume):
                              ORDER BY a.slot DESC LIMIT 1""", (start, end)).fetchone()
         if not pair:
             return end, None
-        opening = db.execute("""SELECT json_extract(record,'$.report.arms.model.equityEur')
-                                FROM main.slots WHERE slot=?""", (start-600,)).fetchone()
+        def opening(table, epoch):
+            row = db.execute(f"""SELECT json_extract(record,'$.report.arms.model.equityEur')
+                                 FROM {table}.slots WHERE slot=?""", (epoch-600,)).fetchone()
+            return row[0] if row else None
+
         slot, v1, v2 = pair
-        return end, dict(start=iso(start), at=iso(slot), v1=describe(v1, opening[0] if opening else None),
-                         v2=describe(v2, 1000))
+        result = dict(start=iso(start), at=iso(slot), v1=describe(v1, opening('main', start)),
+                      v2=describe(v2, 1000))
+        if not has_third:
+            return end, result
+        # An initializing or delayed V3 must not hide the latest V1/V2 comparison.
+        ready = db.execute("SELECT 1 FROM v3.sqlite_master WHERE type='table' AND name='pilot'").fetchone()
+        epoch = db.execute('SELECT start FROM v3.pilot WHERE id=1').fetchone() if ready else None
+        if epoch is None or slot < epoch[0]:
+            return end, result
+        third_row = db.execute('SELECT record FROM v3.slots WHERE slot=?', (slot,)).fetchone()
+        if not third_row or third_row[0] is None:
+            result['v3Pending'] = True
+            return end, result
+        third_start = epoch[0]
+        epoch = max(start, third_start)
+        base_start = end - 604800
+        return end, dict(start=iso(epoch), at=iso(slot),
+                         v1=describe(v1, 1000 if epoch == base_start else opening('main', epoch)),
+                         v2=describe(v2, 1000 if epoch == start else opening('v2', epoch)),
+                         v3=describe(third_row[0], 1000 if epoch == third_start else opening('v3', epoch)))

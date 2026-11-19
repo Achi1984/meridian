@@ -110,14 +110,16 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
   if (audit) {
     const pair = add(content, 'table', '');
     pair.className = 'advisor-accounts';
-    add(pair, 'caption', 'V1 und V2 · gemeinsamer Vergleich');
+    add(pair, 'caption', comparison?.v3 ? 'V1, V2 und V3 · gemeinsamer Vergleich' : 'V1 und V2 · gemeinsamer Vergleich');
     if (comparison?.v1 && comparison?.v2 && timestamp(comparison.at) && timestamp(comparison.start)) {
       const header = add(add(pair,'thead',''),'tr','');
       for (const label of ['Modell','Entscheidung','Kontowert','Seit Vergleichsstart']) add(header,'th',label).scope='col';
       const body = add(pair,'tbody','');
       const latestSlot = Math.floor(Date.parse(report.last.at) / 600000) * 600000;
       const sameSlot = Date.parse(comparison.at) === latestSlot;
-      for (const [label, arm] of [['V1',comparison.v1],['V2',comparison.v2]]) {
+      const models = [['V1',comparison.v1],['V2',comparison.v2]];
+      if (comparison.v3) models.push(['V3',comparison.v3]);
+      for (const [label, arm] of models) {
         const row = add(body,'tr','');
         add(row,'th',label).scope='row';
         const decision = add(row,'td',arm.action === 'SKIPPED' ? 'Ausgesetzt' : actions[arm.action] || 'Unbekannt');
@@ -144,6 +146,7 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
           (arm.change > 0 ? '+' : '') + EURO.format(arm.change) : 'Ausstehend');
         if (arm.change) cell.className = arm.change > 0 ? 'advisor-gain' : 'advisor-loss';
       }
+      if (comparison.v3Pending) add(content, 'small', 'V3-Bericht für diesen Takt ausstehend.');
       if (Date.parse(comparison.at) < latestSlot) {
         add(content, 'p', 'Für den jüngsten Takt steht der gemeinsame Vergleich noch aus.');
       }
