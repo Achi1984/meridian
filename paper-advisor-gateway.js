@@ -2,11 +2,48 @@
 let cached;
 let pending;
 
+const jobUrl = 'https://api.northflank.com/v1/projects/meridian/jobs/meridian-paper-advisor';
+const runIdPattern = /^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i;
+
+export async function resolvePilotRun(token, fallback, request = fetch) {
+  const endpoint = new URL(jobUrl + '/runs');
+  endpoint.searchParams.set('per_page', '100');
+  const signal = AbortSignal.timeout(3000);
+  const seen = new Set();
+  let newest;
+  try {
+    for (;;) {
+      const response = await request(endpoint, {
+        headers: {authorization: 'Bearer ' + token}, redirect: 'error', signal
+      });
+      if (!response.ok) throw new Error('Pilot run lookup unavailable');
+      const {data, pagination} = await response.json();
+      for (const run of data.runs) {
+        if (run?.status !== 'RUNNING' || run.active !== 1 || run.concluded !== false ||
+            !runIdPattern.test(run.id) || !Number.isFinite(Date.parse(run.startedAt))) continue;
+        if (!newest || Date.parse(run.startedAt) > Date.parse(newest.startedAt)) newest = run;
+      }
+      if (!pagination.hasNextPage) break;
+      const cursor = pagination.cursor;
+      if (typeof cursor !== 'string' || !cursor || seen.has(cursor)) throw new Error('Invalid run cursor');
+      seen.add(cursor);
+      endpoint.searchParams.set('cursor', cursor);
+    }
+  } catch (error) {
+    // Existing log-only tokens may lack permission to list runs.
+    if (runIdPattern.test(fallback)) return fallback;
+    throw error;
+  }
+  if (newest) return newest.id;
+  // Preserve the final timestamped report after the pilot has stopped.
+  if (runIdPattern.test(fallback)) return fallback;
+  throw new Error('Missing pilot run');
+}
+
 async function readReport() {
   const token = process.env.MERIDIAN_PILOT_LOG_READ_TOKEN;
   if (!token) throw new Error('Missing pilot log access');
-  const runId = process.env.MERIDIAN_PILOT_RUN_ID;
-  if (!/^[a-f0-9-]{36}$/i.test(runId || '')) throw new Error('Missing pilot run');
+  const runId = await resolvePilotRun(token, process.env.MERIDIAN_PILOT_RUN_ID);
   const [items, usdBars] = await Promise.all([readRun(runId, token), readUsdBars()]);
   const rows = items.filter(item => item.report);
   const comparisons = items.map(item => item.pilotAudit?.comparison).filter(Boolean);
@@ -48,7 +85,7 @@ export function decisionUsdClose(bars, decisionAt) {
 }
 
 async function readRun(runId, token) {
-  const endpoint = new URL('https://api.northflank.com/v1/projects/meridian/jobs/meridian-paper-advisor/logs');
+  const endpoint = new URL(jobUrl + '/logs');
   endpoint.search = new URLSearchParams({
     runId: runId, type: 'runtime', queryType: 'range',
     duration: '86400', lineLimit: '200', direction: 'backward', textIncludes: '"pilotAudit"'

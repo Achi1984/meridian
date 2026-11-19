@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarize, decisionUsdClose} from '../paper-advisor-gateway.js';
+import {summarize, decisionUsdClose, resolvePilotRun} from '../paper-advisor-gateway.js';
 
 function sample(id, execution = 'HOLD', cashEur = 1000, btc = 0) {
   return {pilotAudit:{completedSlots:id}, report:{arms:{model:{cashEur, btc}},
@@ -31,4 +31,26 @@ test('USD quote matches the completed Kraken minute at the decision boundary', (
   for (const invalid of [null, bars.slice(0, -1), [bars[0], bars[2]], [row(end-60, '0'), bars[2]]]) {
     assert.equal(decisionUsdClose(invalid, at), null);
   }
+});
+
+test('run discovery follows a rollover across pages and ignores finished runs', async () => {
+  const run = (n, status = 'RUNNING') => ({
+    id: '00000000-0000-4000-8000-' + String(n).padStart(12, '0'),
+    status, active: Number(status === 'RUNNING'), concluded: status !== 'RUNNING',
+    startedAt: new Date(n * 600000).toISOString()
+  });
+  let second = [run(2, 'SUCCESS')];
+  const request = async url => {
+    const next = url.searchParams.has('cursor');
+    return {ok: true, json: async () => ({
+      data: {runs: next ? second : [run(1)]},
+      pagination: next ? {hasNextPage: false} : {hasNextPage: true, cursor: 'next'}
+    })};
+  };
+  assert.equal(await resolvePilotRun('test', run(1).id, request), run(1).id);
+  second = [run(3), run(4, 'FAILED')];
+  assert.equal(await resolvePilotRun('test', run(1).id, request), run(3).id);
+  const denied = async () => ({ok: false});
+  assert.equal(await resolvePilotRun('test', run(1).id, denied), run(1).id);
+  await assert.rejects(resolvePilotRun('test', undefined, denied));
 });
