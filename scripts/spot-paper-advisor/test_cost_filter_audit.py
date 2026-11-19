@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from decimal import Decimal
 
-from cost_filter_audit import EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, confirmed_breakout, entry_signals, forward_comparison
+from cost_filter_audit import ai_veto, EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, confirmed_breakout, entry_signals, forward_comparison
 from feeds import COST_VERSION
 from worker import DAY, FEE, SLIP, STEP, iso
 
@@ -237,6 +237,22 @@ class CostFilterAuditTest(unittest.TestCase):
                     self.assertEqual(delayed['netEur'], '0')
                 else:
                     self.assertLess(Decimal(delayed['netEur']), Decimal(sample['netEur']))
+
+    def test_only_model_decisions_and_known_costs_enter_ai_comparison(self):
+        last = dict(action='HOLD', reason='wait', execution='HOLD')
+        row = dict(report={'last': last}, states={'model': {'btc': '0'}}, usage=None)
+        immediate = dict(status='MEASURED', netEur='-2')
+        def compare(rate=None):
+            return ai_veto(row, immediate, Decimal('0.01'), rate)
+        self.assertEqual(compare()['status'], 'NO_MODEL_DECISION')
+        row['usage'] = {'input': 10}
+        self.assertIsNone(compare()['deltaAfterApiEur'])
+        self.assertEqual(Decimal(compare(Decimal('0.9'))['deltaAfterApiEur']), Decimal('1.991'))
+        last['reason'] = list(STAGES)[1]
+        self.assertEqual(compare()['status'], 'ALLOW')
+        self.assertEqual(Decimal(compare(Decimal('0.9'))['deltaAfterApiEur']), Decimal('-0.009'))
+        last['reason'] = 'MODEL_UNAVAILABLE: MODEL_TIMEOUT'
+        self.assertEqual(compare()['status'], 'MODEL_FAILURE')
 
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]
