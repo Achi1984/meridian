@@ -117,3 +117,29 @@ class ChallengerTest(unittest.TestCase):
             connect(path, 'fixed-model').close()
             with self.assertRaisesRegex(ValueError, 'separate challenger database'):
                 connect(path, 'fixed-model', challenger=True)
+
+    def test_cost_filter_and_position_context(self):
+        self.db = connect(':memory:', 'fixed-model', cost_aware=True)
+        bars = [[i, 9990, 10000, 9980, 9995] for i in range(7)]
+        self.feed.market.side_effect = lambda _: dict(ten=bars, book=self.quote.copy())
+        def next_slot():
+            self.slot += STEP
+            self.now += STEP
+            return self.run_slot()
+        self.assertEqual(self.run_slot()['last']['execution'], 'HOLD')
+        self.feed.decide.assert_not_called()
+        bars[-1][2] = 10200
+        self.feed.book.side_effect = lambda: dict(self.quote, ask=10250, received=self.now,
+                                                 bidAt=self.now, askAt=self.now)
+        self.assertEqual(next_slot()['last']['execution'], 'HOLD')
+        self.feed.book.side_effect = lambda: dict(self.quote, received=self.now, bidAt=self.now, askAt=self.now)
+        bought = next_slot()
+        self.assertEqual(bought['last']['execution'], 'PAPER_BUY')
+        bars[-1][2] = 10000
+        self.feed.decide.return_value = ('SELL', 'Exit', None)
+        sold = next_slot()
+        self.assertEqual(sold['last']['execution'], 'PAPER_SELL')
+        context = self.feed.decide.call_args.args[0]
+        self.assertEqual(context['position']['minutesHeld'], 10)
+        self.assertAlmostEqual(context['position']['entryCostEur'], 1000 - bought['arms']['model']['cashEur'])
+        self.assertAlmostEqual(context['position']['liquidationPnlEur'], sold['arms']['model']['cashEur']-1000)

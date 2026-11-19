@@ -143,7 +143,7 @@ def paired_directory(volume, start):
     return directory, end
 
 
-def run(directory, start, key, *, challenger=False, paired=False):
+def run(directory, start, key, *, challenger=False, paired=False, cost_aware=False):
     if not os.path.ismount(directory):
         raise ValueError('pilot directory must be a mounted persistent volume')
     end = start + 7 * DAY
@@ -155,7 +155,7 @@ def run(directory, start, key, *, challenger=False, paired=False):
         return
     with (directory/'pilot-writer.lock').open('a') as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        db = connect(directory/'pilot.sqlite', MODEL, challenger=challenger)
+        db = connect(directory/'pilot.sqlite', MODEL, challenger=challenger, cost_aware=cost_aware)
         configure(db, start, time.time())
         while time.time() < end:
             now = time.time()
@@ -177,8 +177,10 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory', type=Path, required=True)
     parser.add_argument('--start', type=int, required=True)
-    parser.add_argument('--challenger', action='store_true', help='Use v2 in a separate pilot volume')
-    parser.add_argument('--paired-challenger', action='store_true',
+    policies = parser.add_mutually_exclusive_group()
+    policies.add_argument('--cost-aware', action='store_true', help='Run v3 on its own mounted paper ledger')
+    policies.add_argument('--challenger', action='store_true', help='Use v2 in a separate pilot volume')
+    policies.add_argument('--paired-challenger', action='store_true',
                         help='Use isolated V2 files on the baseline volume and end at its cutoff')
     args = parser.parse_args()
-    run(args.directory, args.start, os.environ['OPENAI_API_KEY'], challenger=args.challenger, paired=args.paired_challenger)
+    run(args.directory, args.start, os.environ['OPENAI_API_KEY'], challenger=args.challenger, paired=args.paired_challenger, cost_aware=args.cost_aware)

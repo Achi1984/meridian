@@ -1,6 +1,6 @@
 """Single-writer, ten-minute BTC/EUR paper advisor. No exchange order client."""
 import argparse
-from feeds import CHALLENGER_DIGEST, CHALLENGER_VERSION, POLICY_DIGEST, POLICY_VERSION, model_failure
+from feeds import COST_VERSION, COST_DIGEST, CHALLENGER_DIGEST, CHALLENGER_VERSION, POLICY_DIGEST, POLICY_VERSION, model_failure
 import fcntl
 import json
 import math
@@ -93,13 +93,22 @@ def challenger_inputs(snapshot, state, slot):
                 minutesUntilMandatoryExit=(DAY - STEP - slot % DAY) // 60)
 
 
-def connect(path, model, *, challenger=False):
+def range_covers_cost(snapshot, book):
+    bars = snapshot['ten'][-6:]
+    span = D(str(max(row[2] for row in bars))) - D(str(min(row[3] for row in bars)))
+    required_bid = D(str(book['ask'])) * (1+SLIP)*(1+FEE) / ((1-SLIP)*(1-FEE))
+    return len(bars) == 6 and span > required_bid - D(str(book['bid']))
+
+
+def connect(path, model, *, challenger=False, cost_aware=False):
     db = sqlite3.connect(path)
     with db:
         db.execute('CREATE TABLE IF NOT EXISTS slots (slot INTEGER PRIMARY KEY, record TEXT)')
         db.execute('CREATE TABLE IF NOT EXISTS config (id INTEGER PRIMARY KEY, value TEXT NOT NULL)')
-        identity=json.dumps([VERSION, CHALLENGER_VERSION if challenger else POLICY_VERSION,
-                             CHALLENGER_DIGEST if challenger else POLICY_DIGEST, model])
+        policy, digest = (CHALLENGER_VERSION, CHALLENGER_DIGEST) if challenger else (POLICY_VERSION, POLICY_DIGEST)
+        if cost_aware:
+            policy, digest = COST_VERSION, COST_DIGEST
+        identity=json.dumps([VERSION, policy, digest, model])
         db.execute('INSERT OR IGNORE INTO config VALUES (1,?)',(identity,))
         if db.execute('SELECT value FROM config WHERE id=1').fetchone()[0]!=identity:
             raise ValueError('model or policy changed: use a separate challenger database')
@@ -144,15 +153,25 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
         action,reason='SELL' if D(states['model']['btc']) else 'HOLD','DAY_CLOSE'
     elif not key:
         reason='MODEL_KEY_UNAVAILABLE'
+    elif (policy == COST_VERSION and snapshot and clock() < slot+90 and not D(states['model']['btc'])
+          and not range_covers_cost(snapshot, snapshot['book'])):
+        reason = 'Stundenbandbreite deckt die Handelskosten nicht.'
     elif snapshot and clock() < slot+90:
         # A separately committed slot reservation already records possible request intent.
         try:
             context = {'policy':VERSION,'slotUtc':iso(slot),'market':snapshot,
                 'portfolio':mark(states['model'],snapshot['book']),'recent':history[::-1],
                 'initialEur':1000,'entryBudgetEur':100,'feeBpsPerSide':50,'slippageBpsPerSide':10}
-            if policy == CHALLENGER_VERSION:
+            if policy in (CHALLENGER_VERSION, COST_VERSION):
                 context.update(policy=policy, executionContext=challenger_inputs(snapshot, states['model'], slot))
                 del context['recent']
+            if policy == COST_VERSION and D(states['model']['btc']):
+                state = states['model']
+                cost_basis = D(state['entryCostEur'])
+                quantity = D(state['btc'])
+                context['position'] = dict(entryCostEur=float(cost_basis), minutesHeld=(slot-state['opened'])//60,
+                    liquidationPnlEur=float(quantity * D(str(snapshot['book']['bid'])) * (1-SLIP)*(1-FEE) - cost_basis)
+                    if context['executionContext']['bidCoversPosition'] else None)
             action,reason,usage=feeds.decide(context, model, key)
             if action not in ('BUY','SELL','HOLD') or not isinstance(reason,str) or not reason.strip():
                 raise ValueError('invalid decision')
@@ -181,7 +200,15 @@ def cycle(db, slot, model, key, feeds, rates=None, clock=time.time):
         if not forced(states[name],slot) and now>=slot+90 and desired!='HOLD':
             return 'DECISION_WINDOW_EXPIRED'
         return execute(states[name],desired,executable,slot)
+    if policy == COST_VERSION and action == 'BUY' and executable and not range_covers_cost(snapshot, executable):
+        action, reason = 'HOLD', 'Aktuelles Orderbuch deckt die Gewinnschwelle im Stundenband nicht.'
+    cash_before = D(states['model']['cash'])
     execution=fill('model',action)
+    if policy == COST_VERSION:
+        if execution == 'PAPER_BUY':
+            states['model']['entryCostEur'] = str(cash_before - D(states['model']['cash']))
+        elif execution == 'PAPER_SELL':
+            states['model'].pop('entryCostEur', None)
     ref_execution=fill('reference',ref)
     last=dict(at=iso(now),action=action,reason=reason,execution=execution)
     prior_cost=previous.get('report',{}).get('apiCostEur',0)
@@ -200,7 +227,9 @@ def main():
     import feeds
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--directory',type=Path,required=True)
-    parser.add_argument('--challenger', action='store_true', help='Use the v2 decision policy in a separate directory')
+    policies = parser.add_mutually_exclusive_group()
+    policies.add_argument('--cost-aware', action='store_true', help='Use the isolated v3 cost-aware policy')
+    policies.add_argument('--challenger', action='store_true', help='Use the v2 decision policy in a separate directory')
     parser.add_argument('--once',action='store_true')
     args=parser.parse_args()
     key=os.environ.get('OPENAI_API_KEY')
@@ -218,7 +247,7 @@ def main():
     args.directory.mkdir(parents=True,exist_ok=True)
     with (args.directory/'writer.lock').open('a') as lock:
         fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        db=connect(args.directory/'advisor.sqlite',model,challenger=args.challenger)
+        db=connect(args.directory/'advisor.sqlite',model,challenger=args.challenger, cost_aware=args.cost_aware)
         while True:
             slot=int(time.time())//STEP*STEP
             cycle(db,slot,model,key,feeds,rates)
