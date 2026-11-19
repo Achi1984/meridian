@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from decimal import Decimal
 
-from cost_filter_audit import ai_veto, EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, skipped_delayed_trades, confirmation_results, confirmed_breakout, entry_signals, forward_comparison
+from cost_filter_audit import ai_veto, REBOUND_START, EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, skipped_delayed_trades, confirmation_results, confirmed_breakout, entry_signals, forward_comparison
 from feeds import COST_VERSION
 from worker import DAY, FEE, SLIP, STEP, iso
 
@@ -260,6 +260,30 @@ class CostFilterAuditTest(unittest.TestCase):
                          dict(measured=3, unavailable=1, avoidedLosses=1, missedGains=1,
                               flat=1, avoidedLossEur='2.30', missedGainEur='0.70', netBenefitEur='1.60'))
         self.assertIsNone(skipped_delayed_trades([row(None)], regime)['netBenefitEur'])
+
+    def test_forward_rebound_only_trades_recovered_falling_hours(self):
+        start = REBOUND_START
+        for i, (close, recovery) in enumerate([(99, 103), (99, 104), (98, 98), (100, 105), (99, None)]):
+            slot = start + (i-1)*HOUR
+            self.record(slot, 'model', 10000+i*100)
+            hour = [[slot-k*HOUR, 100, 106, 97, 101] for k in range(7, 0, -1)]
+            hour[-1][4] = close
+            updates = [(slot, dict(hour=hour))]
+            if recovery is not None:
+                self.record(slot+STEP, 'model', 10000+i*100)
+                updates.append((slot+STEP, dict(ten=[[slot, close, 106, 97, recovery]])))
+            for at, inputs in updates:
+                raw, = self.db.execute('SELECT record FROM slots WHERE slot=?', (at,)).fetchone()
+                data = dict(json.loads(raw), inputs=inputs)
+                self.db.execute('UPDATE slots SET record=? WHERE slot=?', (json.dumps(data), at))
+        study = audit(self.db)['hourlyExpansion']
+        result = study['fallingHourRebound']
+        self.assertEqual((result['eligible'], result['closedTrades'], result['skipped'],
+                          result['unresolved'], result['alwaysBuyPairs']), (3, 1, 1, 1, 2))
+        rows = [r for r in study['samples'] if r.get('reboundEligible')]
+        self.assertEqual(rows[0]['entryAt'], iso(start))
+        self.assertEqual(result['netVsCashEur'], rows[0]['unconditional10m']['netEur'])
+        self.assertEqual(Decimal(result['netVsAlwaysBuy10mEur']), -Decimal(rows[1]['unconditional10m']['netEur']))
 
     def test_confirmation_control_uses_same_exit_and_separate_denominator(self):
         start = EXPANSION_START

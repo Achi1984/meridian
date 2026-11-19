@@ -163,6 +163,7 @@ def observation_gaps(samples, records):
 
 # Freeze this independent hourly comparison before the first eligible entry.
 EXPANSION_START = int(datetime.fromisoformat('2026-11-19T13:00:00+00:00').timestamp())
+REBOUND_START = int(datetime.fromisoformat('2026-11-19T17:00:00+00:00').timestamp())
 HOUR = 3600
 
 
@@ -306,6 +307,33 @@ def delay_attribution(samples, regime):
                 signalDeltaAfterWaitEur=str(selection) if complete else None)
 
 
+def rebound_results(samples):
+    candidates = [row for row in samples if row.get('reboundEligible')]
+    closed = []
+    skipped = paired = 0
+    paired_delta = Decimal(0)
+    for row in candidates:
+        entry = row['confirmed10m']
+        if entry['status'] not in ('SKIPPED', 'MEASURED'):
+            continue
+        net = Decimal(entry['netEur'])
+        if entry['status'] == 'SKIPPED':
+            skipped += 1
+        else:
+            closed.append(net)
+        always = row['unconditional10m']
+        if always['status'] == 'MEASURED':
+            paired += 1
+            paired_delta += net - Decimal(always['netEur'])
+    resolved = len(closed) + skipped
+    return dict(fromUtc=iso(REBOUND_START), eligible=len(candidates), closedTrades=len(closed),
+                skipped=skipped, unresolved=len(candidates)-resolved,
+                profitableTrades=sum(net > 0 for net in closed),
+                netVsCashEur=str(sum(closed, Decimal(0))) if resolved else None,
+                meanNetPerTradeEur=str(sum(closed)/len(closed)) if closed else None,
+                alwaysBuyPairs=paired, netVsAlwaysBuy10mEur=str(paired_delta) if paired else None)
+
+
 def hourly_expansion_study(records, charges, eur_per_usd):
     latest = max(records, default=-1)
     samples = []
@@ -322,7 +350,10 @@ def hourly_expansion_study(records, charges, eur_per_usd):
         sample.update(hourly_trade(records, latest, slot, end, close))
         if regime == 'risingExpansion':
             sample['aiVeto'] = ai_veto(record, sample, charges.get(slot), eur_per_usd)
-        if regime in ('risingExpansion', 'risingControl'):
+        if regime == 'nonRising' and slot >= REBOUND_START:
+            last_hour = record['inputs']['hour'][-1]
+            sample['reboundEligible'] = last_hour[4] < last_hour[1]
+        if regime in ('risingExpansion', 'risingControl') or sample.get('reboundEligible'):
             check = slot + STEP
             follow = records.get(check)
             if check > latest:
@@ -350,6 +381,7 @@ def hourly_expansion_study(records, charges, eur_per_usd):
                 eurPerUsd=str(eur_per_usd) if eur_per_usd is not None else None, fromUtc=iso(EXPANSION_START), samples=samples, groups=groups,
                 delayAttribution={name: delay_attribution(samples, name)
                                   for name in ('risingExpansion', 'risingControl')},
+                fallingHourRebound=rebound_results(samples),
                 risingControlConfirmationResults=control,
                 expansionMinusControlMeanDeltaEur=difference,
                 confirmationResults=confirmation, confirmationPairs=confirmation['paired'],
