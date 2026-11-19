@@ -230,11 +230,11 @@ def ai_veto(record, immediate, settled_usd, eur_per_usd):
                 deltaAfterApiEur=str(delta-cost) if cost is not None else None)
 
 
-def confirmation_results(samples):
+def confirmation_results(samples, regime='risingExpansion'):
     paired = skipped = unmatched = 0
     immediate = confirmed = avoided = missed = timing = Decimal(0)
     for sample in samples:
-        if sample['regime'] != 'risingExpansion':
+        if sample['regime'] != regime:
             continue
         delayed = sample['confirmed10m']
         if 'deltaVsImmediateEur' not in delayed:
@@ -274,6 +274,7 @@ def hourly_expansion_study(records, charges, eur_per_usd):
         sample.update(hourly_trade(records, latest, slot, end, close))
         if regime == 'risingExpansion':
             sample['aiVeto'] = ai_veto(record, sample, charges.get(slot), eur_per_usd)
+        if regime in ('risingExpansion', 'risingControl'):
             delayed = confirmed_hourly_entry(records, latest, slot, end, close)
             sample['confirmed10m'] = delayed
             if sample['status'] == 'MEASURED' and delayed['status'] in ('SKIPPED', 'MEASURED'):
@@ -282,10 +283,16 @@ def hourly_expansion_study(records, charges, eur_per_usd):
     groups = {name: summarize_windows([row for row in samples if row['regime'] == name])
               for name in ('risingExpansion', 'risingControl', 'nonRising', 'unknown')}
     confirmation = confirmation_results(samples)
+    control = confirmation_results(samples, 'risingControl')
+    difference = None
+    if confirmation['paired'] and control['paired']:
+        difference = str(Decimal(confirmation['meanDeltaEur']) - Decimal(control['meanDeltaEur']))
     ai_deltas = [Decimal(row['aiVeto']['deltaAfterApiEur']) for row in samples
                  if row.get('aiVeto', {}).get('deltaAfterApiEur') is not None]
     return dict(aiPricedPairs=len(ai_deltas), sumPairedAiDeltaEur=str(sum(ai_deltas)) if ai_deltas else None,
                 eurPerUsd=str(eur_per_usd) if eur_per_usd is not None else None, fromUtc=iso(EXPANSION_START), samples=samples, groups=groups,
+                risingControlConfirmationResults=control,
+                expansionMinusControlMeanDeltaEur=difference,
                 confirmationResults=confirmation, confirmationPairs=confirmation['paired'],
                 meanConfirmationDeltaEur=confirmation['meanDeltaEur'])
 
