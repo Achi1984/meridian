@@ -60,7 +60,11 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
       apiBudgetUsd:3, unresolvedReserveUsd:0}
   };
   pilot.decisions = [pilot.report.last, {at:new Date(Date.now()-600000).toISOString(),
-    action:'HOLD', reason:'MARKET_UNAVAILABLE', execution:'HOLD'}];
+    action:'HOLD', reason:'MARKET_UNAVAILABLE', execution:'HOLD'},
+    {at:new Date(Date.now()-1200000).toISOString(), action:'HOLD', execution:'HOLD',
+      reason:'Stundenbandbreite deckt die Handelskosten nicht.'},
+    {at:new Date(Date.now()-1800000).toISOString(), action:'HOLD', execution:'HOLD',
+      reason:'Aktuelles Orderbuch deckt die Gewinnschwelle im Stundenband nicht.'}];
   pilot.trades = [];
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
@@ -223,7 +227,10 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`);
         assert.equal(tile.title,'Kaufen');
         assert.match(await evaluate(`document.querySelector('#paper-advisor .advisor-headline').textContent`),/1,19.*hinter Referenz/);
-        assert.match(await evaluate(`document.querySelector('#paper-advisor [data-key="history"] > summary').textContent`),/Modell entschied bei 1 von 2/);
+        assert.match(await evaluate(`document.querySelector('#paper-advisor [data-key="history"] > summary').textContent`),/Modell entschied bei 1 von 4/);
+        const history = await evaluate(`document.querySelector('#paper-advisor [data-key="history"]').textContent`);
+        assert.match(history, /Kostenfilter vor Modellaufruf/);
+        assert.match(history, /Kostenfilter nach Kaufsignal/);
         assert.match(tile.loss,/-.*1,19/);
         assert.equal(tile.detailsOpen,false);
         const skipped = await evaluate(`document.querySelector('#paper-advisor .advisor-skipped > summary')?.textContent`);
