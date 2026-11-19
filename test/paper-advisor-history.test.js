@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {summarize, decisionUsdClose, resolvePilotRun} from '../paper-advisor-gateway.js';
+import {summarize, decisionUsdClose, resolvePilotRun, usdActivity} from '../paper-advisor-gateway.js';
 
 function sample(id, execution = 'HOLD', cashEur = 1000, btc = 0) {
   return {pilotAudit:{completedSlots:id}, report:{arms:{model:{cashEur, btc}},
@@ -64,4 +64,19 @@ test('after shutdown the newest successful run supersedes a stale configured fal
     data: {runs: [...runs].reverse()}, pagination: {hasNextPage: false}
   })});
   assert.equal(await resolvePilotRun('test', runs[0].id, request), runs[1].id);
+});
+
+test('USD activity counts distinct observed slots, signals and fills independently', () => {
+  const time = n => new Date(n * 600000).toISOString();
+  const make = (n, action, execution) => ({start: time(0), at: time(n), arms: {
+    v3: {action, execution}, v4: {action: 'HOLD', execution: 'HOLD'}
+  }});
+  const buy = make(2, 'BUY', 'PAPER_BUY');
+  const end = make(145, 'SELL', 'PAPER_SELL');
+  const rows = [make(1, 'BUY', 'PAPER_BUY'), buy, buy, make(3, 'BUY', 'NO_FRESH_BOOK'),
+    {...buy, at: time(4), start: time(1)}, end];
+  assert.deepEqual(usdActivity(rows, end), {observed: 3, expected: 144, arms: {
+    v3: {signals: 2, buys: 1, sells: 1}, v4: {signals: 0, buys: 0, sells: 0}
+  }});
+  assert.equal(usdActivity([buy], buy).expected, 3);
 });

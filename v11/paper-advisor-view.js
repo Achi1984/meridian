@@ -92,6 +92,7 @@ function renderUsdRound(root, round) {
     costs.textContent += ' V3-Modellkosten separat: ' + usd.format(round.modelCostUsd) +
       ' · Offene Reserve: ' + usd.format(round.modelReserveUsd);
   }
+  const activity = round.activity;
   const slot = doc.createElement('h4');
   const time = doc.createElement('time');
   time.dateTime = round.at;
@@ -108,10 +109,21 @@ function renderUsdRound(root, round) {
       details.push(Object.hasOwn(executions, execution) ? executions[execution] : 'Ausführung nicht gemeldet');
     }
     if (text(reason)) details.push(Object.hasOwn(usdReasons, reason) ? usdReasons[reason] : reason);
+    const counts = activity?.arms?.[key];
+    if (counts && [counts.signals, counts.buys, counts.sells].every(Number.isInteger)) {
+      details.push('Kaufsignale ' + counts.signals + ' · Käufe ' + counts.buys + ' · Verkäufe ' + counts.sells);
+    }
     detail.textContent = details.join(' · ') || 'Begründung fehlt';
     decisions.append(decision, detail);
   }
-  root.replaceChildren(title, scroll, costs, slot, decisions);
+  if (activity && Number.isInteger(activity.observed) && Number.isInteger(activity.expected)) {
+    const coverage = doc.createElement('small');
+    coverage.textContent = 'Aktivität der letzten 24 Stunden · ' + activity.observed + ' von ' +
+      activity.expected + ' erwarteten Intervallen erfasst.';
+    root.replaceChildren(title, scroll, costs, slot, decisions, coverage);
+  } else {
+    root.replaceChildren(title, scroll, costs, slot, decisions);
+  }
 }
 
 export function renderAdvisorReport(root, report, audit, decisions, trades, krakenUsd, comparison) {
