@@ -238,6 +238,30 @@ class CostFilterAuditTest(unittest.TestCase):
                 else:
                     self.assertLess(Decimal(delayed['netEur']), Decimal(sample['netEur']))
 
+    def test_confirmation_control_uses_same_exit_and_separate_denominator(self):
+        start = EXPANSION_START
+        for i, high in enumerate([105, 102]):
+            slot = start+i*HOUR
+            self.record(slot, 'model', 10000+i*100)
+            self.record(slot+STEP, 'model', 10002+i*100)
+            hour = [[slot-k*HOUR, 100, 102, 99, 101] for k in range(7, 0, -1)]
+            hour[-1][2] = high
+            for at, bars in [(slot, dict(hour=hour)), (slot+STEP, dict(ten=[[slot, 101, 103, 99, 100+i*2]]))]:
+                raw, = self.db.execute('SELECT record FROM slots WHERE slot=?', (at,)).fetchone()
+                self.db.execute('UPDATE slots SET record=? WHERE slot=?', (json.dumps(dict(json.loads(raw), inputs=bars)), at))
+        before = audit(self.db)['hourlyExpansion']
+        self.assertIsNone(before['expansionMinusControlMeanDeltaEur'])
+        self.assertEqual(before['risingControlConfirmationResults']['unmatched'], 1)
+        self.record(start+2*HOUR, 'model', 9000)
+        after = audit(self.db)['hourlyExpansion']
+        expansion, control = after['samples'][:2]
+        self.assertEqual(after['confirmationPairs'], 1)
+        self.assertEqual(after['confirmationResults']['skipped'], 1)
+        self.assertEqual(after['risingControlConfirmationResults']['entered'], 1)
+        expected = (Decimal(expansion['confirmed10m']['deltaVsImmediateEur']) -
+                    Decimal(control['confirmed10m']['deltaVsImmediateEur']))
+        self.assertEqual(Decimal(after['expansionMinusControlMeanDeltaEur']), expected)
+
     def test_confirmation_totals_reconcile_skips_and_delayed_entries(self):
         samples = []
         for status, baseline, net in [('SKIPPED', -4, 0), ('SKIPPED', 2, 0),
