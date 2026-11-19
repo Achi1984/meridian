@@ -258,6 +258,33 @@ def confirmation_results(samples, regime='risingExpansion'):
                 **{key: str(value) if paired else None for key, value in totals.items()})
 
 
+def skipped_delayed_trades(samples, regime):
+    """Compare each explicit skip with buying at the same ten-minute checkpoint."""
+    avoided = missed = flat = unavailable = 0
+    losses = gains = Decimal(0)
+    for sample in samples:
+        if sample['regime'] != regime or sample['confirmed10m']['status'] != 'SKIPPED':
+            continue
+        delayed = sample['unconditional10m']
+        if delayed['status'] != 'MEASURED':
+            unavailable += 1
+            continue
+        net = Decimal(delayed['netEur'])
+        if net < 0:
+            avoided += 1
+            losses -= net
+        elif net > 0:
+            missed += 1
+            gains += net
+        else:
+            flat += 1
+    measured = avoided + missed + flat
+    return dict(measured=measured, unavailable=unavailable, avoidedLosses=avoided,
+                missedGains=missed, flat=flat, avoidedLossEur=str(losses) if measured else None,
+                missedGainEur=str(gains) if measured else None,
+                netBenefitEur=str(losses-gains) if measured else None)
+
+
 def delay_attribution(samples, regime):
     complete = incomplete = 0
     waiting = selection = Decimal(0)
@@ -274,6 +301,7 @@ def delay_attribution(samples, regime):
         waiting += delayed_net - Decimal(sample['netEur'])
         selection += Decimal(confirmed['netEur']) - delayed_net
     return dict(complete=complete, incomplete=incomplete,
+                skippedDelayedTrades=skipped_delayed_trades(samples, regime),
                 waitOnlyDeltaEur=str(waiting) if complete else None,
                 signalDeltaAfterWaitEur=str(selection) if complete else None)
 
