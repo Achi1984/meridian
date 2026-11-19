@@ -82,6 +82,17 @@ def comparison(volume):
         # An initializing or delayed V3 must not hide the latest V1/V2 comparison.
         ready = db.execute("SELECT 1 FROM v3.sqlite_master WHERE type='table' AND name='pilot'").fetchone()
         epoch = db.execute('SELECT start FROM v3.pilot WHERE id=1').fetchone() if ready else None
+        if epoch is not None:
+            # V2 can retire while V1 and V3 continue in the same pilot.
+            newer = db.execute('''SELECT a.slot, a.record, c.record FROM main.slots a
+                                  JOIN v3.slots c USING(slot) WHERE a.slot > ? AND a.slot >= ? AND a.slot < ?
+                                  AND a.record IS NOT NULL AND c.record IS NOT NULL
+                                  ORDER BY a.slot DESC LIMIT 1''', (slot, epoch[0], end)).fetchone()
+            if newer:
+                at, baseline, third_record = newer
+                initial = 1000 if epoch[0] == end - 604800 else opening('main', epoch[0])
+                return end, dict(start=iso(epoch[0]), at=iso(at),
+                                 v1=describe(baseline, initial), v3=describe(third_record, 1000))
         if epoch is None or slot < epoch[0]:
             return end, result
         third_row = db.execute('SELECT record FROM v3.slots WHERE slot=?', (slot,)).fetchone()
