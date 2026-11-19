@@ -3,6 +3,7 @@ import argparse
 from collections import Counter
 from contextlib import closing
 from decimal import Decimal
+from datetime import datetime, timezone
 import json
 from pathlib import Path
 import re
@@ -54,6 +55,47 @@ def entry_check(reason, snapshot, slot):
     return 'confirmed', 'ENTRY_CONFIRMED'
 
 
+# The entry rule was published in PR 1481 at 21:07:52 UTC.
+RULE_PUBLISHED = datetime(2026, 11, 19, 21, 7, 52, tzinfo=timezone.utc)
+DESIGN_ENTRY = datetime(2026, 11, 19, 20, 30, tzinfo=timezone.utc)
+
+
+def filter_outcomes(entries):
+    """Compare skipping only blocked entries with keeping their recorded V3 exits."""
+    groups = {}
+    for label in ('designTrade', 'otherHistorical', 'afterRulePublication'):
+        groups[label] = dict(entries=0, confirmed=0, blocked=0, unverified=0,
+                             blockedClosed=0, blockedWithoutExit=0, avoidedLossUsd=Decimal(0),
+                             missedProfitUsd=Decimal(0))
+    for entry in entries:
+        at = datetime.fromisoformat(entry['at'])
+        if at == DESIGN_ENTRY:
+            label = 'designTrade'
+        elif at < RULE_PUBLISHED:
+            label = 'otherHistorical'
+        else:
+            label = 'afterRulePublication'
+        group = groups[label]
+        group['entries'] += 1
+        group[entry['verdict']] += 1
+        if entry['verdict'] != 'blocked':
+            continue
+        value = entry['realizedUsd']
+        if value is None:
+            group['blockedWithoutExit'] += 1
+            continue
+        group['blockedClosed'] += 1
+        pnl = Decimal(str(value))
+        group['avoidedLossUsd'] += max(-pnl, Decimal(0))
+        group['missedProfitUsd'] += max(pnl, Decimal(0))
+    for group in groups.values():
+        avoided = group['avoidedLossUsd']
+        missed = group['missedProfitUsd']
+        group.update(avoidedLossUsd=float(avoided), missedProfitUsd=float(missed),
+                     differenceOnClosedTradesUsd=float(avoided-missed))
+    return groups
+
+
 def audit(db, *, first_day=False):
     start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
     entries = []
@@ -95,6 +137,7 @@ def audit(db, *, first_day=False):
             totals[item['verdict']] += pnl
             opened = None
     return dict(observedSlots=observed, missingSlots=missing, entries=entries,
+                rulePublishedAt=RULE_PUBLISHED.isoformat(), outcomes=filter_outcomes(entries),
                 closedPnlByVerdictUsd={key: float(value) for key, value in totals.items()})
 
 
