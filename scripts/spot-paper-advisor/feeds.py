@@ -130,10 +130,11 @@ def _request(url, *, body=None, key=None, timeout=5):
 
 
 def _kraken(path):
+    pair_key = 'XXBTZUSD' if 'pair=XBTUSD&' in path else 'XXBTZEUR'
     data = _request(_KRAKEN + path, timeout=12 if path.startswith('OHLC?') else 5)
-    if data.get('error') != [] or not isinstance(data.get('result'), dict) or 'XXBTZEUR' not in data['result']:
+    if data.get('error') != [] or not isinstance(data.get('result'), dict) or pair_key not in data['result']:
         raise FeedError('KRAKEN_RESPONSE_INVALID')
-    return data['result']['XXBTZEUR']
+    return data['result'][pair_key]
 
 
 def _positive(value):
@@ -148,9 +149,9 @@ def _positive(value):
     return n
 
 
-def _book_once(now):
+def _book_once(now, pair):
     started = time.monotonic()
-    levels = _kraken('Depth?pair=XBTEUR&count=1')
+    levels = _kraken(f'Depth?pair={pair}&count=1')
     received = now()
     if time.monotonic() - started > 5:
         raise FeedError('SLOW_BOOK')
@@ -184,8 +185,8 @@ def _retry_public_read(read, *args):
     return read(*args)
 
 
-def book(now=time.time):
-    return _retry_public_read(_book_once, now)
+def book(now=time.time, *, pair='XBTEUR'):
+    return _retry_public_read(_book_once, now, pair)
 
 
 def _closed_window(data, interval, slot, length):
@@ -217,8 +218,8 @@ def _closed_window(data, interval, slot, length):
     return candles
 
 
-def _candles(interval, slot, length, now=time.time):
-    path = f'OHLC?pair=XBTEUR&interval={interval}'
+def _candles(interval, slot, length, now=time.time, *, pair='XBTEUR'):
+    path = f'OHLC?pair={pair}&interval={interval}'
     for offset in (0, 5, 15):
         if offset:
             remaining = slot + offset - now()
@@ -234,13 +235,13 @@ def _candles(interval, slot, length, now=time.time):
     raise FeedError('INCOMPLETE_OHLC')
 
 
-def market(slot, now=time.time):
+def market(slot, now=time.time, *, pair='XBTEUR'):
     if type(slot) is not int or slot % 600 or not slot <= now() < slot+600:
         raise FeedError('INVALID_SLOT')
-    five = _candles(5,slot,72,now)
+    five = _candles(5,slot,72,now,pair=pair)
     ten = [[a[0],a[1],max(a[2],b[2]),min(a[3],b[3]),b[4]] for a,b in zip(five[::2],five[1::2])]
-    hour = _candles(60,slot,24,now)
-    quote = book(now)
+    hour = _candles(60,slot,24,now,pair=pair)
+    quote = book(now,pair=pair)
     if not slot <= quote['received'] < slot+600:
         raise FeedError('SLOT_EXPIRED')
     return dict(ten=ten,hour=hour,book=quote)
@@ -263,6 +264,8 @@ def decide(context, model, key, *, service_tier=None):
     if not key or not model:
         raise FeedError('MODEL_NOT_CONFIGURED')
     instructions = {CHALLENGER_VERSION: _CHALLENGER, COST_VERSION: _COST_POLICY}.get(context.get("policy"), _POLICY)
+    if context.get("policy") == COST_VERSION and context.get("pair") == "BTC/USD":
+        instructions = instructions.replace("EUR", "USD")
     body = dict(model=model, store=False, instructions=instructions, input=json.dumps(context,allow_nan=False),
                 max_output_tokens=1024, text={'format':{'type':'json_schema','name':'paper_decision',
                 'strict':True,'schema':_SCHEMA}})
