@@ -24,6 +24,43 @@ export function validAdvisorReport(report) {
   });
 }
 
+function renderUsdRound(root, round) {
+  const doc = root.ownerDocument;
+  const table = doc.createElement('table');
+  table.className = 'advisor-accounts';
+  const usd = new Intl.NumberFormat('de-AT', {style: 'currency', currency: 'USD'});
+  function row(parent, values, header) {
+    const tr = parent.insertRow();
+    values.forEach((value, i) => {
+      const cell = doc.createElement(header || !i ? 'th' : 'td');
+      if (header || !i) cell.scope = header ? 'col' : 'row';
+      cell.textContent = value;
+      tr.append(cell);
+    });
+  }
+  const title = doc.createElement('h3');
+  title.textContent = 'BTC/USD · 1.000 USD je Paper-Konto';
+  table.createCaption().textContent = 'Gemeinsamer Start · ' + DATE.format(new Date(round.start));
+  row(table.createTHead(), ['Strategie', 'Kontowert', 'Netto', 'Abschlüsse', 'Aktive Tage', 'Max. Rückgang'], true);
+  const body = table.createTBody();
+  for (const [key, name] of Object.entries({v3:'V3', v4:'V4 · Ausbruch', cash:'USD halten', btcHold:'BTC halten'})) {
+    const arm = round.arms[key];
+    row(body, [name, Number.isFinite(arm.equityUsd) ? usd.format(arm.equityUsd) : '—',
+      Number.isFinite(arm.netUsd) ? usd.format(arm.netUsd) : '—', arm.closed, arm.activeDays,
+      PERCENT.format(arm.maxDrawdownPct) + ' %']);
+  }
+  const scroll = doc.createElement('div');
+  scroll.style.overflowX = 'auto';
+  scroll.append(table);
+  const costs = doc.createElement('small');
+  costs.textContent = 'Handelskosten im Kontowert enthalten.';
+  if (Number.isFinite(round.modelCostUsd) && Number.isFinite(round.modelReserveUsd)) {
+    costs.textContent += ' V3-Modellkosten separat: ' + usd.format(round.modelCostUsd) +
+      ' · Offene Reserve: ' + usd.format(round.modelReserveUsd);
+  }
+  root.replaceChildren(title, scroll, costs);
+}
+
 export function renderAdvisorReport(root, report, audit, decisions, trades, krakenUsd, comparison) {
   const doc = root.ownerDocument;
   const content = doc.createDocumentFragment();
@@ -322,17 +359,25 @@ export function mountAdvisor(root, access = appAccess) {
         cache: 'no-store', redirect: 'error', referrerPolicy: 'no-referrer', signal: request.signal
       });
       if (!response.ok) throw new Error('Report unavailable');
-      const {report, pilotAudit, decisions, trades, krakenUsd, comparison} = await response.json();
+      const {report, pilotAudit, decisions, trades, krakenUsd, comparison, usdRound} = await response.json();
       if (controller !== request || !access.isUnlocked()) return;
-      if (!validAdvisorReport(report) || !pilotAudit ||
-          !['closedModelTrades','maxObservedDrawdownPct','modeledApiUsd','apiBudgetUsd','unresolvedReserveUsd'].every(key => nonnegative(pilotAudit[key]))) {
-        throw new Error('Invalid report');
+      let asOf;
+      if (usdRound?.schema === 'MERIDIAN_USD_ROUND_V1' && usdRound.pair === 'BTC/USD' &&
+          timestamp(usdRound.at) && timestamp(usdRound.start)) {
+        renderUsdRound(result, usdRound);
+        asOf = usdRound.at;
+      } else {
+        if (!validAdvisorReport(report) || !pilotAudit ||
+            !['closedModelTrades','maxObservedDrawdownPct','modeledApiUsd','apiBudgetUsd','unresolvedReserveUsd'].every(key => nonnegative(pilotAudit[key]))) {
+          throw new Error('Invalid report');
+        }
+        renderAdvisorReport(result, report, pilotAudit, decisions, trades, krakenUsd, comparison);
+        asOf = report.asOf;
       }
-      renderAdvisorReport(result, report, pilotAudit, decisions, trades, krakenUsd, comparison);
-      result.dataset.asOf = report.asOf;
-      const stale = Date.now() - Date.parse(report.asOf) > 15 * 60 * 1000;
+      result.dataset.asOf = asOf;
+      const stale = Date.now() - Date.parse(asOf) > 15 * 60 * 1000;
       status.dataset.state = stale ? 'warning' : 'fresh';
-      status.textContent = (stale ? 'Veralteter Datenstand · ' : 'Datenstand · ') + DATE.format(new Date(report.asOf));
+      status.textContent = (stale ? 'Veralteter Datenstand · ' : 'Datenstand · ') + DATE.format(new Date(asOf));
     } catch {
       if (controller === request && access.isUnlocked()) {
         status.dataset.state = 'warning';
