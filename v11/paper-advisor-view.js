@@ -54,6 +54,12 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
     if (reason === 'MARKET_UNAVAILABLE' || reason === 'DECISION_WINDOW_EXPIRED') return reasons[reason];
     return null;
   }
+  function costFilter(row) {
+    if (row.action !== 'HOLD' || row.execution !== 'HOLD') return null;
+    if (row.reason === 'Stundenbandbreite deckt die Handelskosten nicht.') return 'Kostenfilter vor Modellaufruf';
+    if (row.reason === 'Aktuelles Orderbuch deckt die Gewinnschwelle im Stundenband nicht.') return 'Kostenfilter nach Kaufsignal';
+    return null;
+  }
   function actionLabel(row) {
     return skippedReason(row.reason) ? 'Ausgesetzt' : actions[row.action] || row.action;
   }
@@ -66,6 +72,7 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
   decision.dataset.action = skipped ? 'SKIPPED' : report.last.action;
   const execution = add(signal, 'p', executions[report.last.execution] || report.last.execution);
   if (skipped) execution.textContent = skipped;
+  else if (costFilter(report.last)) execution.textContent = costFilter(report.last);
   else if (reasons[report.last.reason] && report.last.execution === 'HOLD') {
     execution.textContent += ' · ' + reasons[report.last.reason];
   }
@@ -193,7 +200,7 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
     return section;
   }
   if (Array.isArray(decisions)) {
-    const modelCount = decisions.filter(row => row.reason !== 'DAY_CLOSE' && !skippedReason(row.reason)).length;
+    const modelCount = decisions.filter(row => row.reason !== 'DAY_CLOSE' && !skippedReason(row.reason) && !costFilter(row)).length;
     const title = decisions.length ? 'Verlauf · Modell entschied bei ' + modelCount + ' von ' +
       decisions.length + (decisions.length === 1 ? ' Zeitpunkt' : ' Zeitpunkten') : 'Verlauf · Keine Zeitpunkte verfügbar';
     const history = disclosure(content, 'history', title);
@@ -202,7 +209,7 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
       const action = actionLabel(row);
       const reason = skipped || reasons[row.reason] || row.reason;
       const summary = DATE.format(new Date(row.at)) + ' · ' + action + ' · ' +
-        (skipped ? reason : executions[row.execution] || row.execution);
+        (skipped ? reason : costFilter(row) || executions[row.execution] || row.execution);
       const entry = disclosure(history, row.at, summary);
       if (skipped) entry.classList.add('advisor-skipped');
       add(entry, 'p', reason);
