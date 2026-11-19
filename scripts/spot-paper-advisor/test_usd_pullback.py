@@ -97,3 +97,26 @@ class PullbackTest(unittest.TestCase):
         self.assertLess(result['equityUsd'], 1000)
         self.assertGreater(result['maxObservedDrawdownPct'], 0)
         self.assertEqual(result['sameSlotBaselineEquityUsd']['v3'], 1000)
+
+    def test_first_day_excludes_day_two_trades_and_costs_and_marks_missing_endpoint(self):
+        from usd_pullback import first_day
+        db = sqlite3.connect(':memory:')
+        self.addCleanup(db.close)
+        db.executescript('CREATE TABLE pilot(id, start); CREATE TABLE slots(slot PRIMARY KEY, record);'
+                         'CREATE TABLE calls(slot, charge, settled);')
+        db.execute('INSERT INTO pilot VALUES (1,?)', (START,))
+        arm = dict(equityUsd=999, netUsd=-1, action='BUY', execution='PAPER_BUY', reason='TEST')
+        for slot in (START, START+DAY):
+            report = dict(schema='MERIDIAN_USD_ROUND_V1', pair='BTC/USD', start=iso(START),
+                          at=iso(slot), publishedAt=iso(slot+3),
+                          arms={k: arm for k in ('v3','v4','cash','btcHold')})
+            db.execute('INSERT INTO slots VALUES (?,?)', (slot, json.dumps(dict(report=report))))
+            db.execute('INSERT INTO calls VALUES (?,1000000,1)', (slot,))
+        self.assertIsNone(first_day(db, START)['v5Replay'])
+        self.assertEqual(first_day(db, START+STEP)['arms']['v3']['equityUsd'], 999)
+        report = first_day(db, START+2*DAY)
+        self.assertEqual((report['expectedSlots'], report['observedSlots'], report['missingSlots']), (144,1,143))
+        self.assertEqual(report['modelCostUsd'], 0.1)
+        self.assertEqual(report['arms']['v3']['buys'], 1)
+        self.assertIsNone(report['arms']['v3']['equityUsd'])
+        self.assertIsNone(report['v5Replay']['equityUsd'])
