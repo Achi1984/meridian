@@ -230,6 +230,34 @@ def ai_veto(record, immediate, settled_usd, eur_per_usd):
                 deltaAfterApiEur=str(delta-cost) if cost is not None else None)
 
 
+def confirmation_results(samples):
+    paired = skipped = unmatched = 0
+    immediate = confirmed = avoided = missed = timing = Decimal(0)
+    for sample in samples:
+        if sample['regime'] != 'risingExpansion':
+            continue
+        delayed = sample['confirmed10m']
+        if 'deltaVsImmediateEur' not in delayed:
+            unmatched += 1
+            continue
+        paired += 1
+        baseline = Decimal(sample['netEur'])
+        immediate += baseline
+        confirmed += Decimal(delayed['netEur'])
+        if delayed['status'] == 'SKIPPED':
+            skipped += 1
+            avoided += max(-baseline, 0)
+            missed += max(baseline, 0)
+        else:
+            timing += Decimal(delayed['deltaVsImmediateEur'])
+    totals = dict(immediateNetEur=immediate, confirmedNetEur=confirmed,
+                  avoidedLossEur=avoided, missedGainEur=missed, entryTimingDeltaEur=timing,
+                  netDeltaEur=confirmed-immediate)
+    return dict(paired=paired, unmatched=unmatched, skipped=skipped, entered=paired-skipped,
+                meanDeltaEur=str((confirmed-immediate)/paired) if paired else None,
+                **{key: str(value) if paired else None for key, value in totals.items()})
+
+
 def hourly_expansion_study(records, charges, eur_per_usd):
     latest = max(records, default=-1)
     samples = []
@@ -253,13 +281,13 @@ def hourly_expansion_study(records, charges, eur_per_usd):
         samples.append(sample)
     groups = {name: summarize_windows([row for row in samples if row['regime'] == name])
               for name in ('risingExpansion', 'risingControl', 'nonRising', 'unknown')}
-    deltas = [Decimal(row['confirmed10m']['deltaVsImmediateEur']) for row in samples
-              if 'deltaVsImmediateEur' in row.get('confirmed10m', {})]
+    confirmation = confirmation_results(samples)
     ai_deltas = [Decimal(row['aiVeto']['deltaAfterApiEur']) for row in samples
                  if row.get('aiVeto', {}).get('deltaAfterApiEur') is not None]
     return dict(aiPricedPairs=len(ai_deltas), sumPairedAiDeltaEur=str(sum(ai_deltas)) if ai_deltas else None,
                 eurPerUsd=str(eur_per_usd) if eur_per_usd is not None else None, fromUtc=iso(EXPANSION_START), samples=samples, groups=groups,
-                confirmationPairs=len(deltas), meanConfirmationDeltaEur=str(sum(deltas)/len(deltas)) if deltas else None)
+                confirmationResults=confirmation, confirmationPairs=confirmation['paired'],
+                meanConfirmationDeltaEur=confirmation['meanDeltaEur'])
 
 
 def audit(db, eur_per_usd=None):
