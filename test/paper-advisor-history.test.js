@@ -54,3 +54,14 @@ test('run discovery follows a rollover across pages and ignores finished runs', 
   assert.equal(await resolvePilotRun('test', run(1).id, denied), run(1).id);
   await assert.rejects(resolvePilotRun('test', undefined, denied));
 });
+
+test('after shutdown the newest successful run supersedes a stale configured fallback', async () => {
+  const runs = ['SUCCESS', 'SUCCESS', 'FAILED'].map((status, index) => ({
+    id: '00000000-0000-4000-8000-00000000000' + index,
+    startedAt: new Date(index * 600000).toISOString(), active: 0, concluded: true, status
+  }));
+  const request = async () => ({ok: true, json: async () => ({
+    data: {runs: [...runs].reverse()}, pagination: {hasNextPage: false}
+  })});
+  assert.equal(await resolvePilotRun('test', runs[0].id, request), runs[1].id);
+});
