@@ -90,6 +90,19 @@ def pnl_components(quantity, entry_book, exit_book, net):
                 slippageEur=str(slippage), feesEur=str(quoted - slippage - net))
 
 
+def replay_exit(records, latest, exit_slot, close, bought, initial_cash, entry_book):
+    if exit_slot > latest:
+        return dict(status='PENDING_EXIT')
+    state = dict(bought)
+    sale = replay_fill(state, 'SELL', exit_slot, records.get(exit_slot), mandatory=exit_slot == close)
+    if sale != 'PAPER_SELL':
+        return dict(status='EXIT_' + sale)
+    pnl = Decimal(state['cash']) - initial_cash
+    return dict(status='MEASURED', netEur=str(pnl),
+                components=pnl_components(Decimal(bought['btc']), entry_book,
+                                          records[exit_slot]['executionBook'], pnl))
+
+
 def audit(db):
     records = {slot: json.loads(raw) if raw else None
                for slot, raw in db.execute('SELECT slot, record FROM slots ORDER BY slot')}
@@ -110,20 +123,21 @@ def audit(db):
         samples.append(sample)
         state = dict(model)
         entry = replay_fill(state, 'BUY', slot, record)
-        if entry != 'PAPER_BUY':
-            sample['status'] = 'ENTRY_' + entry
-        elif exit_slot > latest:
-            sample['status'] = 'PENDING_EXIT'
-        else:
-            quantity = Decimal(state['btc'])
-            sale = replay_fill(state, 'SELL', exit_slot, records.get(exit_slot), mandatory=exit_slot == close)
-            if sale != 'PAPER_SELL':
-                sample['status'] = 'EXIT_' + sale
-                continue
-            pnl = Decimal(state['cash']) - Decimal(model['cash'])
-            sample.update(status='MEASURED', netEur=str(pnl),
-                          components=pnl_components(quantity, record['executionBook'],
-                                                    records[exit_slot]['executionBook'], pnl))
+        def outcome(end):
+            if entry != 'PAPER_BUY':
+                return dict(status='ENTRY_' + entry)
+            return replay_exit(records, latest, end, close, state, Decimal(model['cash']),
+                               record['executionBook'])
+
+        sample.update(outcome(exit_slot))
+        if slot >= FORWARD_START and any(sample[key] for key in NEW_SIGNALS):
+            early_exit = min(slot + 3 * STEP, close)
+            early = outcome(early_exit) if early_exit != exit_slot else sample
+            pair = dict(exitAt=iso(early_exit), status=early['status'], netEur=early.get('netEur'),
+                        extraNetFromHoldingEur=None)
+            if early_exit != exit_slot and early['status'] == sample['status'] == 'MEASURED':
+                pair['extraNetFromHoldingEur'] = str(Decimal(sample['netEur']) - Decimal(early['netEur']))
+            sample['exploratory30m'] = pair
     return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples))
 
 
