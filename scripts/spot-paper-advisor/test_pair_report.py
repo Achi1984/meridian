@@ -40,6 +40,32 @@ class PairReportTest(unittest.TestCase):
             self.assertFalse(breakout_signal(row, slot))
             self.assertIsNone(breakout_duel(db, start-600))
 
+    def test_observed_sell_after_gap_counts_without_inventing_trip_profit(self):
+        start = BREAKOUT_START
+        with sqlite3.connect(':memory:') as db:
+            db.execute('CREATE TABLE slots(slot, record)')
+            for i, execution, cash, btc in [
+                (-1, 'HOLD', '1000', '0'), (0, 'PAPER_BUY', '900', '1'),
+                (1, 'HOLD', '900', '1'), (2, 'PAPER_SELL', '1005', '0')
+            ]:
+                slot = start + i * 600
+                row = dict(promptVersion=COST_VERSION, states={'model': dict(cash=cash, btc=btc)},
+                           report=dict(last=dict(at=iso(slot), execution=execution),
+                                       arms={'model': dict(equityEur=1000)}))
+                db.execute('INSERT INTO slots VALUES(?,?)', (slot, json.dumps(row)))
+            def report():
+                return breakout_duel(db, start + 1200, standalone=True)
+
+            self.assertEqual(report()['v3']['netPerTradeEur'], 5)
+            db.execute('DELETE FROM slots WHERE slot=?', (start + 600,))
+            result = report()
+            self.assertEqual(result['missingSlots'], 1)
+            self.assertEqual(result['v3']['closed'], 1)
+            self.assertIsNone(result['v3']['netPerTradeEur'])
+            db.execute('DELETE FROM slots WHERE slot=?', (start,))
+            self.assertEqual(report()['v3']['closed'], 1)
+            self.assertIsNone(report()['v3']['netPerTradeEur'])
+
     def test_v4_wait_reasons_and_strict_breakout(self):
         hour = BREAKOUT_START
         bars = [[hour-i*3600,100,106,94,100] for i in (4,3,2,1)]

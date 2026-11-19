@@ -100,6 +100,7 @@ def breakout_duel(db, end, *, standalone=False):
     last_entry_hour = None
     exclusive = False
     gaps = 0
+    v3_unpriced_closes = 0
     for slot, raw in rows:
         record = json.loads(raw)
         if record.get('promptVersion') != COST_VERSION:
@@ -118,11 +119,16 @@ def breakout_duel(db, end, *, standalone=False):
         execution = last['execution']
         model = metrics['v3']
         model['last'] = execution
+        if not contiguous:
+            v3_entry = None
         if execution == 'PAPER_BUY':
             v3_entry = prior_cash if contiguous else None
-        if execution == 'PAPER_SELL' and v3_entry is not None:
+        if execution == 'PAPER_SELL':
             model['closed'] += 1
-            model['realized'] += cash-v3_entry
+            if v3_entry is None:
+                v3_unpriced_closes += 1
+            else:
+                model['realized'] += cash-v3_entry
             v3_entry = None
         prior_cash = cash
         equity = record['report']['arms']['model']['equityEur']
@@ -182,6 +188,8 @@ def breakout_duel(db, end, *, standalone=False):
         arm['netEur'] = None if arm['equity'] is None else arm['equity']-1000
         arm['tradesPerDay'] = arm['closed']/days
         arm['netPerTradeEur'] = arm['realized']/arm['closed'] if arm['closed'] else None
+    if v3_unpriced_closes:
+        metrics['v3']['netPerTradeEur'] = None
     return dict(start=iso(start), at=iso(end), missingSlots=gaps, onlyV4=only, **metrics)
 
 
