@@ -3,6 +3,10 @@ from contextlib import closing
 from datetime import datetime, timezone
 import json
 import sqlite3
+from decimal import Decimal
+
+from feeds import COST_VERSION
+from worker import DAY, STEP, execute, forced, initial, mark
 
 
 def iso(slot):
@@ -51,6 +55,117 @@ def describe(raw, initial):
     return arm
 
 
+# First eligible hour after the rule was fixed. All timestamps are UTC.
+BREAKOUT_START = int(datetime.fromisoformat('2026-11-19T17:00:00+00:00').timestamp())
+
+
+def breakout_signal(record, slot):
+    hour = slot - slot % 3600
+    inputs = record.get('inputs') or {}
+    bars = inputs.get('hour', [])[-4:]
+    ten = inputs.get('ten', [])
+    if slot == hour or len(bars) != 4 or not ten:
+        return False
+    if any(len(bar) != 5 or bar[0] != hour-(4-i)*3600 or bar[1] <= 0
+           for i, bar in enumerate(bars)):
+        return False
+    candle = ten[-1]
+    if len(candle) != 5 or candle[0] != slot-STEP:
+        return False
+    ranges = [(bar[2]-bar[3])/bar[1] for bar in bars]
+    return ranges[-1] < min(ranges[:-1]) and candle[4] > bars[-1][2]
+
+
+def breakout_duel(db, end, *, standalone=False):
+    """Replay V4 chronologically and compare with the observed flat-start V3 ledger."""
+    if end < BREAKOUT_START:
+        return None
+    table = 'main.slots' if standalone else 'v3.slots'
+    rows = db.execute(f"""SELECT slot, record FROM {table} WHERE slot BETWEEN ? AND ?
+                         AND record IS NOT NULL ORDER BY slot""", (BREAKOUT_START-STEP, end))
+    state = initial()
+    metrics = {k: dict(closed=0, realized=0.0, maxDrawdownPct=0.0, equity=None, last='HOLD')
+               for k in ('v3', 'v4')}
+    peaks = dict(v3=1000.0, v4=1000.0)
+    only = dict(closed=0, netEur=0.0, costsEur=0.0)
+    start = previous = baseline = v3_entry = None
+    last_entry_hour = None
+    exclusive = False
+    gaps = 0
+    for slot, raw in rows:
+        record = json.loads(raw)
+        if record.get('promptVersion') != COST_VERSION:
+            continue
+        last = record['report']['last']
+        account = record['states']['model']
+        cash, btc = float(account['cash']), Decimal(account['btc'])
+        if start is None:
+            if not btc:
+                start, previous, baseline = slot+STEP, slot, cash
+                prior_cash = cash
+            continue
+        contiguous = slot == previous + STEP
+        gaps += (slot-previous)//STEP-1
+        previous = slot
+        execution = last['execution']
+        model = metrics['v3']
+        model['last'] = execution
+        if execution == 'PAPER_BUY':
+            v3_entry = prior_cash if contiguous else None
+        if execution == 'PAPER_SELL' and v3_entry is not None:
+            model['closed'] += 1
+            model['realized'] += cash-v3_entry
+            v3_entry = None
+        prior_cash = cash
+        equity = record['report']['arms']['model']['equityEur']
+        model['equity'] = None if equity is None else 1000 + equity-baseline
+        # A V4-only trade requires continuous evidence of V3 staying flat.
+        flat = not btc and execution not in ('PAPER_BUY', 'PAPER_SELL')
+        exclusive = exclusive and contiguous and flat
+        now = datetime.fromisoformat(last['at']).timestamp()
+        mandatory = forced(state, slot)
+        book = record.get('executionBook') if slot <= now < slot+(STEP if mandatory else 90) else None
+        opened = state['opened']
+        action = 'HOLD'
+        if opened is not None and (mandatory or slot-opened >= 3600):
+            action = 'SELL'
+        elif opened is None and not mandatory and last_entry_hour != slot//3600 and breakout_signal(record, slot):
+            action = 'BUY'
+        before = Decimal(state['cash'])
+        result = execute(state, action, book, slot)
+        shadow = metrics['v4']
+        shadow['last'] = result
+        if result == 'PAPER_BUY':
+            last_entry_hour = slot//3600
+            exclusive = flat
+            entry_cash = before
+            quantity = Decimal(state['btc'])
+            entry_mid = (Decimal(str(book['bid'])) + Decimal(str(book['ask'])))/2
+        elif result == 'PAPER_SELL':
+            net = Decimal(state['cash'])-entry_cash
+            shadow['closed'] += 1
+            shadow['realized'] += float(net)
+            if exclusive:
+                exit_mid = (Decimal(str(book['bid'])) + Decimal(str(book['ask'])))/2
+                only['closed'] += 1
+                only['netEur'] += float(net)
+                only['costsEur'] += float(quantity*(exit_mid-entry_mid)-net)
+        shadow['equity'] = mark(state, book)['equityEur']
+        for key, arm in metrics.items():
+            value = arm['equity']
+            if value is not None:
+                peaks[key] = max(peaks[key], value)
+                arm['maxDrawdownPct'] = max(arm['maxDrawdownPct'], 100*(1-value/peaks[key]))
+    if start is None or previous < start or previous != end:
+        return None
+    days = (end-start+STEP)/DAY
+    for arm in metrics.values():
+        arm['netEur'] = None if arm['equity'] is None else arm['equity']-1000
+        arm['tradesPerDay'] = arm['closed']/days
+        arm['netPerTradeEur'] = arm['realized']/arm['closed'] if arm['closed'] else None
+    return dict(start=iso(start), at=iso(end), missingSlots=gaps, onlyV4=only, **metrics)
+
+
 def comparison(volume):
     base = (volume/'pilot.sqlite').as_uri() + '?mode=ro'
     challenger = (volume/'challenger-v2'/'pilot.sqlite').as_uri() + '?mode=ro'
@@ -91,7 +206,7 @@ def comparison(volume):
             if newer:
                 at, baseline, third_record = newer
                 initial = 1000 if epoch[0] == end - 604800 else opening('main', epoch[0])
-                return end, dict(start=iso(epoch[0]), at=iso(at),
+                return end, dict(duel=breakout_duel(db, at), start=iso(epoch[0]), at=iso(at),
                                  v1=describe(baseline, initial), v3=describe(third_record, 1000))
         if epoch is None or slot < epoch[0]:
             return end, result
@@ -102,7 +217,7 @@ def comparison(volume):
         third_start = epoch[0]
         epoch = max(start, third_start)
         base_start = end - 604800
-        return end, dict(start=iso(epoch), at=iso(slot),
+        return end, dict(duel=breakout_duel(db, slot), start=iso(epoch), at=iso(slot),
                          v1=describe(v1, 1000 if epoch == base_start else opening('main', epoch)),
                          v2=describe(v2, 1000 if epoch == start else opening('v2', epoch)),
                          v3=describe(third_row[0], 1000 if epoch == third_start else opening('v3', epoch)))
