@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from decimal import Decimal
 
-from cost_filter_audit import FORWARD_START, STAGES, audit, confirmed_breakout, entry_signals, forward_comparison
+from cost_filter_audit import EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, confirmed_breakout, entry_signals, forward_comparison
 from feeds import COST_VERSION
 from worker import DAY, FEE, SLIP, STEP, iso
 
@@ -186,6 +186,29 @@ class CostFilterAuditTest(unittest.TestCase):
             self.db.execute('UPDATE slots SET record=? WHERE slot=?', (json.dumps(row), check))
         gaps = audit(self.db)['intermediateExitGaps']
         self.assertEqual([gap['executionBookStatus'] for gap in gaps], ['NOT_RECORDED', 'STALE_BOOK'])
+
+    def test_hourly_expansion_compares_all_slots_outside_veto_cohort(self):
+        start = EXPANSION_START
+        for i in range(4):
+            slot = start+i*HOUR
+            self.record(slot, 'model', 10000+i*100)
+            raw, = self.db.execute('SELECT record FROM slots WHERE slot=?', (slot,)).fetchone()
+            bars = [[slot-(7-k)*HOUR, 100, 102, 99, 101] for k in range(7)]
+            if i == 0:
+                bars[-1][2] = 104
+            elif i == 2:
+                bars[-1][4] = 99
+            elif i == 3:
+                bars[-1][0] = slot
+            row = dict(json.loads(raw), inputs={'hour': bars})
+            self.db.execute('UPDATE slots SET record=? WHERE slot=?', (json.dumps(row), slot))
+        self.record(start-STEP, 'model', 20000)
+        study = audit(self.db)['hourlyExpansion']
+        self.assertEqual([r['regime'] for r in study['samples']],
+                         ['risingExpansion', 'risingControl', 'nonRising', 'unknown'])
+        self.assertEqual(study['groups']['risingExpansion']['measured'], 1)
+        self.assertEqual(study['groups']['unknown']['pending'], 1)
+        self.assertEqual(study['samples'][0]['exitAt'], study['samples'][1]['entryAt'])
 
     def test_session_close_and_missing_evidence(self):
         reason = list(STAGES)[1]

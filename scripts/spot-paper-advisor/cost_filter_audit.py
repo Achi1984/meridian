@@ -6,9 +6,10 @@ from decimal import Decimal
 import json
 from pathlib import Path
 import sqlite3
+from statistics import median
 
 from feeds import COST_VERSION
-from worker import DAY, SLIP, STEP, execute, iso
+from worker import DAY, SLIP, STEP, execute, initial, iso
 
 STAGES = {
     'Stundenbandbreite deckt die Handelskosten nicht.': 'beforeModel',
@@ -160,6 +161,48 @@ def observation_gaps(samples, records):
     return result
 
 
+# Freeze this independent hourly comparison before the first eligible entry.
+EXPANSION_START = int(datetime.fromisoformat('2026-11-19T13:00:00+00:00').timestamp())
+HOUR = 3600
+
+
+def hourly_regime(record, slot):
+    bars = (record.get('inputs') or {}).get('hour', [])[-7:]
+    if len(bars) != 7 or any(len(bar) != 5 or bar[0] != slot-(7-i)*HOUR
+                             for i, bar in enumerate(bars)):
+        return 'unknown'
+    if bars[-1][4] <= bars[-1][1]:
+        return 'nonRising'
+    ranges = [(bar[2]-bar[3])/bar[1] for bar in bars]
+    return 'risingExpansion' if ranges[-1] > median(ranges[:-1]) else 'risingControl'
+
+
+def hourly_expansion_study(records):
+    latest = max(records, default=-1)
+    samples = []
+    for slot in range(EXPANSION_START, latest+1, HOUR):
+        close = slot-slot%DAY+DAY-STEP
+        end = slot+HOUR
+        if end > close:
+            continue
+        record = records.get(slot)
+        if record and record['promptVersion'] != COST_VERSION:
+            continue
+        regime = hourly_regime(record or {}, slot)
+        sample = dict(entryAt=iso(slot), exitAt=iso(end), regime=regime)
+        state = initial()
+        cash = Decimal(state['cash'])
+        entry = replay_fill(state, 'BUY', slot, record)
+        if entry == 'PAPER_BUY':
+            sample.update(replay_exit(records, latest, end, close, state, cash, record['executionBook']))
+        else:
+            sample['status'] = 'ENTRY_' + entry
+        samples.append(sample)
+    groups = {name: summarize_windows([row for row in samples if row['regime'] == name])
+              for name in ('risingExpansion', 'risingControl', 'nonRising', 'unknown')}
+    return dict(fromUtc=iso(EXPANSION_START), samples=samples, groups=groups)
+
+
 def audit(db):
     records = {slot: json.loads(raw) if raw else None
                for slot, raw in db.execute('SELECT slot, record FROM slots ORDER BY slot')}
@@ -199,7 +242,8 @@ def audit(db):
             sample['exploratory30m'] = pair
     return dict(horizonMinutes=60, samples=samples, forwardComparison=forward_comparison(samples),
                 forwardVetoOutcomes60m=veto_outcomes(samples),
-                intermediateExitGaps=observation_gaps(samples, records))
+                intermediateExitGaps=observation_gaps(samples, records),
+                hourlyExpansion=hourly_expansion_study(records))
 
 
 if __name__ == '__main__':
