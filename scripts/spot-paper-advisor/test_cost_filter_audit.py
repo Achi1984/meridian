@@ -3,7 +3,7 @@ import sqlite3
 import unittest
 from decimal import Decimal
 
-from cost_filter_audit import ai_veto, EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, confirmation_results, confirmed_breakout, entry_signals, forward_comparison
+from cost_filter_audit import ai_veto, EXPANSION_START, HOUR, FORWARD_START, STAGES, audit, skipped_delayed_trades, confirmation_results, confirmed_breakout, entry_signals, forward_comparison
 from feeds import COST_VERSION
 from worker import DAY, FEE, SLIP, STEP, iso
 
@@ -247,6 +247,19 @@ class CostFilterAuditTest(unittest.TestCase):
                     self.assertEqual(delayed['netEur'], '0')
                 else:
                     self.assertLess(Decimal(delayed['netEur']), Decimal(sample['netEur']))
+
+    def test_skips_use_the_delayed_trade_even_when_immediate_quote_is_missing(self):
+        regime = 'risingExpansion'
+        def row(net, decision='SKIPPED', group=regime):
+            outcome = dict(status='PENDING_EXIT') if net is None else dict(status='MEASURED', netEur=net)
+            return dict(regime=group, status='ENTRY_NO_FRESH_BOOK',
+                        confirmed10m={'status': decision}, unconditional10m=outcome)
+        rows = [row('-2.30'), row('0.70'), row('0'), row(None), row('4', 'MEASURED'),
+                row('-6', 'CONFIRMATION_UNAVAILABLE'), row('9', group='risingControl')]
+        self.assertEqual(skipped_delayed_trades(rows, regime),
+                         dict(measured=3, unavailable=1, avoidedLosses=1, missedGains=1,
+                              flat=1, avoidedLossEur='2.30', missedGainEur='0.70', netBenefitEur='1.60'))
+        self.assertIsNone(skipped_delayed_trades([row(None)], regime)['netBenefitEur'])
 
     def test_confirmation_control_uses_same_exit_and_separate_denominator(self):
         start = EXPANSION_START
