@@ -1,6 +1,8 @@
 import unittest
-from test_usd_pullback import START, snapshot
-from v3_entry_check import entry_check, filter_outcomes
+from decimal import Decimal
+from test_usd_pullback import START, snapshot, quote
+from worker import iso, execute, initial
+from v3_entry_check import entry_check, filter_outcomes, delayed_exit
 
 
 class EntryCheckTest(unittest.TestCase):
@@ -31,3 +33,21 @@ class EntryCheckTest(unittest.TestCase):
         self.assertEqual((later['entries'], later['blockedClosed'], later['blockedWithoutExit']), (4, 2, 1))
         self.assertEqual((later['avoidedLossUsd'], later['missedProfitUsd'], later['differenceOnClosedTradesUsd']),
                          (1, 3, -2))
+
+    def test_delayed_exit_uses_executable_bid_and_preserves_original_lot(self):
+        slot = START+1200
+        state = initial()
+        execute(state, 'BUY', quote(START), START)
+        state['entryCostUsd'] = str(Decimal(1000)-Decimal(state['cash']))
+        report = dict(publishedAt=iso(slot+3), arms={'v3': {'execution':'HOLD'}})
+        record = dict(report=report, fillBook=quote(slot, 105, 106))
+        result = delayed_exit(state, record, slot, Decimal(999))
+        expected = state.copy()
+        execute(expected, 'SELL', record['fillBook'], slot)
+        self.assertAlmostEqual(result['differenceUsd'], float(Decimal(expected['cash'])-999))
+        self.assertAlmostEqual(result['realizedUsd'], result['differenceUsd']-1)
+        self.assertNotEqual(state['btc'], '0')
+        record['fillBook']['bidSize'] = 0.00001
+        self.assertEqual(delayed_exit(state, record, slot, Decimal(999))['status'], 'INSUFFICIENT_BID_SIZE')
+        report['arms']['v3']['execution'] = 'PAPER_BUY'
+        self.assertEqual(delayed_exit(state, record, slot, Decimal(999))['status'], 'REENTRY_CONFLICT')
