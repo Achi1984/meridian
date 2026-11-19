@@ -34,6 +34,31 @@ class PairReportTest(unittest.TestCase):
             self.assertEqual(result['v2']['change'], 0)
             self.assertEqual(result['v2']['action'], 'SKIPPED')
 
+    def test_third_ledger_pending_then_common_start_and_exact_slot(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            volume = Path(tmp)
+            for name, epoch, samples in [
+                    ('', 600, [(1200, 990), (1800, 991)]),
+                    ('challenger-v2', 1200, [(1200, 995), (1800, 993)]),
+                    ('challenger-v3', 1800, [(2400, 1003)])]:
+                directory = volume / name
+                directory.mkdir(exist_ok=True)
+                with sqlite3.connect(directory / 'pilot.sqlite') as db:
+                    db.executescript('CREATE TABLE pilot(id,start); CREATE TABLE slots(slot,record);')
+                    db.execute('INSERT INTO pilot VALUES(1,?)', (epoch,))
+                    for slot, equity in samples:
+                        record = dict(report=dict(last=dict(action='HOLD', reason='wait'),
+                                                  arms=dict(model=dict(equityEur=equity))))
+                        db.execute('INSERT INTO slots VALUES(?,?)', (slot, json.dumps(record)))
+            _, pending = comparison(volume)
+            self.assertTrue(pending['v3Pending'])
+            self.assertNotIn('v3', pending)
+            with sqlite3.connect(volume/'challenger-v3'/'pilot.sqlite') as db:
+                db.execute('UPDATE slots SET slot=1800 WHERE slot=2400')
+            _, row = comparison(volume)
+            self.assertEqual((row['at'], row['start']), (iso(1800), iso(1800)))
+            self.assertEqual([row[k]['change'] for k in ('v1','v2','v3')], [1,-2,3])
+
     def test_later_challenger_commit_publishes_once_without_next_cycle(self):
         old, current = ({'at': iso(slot)} for slot in (1200, 1800))
         with patch('pilot.comparison', side_effect=[(0, old), (0, old), (0, current)]), \

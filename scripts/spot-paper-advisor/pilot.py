@@ -113,10 +113,10 @@ def publish_pair(directory, slot):
     while True:
         try:
             _, row = comparison(directory)
-            if row and row['at'] != last_at:
-                last_at = row['at']
+            if row and (row['at'], bool(row.get('v3Pending'))) != last_at:
+                last_at = (row['at'], bool(row.get('v3Pending')))
                 print(json.dumps({'pilotAudit': {'comparison': row}}, allow_nan=False), flush=True)
-            if last_at == iso(slot):
+            if last_at == (iso(slot), False):
                 return
         except (sqlite3.Error, ValueError, KeyError, TypeError):
             print('PAIR_REPORT_UNAVAILABLE', flush=True)
@@ -126,7 +126,7 @@ def publish_pair(directory, slot):
         time.sleep(min(5, remaining))
 
 
-def paired_directory(volume, start):
+def paired_directory(volume, start, *, cost_aware=False):
     baseline = volume / 'pilot.sqlite'
     db = sqlite3.connect(baseline.as_uri() + '?mode=ro', uri=True)
     try:
@@ -136,7 +136,7 @@ def paired_directory(volume, start):
     end = baseline_start + 7 * DAY
     if not baseline_start <= start < end:
         raise ValueError('challenger start outside baseline pilot')
-    directory = volume / 'challenger-v2'
+    directory = volume / ('challenger-v3' if cost_aware else 'challenger-v2')
     directory.mkdir(mode=0o700, exist_ok=True)
     if directory.resolve() != directory:
         raise ValueError('challenger directory must be isolated')
@@ -148,8 +148,8 @@ def run(directory, start, key, *, challenger=False, paired=False, cost_aware=Fal
         raise ValueError('pilot directory must be a mounted persistent volume')
     end = start + 7 * DAY
     if paired:
-        challenger = True
-        directory, end = paired_directory(directory.resolve(), start)
+        challenger = not cost_aware
+        directory, end = paired_directory(directory.resolve(), start, cost_aware=cost_aware)
     if time.time() >= end and not (directory/'pilot.sqlite').is_file():
         print('PILOT_ENDED', flush=True)
         return
@@ -182,5 +182,8 @@ if __name__ == '__main__':
     policies.add_argument('--challenger', action='store_true', help='Use v2 in a separate pilot volume')
     policies.add_argument('--paired-challenger', action='store_true',
                         help='Use isolated V2 files on the baseline volume and end at its cutoff')
+    policies.add_argument('--paired-cost-aware', action='store_true',
+                          help='Use isolated V3 files on the baseline volume and end at its cutoff')
     args = parser.parse_args()
-    run(args.directory, args.start, os.environ['OPENAI_API_KEY'], challenger=args.challenger, paired=args.paired_challenger, cost_aware=args.cost_aware)
+    run(args.directory, args.start, os.environ['OPENAI_API_KEY'], challenger=args.challenger, paired=args.paired_challenger or args.paired_cost_aware,
+        cost_aware=args.cost_aware or args.paired_cost_aware)

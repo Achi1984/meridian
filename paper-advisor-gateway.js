@@ -19,7 +19,7 @@ async function readReport() {
   const summary = summarize(rows);
   const latestSlot = Math.floor(Date.parse(summary.report.last.at)/600000)*600000;
   summary.comparison = comparisons.filter(row => Date.parse(row.at) <= latestSlot)
-    .sort((a,b) => Date.parse(b.at)-Date.parse(a.at))[0] ?? null;
+    .sort((a,b) => Date.parse(b.at)-Date.parse(a.at) || Number(Boolean(b.v3))-Number(Boolean(a.v3)))[0] ?? null;
   summary.krakenUsd = decisionUsdClose(usdBars, summary.report.last.at);
   return summary;
 }
@@ -79,7 +79,9 @@ async function readRun(runId, token) {
 export function validComparison(row) {
   if (!row || !Number.isFinite(Date.parse(row.start)) || !Number.isFinite(Date.parse(row.at)) ||
       Date.parse(row.start) > Date.parse(row.at) || Date.parse(row.at) % 600000 !== 0) return false;
-  return [row.v1, row.v2].every(arm => arm && ['BUY','SELL','HOLD','SKIPPED'].includes(arm.action) &&
+  const arms = [row.v1, row.v2];
+  if ('v3' in row) arms.push(row.v3);
+  return arms.every(arm => arm && ['BUY','SELL','HOLD','SKIPPED'].includes(arm.action) &&
     (arm.equity === null || Number.isFinite(arm.equity) && arm.equity >= 0) &&
     (arm.change === null || Number.isFinite(arm.change)));
 }
