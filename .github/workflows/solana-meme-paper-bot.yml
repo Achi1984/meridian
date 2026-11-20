@@ -50,6 +50,9 @@ jobs:
                       f.write(f'- {k}: {v}\n')
                   f.write(f"\nObserved pools: {s['pools']}; completed ticks: {s['ticks']}\n")
           PY
+      - name: Audit entry funnel
+        if: success()
+        run: python3 scripts/memecoin-paper/research/pool_funnel.py meme-account/session >> "$GITHUB_STEP_SUMMARY"
       - name: Retain fills, positions and quotes
         if: always()
         uses: actions/upload-artifact@v4
