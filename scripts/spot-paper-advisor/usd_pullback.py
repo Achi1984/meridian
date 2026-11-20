@@ -111,16 +111,21 @@ def paper_slot(state, snapshot, fill_book, slot, observed, *, require_uptrend=Tr
     return dict(action=action, reason=reason, execution=execution, equityUsd=equity)
 
 
-def fixed_lot_fee_scenarios(ask, quantity, exit_bid, observed_bids):
+def fixed_lot_fee_scenarios(ask, quantity, exit_bid, observed_bids, exit_slot):
     """Reprice identical fills and sampled executable exits, holding size and slippage fixed."""
     scenarios = []
-    for bps in (50, 20, 10, 5):
+    for bps in (50, 35, 20, 10, 5):
         fee = Decimal(bps) / 10000
         cost = ask * (1+SLIP) * (1+fee)
         proceeds_factor = (1-SLIP) * (1-fee)
         first = next(((at, bid) for at, bid in observed_bids if bid*proceeds_factor > cost), None)
-        scenarios.append(dict(feeBpsPerSide=bps, breakEvenBidUsd=float(cost/proceeds_factor),
-                              exitNetUsd=float(quantity*(exit_bid*proceeds_factor-cost)),
+        baseline_net = quantity * (exit_bid * proceeds_factor - cost)
+        early = first is not None and first[0] < exit_slot
+        delta = quantity / 2 * (first[1] - exit_bid) * proceeds_factor if early else Decimal(0)
+        scenarios.append(dict(halfExitAt=iso(first[0]) if early else None,
+                              halfExitNetUsd=float(baseline_net + delta), halfExitDeltaUsd=float(delta),
+                              feeBpsPerSide=bps, breakEvenBidUsd=float(cost/proceeds_factor),
+                              exitNetUsd=float(baseline_net),
                               firstPositiveAt=iso(first[0]) if first else None,
                               firstPositiveBidUsd=float(first[1]) if first else None))
     return scenarios
@@ -192,7 +197,7 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
                                    quotePnlUsd=float(gross), slippageUsd=float(slippage),
                                    feesUsd=float(gross-slippage-net), netUsd=float(net),
                                    eligibleExitSlots=len(observed_bids), holdingSlots=(slot-opened)//STEP,
-                                   fixedLotFeeScenarios=fixed_lot_fee_scenarios(ask, quantity, bid, observed_bids)))
+                                   fixedLotFeeScenarios=fixed_lot_fee_scenarios(ask, quantity, bid, observed_bids, slot)))
                 entry = None
             latest['at'] = iso(slot)
             baseline = {name: report['arms'][name]['equityUsd']
