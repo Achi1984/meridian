@@ -32,3 +32,23 @@ class RetestTest(unittest.TestCase):
         for arm in report['arms'].values():
             self.assertIsNone(arm['breakEvenSlippageBpsPerSide'])
             self.assertEqual(arm['slippageCostPerBp'], 0)
+
+    def test_opening_direction_uses_first_hour_only(self):
+        for first_close, qualifies in [(99, False), (100, False), (101, True)]:
+            with self.subTest(first_close=first_close):
+                bars = [[i*STEP, 100, 101, 99, 100] for i in range(6)]
+                bars[-1][4] = first_close
+                bars.extend([[6*STEP, 100, 103, 99, 102],
+                             [7*STEP, 103, 104, 97, 98],
+                             [8*STEP, 97, 99, 96, 98]])
+                prices = {b[0]: b[1] for b in bars}
+                boundaries = dict.fromkeys(range(0, DAY, 8*3600), 100)
+                market = prices, boundaries, dict.fromkeys(boundaries, 0)
+                with patch('breakout_retest.load_market', return_value=market), patch('breakout_retest.candles', return_value=bars):
+                    report = evaluate(['fixture'], None, bullish_opening_hour=True)
+                trade, = report['events']
+                self.assertEqual(report['arms']['bullishOpeningHour']['closed'], int(qualifies))
+                if qualifies:
+                    self.assertEqual(trade['bullishOpeningHour'], trade['original'])
+                else:
+                    self.assertNotIn('bullishOpeningHour', trade)
