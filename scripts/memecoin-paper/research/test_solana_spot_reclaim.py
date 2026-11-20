@@ -8,6 +8,9 @@ class SolanaSpotReclaimTests(unittest.TestCase):
         bar = [12*STEP,99,102,97,100,9000]
         self.assertTrue(entry_signal(history,bar,0))
         self.assertFalse(entry_signal(history,bar,2))
+        bar[-1]=2500
+        self.assertTrue(entry_signal(history,bar,0,20))
+        self.assertFalse(entry_signal(history,bar,0,80))
         bar[-1]=10000
         self.assertTrue(entry_signal(history,bar,2))
 
