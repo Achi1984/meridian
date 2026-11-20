@@ -36,6 +36,7 @@ def replay(rows, start, end, volume_multiple, side_cost, order_cap=80.):
     position = None
     last_day = None
     trades, reasons = [], Counter()
+    targets_covering_cost = 0
     for i, bar in enumerate(rows):
         t, mid = bar[:2]
         if t < start:
@@ -69,7 +70,9 @@ def replay(rows, start, end, volume_multiple, side_cost, order_cap=80.):
             cost = min(order_cap, .08*cash)
             qty = (cost-.05)/(mid*(1+side_cost))
             stop = max(previous[3], .94*mid)
-            position = t, qty, cost, stop, mid+2*(mid-stop)
+            target = mid+2*(mid-stop)
+            targets_covering_cost += qty*target*(1-side_cost)-.05 > cost
+            position = t, qty, cost, stop, target
             cash -= cost
             last_day = day
         equity = cash if position is None else cash+position[1]*mid*(1-side_cost)-.05
@@ -79,7 +82,7 @@ def replay(rows, start, end, volume_multiple, side_cost, order_cap=80.):
         raise ValueError('Incomplete exit coverage at end of replay')
     return dict(net=cash-1000, trades=len(trades), wins=sum(x>0 for x in trades),
                 mean=sum(trades)/len(trades) if trades else None, maxDrawdownPct=drawdown,
-                best=max(trades, default=None), exits=dict(reasons))
+                best=max(trades, default=None), targetsCoveringCost=targets_covering_cost, exits=dict(reasons))
 
 
 def evaluate(packet, start, end):
