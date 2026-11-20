@@ -121,8 +121,7 @@ def run(out, ticks, *, claude=False, account=None):
             counts[kind] += 1
             ledger.write(json.dumps(dict(at=int(time.time()), event=kind, **fields), allow_nan=False)+'\n')
 
-        def observe(items):
-            found = []
+        def observe(items, candidates):
             for item in items:
                 try:
                     x = snapshot(item)
@@ -139,9 +138,11 @@ def run(out, ticks, *, claude=False, account=None):
                     event('seenAgain', observedAge=t-born, observedAt=t, **x)
                     if (qualifies(original,x,t-born) and x['mint'] not in attempted
                             and (account is None or launchpad_candidate(original,x,t))):
-                        found.append((x['price']/original['price'],pool,x['mint'],t-born,original,x))
+                        candidates[pool] = (x['price']/original['price'],pool,x['mint'],t-born,original,x)
+                    elif pool in candidates:
+                        del candidates[pool]
+                        event('signalWithdrawn',pool=pool,mint=x['mint'])
                 last[pool] = t
-            return found
 
         def mark_positions(final, retry=0):
             for position in account.active():
@@ -160,7 +161,7 @@ def run(out, ticks, *, claude=False, account=None):
             now = int(time.time())
             due = sorted((p for p,(t,_) in first.items() if 60<=now-t<=900 and now-last[p]>=60),
                          key=lambda p:(last[p],p))[:25]
-            candidates = []
+            candidates = {}
             if due:
                 try:
                     items = get(GT+'/pools/multi/'+','.join(due),120)['data']
@@ -168,11 +169,11 @@ def run(out, ticks, *, claude=False, account=None):
                     for p in set(due)-returned:
                         event('missingOnRefresh',pool=p)
                         last[p]=now
-                    candidates.extend(observe(items))
+                    observe(items, candidates)
                 except errors as exc:
                     event('refreshError', reason=type(exc).__name__)
             try:
-                candidates.extend(observe(get(GT+'/new_pools?page=1',120)['data']))
+                observe(get(GT+'/new_pools?page=1',120)['data'], candidates)
                 event('feedRead')
             except errors as exc:
                 event('feedError', reason=type(exc).__name__)
@@ -192,7 +193,7 @@ def run(out, ticks, *, claude=False, account=None):
                 mark_positions(final=tick+1==ticks)
             capacity = len(pending)<3 if account is None else len(account.active())<3
             if candidates and tick < ticks-6 and capacity:
-                _,pool,mint,age,original,current = max(candidates,key=lambda row:row[:3])
+                _,pool,mint,age,original,current = max(candidates.values(),key=lambda row:row[:3])
                 attempted.add(mint)
                 event('momentumCandidate',pool=pool,mint=mint)
                 try:
@@ -206,13 +207,19 @@ def run(out, ticks, *, claude=False, account=None):
                             pending[mint] = int(time.time()),qty
                             event('paperProbe',mint=mint)
                             shadow.record(mint,features(original,current,age,sell),event)
-                        elif account.buy(mint,pool,qty,sell,int(time.time())):
-                            event('botBuy',mint=mint,pool=pool,tokensRaw=qty,usdcRaw=SIZE)
+                        else:
+                            decision_at = int(time.time())
+                            if (not qualifies(original,current,decision_at-first[pool][0])
+                                    or not launchpad_candidate(original,current,decision_at)):
+                                event('signalExpired',pool=pool,mint=mint)
+                            elif account.buy(mint,pool,qty,sell,decision_at):
+                                event('botBuy',mint=mint,pool=pool,tokensRaw=qty,usdcRaw=SIZE)
                 except errors as exc:
                     event('quoteUnavailable', mint=mint,side=side,reason=type(exc).__name__)
             summary = dict(ticks=tick+1,pools=len(first),openProbes=len(pending),events=dict(counts))
             if account is not None:
                 summary['account'] = account.status(int(time.time()))
+                summary['decisionAuditVersion'] = 1
             (out/'summary.json').write_text(json.dumps(summary))
             print(json.dumps(summary),flush=True)
             if tick+1 < ticks:
