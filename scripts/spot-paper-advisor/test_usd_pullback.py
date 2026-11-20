@@ -166,3 +166,17 @@ class PullbackTest(unittest.TestCase):
         self.assertEqual(regular['halfExitAt'], iso(START+STEP))
         self.assertAlmostEqual(regular['halfExitDeltaUsd'], 3 * 0.999 * 0.9965)
         self.assertAlmostEqual(regular['halfExitNetUsd'], regular['exitNetUsd'] + regular['halfExitDeltaUsd'])
+
+class ReclaimTest(unittest.TestCase):
+    def test_signal_fill_and_stop(self):
+        data = snapshot(START)
+        data['ten'] = [[START-i*STEP, 105, 115, 100, 104] for i in range(7, 1, -1)]
+        data['ten'].append([START-STEP, 100, 103, 99, 102])
+        state = initial()
+        def step(book):
+            return paper_slot(state, data, book, START, START+3, reclaim=True)
+        self.assertEqual(step(quote(START, 109, 110))['reason'], 'EXECUTION_COST_FILTER')
+        self.assertEqual(step(quote(START))['execution'], 'PAPER_BUY')
+        data['ten'].append([START, 101, 101, 97, 98])
+        out = paper_slot(state, data, quote(START+STEP, 97, 98), START+STEP, START+STEP+3, reclaim=True)
+        self.assertEqual((out['reason'], out['execution']), ('STOP_CLOSE', 'PAPER_SELL'))
