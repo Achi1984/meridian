@@ -1,6 +1,6 @@
 import unittest
 
-from swing_indicators import DailyIndicators, EMA
+from swing_indicators import DailyIndicators, EMA, confirmed_entry_target
 
 
 class SwingIndicatorTests(unittest.TestCase):
@@ -27,3 +27,11 @@ class SwingIndicatorTests(unittest.TestCase):
         model.update(95., (95, 100))
         self.assertEqual(model.votes['fib'], 0)
         self.assertEqual(model.targets(-1)['trendThreeOfFour'], -1)
+
+    def test_entry_confirmation_persists_until_trend_exits(self):
+        self.assertEqual(confirmed_entry_target(0, 1, 0), 0)
+        self.assertEqual(confirmed_entry_target(0, -1, -1), -1)
+        self.assertEqual(confirmed_entry_target(1, 1, 0), 1)
+        self.assertEqual(confirmed_entry_target(-1, 0, 0), 0)
+        self.assertEqual(confirmed_entry_target(-1, 1, 0), 0)
+        self.assertEqual(confirmed_entry_target(1, -1, -1), -1)
