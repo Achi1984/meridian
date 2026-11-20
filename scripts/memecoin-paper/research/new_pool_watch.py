@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from meme_paper_account import MemeAccount
 from pool_shadow import Shadow, features
 
 GT = 'https://api.geckoterminal.com/api/v2/networks/solana'
@@ -51,6 +52,7 @@ def snapshot(p):
         raise ValueError('invalid pool identity')
     counts = a['transactions']['m5']
     return dict(pool=pool, mint=mint, quote=quote, created=a['pool_created_at'],
+                dex=p['relationships'].get('dex',{}).get('data',{}).get('id'),
                 price=number(a['base_token_price_usd']), liquidity=number(a['reserve_in_usd']),
                 volume=number(a['volume_usd']['m5']), buys=number(counts['buys']), sells=number(counts['sells']))
 
@@ -76,7 +78,30 @@ def quote(src, dst, amount):
     return minimum
 
 
-def run(out, ticks, *, claude=False):
+def launchpad_candidate(first, current, now):
+    if 'pump-fun' not in (first.get('dex'), current.get('dex')):
+        return False
+    try:
+        created = datetime.fromisoformat(first['created']).timestamp()
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return 0 <= now-created <= 3600
+
+
+def spot_quote(src, dst, amount):
+    params = dict(inputMint=src,outputMint=dst,amount=amount,slippageBps=100,swapMode='ExactIn')
+    data = get('https://api.jup.ag/swap/v1/quote?'+urlencode(params),30)
+    if (data.get('inputMint')!=src or data.get('outputMint')!=dst or data.get('inAmount')!=str(amount)
+            or data.get('swapMode')!='ExactIn' or data.get('slippageBps')!=100 or not data.get('routePlan')):
+        raise ValueError('no matching spot route')
+    minimum, expected = int(data['otherAmountThreshold']), int(data['outAmount'])
+    if not 0 < minimum <= expected:
+        raise ValueError('invalid spot quote amounts')
+    return minimum
+
+
+def run(out, ticks, *, claude=False, account=None):
+    entry_quote = quote if account is None else spot_quote
     shadow = Shadow(claude)
     out.mkdir(parents=True,exist_ok=True)
     counts = Counter()
@@ -103,7 +128,8 @@ def run(out, ticks, *, claude=False):
                 else:
                     event('seenAgain', **x)
                     born, original = first[pool]
-                    if qualifies(original,x,t-born) and x['mint'] not in attempted:
+                    if (qualifies(original,x,t-born) and x['mint'] not in attempted
+                            and (account is None or launchpad_candidate(original,x,t))):
                         found.append((x['price']/original['price'],pool,x['mint'],t-born,original,x))
                 last[pool] = t
             return found
@@ -141,21 +167,38 @@ def run(out, ticks, *, claude=False):
                         if int(time.time())-opened >= 600:
                             event('unresolved',mint=mint)
                             del pending[mint]
-            if candidates and tick < ticks-6 and len(pending)<3:
+            if account is not None:
+                for position in account.active():
+                    mint = position['mint']
+                    try:
+                        sell = spot_quote(mint,USDC,int(position['qty']))
+                    except errors as exc:
+                        account.observe(mint,None,int(time.time()))
+                        event('botExitQuoteUnavailable',mint=mint,reason=type(exc).__name__)
+                        continue
+                    reason = account.observe(mint,sell,int(time.time()),final=tick+1==ticks)
+                    event('botSell' if reason else 'botMark',mint=mint,usdcRaw=sell,reason=reason)
+            capacity = len(pending)<3 if account is None else len(account.active())<3
+            if candidates and tick < ticks-6 and capacity:
                 _,pool,mint,age,original,current = max(candidates,key=lambda row:row[:3])
                 attempted.add(mint)
                 event('momentumCandidate',pool=pool,mint=mint)
                 try:
-                    qty = quote(USDC,mint,SIZE)
-                    sell = quote(mint,USDC,qty)
+                    qty = entry_quote(USDC,mint,SIZE)
+                    sell = entry_quote(mint,USDC,qty)
                     event('roundTripQuote',pool=pool,mint=mint,tokensRaw=qty, usdcRaw=sell)
                     if sell >= .95*SIZE:
-                        pending[mint] = int(time.time()),qty
-                        event('paperProbe',mint=mint)
-                        shadow.record(mint,features(original,current,age,sell),event)
+                        if account is None:
+                            pending[mint] = int(time.time()),qty
+                            event('paperProbe',mint=mint)
+                            shadow.record(mint,features(original,current,age,sell),event)
+                        elif account.buy(mint,pool,qty,sell,int(time.time())):
+                            event('botBuy',mint=mint,pool=pool,tokensRaw=qty,usdcRaw=SIZE)
                 except errors as exc:
                     event('quoteUnavailable', mint=mint,reason=type(exc).__name__)
             summary = dict(ticks=tick+1,pools=len(first),openProbes=len(pending),events=dict(counts))
+            if account is not None:
+                summary['account'] = account.status(int(time.time()))
             (out/'summary.json').write_text(json.dumps(summary))
             print(json.dumps(summary),flush=True)
             if tick+1 < ticks:
@@ -173,5 +216,13 @@ if __name__=='__main__':
     parser.add_argument('output',type=Path)
     parser.add_argument('--ticks',type=int,choices=range(1,61),default=60,metavar='1..60')
     parser.add_argument('--claude',action='store_true',help='Enable up to ten advisory Claude calls')
+    parser.add_argument('--paper-account',type=Path,help='Trade the Pump.fun paper strategy in this SQLite account')
     args=parser.parse_args()
-    run(args.output,args.ticks,claude=args.claude)
+    if args.paper_account and args.claude:
+        parser.error('Claude comparison belongs to the quote-probe cohort')
+    account = MemeAccount(args.paper_account) if args.paper_account else None
+    try:
+        run(args.output,args.ticks,claude=args.claude,account=account)
+    finally:
+        if account is not None:
+            account.close()
