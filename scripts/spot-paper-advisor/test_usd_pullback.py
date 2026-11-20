@@ -91,6 +91,11 @@ class PullbackTest(unittest.TestCase):
         trade, = result['closedTrades']
         self.assertEqual((trade['entryAt'], trade['exitAt']), (iso(START), iso(START+3600)))
         self.assertAlmostEqual(trade['quotePnlUsd'], -trade['btc'])
+        self.assertEqual((trade['eligibleExitSlots'], trade['holdingSlots']), (1, 6))
+        stress, *others = trade['fixedLotFeeScenarios']
+        self.assertAlmostEqual(stress['exitNetUsd'], trade['netUsd'])
+        self.assertIsNone(stress['firstPositiveAt'])
+        self.assertGreater(others[-1]['exitNetUsd'], stress['exitNetUsd'])
         self.assertGreater(trade['feesUsd'], 0)
         self.assertGreater(trade['slippageUsd'], 0)
         self.assertAlmostEqual(trade['quotePnlUsd']-trade['feesUsd']-trade['slippageUsd'], result['netUsd'])
@@ -137,3 +142,13 @@ class PullbackTest(unittest.TestCase):
         self.assertEqual(pnl_parts(dict(cash='1003.5', btc='0', entryCostUsd='99.75'), 1003.5),
                          dict(realizedUsd=3.5, openPnlUsd=0.0))
         self.assertEqual(pnl_parts(None, 1000), dict(realizedUsd=None, openPnlUsd=None))
+
+
+    def test_first_positive_is_fee_specific_and_uses_first_eligible_bid(self):
+        from decimal import Decimal
+        from usd_pullback import fixed_lot_fee_scenarios
+        bids = [(START+STEP, Decimal('100.35')), (START+2*STEP, Decimal('102'))]
+        results = fixed_lot_fee_scenarios(Decimal(100), Decimal(1), bids[-1][1], bids)
+        self.assertEqual(results[0]['firstPositiveAt'], iso(START+2*STEP))
+        self.assertEqual(results[-1]['firstPositiveAt'], iso(START+STEP))
+        self.assertEqual(results[-1]['firstPositiveBidUsd'], 100.35)
