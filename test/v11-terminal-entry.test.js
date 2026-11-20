@@ -819,7 +819,7 @@ function restoreB2(source){
   source=source.replace("        <li><strong>Meridian 11 · B19</strong><span class=\"version-status\">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>\n","").replace("11 · Vorschau B19<","11 · Vorschau B18<").replace("Diese Vorschau · B19:</b> Klarere Live-Paperbot-Auswertung. <b>Vorige Vorschau · B18","Diese Vorschau · B18");
   const compact=source.match(/  <style id="dashboard-compact-b18">[^]*?<\/style>\n/)?.[0];
   assert.ok(compact);
-  assert.equal(gitBlob(compact),'55d7db9f64c2d7f6c6e68b0d0e01e26e794d0106');
+  assert.equal(gitBlob(compact),'a89ca6314036346283daa475d75b986dc832515c');
   source=source.replace(compact,"").replace("        <li><strong>Meridian 11 · B18</strong><span class=\"version-status\">Vorschau</span><p>Direkte Tab-Navigation, kompakte Botansicht und weniger doppelte Statusmeldungen in Command.</p></li>\n","").replace("11 · Vorschau B18<","11 · Vorschau B17<").replace("Diese Vorschau · B18:</b> Kompakte Navigation und Botansicht. <b>Vorige Vorschau · B17","Diese Vorschau · B17");
   source=source.replace('        <li><strong>Meridian 11 · B17</strong><span class="version-status">Vorschau</span><p>Kompakte Kopfzeile auf dem Smartphone, kürzere Tab-Einstiege und der BTC/EUR-Live-Paperbot an erster Stelle unter Strategien.</p></li>\n', '').replace('11 · Vorschau B17<','11 · Vorschau B16<').replace('Diese Vorschau · B17:</b> Kompaktes Dashboard mit Live-Paperbot. <b>Vorige Vorschau · B16:','Diese Vorschau · B16:');
   const palette = source.match(/  <style id="m11-dashboard-palette">[^]*?<\/style>\n/)?.[0];
