@@ -111,6 +111,21 @@ def paper_slot(state, snapshot, fill_book, slot, observed, *, require_uptrend=Tr
     return dict(action=action, reason=reason, execution=execution, equityUsd=equity)
 
 
+def fixed_lot_fee_scenarios(ask, quantity, exit_bid, observed_bids):
+    """Reprice identical fills and sampled executable exits, holding size and slippage fixed."""
+    scenarios = []
+    for bps in (50, 20, 10, 5):
+        fee = Decimal(bps) / 10000
+        cost = ask * (1+SLIP) * (1+fee)
+        proceeds_factor = (1-SLIP) * (1-fee)
+        first = next(((at, bid) for at, bid in observed_bids if bid*proceeds_factor > cost), None)
+        scenarios.append(dict(feeBpsPerSide=bps, breakEvenBidUsd=float(cost/proceeds_factor),
+                              exitNetUsd=float(quantity*(exit_bid*proceeds_factor-cost)),
+                              firstPositiveAt=iso(first[0]) if first else None,
+                              firstPositiveBidUsd=float(first[1]) if first else None))
+    return scenarios
+
+
 def replay(db, *, duration=7*DAY, require_uptrend=True):
     # Keep the pilot epoch, slots and endpoint baselines on one SQLite snapshot.
     with closing(db.cursor()) as cursor:
@@ -146,6 +161,11 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
             observed = datetime.fromisoformat(report['publishedAt'])
             if observed.tzinfo is None:
                 raise ValueError('expected timezone-aware publication time')
+            if entry is not None:
+                now = observed.timestamp()
+                book = usable_book(record.get('fillBook'), now, slot)
+                if book and (now < slot+90 or forced(state, slot)) and Decimal(str(book['bidSize'])) >= entry[2]:
+                    observed_bids.append((slot, Decimal(str(book['bid']))))
             cash_before = Decimal(state['cash'])
             latest = paper_slot(state, record.get('snapshot'), record.get('fillBook'), slot,
                                 observed.timestamp(), require_uptrend=require_uptrend)
@@ -159,6 +179,7 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
             if latest['execution'] in ('PAPER_BUY', 'PAPER_SELL'):
                 active_days.add(slot//DAY)
             if latest['execution'] == 'PAPER_BUY':
+                observed_bids = []
                 entry = (slot, Decimal(str(record['fillBook']['ask'])), Decimal(state['btc']), cash_before)
             elif latest['execution'] == 'PAPER_SELL':
                 opened, ask, quantity, starting_cash = entry
@@ -169,7 +190,9 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
                 trades.append(dict(entryAt=iso(opened), exitAt=iso(slot), entryAskUsd=float(ask),
                                    exitBidUsd=float(bid), btc=float(quantity), exitReason=latest['reason'],
                                    quotePnlUsd=float(gross), slippageUsd=float(slippage),
-                                   feesUsd=float(gross-slippage-net), netUsd=float(net)))
+                                   feesUsd=float(gross-slippage-net), netUsd=float(net),
+                                   eligibleExitSlots=len(observed_bids), holdingSlots=(slot-opened)//STEP,
+                                   fixedLotFeeScenarios=fixed_lot_fee_scenarios(ask, quantity, bid, observed_bids)))
                 entry = None
             latest['at'] = iso(slot)
             baseline = {name: report['arms'][name]['equityUsd']
