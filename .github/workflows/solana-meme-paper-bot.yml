@@ -1,0 +1,60 @@
+name: Meridian Solana Meme Paper Bot
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/memecoin-paper/research/launches/meme-account-20261120.json']
+permissions:
+  contents: read
+concurrency:
+  group: meridian-meme-paper-account
+  cancel-in-progress: false
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Check paper rules and accounting
+        run: python3 -m unittest discover -s scripts/memecoin-paper/research
+      - name: Verify hosted discovery and Jupiter quotes
+        working-directory: scripts/memecoin-paper/research
+        run: |
+          python3 - <<'PY'
+          from new_pool_watch import GT, SIZE, USDC, WSOL, get, snapshot, spot_quote
+          items=get(GT+'/new_pools?page=1',120)['data']
+          assert items and any(snapshot(p)['price'] > 0 for p in items)
+          tokens=spot_quote(USDC,WSOL,SIZE)
+          assert spot_quote(WSOL,USDC,tokens)>0
+          print('Public discovery and bidirectional quote verified')
+          PY
+      - name: Run virtual USDC spot account
+        run: |
+          mkdir -p meme-account
+          python3 -u scripts/memecoin-paper/research/new_pool_watch.py meme-account/session --ticks 60 --paper-account meme-account/ledger.sqlite
+      - name: Publish account statement
+        if: always()
+        working-directory: scripts/memecoin-paper/research
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          root=Path(os.environ['GITHUB_WORKSPACE'])/'meme-account/session/summary.json'
+          if root.exists():
+              s=json.loads(root.read_text())
+              with open(os.environ['GITHUB_STEP_SUMMARY'],'a') as f:
+                  f.write('### Virtual spot account (USDC)\n\n')
+                  for k,v in s['account'].items():
+                      f.write(f'- {k}: {v}\n')
+                  f.write(f"\nObserved pools: {s['pools']}; completed ticks: {s['ticks']}\n")
+          PY
+      - name: Retain fills, positions and quotes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: meme-paper-account-${{ github.run_id }}-${{ github.run_attempt }}
+          path: meme-account/
+          if-no-files-found: warn
+          retention-days: 30
