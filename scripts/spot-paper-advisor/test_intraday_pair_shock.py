@@ -1,7 +1,9 @@
 import unittest
 from collections import Counter
 from math import log
-from intraday_pair_shock import DAY, STEP, Pair, exit_reason, session
+from datetime import datetime, timezone
+from regime_breakout import Account
+from intraday_pair_shock import DAY, STEP, Pair, exit_reason, session, us_session
 
 
 class PairShockTests(unittest.TestCase):
@@ -34,3 +36,19 @@ class PairShockTests(unittest.TestCase):
         session(0, ratios, markets, pairs, exits)
         self.assertEqual(exits, {'dayClose':1})
         self.assertLess(pairs[0].result()['net'], 0)
+
+    def test_new_york_entry_on_next_open_and_close_based_exit_in_both_seasons(self):
+        for month, hour in [(1, 14), (7, 13)]:
+            day = int(datetime(2024, month, 2, tzinfo=timezone.utc).timestamp())
+            start = day+hour*3600+1800
+            slots = range(day,day+DAY,STEP)
+            series = {t: [t,100,101,99,100] for t in slots}
+            entry = start+3*STEP
+            series[entry-STEP][4] = 101
+            series[entry][4] = 105
+            prices = dict.fromkeys(slots, 100.)
+            prices[entry+STEP] = 104.
+            markets = [(prices,{}, {})]*2
+            accounts = [Account(), Account()]
+            us_session(day, (series,series), markets, accounts)
+            self.assertTrue(all(a.trades == 1 and a.quantity == 0 and a.net > 3 for a in accounts))
