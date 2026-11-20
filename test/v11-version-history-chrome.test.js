@@ -37,7 +37,7 @@ test('version history: native keyboard, focus and compact viewport at five width
    };
    await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,screenWidth:width,screenHeight:height});
    await unlockAppThroughGate(call);
-   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),shortcut:rect('.terminal-entry'),status:rect('#autonomy-status'),brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
+   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),shortcut:rect('.strategy-entry-link'),status:rect('#autonomy-status'),brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
    assert.ok(header.identity.top>=20,'identity has breathing room below the safe area');
    assert.ok(header.brandVisible&&header.historyVisible,'identity and version descriptions remain visible');
    for(const target of [header.version,header.lock]){
@@ -45,7 +45,7 @@ test('version history: native keyboard, focus and compact viewport at five width
     assert.ok(target.left>=16&&target.right<=width-16+1,'header actions stay inside horizontal safe padding');
    }
    assert.ok(header.version.right+11<=header.lock.left,'build and lock controls have a clear gap');
-   assert.ok(header.shortcut.height<=1,'shortcut occupies no visible header row');
+   assert.ok(header.shortcut.height>=44 && header.shortcut.width>=44,'strategy shortcut has a visible touch target');
    assert.ok(header.status.top>=header.lock.bottom+7,'status is separated from navigation');
    assert.ok(header.root<=width+1,'header does not introduce horizontal scrolling');
    if(width<=600){
