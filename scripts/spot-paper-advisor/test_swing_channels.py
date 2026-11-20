@@ -1,5 +1,5 @@
 import unittest
-from swing_channels import ChannelRule, ChannelSignals, configurations
+from swing_channels import ChannelRule, ChannelSignals, configurations, vote_groups
 
 
 class ChannelTests(unittest.TestCase):
@@ -39,3 +39,9 @@ class ChannelTests(unittest.TestCase):
         self.assertEqual(r.target(-1, -1, 0, s), -1)
         s.channel_exit = 1
         self.assertEqual(r.target(-1, -1, 0, s), 0)
+
+    def test_grid_contains_every_distinct_group_and_vote_threshold(self):
+        groups = list(vote_groups(('momentum', 'rsi', 'macd', 'fib')))
+        self.assertEqual(len(set(groups)), 32)
+        self.assertTrue(all(1 <= minimum <= len(group) for group, minimum in groups))
+        self.assertEqual(len(groups) * len(configurations()), 512)
