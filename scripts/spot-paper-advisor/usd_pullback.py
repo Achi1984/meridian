@@ -79,6 +79,41 @@ def signal(state, snapshot, slot, *, require_uptrend=True):
     return 'BUY', 'PULLBACK_RECOVERY', pullback[3], target
 
 
+def reclaim_entry(ask, stop, target):
+    """Require two dollars of potential net gain for each dollar at risk."""
+    ask, stop, target = (Decimal(str(x)) for x in (ask, stop, target))
+    entry = ask * (1+SLIP) * (1+FEE)
+    proceeds = (1-SLIP) * (1-FEE)
+    return stop < ask and target*proceeds-entry >= 2*(entry-stop*proceeds)
+
+
+def reclaim_signal(state, snapshot, slot):
+    """Buy a failed downside break of the preceding six completed candles."""
+    if forced(state, slot):
+        return ('SELL' if state['opened'] is not None else 'HOLD'), 'DAY_CLOSE', None, None
+    if state['opened'] is not None and slot-state['opened'] >= 7200:
+        return 'SELL', 'TIME_EXIT', None, None
+    bars = closed_bars(snapshot, 'ten', 1 if state['opened'] is not None else 7, slot, STEP)
+    if bars is None:
+        return 'HOLD', 'CANDLES_UNAVAILABLE', None, None
+    last = bars[-1]
+    if state['opened'] is not None:
+        if last[4] <= state['stop'] or last[4] >= state['target']:
+            return 'SELL', ('STOP_CLOSE' if last[4] <= state['stop'] else 'TARGET_CLOSE'), None, None
+        return 'HOLD', 'POSITION_OPEN', None, None
+    floor = min(b[3] for b in bars[:-1])
+    if not last[3] < floor < last[4] or last[4] <= last[1]:
+        return 'HOLD', 'WAIT_RECLAIM', None, None
+    book = snapshot.get('book')
+    stamp = book.get('received') if isinstance(book, dict) else None
+    if type(stamp) not in (int, float) or not usable_book(book, stamp, slot):
+        return 'HOLD', 'NO_SIGNAL_BOOK', None, None
+    target = max(b[2] for b in bars[:-1])
+    if not reclaim_entry(book['ask'], last[3], target):
+        return 'HOLD', 'INSUFFICIENT_NET_REWARD', None, None
+    return 'BUY', 'RANGE_RECLAIM', last[3], target
+
+
 def pnl_parts(state, equity):
     """Attribute net PnL using the recorded cash cost of the open BTC lot."""
     if not state or 'cash' not in state or 'btc' not in state:
@@ -93,12 +128,14 @@ def pnl_parts(state, equity):
                 openPnlUsd=None if equity is None else float(Decimal(str(equity))-basis))
 
 
-def paper_slot(state, snapshot, fill_book, slot, observed, *, require_uptrend=True):
-    action, reason, stop, target = signal(state, snapshot, slot, require_uptrend=require_uptrend)
+def paper_slot(state, snapshot, fill_book, slot, observed, *, require_uptrend=True, reclaim=False):
+    action, reason, stop, target = (reclaim_signal(state, snapshot, slot) if reclaim else
+                                  signal(state, snapshot, slot, require_uptrend=require_uptrend))
     book = usable_book(fill_book, observed, slot)
     if action == 'BUY' and book and snapshot['book']['received'] > book['received']:
         action, reason = 'HOLD', 'SIGNAL_AFTER_FILL_BOOK'
-    if action == 'BUY' and book and not target_covers_cost(book['ask'], target):
+    if action == 'BUY' and book and not (reclaim_entry(book['ask'], stop, target) if reclaim
+                                        else target_covers_cost(book['ask'], target)):
         action, reason = 'HOLD', 'EXECUTION_COST_FILTER'
     cash_before = Decimal(state['cash'])
     if action != 'HOLD' and observed >= slot+90 and not forced(state, slot):
@@ -131,12 +168,12 @@ def fixed_lot_fee_scenarios(ask, quantity, exit_bid, observed_bids, exit_slot):
     return scenarios
 
 
-def replay(db, *, duration=7*DAY, require_uptrend=True):
+def replay(db, *, duration=7*DAY, require_uptrend=True, reclaim=False, since=None):
     # Keep the pilot epoch, slots and endpoint baselines on one SQLite snapshot.
     with closing(db.cursor()) as cursor:
         rows = cursor.execute("""SELECT p.start, s.slot, s.record FROM pilot p
-                                 LEFT JOIN slots s ON s.slot >= p.start
-                                 AND s.slot < p.start + ? WHERE p.id=1 ORDER BY s.slot""", (duration,))
+                                 LEFT JOIN slots s ON s.slot >= max(p.start, coalesce(?, p.start))
+                                 AND s.slot < p.start + ? WHERE p.id=1 ORDER BY s.slot""", (since, duration))
         state = initial()
         latest = baseline = start = previous = None
         missing = modeled = 0
@@ -152,7 +189,7 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
                 break
             if slot % STEP:
                 raise ValueError('USD ledger contains an off-grid slot')
-            next_slot = start if previous is None else previous + STEP
+            next_slot = max(start, since or start) if previous is None else previous + STEP
             missing += (slot-next_slot)//STEP
             previous = slot
             if raw is None:
@@ -173,7 +210,7 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
                     observed_bids.append((slot, Decimal(str(book['bid']))))
             cash_before = Decimal(state['cash'])
             latest = paper_slot(state, record.get('snapshot'), record.get('fillBook'), slot,
-                                observed.timestamp(), require_uptrend=require_uptrend)
+                                observed.timestamp(), require_uptrend=require_uptrend, reclaim=reclaim)
             reasons[latest['action']][latest['reason']] += 1
             executions[latest['execution']] += 1
             modeled += 1
@@ -205,11 +242,11 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
     if latest is None:
         raise ValueError('no completed BTC/USD round slots')
     equity = latest['equityUsd']
-    return dict(schema='MERIDIAN_USD_PULLBACK_V1', mode='REPLAY', pair='BTC/USD', start=iso(start),
+    return dict(schema=('MERIDIAN_USD_RECLAIM_V1' if reclaim else 'MERIDIAN_USD_PULLBACK_V1'), mode='REPLAY', pair='BTC/USD', start=iso(max(start, since or start)),
                 through=iso(previous), modeledSlots=modeled, missingSlots=missing, last=latest,
                 equityUsd=equity, netUsd=None if equity is None else equity-1000, closed=len(trades), closedTrades=trades,
                 **pnl_parts(state, equity), activeDays=len(active_days), maxObservedDrawdownPct=drawdown,
-                signalReasonCounts=reasons, executionCounts=executions, sameSlotBaselineEquityUsd=baseline)
+                signalReasonCounts=reasons, executionCounts=executions, sameSlotBaselineEquityUsd=baseline if since is None or since <= start else None)
 
 
 def first_day(db, now):
@@ -265,10 +302,19 @@ if __name__ == '__main__':
                       help='Compare independent all-slot pullbacks with and without the hourly trend requirement')
     mode.add_argument('--first-day', action='store_true',
                         help='Compare closed intervals of the first 24 hours, including recorded model costs')
+    mode.add_argument('--range-reclaim', action='store_true',
+                      help='Replay the cost-aware failed breakdown and score future slots separately')
     args = parser.parse_args()
     with closing(sqlite3.connect(args.ledger.resolve().as_uri() + '?mode=ro', uri=True)) as db:
         db.execute('BEGIN')
-        if args.compare_hourly_filter:
+        if args.range_reclaim:
+            cutoff = int(datetime.fromisoformat('2026-11-21T00:00:00+00:00').timestamp())
+            result = dict(fullRound=replay(db, reclaim=True), forwardFrom=iso(cutoff), forward=None)
+            start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
+            if db.execute('SELECT 1 FROM slots WHERE slot>=? AND slot<? AND record IS NOT NULL LIMIT 1',
+                          (max(start, cutoff), start+7*DAY)).fetchone():
+                result['forward'] = replay(db, reclaim=True, since=cutoff)
+        elif args.compare_hourly_filter:
             result = dict(withHourlyTrend=replay(db), withoutHourlyTrend=replay(db, require_uptrend=False))
         else:
             result = first_day(db, time.time()) if args.first_day else replay(db)
