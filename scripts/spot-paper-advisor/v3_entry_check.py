@@ -9,8 +9,8 @@ from pathlib import Path
 import re
 import sqlite3
 
-from usd_pullback import closed_bars, target_covers_cost, usable_book
-from worker import DAY, STEP, execute, forced, iso
+from usd_pullback import paper_slot, closed_bars, target_covers_cost, usable_book
+from worker import DAY, STEP, execute, forced, initial, iso
 
 
 def entry_check(reason, snapshot, slot):
@@ -143,6 +143,8 @@ def audit(db, *, first_day=False):
     entries = []
     totals = Counter()
     opened = pending_exit = None
+    retry_account = initial()
+    retry_trade = pending_retry = None
     missing = observed = 0
     next_slot = start
     end = start + (DAY if first_day else 7*DAY)
@@ -152,11 +154,11 @@ def audit(db, *, first_day=False):
             raise ValueError('off-grid slot')
         missing += (slot-next_slot)//STEP
         if slot != next_slot:
-            opened = pending_exit = None
+            opened = pending_exit = pending_retry = None
         next_slot = slot+STEP
         if raw is None:
             missing += 1
-            opened = pending_exit = None
+            opened = pending_exit = pending_retry = None
             continue
         record = json.loads(raw)
         report = record['report']
@@ -165,6 +167,24 @@ def audit(db, *, first_day=False):
             raise ValueError('unexpected round')
         observed += 1
         arm = report['arms']['v3']
+        if pending_retry is not None or retry_trade is not None:
+            published = datetime.fromisoformat(report['publishedAt'])
+            if published.tzinfo is None:
+                raise ValueError('expected timezone-aware publication time')
+            cash_before = Decimal(retry_account['cash'])
+            result = paper_slot(retry_account, record.get('snapshot'), record.get('fillBook'),
+                                slot, published.timestamp())
+            if retry_trade is not None:
+                if result['execution'] == 'PAPER_SELL':
+                    item, basis = retry_trade
+                    item['nextSlotPullback'].update(exitAt=iso(slot), exitReason=result['reason'],
+                        realizedUsd=float(Decimal(retry_account['cash'])-basis))
+                    retry_trade = None
+            elif pending_retry is not None:
+                pending_retry['nextSlotPullback'] = dict(at=iso(slot), **result, realizedUsd=None)
+                if result['execution'] == 'PAPER_BUY':
+                    retry_trade = pending_retry, cash_before
+            pending_retry = None
         if pending_exit:
             item, state, actual_cash = pending_exit
             item['delayedExit'] = delayed_exit(state, record, slot, actual_cash)
@@ -174,6 +194,14 @@ def audit(db, *, first_day=False):
             state = record['states']['v3']
             before = Decimal(state['cash']) + Decimal(state['entryCostUsd'])
             item = dict(at=iso(slot), verdict=verdict, reason=cause, realizedUsd=None)
+            if cause == 'BREAKOUT_UNCONFIRMED':
+                item['nextSlotPullback'] = dict(status='NEXT_SLOT_UNAVAILABLE')
+                if retry_trade is not None:
+                    item['nextSlotPullback']['status'] = 'POSITION_OPEN'
+                elif (slot+STEP)//DAY == slot//DAY:
+                    pending_retry = item
+                else:
+                    item['nextSlotPullback']['status'] = 'DAY_BOUNDARY'
             entries.append(item)
             opened = item, before, state
         elif arm['execution'] == 'PAPER_SELL' and opened:
