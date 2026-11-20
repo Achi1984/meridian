@@ -12,6 +12,8 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
+from pool_shadow import Shadow, features
+
 GT = 'https://api.geckoterminal.com/api/v2/networks/solana'
 ROUTE = 'https://transaction-v1.raydium.io/compute/swap-base-in'
 USDC = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
@@ -74,7 +76,8 @@ def quote(src, dst, amount):
     return minimum
 
 
-def run(out, ticks):
+def run(out, ticks, *, claude=False):
+    shadow = Shadow(claude)
     out.mkdir(parents=True,exist_ok=True)
     counts = Counter()
     first, last, attempted, pending = {}, {}, set(), {}
@@ -101,7 +104,7 @@ def run(out, ticks):
                     event('seenAgain', **x)
                     born, original = first[pool]
                     if qualifies(original,x,t-born) and x['mint'] not in attempted:
-                        found.append((x['price']/original['price'],pool,x['mint']))
+                        found.append((x['price']/original['price'],pool,x['mint'],t-born,original,x))
                 last[pool] = t
             return found
 
@@ -139,7 +142,7 @@ def run(out, ticks):
                             event('unresolved',mint=mint)
                             del pending[mint]
             if candidates and tick < ticks-6 and len(pending)<3:
-                _,pool,mint = max(candidates)
+                _,pool,mint,age,original,current = max(candidates,key=lambda row:row[:3])
                 attempted.add(mint)
                 event('momentumCandidate',pool=pool,mint=mint)
                 try:
@@ -149,6 +152,7 @@ def run(out, ticks):
                     if sell >= .95*SIZE:
                         pending[mint] = int(time.time()),qty
                         event('paperProbe',mint=mint)
+                        shadow.record(mint,features(original,current,age,sell),event)
                 except errors as exc:
                     event('quoteUnavailable', mint=mint,reason=type(exc).__name__)
             summary = dict(ticks=tick+1,pools=len(first),openProbes=len(pending),events=dict(counts))
@@ -168,5 +172,6 @@ if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('output',type=Path)
     parser.add_argument('--ticks',type=int,choices=range(1,61),default=60,metavar='1..60')
+    parser.add_argument('--claude',action='store_true',help='Enable up to ten advisory Claude calls')
     args=parser.parse_args()
-    run(args.output,args.ticks)
+    run(args.output,args.ticks,claude=args.claude)
