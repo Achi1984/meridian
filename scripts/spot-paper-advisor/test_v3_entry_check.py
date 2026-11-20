@@ -90,3 +90,15 @@ class EntryCheckTest(unittest.TestCase):
             self.assertEqual(relaxed, result)
             db.execute('DELETE FROM slots WHERE slot=?', (START+STEP,))
             self.assertEqual(audit(db)['entries'][0]['nextSlotPullback']['status'], 'NEXT_SLOT_UNAVAILABLE')
+
+    def test_cost_attribution_keeps_lot_fixed_and_checks_cash(self):
+        from v3_entry_check import trade_costs
+        ask, bid, qty = map(Decimal, ('100', '101', '2'))
+        # Cash equals slipped exit proceeds less entry basis including both fees.
+        ledger = qty * (bid*Decimal('.999')*Decimal('.995') - ask*Decimal('1.001')*Decimal('1.005'))
+        row = trade_costs(ask, bid, qty, ledger)
+        self.assertEqual(row['quotePnlUsd'], 2)
+        self.assertAlmostEqual(row['slippageUsd'], .402)
+        self.assertAlmostEqual(row['net20bpsUsd'], 1.598 - .002*401.998)
+        self.assertLess(row['ledgerNetUsd'], 0)
+        self.assertIsNone(trade_costs(ask, bid, qty, ledger+1))
