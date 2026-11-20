@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 import json
 from pathlib import Path
 
-from breakout_perp_history import FUNDING_STEP, load_market, paired_trade
+from breakout_perp_history import FUNDING_STEP, SLIPPAGE_BPS_PER_SIDE, load_market, paired_trade
 from reclaim_history import breakout_slot, candles
 from worker import DAY, STEP, initial
 
@@ -19,7 +19,7 @@ def evaluate(paths, root):
         raise ValueError('No monthly spot archives')
     prices, marks, rates = market = load_market(paths, root)
     history, state = deque(maxlen=144), initial()
-    stats = {key: dict(net=0., closed=0, peak=1000., maxDrawdownPct=0., monthly=Counter())
+    stats = {key: dict(net=0., netZeroSlippage=0., closed=0, peak=1000., maxDrawdownPct=0., monthly=Counter())
              for key in ('original', 'confirmed')}
     events = []
     excluded_days = set()
@@ -64,6 +64,7 @@ def evaluate(paths, root):
                 arm['maxDrawdownPct'] = max(arm['maxDrawdownPct'],100*(1-equity/arm['peak']))
                 if closed:
                     arm['net'] += row['futuresNet']
+                    arm['netZeroSlippage'] += row['futuresNetZeroSlippage']
                     arm['closed'] += 1
                     arm['monthly'][month] += 1
                     record[key] = dict(entry=entry[0], futuresEntryMid=prices[entry[0]], net=row['futuresNet'])
@@ -75,6 +76,12 @@ def evaluate(paths, root):
         raise ValueError('Unclosed breakout at end of input')
     for arm in stats.values():
         del arm['peak']
+        # Fixed fills and quantities make net P&L linear in per-side slippage.
+        cost_per_bp = (arm['netZeroSlippage'] - arm['net']) / SLIPPAGE_BPS_PER_SIDE
+        arm['slippageCostPerBp'] = cost_per_bp
+        arm['breakEvenSlippageBpsPerSide'] = (
+            arm['netZeroSlippage'] / cost_per_bp if cost_per_bp > 0 else None
+        )
         arm['meanNet'] = arm['net']/arm['closed'] if arm['closed'] else None
     skipped = [e['original']['net'] for e in events if 'confirmed' not in e]
     better = sum(e['confirmed']['futuresEntryMid'] < e['original']['futuresEntryMid']

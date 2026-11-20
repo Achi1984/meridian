@@ -11,6 +11,7 @@ from zipfile import ZipFile
 from reclaim_history import breakout_slot, candles
 from worker import initial
 
+SLIPPAGE_BPS_PER_SIDE = 10
 FUNDING_STEP = 8 * 3600
 
 
@@ -51,7 +52,8 @@ def paired_trade(entry, exit_slot, spot_exit, prices, marks, rates):
         if at not in marks or at not in rates:
             return None
         funding += quantity*marks[at]*rates[at]
-    buy, sell = 1.0001*1.001, .9999*.999
+    slippage = SLIPPAGE_BPS_PER_SIDE / 10000
+    buy, sell = 1.0001*(1+slippage), .9999*(1-slippage)
     spot = quantity*(spot_exit*sell*.999-spot_open*buy*1.001)
     gross = quantity*(prices[exit_slot]-prices[opened])
     future = quantity*(prices[exit_slot]*sell*.9995-prices[opened]*buy*1.0005)-funding
