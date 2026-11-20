@@ -1,6 +1,6 @@
 """Fixed daily directional-strength, breakout and exit variants for offline BTC replay."""
 from collections import deque
-from itertools import product
+from itertools import combinations, product
 
 
 class Wilder:
@@ -86,3 +86,9 @@ class ChannelRule:
 
 def configurations():
     return [ChannelRule(*switches) for switches in product((False, True), repeat=4)]
+
+def vote_groups(names):
+    for size in range(1, len(names) + 1):
+        for group in combinations(names, size):
+            for minimum in range(1, size + 1):
+                yield group, minimum
