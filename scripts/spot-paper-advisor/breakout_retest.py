@@ -14,13 +14,16 @@ def confirms(bar, level, elapsed):
     return 1 <= elapsed <= 3 and bar[3] <= level < bar[4]
 
 
-def evaluate(paths, root):
+def evaluate(paths, root, *, bullish_opening_hour=False):
     if not paths:
         raise ValueError('No monthly spot archives')
     prices, marks, rates = market = load_market(paths, root)
     history, state = deque(maxlen=144), initial()
+    variants = ['original', 'confirmed']
+    if bullish_opening_hour:
+        variants.append('bullishOpeningHour')
     stats = {key: dict(net=0., netZeroSlippage=0., closed=0, peak=1000., maxDrawdownPct=0., monthly=Counter())
-             for key in ('original', 'confirmed')}
+             for key in variants}
     events = []
     excluded_days = set()
     current = None
@@ -40,8 +43,12 @@ def evaluate(paths, root):
         execution = breakout_slot(state, history, book, slot)['execution']
         if execution == 'PAPER_BUY':
             qty = int(100/(mid*1.0001*1.001*1.001)*1e8)/1e8
-            level = max(b[2] for b in history if slot-slot%DAY <= b[0] < slot-slot%DAY+3600)
+            opening = [b for b in history if day <= b[0] < day + 3600]
+            level = max(b[2] for b in opening)
             current = dict(level=level, original=(slot,mid,qty), confirmed=None)
+            if bullish_opening_hour:
+                rising = opening[-1][4] > opening[0][1]
+                current['bullishOpeningHour'] = current['original'] if rising else None
         elif current and execution != 'PAPER_SELL' and current['confirmed'] is None:
             opened, _, qty = current['original']
             elapsed = (slot-opened)//STEP
@@ -95,5 +102,8 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('spot', type=Path)
     parser.add_argument('futures', type=Path)
+    parser.add_argument('--bullish-opening-hour', action='store_true',
+                        help='Also score breakouts where the completed first UTC hour closed above its open')
     args = parser.parse_args()
-    print(json.dumps(evaluate(sorted(args.spot.glob('BTCUSDT-5m-????-??.zip')), args.futures)))
+    print(json.dumps(evaluate(sorted(args.spot.glob('BTCUSDT-5m-????-??.zip')), args.futures,
+                              bullish_opening_hour=args.bullish_opening_hour)))
