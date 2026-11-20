@@ -12,6 +12,7 @@ class CostReportTests(unittest.TestCase):
         db.execute('attach database ":memory:" as spot')
         db.execute('create table observations(slot,event,data)')
         db.execute('create table spot.slots(slot,record)')
+        self.assertIsNone(report(db)['settledPerformance'])
         entry = dict(status='FILLED',ts=100,price='100',executedUsd='90')
         sale = dict(status='FILLED',entryTs=100,price='102',fundingUsd='-.1',netUsd='1.8091')
         for slot,event,row in [(1,'PAPER_BUY',entry),(2,'PAPER_SELL',sale),
@@ -21,6 +22,7 @@ class CostReportTests(unittest.TestCase):
             db.execute('insert into spot.slots values(?,?)',(slot,json.dumps(spot)))
         result = report(db)
         self.assertEqual((result['pairedClosed'],result['fundingPending'],result['openPaired']),(1,1,False))
+        self.assertEqual(result['settledPerformance'], dict(wins=1, meanNetUsd=1.8091, netUsd=1.8091))
         high,low = result['trades'][0]['scenarios']
         self.assertAlmostEqual(high['spotNetUsd'],1.798-0.403996)
         self.assertAlmostEqual(high['futuresMinusSpotUsd'],1.8091-high['spotNetUsd'])
