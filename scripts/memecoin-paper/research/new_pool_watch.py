@@ -143,6 +143,18 @@ def run(out, ticks, *, claude=False, account=None):
                 last[pool] = t
             return found
 
+        def mark_positions(final, retry=0):
+            for position in account.active():
+                mint = position['mint']
+                try:
+                    sell = spot_quote(mint,USDC,int(position['qty']))
+                except errors as exc:
+                    account.observe(mint,None,int(time.time()))
+                    event('botExitQuoteUnavailable',mint=mint,retry=retry,reason=type(exc).__name__)
+                    continue
+                reason = account.observe(mint,sell,int(time.time()),final=final)
+                event('botSell' if reason else 'botMark',mint=mint,usdcRaw=sell,retry=retry,reason=reason)
+
         for tick in range(ticks):
             clock = time.monotonic()
             now = int(time.time())
@@ -177,16 +189,7 @@ def run(out, ticks, *, claude=False, account=None):
                             event('unresolved',mint=mint)
                             del pending[mint]
             if account is not None:
-                for position in account.active():
-                    mint = position['mint']
-                    try:
-                        sell = spot_quote(mint,USDC,int(position['qty']))
-                    except errors as exc:
-                        account.observe(mint,None,int(time.time()))
-                        event('botExitQuoteUnavailable',mint=mint,reason=type(exc).__name__)
-                        continue
-                    reason = account.observe(mint,sell,int(time.time()),final=tick+1==ticks)
-                    event('botSell' if reason else 'botMark',mint=mint,usdcRaw=sell,reason=reason)
+                mark_positions(final=tick+1==ticks)
             capacity = len(pending)<3 if account is None else len(account.active())<3
             if candidates and tick < ticks-6 and capacity:
                 _,pool,mint,age,original,current = max(candidates,key=lambda row:row[:3])
@@ -214,6 +217,16 @@ def run(out, ticks, *, claude=False, account=None):
             print(json.dumps(summary),flush=True)
             if tick+1 < ticks:
                 time.sleep(max(0,60-(time.monotonic()-clock)))
+        if account is not None:
+            retry = 0
+            while account.active() and retry < 3:
+                time.sleep(30)
+                retry += 1
+                mark_positions(final=True, retry=retry)
+            for position in account.active():
+                event('botExitUnresolved', mint=position['mint'], pool=position['pool'])
+            summary['exitRetryRounds'] = retry
+            summary['account'] = account.status(int(time.time()))
         for mint in pending:
             event('unresolvedAtEnd',mint=mint)
         summary.update(events=dict(counts))
