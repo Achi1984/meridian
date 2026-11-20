@@ -138,7 +138,7 @@ def exit_summary(entries):
                 differenceUsd=float(sum(paired)) if paired else None, excluded=dict(excluded))
 
 
-def audit(db, *, first_day=False):
+def audit(db, *, first_day=False, require_uptrend=True):
     start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
     entries = []
     totals = Counter()
@@ -173,7 +173,7 @@ def audit(db, *, first_day=False):
                 raise ValueError('expected timezone-aware publication time')
             cash_before = Decimal(retry_account['cash'])
             result = paper_slot(retry_account, record.get('snapshot'), record.get('fillBook'),
-                                slot, published.timestamp())
+                                slot, published.timestamp(), require_uptrend=require_uptrend)
             if retry_trade is not None:
                 if result['execution'] == 'PAPER_SELL':
                     item, basis = retry_trade
@@ -215,7 +215,7 @@ def audit(db, *, first_day=False):
                 pending_exit = item, state, Decimal(record['states']['v3']['cash'])
             totals[item['verdict']] += pnl
             opened = None
-    return dict(observedSlots=observed, missingSlots=missing, entries=entries,
+    return dict(retryRequiresHourlyUptrend=require_uptrend, observedSlots=observed, missingSlots=missing, entries=entries,
                 rulePublishedAt=RULE_PUBLISHED.isoformat(), outcomes=filter_outcomes(entries),
                 delayedExitSummary=exit_summary(entries),
                 closedPnlByVerdictUsd={key: float(value) for key, value in totals.items()})
@@ -225,7 +225,15 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ledger', type=Path, required=True)
     parser.add_argument('--first-day', action='store_true')
+    parser.add_argument('--compare-hourly-filter', action='store_true',
+                        help='Replay the same next-slot opportunities with and without the hourly trend gate')
     args = parser.parse_args()
     with closing(sqlite3.connect(args.ledger.resolve().as_uri()+'?mode=ro', uri=True)) as db:
         db.execute('BEGIN')
-        print(json.dumps(audit(db, first_day=args.first_day), allow_nan=False))
+        report = audit(db, first_day=args.first_day)
+        if args.compare_hourly_filter:
+            alternative = audit(db, first_day=args.first_day, require_uptrend=False)
+            for original, variant in zip(report['entries'], alternative['entries'], strict=True):
+                if 'nextSlotPullback' in variant:
+                    original['nextSlotPullbackWithoutHourlyTrend'] = variant['nextSlotPullback']
+        print(json.dumps(report, allow_nan=False))

@@ -43,7 +43,7 @@ def usable_book(book, observed, slot):
     return book
 
 
-def signal(state, snapshot, slot):
+def signal(state, snapshot, slot, *, require_uptrend=True):
     """Return (action, reason, stop, target) using information available before the fill."""
     opened = state['opened']
     if forced(state, slot):
@@ -65,7 +65,7 @@ def signal(state, snapshot, slot):
     bars = closed_bars(snapshot, 'hour', 3, hour, 3600)
     if bars is None:
         return 'HOLD', 'CANDLES_UNAVAILABLE', None, None
-    if not bars[0][4] < bars[1][4] < bars[2][4]:
+    if require_uptrend and not bars[0][4] < bars[1][4] < bars[2][4]:
         return 'HOLD', 'NO_UPTREND', None, None
     if pullback[4] >= pullback[1] or close <= pullback[2]:
         return 'HOLD', 'WAIT_RECOVERY', None, None
@@ -93,8 +93,8 @@ def pnl_parts(state, equity):
                 openPnlUsd=None if equity is None else float(Decimal(str(equity))-basis))
 
 
-def paper_slot(state, snapshot, fill_book, slot, observed):
-    action, reason, stop, target = signal(state, snapshot, slot)
+def paper_slot(state, snapshot, fill_book, slot, observed, *, require_uptrend=True):
+    action, reason, stop, target = signal(state, snapshot, slot, require_uptrend=require_uptrend)
     book = usable_book(fill_book, observed, slot)
     if action == 'BUY' and book and snapshot['book']['received'] > book['received']:
         action, reason = 'HOLD', 'SIGNAL_AFTER_FILL_BOOK'
