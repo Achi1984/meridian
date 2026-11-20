@@ -54,9 +54,23 @@ jobs:
           account = summary['account']
           if account['startUsdc'] != 1000 or summary['ticks'] != 60:
               raise ValueError('Incomplete or unexpected paper session')
+          comparison = None
           exceptions = {}
           if (session/'funnel.json').is_file():
-              exceptions = read('funnel.json').get('decisionExceptions') or {}
+              funnel = read('funnel.json')
+              exceptions = funnel.get('decisionExceptions') or {}
+              if 'liquidityFloorComparison' in funnel:
+                  comparison = {}
+                  for floor in ('10000', '5000'):
+                      row = funnel['liquidityFloorComparison'][floor]
+                      signals = count(row['signalPools'])
+                      priced = count(row['pricedAtFiveMinutes'])
+                      missing = count(row['missingAtFiveMinutes'])
+                      median = row['medianPriceChangePct']
+                      if priced + missing != signals or (median is None) != (priced == 0):
+                          raise ValueError('Inconsistent five-minute observations')
+                      comparison[floor] = dict(signals=signals, priced=priced, missing=missing,
+                                              medianPct=None if median is None else amount(median))
           equity = account['equityUsdc']
           report = dict(schema=1, runId=int(os.environ['RUN_ID']), attempt=int(os.environ['ATTEMPT']),
                         at=os.environ['FINISHED'], pools=count(summary['pools']),
@@ -64,6 +78,8 @@ jobs:
                         realized=amount(account['realizedPnlUsdc']), equity=None if equity is None else amount(equity),
                         withdrawn=count(exceptions['signalWithdrawn']) if 'signalWithdrawn' in exceptions else None,
                         expired=count(exceptions['signalExpired']) if 'signalExpired' in exceptions else None)
+          if comparison is not None:
+              report['fiveMinuteComparison'] = comparison
           with open(os.environ['GITHUB_OUTPUT'],'a') as output:
               print('report='+json.dumps(report,allow_nan=False),file=output)
           PY
