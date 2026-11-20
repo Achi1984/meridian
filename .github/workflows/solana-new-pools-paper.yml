@@ -17,13 +17,15 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Verify hosted access to the live discovery feed
+        run: python3 -u scripts/memecoin-paper/research/new_pool_watch.py paper-results/preflight --ticks 1
       - name: Collect first sightings and two-way quote probes
-        run: python3 -u scripts/memecoin-paper/research/new_pool_watch.py paper-results --ticks 60
+        run: python3 -u scripts/memecoin-paper/research/new_pool_watch.py paper-results/observations --ticks 60
       - name: Publish run counts
         if: always()
         run: |
-          if test -s paper-results/summary.json; then
-            cat paper-results/summary.json >> "$GITHUB_STEP_SUMMARY"
+          if test -s paper-results/observations/summary.json; then
+            cat paper-results/observations/summary.json >> "$GITHUB_STEP_SUMMARY"
           fi
       - name: Retain paper observations
         if: always()
