@@ -92,3 +92,41 @@ class MemeAccountTests(unittest.TestCase):
                 self.assertEqual(summary['account']['openPositions'],remaining)
                 self.assertEqual(summary['account']['equityUsdc'],None if remaining else 998.9)
                 self.assertEqual(summary['account']['cashUsdc'],979.95 if remaining else 998.9)
+
+    def test_retracted_and_expired_signals_cannot_buy(self):
+        for scenario in ('withdrawn','expired'):
+            with self.subTest(scenario=scenario), TemporaryDirectory() as out:
+                account = MemeAccount(':memory:')
+                self.addCleanup(account.close)
+                clock = [100000]
+                def feed(url, max_age):
+                    tick = clock[0]-100000
+                    price = 1.2 if tick == (895 if scenario == 'expired' else 60) else 1.0
+                    if scenario == 'withdrawn' and '/new_pools' in url:
+                        price = 1.0
+                    row = dict(pool='pool',mint='mint',quote=watch.WSOL,price=price,
+                               dex='pump-fun',created='1970-01-02T03:46:40Z',
+                               liquidity=20000,volume=4000,buys=8,sells=4)
+                    return {'data':[dict(row,attributes={'address':'pool'})]}
+                def advance(seconds):
+                    clock[0] += 895 if scenario == 'expired' and clock[0] == 100000 else seconds
+                def quote(src,dst,amount):
+                    clock[0] += 4
+                    return SIZE
+                with patch.object(watch,'get',side_effect=feed), \
+                     patch.object(watch,'snapshot',side_effect=lambda x:x), \
+                     patch.object(watch,'spot_quote',side_effect=quote) as quotes, \
+                     patch.object(watch.time,'time',side_effect=lambda:clock[0]), \
+                     patch.object(watch.time,'monotonic',side_effect=lambda:clock[0]), \
+                     patch.object(watch.time,'sleep',side_effect=advance):
+                    watch.run(Path(out),8,account=account)
+                from pool_funnel import audit
+                summary = json.loads((Path(out)/'summary.json').read_text())
+                rows = (json.loads(line) for line in (Path(out)/'events.jsonl').read_text().splitlines())
+                report = audit(rows,summary)
+                self.assertEqual(report['decisionExceptions'],
+                                 {'signalWithdrawn':int(scenario=='withdrawn'),
+                                  'signalExpired':int(scenario=='expired')})
+                self.assertEqual(quotes.call_count,0 if scenario=='withdrawn' else 2)
+                self.assertEqual(report['distinctPools']['bought'],0)
+                self.assertEqual(report['account']['cashUsdc'],1000)
