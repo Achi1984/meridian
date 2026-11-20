@@ -88,6 +88,13 @@ class PullbackTest(unittest.TestCase):
         self.assertEqual(result['missingSlots'], 6)
         self.assertEqual(result['modeledSlots'], 2)
         self.assertEqual(result['closed'], 1)
+        trade, = result['closedTrades']
+        self.assertEqual((trade['entryAt'], trade['exitAt']), (iso(START), iso(START+3600)))
+        self.assertAlmostEqual(trade['quotePnlUsd'], -trade['btc'])
+        self.assertGreater(trade['feesUsd'], 0)
+        self.assertGreater(trade['slippageUsd'], 0)
+        self.assertAlmostEqual(trade['quotePnlUsd']-trade['feesUsd']-trade['slippageUsd'], result['netUsd'])
+        self.assertAlmostEqual(trade['netUsd'], result['realizedUsd'])
         self.assertEqual(result['signalReasonCounts'], {'BUY': {'PULLBACK_RECOVERY': 1},
                                                        'SELL': {'TIME_EXIT': 1}, 'HOLD': {}})
         self.assertEqual(result['executionCounts'], {'PAPER_BUY': 1, 'PAPER_SELL': 1})
