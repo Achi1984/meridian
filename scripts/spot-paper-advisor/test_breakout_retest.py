@@ -17,3 +17,18 @@ class RetestTest(unittest.TestCase):
         self.assertEqual((trade['original']['entry'], trade['confirmed']['entry'], trade['exit']),
                          (7*STEP, 8*STEP, 9*STEP))
         self.assertEqual(report['improvedEntries'], 1)
+
+        for key, entry_price in [('original', 103), ('confirmed', 102)]:
+            arm = report['arms'][key]
+            buy = entry_price * 1.0001 * 1.0005
+            sell = 97 * .9999 * .9995
+            expected = 10000 * (sell - buy) / (buy + sell)
+            self.assertAlmostEqual(arm['breakEvenSlippageBpsPerSide'], expected)
+            self.assertLess(arm['net'], arm['netZeroSlippage'])
+
+    def test_no_trades_have_no_slippage_threshold(self):
+        with patch('breakout_retest.load_market', return_value=({}, {}, {})), patch('breakout_retest.candles', return_value=[]):
+            report = evaluate(['fixture'], None)
+        for arm in report['arms'].values():
+            self.assertIsNone(arm['breakEvenSlippageBpsPerSide'])
+            self.assertEqual(arm['slippageCostPerBp'], 0)
