@@ -22,15 +22,15 @@ def validate(rows):
         previous = t
 
 
-def entry_signal(history, bar, volume_multiple):
+def entry_signal(history, bar, volume_multiple, order_cap=80.):
     if len(history) != 12 or bar[0]-history[0][0] != 12*STEP:
         return False
     floor = min(b[3] for b in history)
-    return (bar[3] < floor < bar[4] and bar[5] >= 8000 and
+    return (bar[3] < floor < bar[4] and bar[5] >= 100*order_cap and
             bar[5] >= volume_multiple * median(b[5] for b in history))
 
 
-def replay(rows, start, end, volume_multiple, side_cost):
+def replay(rows, start, end, volume_multiple, side_cost, order_cap=80.):
     cash = peak = 1000.
     drawdown = 0.
     position = None
@@ -65,8 +65,8 @@ def replay(rows, start, end, volume_multiple, side_cost):
                 position = None
         if (not held_at_open and last_day != day and i >= 13 and previous[0]+STEP == t
                 and 3900 <= t%DAY <= 20*3600 and mid > previous[3]
-                and entry_signal(rows[i-13:i-1], previous, volume_multiple)):
-            cost = min(80., .08*cash)
+                and entry_signal(rows[i-13:i-1], previous, volume_multiple, order_cap)):
+            cost = min(order_cap, .08*cash)
             qty = (cost-.05)/(mid*(1+side_cost))
             stop = max(previous[3], .94*mid)
             position = t, qty, cost, stop, mid+2*(mid-stop)
@@ -92,8 +92,8 @@ def evaluate(packet, start, end):
         raise ValueError('Incomplete requested date coverage')
     return dict(pool=packet['pool'], mint=packet['mint'], candles=len(sampled),
                 missingSlots=(end-start)//STEP-len(sampled),
-                arms={f'volume{v}_bps{bps}':replay(rows,start,end,v,bps/10000)
-                      for v in (0,2) for bps in (50,100)})
+                arms={f'cap{cap}_volume{v}_bps{bps}':replay(rows,start,end,v,bps/10000,cap)
+                      for cap in (20,80) for v in (0,2) for bps in (50,100)})
 
 
 if __name__ == '__main__':
