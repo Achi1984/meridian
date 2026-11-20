@@ -1,1 +1,1 @@
-{"schema":1,"runId":44824912802,"attempt":1,"at":"2026-11-20T22:57:16Z","pools":983,"open":0,"closed":0,"realized":0,"equity":1000,"withdrawn":null,"expired":null}
+{"schema":1,"runId":44824912802,"attempt":1,"at":"2026-11-20T22:57:16Z","pools":983,"open":0,"closed":0,"realized":0,"equity":1000,"withdrawn":null,"expired":null,"fiveMinuteComparison":{"5000":{"signals":2,"priced":0,"missing":2,"medianPct":null},"10000":{"signals":0,"priced":0,"missing":0,"medianPct":null}}}
