@@ -75,6 +75,25 @@ export function mountSolanaReport(section) {
       field('Beobachtete Pools',s.pools);
       if (count(s.withdrawn)) field('Signal zurückgenommen · Pools',s.withdrawn);
       if (count(s.expired)) field('Signal abgelaufen · Pools',s.expired);
+      if (s.fiveMinuteComparison) {
+        const rows = ['10000','5000'].map(key=>s.fiveMinuteComparison[key]);
+        if (rows.every(row=>row && [row.signals,row.priced,row.missing].every(count)
+            && row.signals === row.priced + row.missing
+            && (row.priced === 0 ? row.medianPct === null : Number.isFinite(row.medianPct)))) {
+          const comparison = add(body,'details','');
+          add(comparison,'summary','Liquiditätsvergleich · 5 Minuten');
+          add(comparison,'p','Kursänderung ab dem ersten Signal je Pool, vor Handelskosten.');
+          for (const [i,row] of rows.entries()) {
+            const label = i === 0 ? '10.000 USD' : '5.000 USD';
+            add(comparison,'h3','Mindestliquidität ' + label);
+            add(comparison,'p',row.signals + ' Signalpools · ' + row.priced +
+                ' mit Folgekurs · ' + row.missing + ' ohne Folgekurs');
+            const value = row.medianPct === null ? 'nicht ermittelbar' :
+              row.medianPct.toLocaleString('de-AT',{maximumFractionDigits:2}) + ' %';
+            add(comparison,'p','Mediane Kursänderung · ' + value);
+          }
+        }
+      }
     } finally {
       loading = false;
       refresh.disabled = false;
