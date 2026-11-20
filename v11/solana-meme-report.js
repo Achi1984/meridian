@@ -30,7 +30,7 @@ export function mountSolanaReport(section) {
   refresh.className = 'strategy-entry-link';
   const source = add(section,'a','Pilotläufe auf GitHub');
   source.href = 'https://github.com/' + repo + '/actions/workflows/' + workflow;
-  source.className = 'strategy-entry-link';
+  source.style.cssText = 'display:inline-flex;align-items:center;min-height:44px;padding:0 10px';
   let loading = false;
   async function update() {
     if (loading) return;
