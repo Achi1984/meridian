@@ -111,7 +111,7 @@ def paper_slot(state, snapshot, fill_book, slot, observed, *, require_uptrend=Tr
     return dict(action=action, reason=reason, execution=execution, equityUsd=equity)
 
 
-def replay(db, *, duration=7*DAY):
+def replay(db, *, duration=7*DAY, require_uptrend=True):
     # Keep the pilot epoch, slots and endpoint baselines on one SQLite snapshot.
     with closing(db.cursor()) as cursor:
         rows = cursor.execute("""SELECT p.start, s.slot, s.record FROM pilot p
@@ -145,7 +145,7 @@ def replay(db, *, duration=7*DAY):
             if observed.tzinfo is None:
                 raise ValueError('expected timezone-aware publication time')
             latest = paper_slot(state, record.get('snapshot'), record.get('fillBook'), slot,
-                                observed.timestamp())
+                                observed.timestamp(), require_uptrend=require_uptrend)
             reasons[latest['action']][latest['reason']] += 1
             executions[latest['execution']] += 1
             modeled += 1
@@ -218,10 +218,16 @@ def first_day(db, now):
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--ledger', type=Path, required=True, help='Existing USD round.sqlite file')
-    parser.add_argument('--first-day', action='store_true',
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument('--compare-hourly-filter', action='store_true',
+                      help='Compare independent all-slot pullbacks with and without the hourly trend requirement')
+    mode.add_argument('--first-day', action='store_true',
                         help='Compare closed intervals of the first 24 hours, including recorded model costs')
     args = parser.parse_args()
     with closing(sqlite3.connect(args.ledger.resolve().as_uri() + '?mode=ro', uri=True)) as db:
         db.execute('BEGIN')
-        result = first_day(db, time.time()) if args.first_day else replay(db)
+        if args.compare_hourly_filter:
+            result = dict(withHourlyTrend=replay(db), withoutHourlyTrend=replay(db, require_uptrend=False))
+        else:
+            result = first_day(db, time.time()) if args.first_day else replay(db)
         print(json.dumps(result, allow_nan=False))
