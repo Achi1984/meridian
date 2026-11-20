@@ -91,6 +91,10 @@ def filter_outcomes(entries):
     for group in groups.values():
         avoided = group['avoidedLossUsd']
         missed = group['missedProfitUsd']
+        # Under a veto-only policy an unverifiable entry still goes through.
+        retained = group['confirmed'] + group['unverified']
+        group.update(retainedEntries=retained,
+                     retainedEntryPct=100 * retained / group['entries'] if group['entries'] else None)
         group.update(avoidedLossUsd=float(avoided), missedProfitUsd=float(missed),
                      differenceOnClosedTradesUsd=float(avoided-missed))
     return groups
