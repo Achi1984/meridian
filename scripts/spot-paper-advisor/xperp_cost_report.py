@@ -2,6 +2,7 @@
 import argparse
 import json
 import sqlite3
+import time
 from contextlib import closing
 from decimal import Decimal as D
 from pathlib import Path
@@ -64,10 +65,35 @@ def report(db):
                 unmatchedCloses=unmatched, openPaired=bool(entry and entry[1]['status']=='FILLED'), trades=trades)
 
 
+def snapshot(db, start):
+    result = report(db)
+    trades = result.pop('trades')
+    delta = {str(bps): sum(s['futuresMinusSpotUsd'] for trade in trades
+                          for s in trade['scenarios'] if s['spotFeeBps'] == bps)
+             for bps in (20, 10)} if trades else None
+    return dict(result, startSlot=start, deltaUsd=delta)
+
+
+def publish(db):
+    start = db.execute('select start from spot.pilot where id=1').fetchone()[0]
+    previous = None
+    while time.time() < start + 7*86400 + 600:
+        current = snapshot(db, start)
+        if current['lastSlot'] is not None and current != previous:
+            print(json.dumps({'pilotAudit': {'xperpComparison': current}}, allow_nan=False), flush=True)
+            previous = current
+        time.sleep(15)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
-    directory = parser.parse_args().directory.resolve()
+    parser.add_argument('--publish', action='store_true', help='Emit dashboard updates to the pilot log')
+    args = parser.parse_args()
+    directory = args.directory.resolve()
     with closing(sqlite3.connect((directory/'xperp.sqlite').as_uri()+'?mode=ro',uri=True)) as db:
         db.execute('attach database ? as spot', ((directory/'round.sqlite').as_uri()+'?mode=ro',))
-        print(json.dumps(report(db),allow_nan=False))
+        if args.publish:
+            publish(db)
+        else:
+            print(json.dumps(report(db),allow_nan=False))

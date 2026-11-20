@@ -76,7 +76,12 @@ async function readReport() {
   const usdRows = items.filter(item => item.usdRound).map(item => item.usdRound);
   const usd = usdRows
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
-  if (usd) return {usdRound: {...usd, activity: usdActivity(usdRows, usd)}};
+  if (usd) {
+    const comparison = items.map(item => item.xperpComparison).filter(row => row &&
+      row.startSlot * 1000 === Date.parse(usd.start) && row.lastSlot * 1000 <= Date.parse(usd.at))
+      .sort((a,b) => b.lastSlot-a.lastSlot || b.pairedClosed-a.pairedClosed)[0];
+    return {usdRound: {...usd, activity: usdActivity(usdRows, usd), xperpComparison: comparison ?? null}};
+  }
   const rows = items.filter(item => item.report);
   const comparisons = items.map(item => item.pilotAudit?.comparison).filter(Boolean);
   // This pilot moved to a new job instance with its original account ledger.
@@ -134,6 +139,15 @@ async function readRun(runId, token) {
     let item;
     try { item = JSON.parse(log.slice(start)); } catch { continue; }
     const {report, pilotAudit} = item || {};
+    const paired = pilotAudit?.xperpComparison;
+    if (paired && [paired.startSlot, paired.lastSlot, paired.observed, paired.pairedClosed,
+      paired.fundingPending, paired.unmatchedCloses].every(v => Number.isSafeInteger(v) && v >= 0) &&
+      paired.lastSlot >= paired.startSlot && typeof paired.openPaired === 'boolean' &&
+      (paired.pairedClosed === 0 ? paired.deltaUsd === null :
+        [paired.deltaUsd?.['10'], paired.deltaUsd?.['20']].every(Number.isFinite))) {
+      rows.push({xperpComparison: paired});
+      continue;
+    }
     const usd = pilotAudit?.usdRound;
     if (usd?.schema === 'MERIDIAN_USD_ROUND_V1' && usd.pair === 'BTC/USD' &&
         Number.isFinite(Date.parse(usd.at)) && Number.isFinite(Date.parse(usd.start)) &&
