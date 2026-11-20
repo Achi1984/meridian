@@ -1209,8 +1209,8 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
 });
 
 async function browserRun(call,start,width,height,server){
-  const evaluate=async expression=>{
-    const response=await call('Runtime.evaluate',{expression,returnByValue:true});
+  const evaluate=async (expression,awaitPromise=false)=>{
+    const response=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise});
     assert.ok(!response.exceptionDetails,'browser evaluation failed: '+JSON.stringify(response.exceptionDetails));
     return response.result?.value;
   };
@@ -1561,7 +1561,7 @@ async function browserRun(call,start,width,height,server){
       return {text:section.innerText,values:[...section.querySelectorAll('dd')].map(x=>x.textContent),
         fits:section.scrollWidth<=section.clientWidth+1};
     } finally {window.fetch=fetchOriginal;section.open=false;}
-  })()`);
+  })()`,true);
   assert.match(paperSnapshot.text,/Letzter Pilot · Läuft/);
   assert.deepEqual(paperSnapshot.values,['Unbewertet','0,00 USDC','1','0','12']);
   assert.equal(paperSnapshot.fits,true,'Solana paper report fits the strategy panel');
