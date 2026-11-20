@@ -10,7 +10,7 @@ from pathlib import Path
 from breakout_perp_history import FUNDING_STEP, SLIPPAGE_BPS_PER_SIDE, load_market
 from reclaim_history import candles
 from worker import DAY, STEP
-from swing_indicators import DailyIndicators
+from swing_indicators import DailyIndicators, confirmed_entry_target
 
 
 def regime(closes):
@@ -107,7 +107,7 @@ def evaluate(root, start, end, *, indicators=False):
     accounts = {k: Account() for k in (*intraday, 'swing', 'swingLongOnly', 'buyHold')}
     daily = DailyIndicators() if indicators else None
     if daily:
-        for key in daily.names:
+        for key in (*daily.names, 'confirmedEntry'):
             accounts[key] = Account()
             accounts[key + 'LongOnly'] = Account()
     closes = deque(maxlen=60)
@@ -155,7 +155,10 @@ def evaluate(root, start, end, *, indicators=False):
                         accounts['swingLongOnly'].target(max(0, trend), mid)
                         accounts['buyHold'].target(1, mid)
                         if daily:
-                            for key, side in daily.targets(trend).items():
+                            targets = daily.targets(trend)
+                            targets['confirmedEntry'] = confirmed_entry_target(
+                                accounts['confirmedEntry'].quantity, trend, targets['trendThreeOfFour'])
+                            for key, side in targets.items():
                                 accounts[key].target(side, mid)
                                 accounts[key + 'LongOnly'].target(max(0, side), mid)
                     if slot == day + DAY - STEP:
