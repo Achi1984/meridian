@@ -1,9 +1,10 @@
 """Offline ETH/BTC relative shock, equal initial USDT notional on two perpetuals."""
 import argparse
 from collections import Counter
-from datetime import date, timezone, datetime
+from datetime import date, timezone, datetime, time
 from itertools import groupby
 from math import log, log1p
+from zoneinfo import ZoneInfo
 from pathlib import Path
 import json
 
@@ -17,7 +18,7 @@ SHOCK = log1p(.03)
 
 def days(paths):
     for day, group in groupby(candles(paths), key=lambda b: b[0] // DAY * DAY):
-        yield day, {b[0]: b[4] for b in group}
+        yield day, {b[0]: b for b in group}
 
 
 class Pair:
@@ -93,10 +94,50 @@ def session(day, ratios, markets, accounts, exits):
             pair.mark(mids)
 
 
+NEW_YORK = ZoneInfo('America/New_York')
+
+
+def us_session(day, spot, markets, accounts):
+    # All crypto weekdays, including US exchange holidays. Three completed 10m bars.
+    local_date = datetime.fromtimestamp(day, timezone.utc).date()
+    if local_date.weekday() >= 5:
+        return
+    start = int(datetime.combine(local_date, time(9, 30), tzinfo=NEW_YORK).timestamp())
+    windows = [[series[start+i*STEP] for i in range(3)] for series in spot]
+    moves = [w[-1][4]/w[0][1]-1 for w in windows]
+    if min(moves) >= .0032:
+        side = 1
+    elif max(moves) <= -.0032:
+        side = -1
+    else:
+        return
+    entry = start+3*STEP
+    cutoff = start+38*STEP  # 15:50 New York
+    for bars, series, (prices, marks, rates), account in zip(windows, spot, markets, accounts):
+        # Range and brackets fixed in spot-price units at the entry open.
+        risk = max(b[2] for b in bars)-min(b[3] for b in bars)
+        if risk <= 0:
+            continue
+        reference = series[entry][1]
+        account.target(side, prices[entry])
+        account.mark(prices[entry])
+        for slot in range(entry+STEP, cutoff+1, STEP):
+            mid = prices[slot]
+            if slot % FUNDING_STEP == 0:
+                account.settle(rates.get(slot), marks.get(slot), mid)
+            profit = side*(series[slot-STEP][4]-reference)
+            if profit <= -risk or profit >= 2*risk or slot == cutoff:
+                account.target(0, mid)
+                account.mark(mid)
+                break
+            account.mark(mid)
+
+
 def evaluate(eth_root, btc_root, start, end):
     if start % DAY or end % DAY or end <= start:
         raise ValueError('Expected a nonempty UTC day range')
     accounts, exits = [Pair(), Pair()], Counter()
+    us_accounts = [Account(), Account()]
     skipped = total = 0
     cursor = datetime.fromtimestamp(start, timezone.utc).date().replace(day=1)
     while cursor.isoformat() < datetime.fromtimestamp(end, timezone.utc).date().isoformat():
@@ -114,10 +155,12 @@ def evaluate(eth_root, btc_root, start, end):
             if any(t not in eth or t not in btc or t not in markets[0][0] or t not in markets[1][0] for t in slots):
                 skipped += 1
                 continue
-            session(day, {t:log(eth[t]/btc[t]) for t in slots}, markets, accounts, exits)
+            session(day, {t:log(eth[t][4]/btc[t][4]) for t in slots}, markets, accounts, exits)
+            us_session(day, (eth, btc), markets, us_accounts)
         cursor = next_month
     return dict(days=total, excludedDays=skipped, exits=exits, reversion=accounts[0].result(),
-                continuation=accounts[1].result())
+                continuation=accounts[1].result(),
+                usSessionETH=us_accounts[0].result(), usSessionBTC=us_accounts[1].result())
 
 
 if __name__ == '__main__':
