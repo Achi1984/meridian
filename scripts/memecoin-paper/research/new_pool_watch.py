@@ -57,13 +57,13 @@ def snapshot(p):
                 volume=number(a['volume_usd']['m5']), buys=number(counts['buys']), sells=number(counts['sells']))
 
 
-def failed_checks(first, now, age):
+def failed_checks(first, now, age, *, liquidity_floor=10000):
     checks = {
         'observationWindow': 60 <= age <= 900,
         'tokenPair': (now['mint'] == first['mint'] and now['quote'] == first['quote']
                       and now['quote'] in (USDC, WSOL) and now['mint'] not in (USDC, WSOL)),
         'priceMomentum': first['price'] > 0 and now['price']/first['price'] >= 1.10,
-        'liquidity': now['liquidity'] >= max(10000, first['liquidity']),
+        'liquidity': now['liquidity'] >= max(liquidity_floor, first['liquidity']),
         'volume': now['volume'] >= 3000,
         'orderFlow': now['buys'] >= now['sells'] >= 3,
     }
@@ -115,6 +115,8 @@ def run(out, ticks, *, claude=False, account=None):
     out.mkdir(parents=True,exist_ok=True)
     counts = Counter()
     first, last, attempted, pending = {}, {}, set(), {}
+    comparison_signals = {}
+    comparison_priced = set()
     errors = (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, OSError)
     with (out/'events.jsonl').open('x', buffering=1) as ledger:
         def event(kind, **fields):
@@ -136,6 +138,14 @@ def run(out, ticks, *, claude=False, account=None):
                 else:
                     born, original = first[pool]
                     event('seenAgain', observedAge=t-born, observedAt=t, **x)
+                    if account is not None and launchpad_candidate(original,x,t):
+                        if (pool not in comparison_signals
+                                and not failed_checks(original,x,t-born,liquidity_floor=5000)):
+                            comparison_signals[pool] = (t,x['mint'],x['quote'])
+                    if pool in comparison_signals:
+                        at,mint,quote_token = comparison_signals[pool]
+                        if 300 <= t-at <= 360 and x['price'] > 0 and (x['mint'],x['quote']) == (mint,quote_token):
+                            comparison_priced.add(pool)
                     if (qualifies(original,x,t-born) and x['mint'] not in attempted
                             and (account is None or launchpad_candidate(original,x,t))):
                         candidates[pool] = (x['price']/original['price'],pool,x['mint'],t-born,original,x)
@@ -161,6 +171,11 @@ def run(out, ticks, *, claude=False, account=None):
             now = int(time.time())
             due = sorted((p for p,(t,_) in first.items() if 60<=now-t<=900 and now-last[p]>=60),
                          key=lambda p:(last[p],p))[:25]
+            followups = sorted((p for p,(at,_,_) in comparison_signals.items()
+                                if p not in comparison_priced and 300 <= now-at <= 360),
+                               key=lambda p:(comparison_signals[p][0],p))
+            # Reuse the existing provider batch; oldest due observations are read first.
+            due = list(dict.fromkeys(followups + due))[:25]
             candidates = {}
             if due:
                 try:
