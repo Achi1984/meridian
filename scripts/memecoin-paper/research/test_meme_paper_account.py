@@ -68,3 +68,27 @@ class MemeAccountTests(unittest.TestCase):
         self.assertEqual(a.status(86400)['cashUsdc'],979.95)
         self.assertEqual(a.observe('m',SIZE,86410),'dayClose')
         a.close()
+
+    def test_final_exit_recovery_and_exhaustion(self):
+        for quotes, rounds, remaining in [
+            ([ValueError(), ValueError(), 19*UNIT], 2, 0),
+            ([ValueError()] * 4, 3, 1),
+        ]:
+            with self.subTest(rounds=rounds), TemporaryDirectory() as out:
+                account = MemeAccount(':memory:')
+                self.addCleanup(account.close)
+                self.assertTrue(account.buy('mint','pool',100,SIZE,10000))
+                with patch.object(watch,'get',return_value={'data':[{}]}), \
+                     patch.object(watch,'snapshot',return_value={'pool':'pool'}), \
+                     patch.object(watch,'spot_quote',side_effect=quotes) as quote, \
+                     patch.object(watch.time,'time',return_value=10060), \
+                     patch.object(watch.time,'sleep') as sleep:
+                    watch.run(Path(out),1,account=account)
+                summary = json.loads((Path(out)/'summary.json').read_text())
+                self.assertEqual(summary['exitRetryRounds'],rounds)
+                self.assertEqual(quote.call_count,rounds+1)
+                self.assertEqual(sleep.call_count,rounds)
+                self.assertEqual(summary['events'].get('botExitUnresolved',0),remaining)
+                self.assertEqual(summary['account']['openPositions'],remaining)
+                self.assertEqual(summary['account']['equityUsdc'],None if remaining else 998.9)
+                self.assertEqual(summary['account']['cashUsdc'],979.95 if remaining else 998.9)
