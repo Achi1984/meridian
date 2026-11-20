@@ -10,7 +10,7 @@ import re
 import sqlite3
 
 from usd_pullback import paper_slot, closed_bars, target_covers_cost, usable_book
-from worker import DAY, STEP, execute, forced, initial, iso
+from worker import DAY, FEE, SLIP, STEP, execute, forced, initial, iso
 
 
 def entry_check(reason, snapshot, slot):
@@ -138,6 +138,20 @@ def exit_summary(entries):
                 differenceUsd=float(sum(paired)) if paired else None, excluded=dict(excluded))
 
 
+def trade_costs(ask, bid, quantity, ledger_net):
+    gross = quantity * (bid - ask)
+    slip = quantity * (bid + ask) * SLIP
+    turnover = quantity * (ask * (1 + SLIP) + bid * (1 - SLIP))
+    before_fees = gross - slip
+    fees = turnover * FEE
+    if abs(before_fees - fees - ledger_net) > Decimal('.000001'):
+        return None
+    return dict(quotePnlUsd=float(gross), slippageUsd=float(slip), turnoverUsd=float(turnover),
+                feesUsd=float(fees), ledgerNetUsd=float(ledger_net),
+                net20bpsUsd=float(before_fees-turnover*Decimal('.002')),
+                net10bpsUsd=float(before_fees-turnover*Decimal('.001')))
+
+
 def audit(db, *, first_day=False, require_uptrend=True):
     start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
     entries = []
@@ -145,7 +159,8 @@ def audit(db, *, first_day=False, require_uptrend=True):
     opened = pending_exit = None
     retry_account = initial()
     retry_trade = pending_retry = None
-    missing = observed = 0
+    missing = observed = unpaired_sales = 0
+    last_slot = None
     next_slot = start
     end = start + (DAY if first_day else 7*DAY)
     for slot, raw in db.execute('SELECT slot, record FROM slots WHERE slot>=? AND slot<? ORDER BY slot',
@@ -165,6 +180,7 @@ def audit(db, *, first_day=False, require_uptrend=True):
         if (report['pair'], report['schema'], report['start'], report['at']) != (
                 'BTC/USD', 'MERIDIAN_USD_ROUND_V1', iso(start), iso(slot)):
             raise ValueError('unexpected round')
+        last_slot = slot
         observed += 1
         arm = report['arms']['v3']
         if pending_retry is not None or retry_trade is not None:
@@ -203,11 +219,13 @@ def audit(db, *, first_day=False, require_uptrend=True):
                 else:
                     item['nextSlotPullback']['status'] = 'DAY_BOUNDARY'
             entries.append(item)
-            opened = item, before, state
+            opened = item, before, state, Decimal(str(record['fillBook']['ask']))
         elif arm['execution'] == 'PAPER_SELL' and opened:
-            item, before, state = opened
+            item, before, state, entry_ask = opened
             pnl = Decimal(record['states']['v3']['cash'])-before
             item['realizedUsd'] = float(pnl)
+            item['costs'] = trade_costs(entry_ask, Decimal(str(record['fillBook']['bid'])),
+                                       Decimal(state['btc']), pnl)
             if forced(state, slot):
                 item['delayedExit'] = dict(status='MANDATORY_EXIT')
             else:
@@ -215,7 +233,14 @@ def audit(db, *, first_day=False, require_uptrend=True):
                 pending_exit = item, state, Decimal(record['states']['v3']['cash'])
             totals[item['verdict']] += pnl
             opened = None
-    return dict(retryRequiresHourlyUptrend=require_uptrend, observedSlots=observed, missingSlots=missing, entries=entries,
+        elif arm['execution'] == 'PAPER_SELL':
+            unpaired_sales += 1
+    costs = [e['costs'] for e in entries if e.get('costs')]
+    ignored = unpaired_sales + sum('costs' in e and e['costs'] is None for e in entries)
+    summary = dict(through=iso(last_slot) if last_slot is not None else None, closed=len(costs),
+                   excludedCloses=ignored, totals={k: sum(row[k] for row in costs) for k in costs[0]} if costs else None,
+                   positiveQuoteTrades=sum(row['quotePnlUsd'] > 0 for row in costs))
+    return dict(costSummary=summary, retryRequiresHourlyUptrend=require_uptrend, observedSlots=observed, missingSlots=missing, entries=entries,
                 rulePublishedAt=RULE_PUBLISHED.isoformat(), outcomes=filter_outcomes(entries),
                 delayedExitSummary=exit_summary(entries),
                 closedPnlByVerdictUsd={key: float(value) for key, value in totals.items()})
