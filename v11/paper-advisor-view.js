@@ -124,6 +124,30 @@ function renderUsdRound(root, round) {
   } else {
     root.replaceChildren(title, scroll, costs, slot, decisions);
   }
+  const heading = doc.createElement('h4');
+  heading.textContent = 'BTC-Futures im Vergleich zu V3 Spot';
+  const status = doc.createElement('p');
+  const paired = round.xperpComparison;
+  if (!paired) {
+    status.textContent = 'Für diese Runde liegt noch kein Futures-Bericht vor.';
+  } else {
+    const details = [DATE.format(new Date(paired.lastSlot * 1000))];
+    if (paired.openPaired) details.push('Position offen');
+    if (paired.fundingPending) details.push('Funding ausstehend: ' + paired.fundingPending);
+    if (paired.unmatchedCloses) details.push('Ohne Vergleichsausführung: ' + paired.unmatchedCloses);
+    details.push(paired.pairedClosed ? 'Abgerechnete Trades: ' + paired.pairedClosed :
+      'Noch kein abgerechneter Trade');
+    status.textContent = details.join(' · ');
+    if (paired.pairedClosed && paired.deltaUsd) {
+      const delta = doc.createElement('p');
+      delta.textContent = 'Futures minus Spot, netto über alle abgerechneten Trades: ' +
+        usd.format(paired.deltaUsd['20']) + ' bei 0,20 % Spotgebühr · ' +
+        usd.format(paired.deltaUsd['10']) + ' bei 0,10 %.';
+      root.append(heading, status, delta);
+      return;
+    }
+  }
+  root.append(heading, status);
 }
 
 export function renderAdvisorReport(root, report, audit, decisions, trades, krakenUsd, comparison) {
