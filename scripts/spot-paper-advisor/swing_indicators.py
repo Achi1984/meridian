@@ -68,3 +68,10 @@ class DailyIndicators:
         consensus = int(votes.count(1) >= 3) - int(votes.count(-1) >= 3)
         return dict(self.votes, threeOfFour=consensus,
                     trendThreeOfFour=consensus if consensus == trend else 0)
+
+
+def confirmed_entry_target(quantity, trend, confirmed):
+    """Hold a trend-aligned position until neutral or reversal; confirm each new entry."""
+    if quantity * trend > 0:
+        return trend
+    return confirmed
