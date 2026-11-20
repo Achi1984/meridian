@@ -20,14 +20,22 @@ def archive_rows(path):
         yield from csv.DictReader(TextIOWrapper(raw, encoding='ascii'))
 
 
+def kline_opens(path):
+    """Monthly futures candles acquired before the header rollout have no header."""
+    with ZipFile(path) as archive, archive.open(path.stem + '.csv') as raw:
+        for index, row in enumerate(csv.reader(TextIOWrapper(raw, encoding='ascii'))):
+            if index == 0 and row[:2] == ['open_time', 'open']:
+                continue
+            yield int(row[0]) // 1000, row[1]
+
+
 def load_market(spot_paths, root):
     prices, marks, rates = {}, {}, {}
     for spot_path in spot_paths:
         for kind, table in [('klines', prices), ('markPriceKlines', marks)]:
-            for row in archive_rows(root/kind/spot_path.name):
-                at = int(row['open_time'])//1000
+            for at, opening in kline_opens(root/kind/spot_path.name):
                 if at % (600 if kind == 'klines' else FUNDING_STEP) == 0:
-                    price = float(row['open'])
+                    price = float(opening)
                     if not 0 < price < float('inf') or at in table:
                         raise ValueError('invalid or duplicate opening price')
                     table[at] = price
