@@ -1,6 +1,11 @@
 name: Solana new-pool paper observation
 on:
   workflow_dispatch:
+    inputs:
+      claude:
+        description: Compare Claude on the same quote probes (up to 10 API calls)
+        type: boolean
+        default: false
   push:
     branches: [main]
     paths: ['scripts/memecoin-paper/research/launches/solana-discovery-20261120.json']
@@ -17,10 +22,25 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Test scanner and paired attribution
+        run: python3 -m unittest discover -s scripts/memecoin-paper/research
       - name: Verify hosted access to the live discovery feed
         run: python3 -u scripts/memecoin-paper/research/new_pool_watch.py paper-results/preflight --ticks 1
       - name: Collect first sightings and two-way quote probes
-        run: python3 -u scripts/memecoin-paper/research/new_pool_watch.py paper-results/observations --ticks 60
+        env:
+          USE_CLAUDE: ${{ github.event_name == 'workflow_dispatch' && inputs.claude }}
+          ANTHROPIC_API_KEY: ${{ github.event_name == 'workflow_dispatch' && inputs.claude && secrets.ANTHROPIC_API_KEY || '' }}
+        run: |
+          args=()
+          if [[ "$USE_CLAUDE" == "true" ]]; then args+=(--claude); fi
+          python3 -u scripts/memecoin-paper/research/new_pool_watch.py paper-results/observations --ticks 60 "${args[@]}"
+      - name: Compare prospective decisions
+        if: always()
+        run: |
+          if test -s paper-results/observations/events.jsonl; then
+            python3 scripts/memecoin-paper/research/pool_shadow.py paper-results/observations/events.jsonl > paper-results/comparison.json
+            cat paper-results/comparison.json >> "$GITHUB_STEP_SUMMARY"
+          fi
       - name: Publish run counts
         if: always()
         run: |
