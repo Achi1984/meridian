@@ -1269,6 +1269,7 @@ async function browserRun(call,start,width,height,server){
     const link=document.querySelector('a.strategy-entry-link'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
     return {width:innerWidth,height:innerHeight,viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,
       root:document.documentElement.scrollWidth,count:document.querySelectorAll('a.strategy-entry-link').length,
+      hit:link.contains(document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)),
       text:link.textContent,href:link.getAttribute('href'),linkHeight:rect.height,linkWidth:rect.width,
       visible:rect.width>0&&rect.height>0&&style.display!=='none'&&style.visibility==='visible',
       outsideHistory:!link.closest('#version-panel')&&!link.closest('[hidden]'),
@@ -1277,6 +1278,7 @@ async function browserRun(call,start,width,height,server){
   assert.equal(initial.width,width);assert.equal(initial.height,height);assert.equal(initial.viewport,width);
   assert.ok(initial.body<=width+1&&initial.root<=width+1,'initial page overflow at '+width);
   assert.equal(initial.count,1);assert.equal(initial.text,'Strategien öffnen');assert.equal(initial.href,'#view-strategies');
+  assert.ok(initial.hit && initial.linkWidth>=44 && initial.linkHeight>=44,'unfocused strategy link accepts pointer input at '+width);
   assert.ok(initial.outsideHistory&&initial.historyHidden,'keyboard shortcut is outside the closed history');
   assert.ok(await evaluate("document.querySelector('#nav [data-v=strategies]').getBoundingClientRect().height>=44"),'persistent strategy target is at least 44px tall');
 
