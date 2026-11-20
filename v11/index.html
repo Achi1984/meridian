@@ -671,17 +671,6 @@
     if (!button || !nav.contains(button)) return;
     activate(button.dataset.v);
   });
-  const strategyLink = document.querySelector('[data-open-strategies]');
-  const strategyTab = tabs.find(button => button.dataset.v === 'strategies');
-  if (strategyLink && strategyTab) {
-    strategyLink.addEventListener('click', function (event) {
-      if (event.defaultPrevented || event.button !== 0 || event.metaKey ||
-          event.ctrlKey || event.shiftKey || event.altKey) return;
-      event.preventDefault();
-      event.stopPropagation();
-      strategyTab.click();
-    });
-  }
   const versionToggle = document.getElementById('version-toggle');
   const versionPanel = document.getElementById('version-panel');
   const versionClose = document.getElementById('version-close');
