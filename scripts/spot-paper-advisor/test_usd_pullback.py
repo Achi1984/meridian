@@ -148,7 +148,21 @@ class PullbackTest(unittest.TestCase):
         from decimal import Decimal
         from usd_pullback import fixed_lot_fee_scenarios
         bids = [(START+STEP, Decimal('100.35')), (START+2*STEP, Decimal('102'))]
-        results = fixed_lot_fee_scenarios(Decimal(100), Decimal(1), bids[-1][1], bids)
+        results = fixed_lot_fee_scenarios(Decimal(100), Decimal(1), bids[-1][1], bids, bids[-1][0])
         self.assertEqual(results[0]['firstPositiveAt'], iso(START+2*STEP))
         self.assertEqual(results[-1]['firstPositiveAt'], iso(START+STEP))
         self.assertEqual(results[-1]['firstPositiveBidUsd'], 100.35)
+
+        self.assertIsNone(results[0]['halfExitAt'])
+        self.assertEqual(results[0]['halfExitDeltaUsd'], 0)
+        self.assertLess(results[-1]['halfExitDeltaUsd'], 0)
+
+    def test_half_exit_locks_half_the_quote_difference_after_sell_costs(self):
+        from decimal import Decimal
+        from usd_pullback import fixed_lot_fee_scenarios
+        bids = [(START+STEP, Decimal(102)), (START+2*STEP, Decimal(99))]
+        scenarios = fixed_lot_fee_scenarios(Decimal(100), Decimal(2), bids[-1][1], bids, bids[-1][0])
+        regular = next(s for s in scenarios if s['feeBpsPerSide'] == 35)
+        self.assertEqual(regular['halfExitAt'], iso(START+STEP))
+        self.assertAlmostEqual(regular['halfExitDeltaUsd'], 3 * 0.999 * 0.9965)
+        self.assertAlmostEqual(regular['halfExitNetUsd'], regular['exitNetUsd'] + regular['halfExitDeltaUsd'])
