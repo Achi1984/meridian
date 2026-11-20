@@ -25,3 +25,17 @@ class FunnelTest(unittest.TestCase):
         self.assertIsNone(report['account']['equityUsdc'])
         with self.assertRaises(ValueError):
             audit(rows[:-1], summary)
+
+    def test_floor_replay_uses_first_signal_and_bounded_followup(self):
+        first = dict(event='firstSeen', at=0, created='1970-01-01T00:00:00+00:00',
+                     mint='a',quote=WSOL,pool='A',dex='pump-fun',price=1,liquidity=4000,
+                     volume=4000,buys=4,sells=3)
+        signal = dict(first,event='seenAgain',at=60,price=2,liquidity=6000)
+        rows = [first,dict(first,pool='B'),signal,dict(signal,pool='B'),
+                dict(signal,at=359,price=4),dict(signal,at=360,price=1),
+                dict(signal,pool='B',at=421,price=4)]
+        result=audit(rows,dict(events=dict(Counter(r['event'] for r in rows)),pools=2,ticks=8,account={}))
+        self.assertEqual(result['liquidityFloorComparison']['10000']['signalPools'],0)
+        self.assertEqual(result['liquidityFloorComparison']['5000'],
+                         dict(signalPools=2,pricedAtFiveMinutes=1,missingAtFiveMinutes=1,
+                              medianPriceChangePct=-50))
