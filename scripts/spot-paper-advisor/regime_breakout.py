@@ -50,7 +50,7 @@ class Account:
             self.net -= charge
             self.funding += charge
 
-    def target(self, side, mid):
+    def target(self, side, mid, *, entry_notional=100):
         if side == (1 if self.quantity > 0 else -1 if self.quantity < 0 else 0):
             return
         if self.quantity:
@@ -65,7 +65,7 @@ class Account:
             self.quantity = 0.
         if side:
             self.before_entry = self.net
-            self.quantity = side * floor(100 / mid * 1e8) / 1e8
+            self.quantity = side * floor(entry_notional / mid * 1e8) / 1e8
             self.entry = mid
             fee = self.fill_cost(self.quantity, mid)
             self.cost += fee
