@@ -27,6 +27,7 @@ export function mountSolanaReport(section) {
   const body = add(section,'div','');
   const refresh = add(section,'button','Aktualisieren');
   refresh.type = 'button';
+  refresh.className = 'strategy-entry-link';
   const source = add(section,'a','Pilotläufe auf GitHub');
   source.href = 'https://github.com/' + repo + '/actions/workflows/' + workflow;
   source.className = 'strategy-entry-link';
@@ -68,7 +69,7 @@ export function mountSolanaReport(section) {
       }
       field('Kontowert',amount(s.equity));
       field('Realisierter PnL',amount(s.realized)).className =
-        s.realized > 0 ? 'tone-positive' : s.realized < 0 ? 'tone-negative' : '';
+        s.realized > 0 ? 'tone-safe' : s.realized < 0 ? 'tone-danger' : '';
       field('Offene Positionen',s.open);
       field('Geschlossene Trades',s.closed);
       field('Beobachtete Pools',s.pools);
