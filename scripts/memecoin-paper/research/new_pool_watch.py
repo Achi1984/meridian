@@ -57,12 +57,21 @@ def snapshot(p):
                 volume=number(a['volume_usd']['m5']), buys=number(counts['buys']), sells=number(counts['sells']))
 
 
+def failed_checks(first, now, age):
+    checks = {
+        'observationWindow': 60 <= age <= 900,
+        'tokenPair': (now['mint'] == first['mint'] and now['quote'] == first['quote']
+                      and now['quote'] in (USDC, WSOL) and now['mint'] not in (USDC, WSOL)),
+        'priceMomentum': first['price'] > 0 and now['price']/first['price'] >= 1.10,
+        'liquidity': now['liquidity'] >= max(10000, first['liquidity']),
+        'volume': now['volume'] >= 3000,
+        'orderFlow': now['buys'] >= now['sells'] >= 3,
+    }
+    return [name for name, passed in checks.items() if not passed]
+
+
 def qualifies(first, now, age):
-    return (60 <= age <= 900 and now['mint']==first['mint'] and now['quote']==first['quote']
-            and now['quote'] in (USDC, WSOL) and now['mint'] not in (USDC, WSOL)
-            and first['price'] > 0 and now['price']/first['price'] >= 1.10
-            and now['liquidity'] >= max(10000, first['liquidity'])
-            and now['volume'] >= 3000 and now['buys'] >= now['sells'] >= 3)
+    return not failed_checks(first, now, age)
 
 
 def quote(src, dst, amount):
@@ -126,8 +135,8 @@ def run(out, ticks, *, claude=False, account=None):
                     first[pool] = (t, x)
                     event('firstSeen', **x)
                 else:
-                    event('seenAgain', **x)
                     born, original = first[pool]
+                    event('seenAgain', observedAge=t-born, observedAt=t, **x)
                     if (qualifies(original,x,t-born) and x['mint'] not in attempted
                             and (account is None or launchpad_candidate(original,x,t))):
                         found.append((x['price']/original['price'],pool,x['mint'],t-born,original,x))
@@ -184,7 +193,9 @@ def run(out, ticks, *, claude=False, account=None):
                 attempted.add(mint)
                 event('momentumCandidate',pool=pool,mint=mint)
                 try:
+                    side = 'buy'
                     qty = entry_quote(USDC,mint,SIZE)
+                    side = 'sell'
                     sell = entry_quote(mint,USDC,qty)
                     event('roundTripQuote',pool=pool,mint=mint,tokensRaw=qty, usdcRaw=sell)
                     if sell >= .95*SIZE:
@@ -195,7 +206,7 @@ def run(out, ticks, *, claude=False, account=None):
                         elif account.buy(mint,pool,qty,sell,int(time.time())):
                             event('botBuy',mint=mint,pool=pool,tokensRaw=qty,usdcRaw=SIZE)
                 except errors as exc:
-                    event('quoteUnavailable', mint=mint,reason=type(exc).__name__)
+                    event('quoteUnavailable', mint=mint,side=side,reason=type(exc).__name__)
             summary = dict(ticks=tick+1,pools=len(first),openProbes=len(pending),events=dict(counts))
             if account is not None:
                 summary['account'] = account.status(int(time.time()))
