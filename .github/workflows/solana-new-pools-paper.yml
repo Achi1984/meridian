@@ -1,0 +1,37 @@
+name: Solana new-pool paper observation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/memecoin-paper/research/launches/solana-discovery-20261120.json']
+permissions:
+  contents: read
+concurrency:
+  group: solana-new-pool-observer
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 85
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify hosted access to the live discovery feed
+        run: python3 -u scripts/memecoin-paper/research/new_pool_watch.py paper-results/preflight --ticks 1
+      - name: Collect first sightings and two-way quote probes
+        run: python3 -u scripts/memecoin-paper/research/new_pool_watch.py paper-results/observations --ticks 60
+      - name: Publish run counts
+        if: always()
+        run: |
+          if test -s paper-results/observations/summary.json; then
+            cat paper-results/observations/summary.json >> "$GITHUB_STEP_SUMMARY"
+          fi
+      - name: Retain paper observations
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: solana-new-pools-${{ github.run_id }}-${{ github.run_attempt }}
+          path: paper-results/
+          if-no-files-found: error
+          retention-days: 30
