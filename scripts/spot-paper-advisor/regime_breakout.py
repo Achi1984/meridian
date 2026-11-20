@@ -10,7 +10,7 @@ from pathlib import Path
 from breakout_perp_history import FUNDING_STEP, SLIPPAGE_BPS_PER_SIDE, load_market
 from reclaim_history import candles
 from worker import DAY, STEP
-from swing_channels import ChannelSignals, configurations
+from swing_channels import ChannelSignals, configurations, vote_groups
 from swing_indicators import DailyIndicators, confirmed_entry_target
 
 
@@ -101,11 +101,12 @@ def signals(bars, previous_low):
         yield bars[i+1][0], (direction, reclaimed, bar[4], midpoint)
 
 
-def evaluate(root, start, end, *, indicators=False, channels=False):
+def evaluate(root, start, end, *, indicators=False, channels=False, full_grid=False):
     if start % DAY or end % DAY or end <= start:
         raise ValueError('Expected a nonempty half-open UTC day range')
     intraday = ('long', 'short', 'regime', 'regimeReclaim')
     accounts = {k: Account() for k in (*intraday, 'swing', 'swingLongOnly', 'buyHold')}
+    channels = channels or full_grid
     indicators = indicators or channels
     rules = configurations() if channels else []
     channel_signals = ChannelSignals() if channels else None
@@ -116,6 +117,16 @@ def evaluate(root, start, end, *, indicators=False, channels=False):
         for key in (*daily.names, 'confirmedEntry'):
             accounts[key] = Account()
             accounts[key + 'LongOnly'] = Account()
+    grid = {}
+    if full_grid:
+        for group, minimum in vote_groups(tuple(daily.votes)):
+            prefix = 'grid_' + '-'.join(group) + '_' + str(minimum) + '_'
+            variants = []
+            for rule in configurations():
+                account = Account()
+                accounts[prefix + rule.name] = account
+                variants.append((rule, account))
+            grid[group, minimum] = variants
     closes = deque(maxlen=60)
     previous_low = previous_day = last_mid = None
     excluded = warmup = total = 0
@@ -168,6 +179,12 @@ def evaluate(root, start, end, *, indicators=False, channels=False):
                                 account = accounts['channel_' + rule.name]
                                 side = rule.target(account.quantity, trend, targets['trendThreeOfFour'], channel_signals)
                                 account.target(side, mid)
+                            for (group, minimum), variants in grid.items():
+                                aligned = sum(daily.votes[key] == trend for key in group)
+                                confirmed = trend if aligned >= minimum else 0
+                                for rule, account in variants:
+                                    side = rule.target(account.quantity, trend, confirmed, channel_signals)
+                                    account.target(side, mid)
                             for key, side in targets.items():
                                 accounts[key].target(side, mid)
                                 accounts[key + 'LongOnly'].target(max(0, side), mid)
@@ -212,7 +229,9 @@ if __name__ == '__main__':
     parser.add_argument('--indicators', action='store_true',
                         help='Score individual and combined daily indicators; use all prior spot history for warmup')
     parser.add_argument('--channels', action='store_true', help='Compare all 16 fixed daily entry/exit combinations')
+    parser.add_argument('--full-grid', action='store_true',
+                        help='Cross all 32 indicator groups/vote thresholds with the 16 channel variants')
     args = parser.parse_args()
     def stamp(date):
         return int(datetime.strptime(date, '%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp())
-    print(json.dumps(evaluate(args.root, stamp(args.start), stamp(args.end), indicators=args.indicators, channels=args.channels), indent=2))
+    print(json.dumps(evaluate(args.root, stamp(args.start), stamp(args.end), indicators=args.indicators, channels=args.channels, full_grid=args.full_grid), indent=2))
