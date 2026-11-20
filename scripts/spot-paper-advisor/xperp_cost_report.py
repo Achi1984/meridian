@@ -61,7 +61,10 @@ def report(db):
             else:
                 unmatched += 1
             entry = None
-    return dict(observed=observed, lastSlot=last_slot, pairedClosed=len(trades), fundingPending=pending,
+    nets = [trade['scenarios'][0]['futuresNetUsd'] for trade in trades]
+    performance = dict(netUsd=sum(nets), meanNetUsd=sum(nets)/len(nets),
+                       wins=sum(net > 0 for net in nets)) if nets else None
+    return dict(settledPerformance=performance, observed=observed, lastSlot=last_slot, pairedClosed=len(trades), fundingPending=pending,
                 unmatchedCloses=unmatched, openPaired=bool(entry and entry[1]['status']=='FILLED'), trades=trades)
 
 
