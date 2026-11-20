@@ -1,4 +1,4 @@
-"""Offline BTCUSDT regime comparison. Input layout: YEAR/{spot,klines,markPriceKlines,fundingRate}."""
+"""Offline BTCUSDT/ETHUSDT regime comparison. Input layout: YEAR/{spot,klines,markPriceKlines,fundingRate}."""
 import argparse
 from collections import deque
 from datetime import datetime, timezone
@@ -101,7 +101,9 @@ def signals(bars, previous_low):
         yield bars[i+1][0], (direction, reclaimed, bar[4], midpoint)
 
 
-def evaluate(root, start, end, *, indicators=False, channels=False, full_grid=False):
+def evaluate(root, start, end, *, indicators=False, channels=False, full_grid=False, symbol='BTCUSDT'):
+    if symbol not in ('BTCUSDT', 'ETHUSDT'):
+        raise ValueError('Unsupported perpetual symbol')
     if start % DAY or end % DAY or end <= start:
         raise ValueError('Expected a nonempty half-open UTC day range')
     intraday = ('long', 'short', 'regime', 'regimeReclaim')
@@ -114,7 +116,7 @@ def evaluate(root, start, end, *, indicators=False, channels=False, full_grid=Fa
         accounts['channel_' + rule.name] = Account()
     daily = DailyIndicators() if indicators else None
     if daily:
-        for key in (*daily.names, 'confirmedEntry'):
+        for key in (*daily.names, 'confirmedEntry', 'macdEntry'):
             accounts[key] = Account()
             accounts[key + 'LongOnly'] = Account()
     grid = {}
@@ -132,7 +134,7 @@ def evaluate(root, start, end, *, indicators=False, channels=False, full_grid=Fa
     excluded = warmup = total = 0
     for folder in sorted(root.glob('[0-9][0-9][0-9][0-9]')):
         paths = []
-        for path in sorted((folder/'spot').glob('BTCUSDT-5m-????-??.zip')):
+        for path in sorted((folder/'spot').glob(f'{symbol}-5m-????-??.zip')):
             month = datetime.strptime(path.stem[-7:], '%Y-%m').replace(tzinfo=timezone.utc).timestamp()
             if month < end and (indicators or month >= start - 93*DAY):
                 paths.append(path)
@@ -175,6 +177,9 @@ def evaluate(root, start, end, *, indicators=False, channels=False, full_grid=Fa
                             targets = daily.targets(trend)
                             targets['confirmedEntry'] = confirmed_entry_target(
                                 accounts['confirmedEntry'].quantity, trend, targets['trendThreeOfFour'])
+                            macd_confirmation = trend if daily.votes['macd'] == trend else 0
+                            targets['macdEntry'] = confirmed_entry_target(
+                                accounts['macdEntry'].quantity, trend, macd_confirmation)
                             for rule in rules:
                                 account = accounts['channel_' + rule.name]
                                 side = rule.target(account.quantity, trend, targets['trendThreeOfFour'], channel_signals)
@@ -231,7 +236,9 @@ if __name__ == '__main__':
     parser.add_argument('--channels', action='store_true', help='Compare all 16 fixed daily entry/exit combinations')
     parser.add_argument('--full-grid', action='store_true',
                         help='Cross all 32 indicator groups/vote thresholds with the 16 channel variants')
+    parser.add_argument('--symbol', choices=('BTCUSDT', 'ETHUSDT'), default='BTCUSDT',
+                        help='Use matching spot and perpetual archives for this symbol')
     args = parser.parse_args()
     def stamp(date):
         return int(datetime.strptime(date, '%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp())
-    print(json.dumps(evaluate(args.root, stamp(args.start), stamp(args.end), indicators=args.indicators, channels=args.channels, full_grid=args.full_grid), indent=2))
+    print(json.dumps(evaluate(args.root, stamp(args.start), stamp(args.end), indicators=args.indicators, channels=args.channels, full_grid=args.full_grid, symbol=args.symbol), indent=2))
