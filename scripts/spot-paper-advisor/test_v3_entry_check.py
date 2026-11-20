@@ -53,3 +53,32 @@ class EntryCheckTest(unittest.TestCase):
         self.assertEqual(delayed_exit(state, record, slot, Decimal(999))['status'], 'INSUFFICIENT_BID_SIZE')
         report['arms']['v3']['execution'] = 'PAPER_BUY'
         self.assertEqual(delayed_exit(state, record, slot, Decimal(999))['status'], 'REENTRY_CONFLICT')
+
+
+    def test_retry_has_independent_entry_and_exit(self):
+        import sqlite3
+        import json
+        from worker import STEP
+        from v3_entry_check import audit
+        from contextlib import closing
+        with closing(sqlite3.connect(':memory:')) as db:
+            db.execute('CREATE TABLE pilot (id, start)')
+            db.execute('INSERT INTO pilot VALUES (1, ?)', (START,))
+            db.execute('CREATE TABLE slots (slot, record)')
+            for i, execution in enumerate(('PAPER_BUY', 'PAPER_SELL', 'HOLD')):
+                slot = START+i*STEP
+                arm = dict(reason='Ausbruch', execution=execution)
+                report = dict(pair='BTC/USD', schema='MERIDIAN_USD_ROUND_V1', start=iso(START),
+                              at=iso(slot), publishedAt=iso(slot+3), arms={'v3': arm})
+                data = snapshot(slot)
+                if i == 2:
+                    data['ten'][-1][2:5] = [112, 98, 111]
+                record = dict(report=report, snapshot=data, fillBook=quote(slot, 111, 112) if i==2 else quote(slot),
+                              states={'v3': dict(btc='1', cash='900', entryCostUsd='100', opened=START)})
+                db.execute('INSERT INTO slots VALUES (?,?)', (slot, json.dumps(record)))
+            result = audit(db)['entries'][0]['nextSlotPullback']
+            self.assertEqual(result['execution'], 'PAPER_BUY')
+            self.assertEqual(result['exitReason'], 'TARGET_REACHED')
+            self.assertGreater(result['realizedUsd'], 0)
+            db.execute('DELETE FROM slots WHERE slot=?', (START+STEP,))
+            self.assertEqual(audit(db)['entries'][0]['nextSlotPullback']['status'], 'NEXT_SLOT_UNAVAILABLE')
