@@ -1,3 +1,4 @@
+import {mountSolanaReport} from './solana-meme-report.js?v=B19-M11';
 import {createAdvisorSection} from './paper-advisor-view.js?v=B19-M11';
 import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B19-M11';
 import {createStrategyArenaView} from './strategy-arena.js?v=B19-M11';
@@ -44,6 +45,8 @@ function mountWorkspace(){
   const botOverviewRoot=document.createElement('section');
   botOverviewRoot.id='paper-bot-overview-root';
   botReports.append(botOverviewRoot);
+  const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot',botReports);
+  mountSolanaReport(solana);
   const advisor = collapsedSection('paper-advisor','BTC/EUR · Live-Paperbot',botReports);
   advisor.open = true;
   advisorController = createAdvisorSection(advisor);
