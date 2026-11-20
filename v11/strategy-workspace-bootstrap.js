@@ -45,12 +45,12 @@ function mountWorkspace(){
   const botOverviewRoot=document.createElement('section');
   botOverviewRoot.id='paper-bot-overview-root';
   botReports.append(botOverviewRoot);
-  const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot',botReports);
-  mountSolanaReport(solana);
   const advisor = collapsedSection('paper-advisor','BTC/EUR · Live-Paperbot',botReports);
   advisor.open = true;
   advisorController = createAdvisorSection(advisor);
   advisorController.setActive(Boolean(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')));
+  const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot');
+  mountSolanaReport(solana);
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';
