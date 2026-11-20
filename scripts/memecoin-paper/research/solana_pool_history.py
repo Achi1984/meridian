@@ -4,6 +4,7 @@ from datetime import date
 import json
 from pathlib import Path
 import time
+from urllib.error import HTTPError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -26,8 +27,16 @@ def fetch(token, start, end):
     while cursor >= start:
         params = dict(aggregate=5, limit=1000, currency='usd', token='base', before_timestamp=cursor)
         request = Request(endpoint+'?'+urlencode(params), headers={'User-Agent':'Meridian-offline-research'})
-        with urlopen(request, timeout=30) as response:
-            packet = json.load(response)
+        for attempt in range(4):
+            try:
+                with urlopen(request, timeout=30) as response:
+                    packet = json.load(response)
+                break
+            except HTTPError as error:
+                if error.code != 429 or attempt == 3:
+                    raise
+                delay = error.headers.get('Retry-After', '')
+                time.sleep(max(60, int(delay)) if delay.isdigit() else 60)
         meta = packet['meta']
         if meta['base']['address'] != mint or meta['quote']['address'] != WSOL:
             raise ValueError('Unexpected pool token identities')
@@ -45,7 +54,7 @@ def fetch(token, start, end):
                 rows[at] = row
         cursor = oldest-1
         if cursor >= start:
-            time.sleep(2)
+            time.sleep(7)
     ordered = [rows[t] for t in sorted(rows)]
     validate(ordered)
     return dict(pool=pool, mint=mint, rows=ordered)
