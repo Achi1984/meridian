@@ -11,6 +11,16 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
   const main=document.getElementById('app-main');
   if(!app||!gate||!form||!input||!status||!lockButton)return null;
   let disposed=false,lastStatus='locked',submissionGeneration=0;
+  const strategyLink=document.querySelector?.('[data-open-strategies]');
+  function openStrategies(event){
+    if(event.defaultPrevented || event.button!==0 || event.ctrlKey || event.metaKey ||
+       event.shiftKey || event.altKey || app.hidden || !access.isUnlocked())return;
+    const tab=document.querySelector('#nav button[data-v="strategies"]');
+    if(!tab)return;
+    event.preventDefault();
+    tab.click();
+  }
+  strategyLink?.addEventListener('click',openStrategies);
   let strategyLinkPending=window.location?.hash==='#view-strategies';
   function followStrategyLink(){
     if(!strategyLinkPending||app.hidden||document.hidden||!access.isUnlocked())return;
@@ -90,6 +100,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
     submissionGeneration++;input.value='';
     access.lock();disposed=true;
     unsubscribe();
+    strategyLink?.removeEventListener('click',openStrategies);
     form.removeEventListener('submit',submit);
     lockButton.removeEventListener('click',lock);
     document.removeEventListener('visibilitychange',visibility);

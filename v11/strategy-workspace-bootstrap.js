@@ -187,11 +187,3 @@ if(!bindNavWhenReady()){
   navObserver = new MutationObserver(bindNavWhenReady);
   navObserver.observe(document.documentElement,{childList:true,subtree:true});
 }
-document.addEventListener('click',event=>{
-  const link = event.target.closest?.('[data-open-strategies]');
-  if (!link) return;
-  event.preventDefault();
-  document.querySelector('#nav button[data-v="strategies"]')?.click();
-  requestWorkspaceLoad();
-});
-
