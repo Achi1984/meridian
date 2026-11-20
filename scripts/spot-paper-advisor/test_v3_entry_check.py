@@ -29,7 +29,9 @@ class EntryCheckTest(unittest.TestCase):
                                   entry('21:30:00', None), entry('21:40:00', 12, 'unverified')])
         self.assertEqual(result['designTrade']['avoidedLossUsd'], 0.67)
         self.assertEqual(result['otherHistorical']['avoidedLossUsd'], 2)
+        self.assertIsNone(filter_outcomes([])['afterRulePublication']['retainedEntryPct'])
         later = result['afterRulePublication']
+        self.assertEqual((later['retainedEntries'], later['retainedEntryPct']), (1, 25))
         self.assertEqual((later['entries'], later['blockedClosed'], later['blockedWithoutExit']), (4, 2, 1))
         self.assertEqual((later['avoidedLossUsd'], later['missedProfitUsd'], later['differenceOnClosedTradesUsd']),
                          (1, 3, -2))
