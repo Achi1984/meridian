@@ -118,6 +118,22 @@ def delayed_exit(state, record, slot, original_cash):
                 differenceUsd=float(cash-original_cash))
 
 
+def exit_summary(entries):
+    paired = []
+    excluded = Counter()
+    for entry in entries:
+        exit_result = entry.get('delayedExit')
+        if exit_result is None:
+            excluded['NO_MATCHED_SALE'] += 1
+        elif exit_result['status'] != 'PRICED':
+            excluded[exit_result['status']] += 1
+        else:
+            paired.append(Decimal(str(exit_result['differenceUsd'])))
+    return dict(paired=len(paired), better=sum(x > 0 for x in paired),
+                worse=sum(x < 0 for x in paired), unchanged=paired.count(0),
+                differenceUsd=float(sum(paired)) if paired else None, excluded=dict(excluded))
+
+
 def audit(db, *, first_day=False):
     start, = db.execute('SELECT start FROM pilot WHERE id=1').fetchone()
     entries = []
@@ -169,6 +185,7 @@ def audit(db, *, first_day=False):
             opened = None
     return dict(observedSlots=observed, missingSlots=missing, entries=entries,
                 rulePublishedAt=RULE_PUBLISHED.isoformat(), outcomes=filter_outcomes(entries),
+                delayedExitSummary=exit_summary(entries),
                 closedPnlByVerdictUsd={key: float(value) for key, value in totals.items()})
 
 
