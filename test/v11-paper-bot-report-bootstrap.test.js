@@ -865,7 +865,7 @@ test('progress read is aborted and cannot repaint after lock or navigation', asy
   }
 });
 
-test('M11 strategy bootstrap mounts both reviewed panels under existing navigation and owns the only click path', () => {
+test('M11 strategy bootstrap mounts both reviewed panels under existing navigation and delegates shortcut ownership to the access shell', () => {
   const source = readFileSync(new URL('../v11/strategy-workspace-bootstrap.js', import.meta.url), 'utf8');
   assert.match(source, /mountPaperBotReportWorkspace/);
   assert.match(source, /paper-bot-overview-section/);
@@ -873,7 +873,10 @@ test('M11 strategy bootstrap mounts both reviewed panels under existing navigati
   assert.match(source, /Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt/);
   assert.match(source, /paperBotReportWorkspace\?\.setActive\(button\.dataset\.v==='strategies'\)/);
   assert.match(source, /botReports\.open=true/);
-  assert.equal((source.match(/addEventListener\(['"]click['"]/g) || []).length, 2,
-    'one nav and one strategy shortcut listener remain; no report polling listener is added');
+  assert.equal((source.match(/addEventListener\(['"]click['"]/g) || []).length, 1,
+    'only the bottom nav listener loads reports');
+  const access = readFileSync(new URL('../v11/app-access-bootstrap.js', import.meta.url), 'utf8');
+  assert.ok(access.includes("strategyLink?.addEventListener('click',openStrategies)"));
+  assert.ok(access.includes("strategyLink?.removeEventListener('click',openStrategies)"));
   assert.doesNotMatch(source, /\bsetInterval\s*\(|\bsetTimeout\s*\(/);
 });
