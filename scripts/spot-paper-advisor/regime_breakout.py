@@ -10,6 +10,7 @@ from pathlib import Path
 from breakout_perp_history import FUNDING_STEP, SLIPPAGE_BPS_PER_SIDE, load_market
 from reclaim_history import candles
 from worker import DAY, STEP
+from swing_indicators import DailyIndicators
 
 
 def regime(closes):
@@ -99,11 +100,16 @@ def signals(bars, previous_low):
         yield bars[i+1][0], (direction, reclaimed, bar[4], midpoint)
 
 
-def evaluate(root, start, end):
+def evaluate(root, start, end, *, indicators=False):
     if start % DAY or end % DAY or end <= start:
         raise ValueError('Expected a nonempty half-open UTC day range')
     intraday = ('long', 'short', 'regime', 'regimeReclaim')
     accounts = {k: Account() for k in (*intraday, 'swing', 'swingLongOnly', 'buyHold')}
+    daily = DailyIndicators() if indicators else None
+    if daily:
+        for key in daily.names:
+            accounts[key] = Account()
+            accounts[key + 'LongOnly'] = Account()
     closes = deque(maxlen=60)
     previous_low = previous_day = last_mid = None
     excluded = warmup = total = 0
@@ -111,7 +117,7 @@ def evaluate(root, start, end):
         paths = []
         for path in sorted((folder/'spot').glob('BTCUSDT-5m-????-??.zip')):
             month = datetime.strptime(path.stem[-7:], '%Y-%m').replace(tzinfo=timezone.utc).timestamp()
-            if start - 93*DAY <= month < end:
+            if month < end and (indicators or month >= start - 93*DAY):
                 paths.append(path)
         if not paths:
             continue
@@ -148,6 +154,10 @@ def evaluate(root, start, end):
                         accounts['swing'].target(trend, mid)
                         accounts['swingLongOnly'].target(max(0, trend), mid)
                         accounts['buyHold'].target(1, mid)
+                        if daily:
+                            for key, side in daily.targets(trend).items():
+                                accounts[key].target(side, mid)
+                                accounts[key + 'LongOnly'].target(max(0, side), mid)
                     if slot == day + DAY - STEP:
                         for k in intraday:
                             accounts[k].target(0, mid)
@@ -164,7 +174,11 @@ def evaluate(root, start, end):
                                 used.add(k)
                     for account in accounts.values():
                         account.mark(mid)
-            closes.append(bars[-1][4] if bars[-1][0] == day+DAY-STEP else None)
+            close = bars[-1][4] if bars[-1][0] == day+DAY-STEP else None
+            closes.append(close)
+            if daily:
+                day_range = (min(b[3] for b in bars), max(b[2] for b in bars)) if complete else None
+                daily.update(close, day_range)
             previous_low = min(b[3] for b in bars) if complete else None
     if total != (end-start)//DAY or last_mid is None:
         raise ValueError('Incomplete evaluation period')
@@ -180,7 +194,9 @@ if __name__ == '__main__':
     parser.add_argument('root', type=Path)
     parser.add_argument('start', help='Inclusive UTC date')
     parser.add_argument('end', help='Exclusive UTC date')
+    parser.add_argument('--indicators', action='store_true',
+                        help='Score individual and combined daily indicators; use all prior spot history for warmup')
     args = parser.parse_args()
     def stamp(date):
         return int(datetime.strptime(date, '%Y-%m-%d').replace(tzinfo=timezone.utc).timestamp())
-    print(json.dumps(evaluate(args.root, stamp(args.start), stamp(args.end)), indent=2))
+    print(json.dumps(evaluate(args.root, stamp(args.start), stamp(args.end), indicators=args.indicators), indent=2))
