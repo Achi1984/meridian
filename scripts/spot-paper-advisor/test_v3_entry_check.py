@@ -80,5 +80,13 @@ class EntryCheckTest(unittest.TestCase):
             self.assertEqual(result['execution'], 'PAPER_BUY')
             self.assertEqual(result['exitReason'], 'TARGET_REACHED')
             self.assertGreater(result['realizedUsd'], 0)
+            row = db.execute('SELECT record FROM slots WHERE slot=?', (START+STEP,)).fetchone()
+            retry_record = json.loads(row[0])
+            retry_record['snapshot']['hour'][0][4] = 101
+            db.execute('UPDATE slots SET record=? WHERE slot=?', (json.dumps(retry_record), START+STEP))
+            strict = audit(db)['entries'][0]['nextSlotPullback']
+            relaxed = audit(db, require_uptrend=False)['entries'][0]['nextSlotPullback']
+            self.assertEqual(strict['reason'], 'NO_UPTREND')
+            self.assertEqual(relaxed, result)
             db.execute('DELETE FROM slots WHERE slot=?', (START+STEP,))
             self.assertEqual(audit(db)['entries'][0]['nextSlotPullback']['status'], 'NEXT_SLOT_UNAVAILABLE')
