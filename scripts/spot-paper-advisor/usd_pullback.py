@@ -119,7 +119,9 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
                                  AND s.slot < p.start + ? WHERE p.id=1 ORDER BY s.slot""", (duration,))
         state = initial()
         latest = baseline = start = previous = None
-        missing = closed = modeled = 0
+        missing = modeled = 0
+        trades = []
+        entry = None
         peak = 1000
         drawdown = 0
         active_days = set()
@@ -144,6 +146,7 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
             observed = datetime.fromisoformat(report['publishedAt'])
             if observed.tzinfo is None:
                 raise ValueError('expected timezone-aware publication time')
+            cash_before = Decimal(state['cash'])
             latest = paper_slot(state, record.get('snapshot'), record.get('fillBook'), slot,
                                 observed.timestamp(), require_uptrend=require_uptrend)
             reasons[latest['action']][latest['reason']] += 1
@@ -155,8 +158,19 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
                 drawdown = max(drawdown, 100*(1-equity/peak))
             if latest['execution'] in ('PAPER_BUY', 'PAPER_SELL'):
                 active_days.add(slot//DAY)
-            if latest['execution'] == 'PAPER_SELL':
-                closed += 1
+            if latest['execution'] == 'PAPER_BUY':
+                entry = (slot, Decimal(str(record['fillBook']['ask'])), Decimal(state['btc']), cash_before)
+            elif latest['execution'] == 'PAPER_SELL':
+                opened, ask, quantity, starting_cash = entry
+                bid = Decimal(str(record['fillBook']['bid']))
+                gross = quantity * (bid - ask)
+                slippage = quantity * (ask + bid) * SLIP
+                net = Decimal(state['cash']) - starting_cash
+                trades.append(dict(entryAt=iso(opened), exitAt=iso(slot), entryAskUsd=float(ask),
+                                   exitBidUsd=float(bid), btc=float(quantity), exitReason=latest['reason'],
+                                   quotePnlUsd=float(gross), slippageUsd=float(slippage),
+                                   feesUsd=float(gross-slippage-net), netUsd=float(net)))
+                entry = None
             latest['at'] = iso(slot)
             baseline = {name: report['arms'][name]['equityUsd']
                         for name in ('v3', 'v4', 'cash', 'btcHold')}
@@ -165,7 +179,7 @@ def replay(db, *, duration=7*DAY, require_uptrend=True):
     equity = latest['equityUsd']
     return dict(schema='MERIDIAN_USD_PULLBACK_V1', mode='REPLAY', pair='BTC/USD', start=iso(start),
                 through=iso(previous), modeledSlots=modeled, missingSlots=missing, last=latest,
-                equityUsd=equity, netUsd=None if equity is None else equity-1000, closed=closed,
+                equityUsd=equity, netUsd=None if equity is None else equity-1000, closed=len(trades), closedTrades=trades,
                 **pnl_parts(state, equity), activeDays=len(active_days), maxObservedDrawdownPct=drawdown,
                 signalReasonCounts=reasons, executionCounts=executions, sameSlotBaselineEquityUsd=baseline)
 
