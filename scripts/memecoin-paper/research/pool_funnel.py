@@ -34,6 +34,8 @@ def audit(events, summary):
                 failures[pool].update(failed)
             else:
                 stages['signal'].add(pool)
+        elif kind in ('signalWithdrawn', 'signalExpired'):
+            stages[kind].add(pool)
         elif kind == 'momentumCandidate':
             stages['selected'].add(pool)
         elif kind == 'roundTripQuote':
@@ -51,6 +53,8 @@ def audit(events, summary):
         name: len(stages[name]) for name in ('revisited','inWindow','launchpad','signal',
                                               'selected','quoted','passedQuote','bought')}),
                 failedAtLeastOnceAmongNeverConfirmed=dict(rejected), quoteErrorsBySide=dict(quote_errors),
+                decisionExceptions={name: len(stages[name]) for name in ('signalWithdrawn','signalExpired')}
+                if summary.get('decisionAuditVersion') == 1 else None,
                 account=summary['account'])
 
 
@@ -60,6 +64,9 @@ def render(report):
     lines.extend(['', 'Failed checks among launchpad pools that never confirmed (overlap possible): ' +
                   json.dumps(report['failedAtLeastOnceAmongNeverConfirmed'], sort_keys=True),
                   '','Quote errors by side: ' + json.dumps(report['quoteErrorsBySide'], sort_keys=True)])
+    if report['decisionExceptions'] is not None:
+        lines.extend(['', 'Distinct pools with a withdrawn or expired signal: ' +
+                      json.dumps(report['decisionExceptions'], sort_keys=True)])
     return '\n'.join(lines)
 
 
