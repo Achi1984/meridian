@@ -951,7 +951,7 @@ test('Terminal öffnen preserves the reviewed history-close baseline and stays o
   assert.equal(gitBlob(restored),preimageBlob,'all source bytes except terminal-entry insertions, the checked viewport pair and exact Depot/revision deltas must match the reviewed history-close baseline');
 });
 
-const moduleNames=['ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','paper-advisor-view.js','paper-bot-report-bootstrap.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-report-connector.js','paper-readiness.js','paper-readiness-view.js','release-update.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','pionex-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js','spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js','spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js','spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-progress-config.js','spot-paper-paired-progress-connector.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js','spot-paper-three-way-controller.js','spot-paper-three-way-model.js','spot-paper-three-way-reader.js','spot-paper-three-way-view.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
+const moduleNames=['solana-meme-report.js','ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','paper-advisor-view.js','paper-bot-report-bootstrap.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-report-connector.js','paper-readiness.js','paper-readiness-view.js','release-update.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','app-access-bootstrap.js','app-access.js','agent-status-bootstrap.js','agent-status-client.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-view.js','bot-read-model.js','bot-overview-model.js','depot-read-bootstrap.js','depot-read-client.js','depot-read-model.js','depot-read-view.js','depot-history-model.js','pionex-history-model.js','depot-history-view.js','depot-current-model.js','depot-portfolio-state.js','spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js','spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js','spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js','spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-progress-config.js','spot-paper-paired-progress-connector.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js','spot-paper-three-way-controller.js','spot-paper-three-way-model.js','spot-paper-three-way-reader.js','spot-paper-three-way-view.js','strategy-workspace-bootstrap.js','strategy-catalog.js','research-evidence.js','strategy-arena.js','arena-inspection-report.js','arena-historical-result.js','arena-historical-export.js','arena-result-view.js'];
 function deploymentServer(){
   const inlineScript=html.match(/<script>([\s\S]*?)<\/script>/i)?.[1];
   assert.ok(inlineScript,'actual UI-only navigation script');
@@ -1209,8 +1209,8 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
 });
 
 async function browserRun(call,start,width,height,server){
-  const evaluate=async expression=>{
-    const response=await call('Runtime.evaluate',{expression,returnByValue:true});
+  const evaluate=async (expression,awaitPromise=false)=>{
+    const response=await call('Runtime.evaluate',{expression,returnByValue:true,awaitPromise});
     assert.ok(!response.exceptionDetails,'browser evaluation failed: '+JSON.stringify(response.exceptionDetails));
     return response.result?.value;
   };
@@ -1546,6 +1546,25 @@ async function browserRun(call,start,width,height,server){
   })`);
   assert.equal(strategyState.url,start,'native Strategies navigation does not change document');
   assert.deepEqual(strategyState.view,['view-strategies']);assert.deepEqual(strategyState.current,['strategies']);
+  const paperSnapshot = await evaluate(`(async()=>{
+    const section=document.querySelector('#solana-meme-paper');
+    const fetchOriginal=window.fetch;
+    try {
+      window.fetch=async url=>{
+        const data=String(url).includes('/actions/')
+          ? {workflow_runs:[{id:22,status:'in_progress'}]}
+          : {schema:1,runId:21,at:'2026-11-20T12:00:00Z',pools:12,open:1,closed:0,realized:0,equity:null};
+        return new Response(JSON.stringify(data));
+      };
+      section.open=true;
+      for(let i=0;i<50&&!section.querySelector('dd');i++)await new Promise(resolve=>setTimeout(resolve,20));
+      return {text:section.innerText,values:[...section.querySelectorAll('dd')].map(x=>x.textContent),
+        fits:section.scrollWidth<=section.clientWidth+1};
+    } finally {window.fetch=fetchOriginal;section.open=false;}
+  })()`,true);
+  assert.match(paperSnapshot.text,/Letzter Pilot · Läuft/);
+  assert.deepEqual(paperSnapshot.values,['Unbewertet','0,00 USDC','1','0','12']);
+  assert.equal(paperSnapshot.fits,true,'Solana paper report fits the strategy panel');
   const rendered=await evaluate(`document.querySelector('#strategy-catalog').textContent`);
   assert.equal((await evaluate(`document.querySelectorAll('#strategy-catalog .strategy-family').length`)),12);
   assert.match(rendered,/H1Hypothese/);assert.match(rendered,/7 Assets · 44 geplante Pfade/);

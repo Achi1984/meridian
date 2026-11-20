@@ -1,3 +1,4 @@
+import {mountSolanaReport} from './solana-meme-report.js?v=B19-M11';
 import {createAdvisorSection} from './paper-advisor-view.js?v=B19-M11';
 import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B19-M11';
 import {createStrategyArenaView} from './strategy-arena.js?v=B19-M11';
@@ -48,6 +49,8 @@ function mountWorkspace(){
   advisor.open = true;
   advisorController = createAdvisorSection(advisor);
   advisorController.setActive(Boolean(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')));
+  const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot');
+  mountSolanaReport(solana);
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';
