@@ -8,7 +8,8 @@ import {
   recordEntryConfirmationSell, SPOT_PAPER_ENTRY_CONFIRMATION_ID
 } from "./entry-confirmation.mjs";
 import {
-  advanceRangePullback, createRangePullbackState, SPOT_PAPER_RANGE_PULLBACK_ID
+  advanceRangePullback, createRangePullbackState, RANGE_PULLBACK_COOLDOWN_MS,
+  SPOT_PAPER_RANGE_PULLBACK_ID
 } from "./range-pullback.mjs";
 
 export const SPOT_PAPER_RESEARCH_LIMITS = Object.freeze({
@@ -334,8 +335,21 @@ function applyRangeObservation(arm, observation, parsed, quote) {
   const signal = advanced.signals.at(-1) ?? null;
   const before = arm.ledger;
   const result = applyPaperObservation(before, { signal, quote, nowMs: at });
-  const fills = annotateFills(result, arm.strategyId, true, at);
-  for (const fill of fills) { arm.fills.push(fill); arm.grossTurnoverCents += fill.grossCents; }
+  for (const fill of result.fills) {
+    const strategyReason = fill.reason === "SAMPLED_2PCT_BID_STOP" ?
+      fill.reason : signal.strategyReason;
+    const annotated = { ...fill, strategyId: arm.strategyId, executionAt: at,
+      ledgerReason: fill.reason, reason: strategyReason, strategyReason };
+    arm.fills.push(annotated);
+    arm.grossTurnoverCents += fill.grossCents;
+    if (fill.side === "BUY") {
+      Object.assign(arm.strategy, { held: true, entryAt: at,
+        entryPriceNano: fill.priceNano, entryAtrNano: signal.entryAtrNano });
+    } else {
+      Object.assign(arm.strategy, { held: false, entryAt: null, entryPriceNano: null,
+        entryAtrNano: null, cooldownUntil: at + RANGE_PULLBACK_COOLDOWN_MS });
+    }
+  }
   const rejected = entryRejectionReason(signal, before, result, quote);
   if (rejected) increment(arm.rejectedEntries, rejected);
   arm.ledger = result.ledger;
