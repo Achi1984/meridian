@@ -149,7 +149,24 @@ class PersistenceStudy:
         return [pool for _,pool in sorted(pending)]
 
 
-def run(out, ticks, *, claude=False, account=None):
+def confirmed_quote_probe(pool, mint, observed_at, event):
+    """Measure the immediate conservative round trip independently of the paper ledger."""
+    if not 0 <= int(time.time()) - observed_at <= 30:
+        event('confirmationQuoteSkipped',pool=pool,reason='stale')
+        return
+    side = 'buy'
+    try:
+        qty = spot_quote(USDC,mint,SIZE)
+        side = 'sell'
+        returned = spot_quote(mint,USDC,qty)
+    except (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, OSError) as exc:
+        event('confirmationQuoteUnavailable',pool=pool,mint=mint,side=side,reason=type(exc).__name__)
+        return
+    event('confirmationRoundTrip',pool=pool,mint=mint,usdcRaw=returned,
+          passesGate=returned*100 >= SIZE*95, confirmedAt=observed_at)
+
+
+def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
     entry_quote = quote if account is None else spot_quote
     shadow = Shadow(claude)
     out.mkdir(parents=True,exist_ok=True)
@@ -158,6 +175,7 @@ def run(out, ticks, *, claude=False, account=None):
     comparison_signals = {}
     comparison_priced = set()
     persistence = PersistenceStudy()
+    probed = set()
     errors = (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, OSError)
     with (out/'events.jsonl').open('x', buffering=1) as ledger:
         def event(kind, **fields):
@@ -274,10 +292,19 @@ def run(out, ticks, *, claude=False, account=None):
                                 event('botBuy',mint=mint,pool=pool,tokensRaw=qty,usdcRaw=SIZE)
                 except errors as exc:
                     event('quoteUnavailable', mint=mint,side=side,reason=type(exc).__name__)
+            if probe_confirmations:
+                for pool in sorted(persistence.confirmed.keys()-probed):
+                    probed.add(pool)
+                    at,_ = persistence.confirmed[pool]
+                    if len(probed) <= 12:
+                        confirmed_quote_probe(pool, first[pool][1]['mint'], at, event)
+                    else:
+                        event('confirmationQuoteSkipped',pool=pool,reason='sessionLimit')
             summary = dict(ticks=tick+1,pools=len(first),openProbes=len(pending),events=dict(counts))
             if account is not None:
                 summary['account'] = account.status(int(time.time()))
                 summary['decisionAuditVersion'] = 1
+                summary['probeConfirmations'] = probe_confirmations
             (out/'summary.json').write_text(json.dumps(summary))
             print(json.dumps(summary),flush=True)
             if tick+1 < ticks:
@@ -306,12 +333,13 @@ if __name__=='__main__':
     parser.add_argument('--ticks',type=int,choices=range(1,61),default=60,metavar='1..60')
     parser.add_argument('--claude',action='store_true',help='Enable up to ten advisory Claude calls')
     parser.add_argument('--paper-account',type=Path,help='Trade the Pump.fun paper strategy in this SQLite account')
+    parser.add_argument('--probe-confirmations',action='store_true',help='Quote up to 12 confirmed research pools')
     args=parser.parse_args()
     if args.paper_account and args.claude:
         parser.error('Claude comparison belongs to the quote-probe cohort')
     account = MemeAccount(args.paper_account) if args.paper_account else None
     try:
-        run(args.output,args.ticks,claude=args.claude,account=account)
+        run(args.output,args.ticks,claude=args.claude,account=account,probe_confirmations=args.probe_confirmations)
     finally:
         if account is not None:
             account.close()
