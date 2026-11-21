@@ -464,6 +464,12 @@
     #paper-reports-section>.card{margin:8px 0}
     #solana-meme-paper .strategy-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
     #solana-meme-paper .strategy-summary dd{font-size:1rem}
+    #solana-meme-paper>summary{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:4px 8px}
+    #solana-meme-paper .pilot-status{font-size:.75rem;color:var(--muted);line-height:1.4}
+    #solana-meme-paper .pilot-status[data-state="running"]{color:#70e5b4}
+    #solana-meme-paper details>summary{min-height:44px;display:flex;align-items:center;justify-content:space-between;gap:8px}
+    #solana-meme-paper details>summary::after{content:'+'}
+    #solana-meme-paper details[open]>summary::after{content:'−'}
     #solana-meme-paper .strategy-summary dt{font-size:.75rem}
     @media(max-width:600px){
       .header-inner{flex-direction:row;align-items:center;gap:8px}
