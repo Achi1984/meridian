@@ -63,7 +63,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
           const nav=document.getElementById('nav').getBoundingClientRect();
           return {value:{top:value.top,bottom:value.bottom},status:{top:status.top,bottom:status.bottom},navTop:nav.top};
         })(),
-        disclosureHeight:document.querySelector('#autonomy-status summary').getBoundingClientRect().height,
+        sourceClosed:document.querySelector('#autonomy-status').closest('.command-source-details')?.open===false,
         targets:[...document.querySelectorAll('#nav button,#version-toggle,.command-source-details>summary,.command-context-details>summary')].every(node=>node.getBoundingClientRect().height>=44)
       })`);
       assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
@@ -76,7 +76,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       assert.ok(initial.header<Math.min(360,size.height*0.65),'bounded readable header: '+initial.header+'px');
       assert.ok(initial.headerPadding>=8,'header includes breathing room before safe-area padding');
       assert.equal(initial.headerControlsFit,true,'header labels and controls fit their available rows');
-      assert.equal(initial.disclosureHeight,0);assert.equal(initial.targets,true,'all primary touch controls meet 44px');
+      assert.equal(initial.sourceClosed,true);assert.equal(initial.targets,true,'all primary touch controls meet 44px');
       for(const selector of ['.portfolio-value','.portfolio-description']){
         const reachable=await evaluate(`(()=>{
           const node=document.querySelector('#command-portfolio ${selector}');
