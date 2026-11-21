@@ -39,3 +39,24 @@ class FunnelTest(unittest.TestCase):
         self.assertEqual(result['liquidityFloorComparison']['5000'],
                          dict(signalPools=2,pricedAtFiveMinutes=1,missingAtFiveMinutes=1,
                               medianPriceChangePct=-50))
+
+    def test_confirmation_is_single_use_and_outcome_starts_at_confirmation(self):
+        from new_pool_watch import PersistenceStudy
+        study=PersistenceStudy()
+        base=dict(pool='p',mint='a',quote=WSOL,price=1,liquidity=4000,volume=4000,
+                  buys=6,sells=3,dex='pump-fun',created='1970-01-01T00:00:00Z')
+        def observe(pool,now,price):
+            study.observe(dict(base,pool=pool),dict(base,pool=pool,liquidity=6000,price=price),now,now)
+        for pool in ('p','q','r'):
+            observe(pool,60,2)
+        self.assertEqual(study.due(120),['p','q','r'])
+        observe('q',120,1.99)
+        observe('q',121,3)
+        observe('p',120,2.5)
+        observe('p',360,7)
+        self.assertFalse(study.returns)
+        self.assertEqual(study.due(420),['p'])
+        observe('p',420,2)
+        self.assertAlmostEqual(study.returns['p'],-20)
+        self.assertEqual(study.rejected,{'q'})
+        self.assertNotIn('r',study.confirmed)
