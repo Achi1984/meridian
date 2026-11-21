@@ -33,7 +33,7 @@ jobs:
       - name: Run virtual USDC spot account
         run: |
           mkdir -p meme-account
-          python3 -u scripts/memecoin-paper/research/new_pool_watch.py meme-account/session --ticks 60 --paper-account meme-account/ledger.sqlite
+          python3 -u scripts/memecoin-paper/research/new_pool_watch.py meme-account/session --ticks 60 --paper-account meme-account/ledger.sqlite --probe-confirmations
       - name: Publish account statement
         if: always()
         working-directory: scripts/memecoin-paper/research
