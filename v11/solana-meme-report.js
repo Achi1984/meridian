@@ -187,6 +187,14 @@ export function mountSolanaReport(section) {
             ' ohne Rückverkaufskurs · ' + quotes.skipped + ' übersprungen');
         add(detail,'p','Medianer Rückfluss vor Netzwerkgebühren · ' +
             (quotes.quoted ? amount(quotes.medianReturnUsdc) : 'nicht ermittelbar'));
+        if (quotes.quoted > 0) {
+          const difference = quotes.medianReturnUsdc - 20;
+          const percent = (difference / 20).toLocaleString('de-AT',{
+            style:'percent',maximumFractionDigits:2,minimumFractionDigits:2
+          });
+          add(detail,'p','Differenz zum Einsatz von 20 USDC · ' + amount(difference) + ' (' + percent + ')');
+          add(detail,'p','Grundlage sind Kauf- und Rückverkaufsangebote vor Netzwerkgebühren.');
+        }
       }
     } finally {
       loading = false;
