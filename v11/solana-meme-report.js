@@ -23,6 +23,8 @@ export function mountSolanaReport(section) {
     parent.append(child);
     return child;
   };
+  const badge = add(section.querySelector('summary'),'small','Status wird geladen');
+  badge.className = 'pilot-status';
   const live = add(section,'p','Laufstatus wird beim Öffnen geladen.');
   live.setAttribute('role','status');
   const notice = add(section,'p','');
@@ -36,34 +38,51 @@ export function mountSolanaReport(section) {
   source.style.cssText = 'display:inline-flex;align-items:center;min-height:44px;padding:0 10px';
   let loading = false;
   let hasReport = false;
+  let pendingStatus;
+  let statusAt = 0;
+  let observedRuns = [];
+  function renderStatus(status) {
+    const recent = status?.workflow_runs;
+    observedRuns = Array.isArray(recent) ? recent : [];
+    const run = observedRuns[0];
+    const states = {queued:'Wartet',pending:'Wartet',requested:'Wartet',waiting:'Wartet',
+      in_progress:'Läuft',completed:'Beendet'};
+    let label = states[run?.status] || 'Status unbekannt';
+    if (run?.status === 'completed' && run.conclusion !== 'success') label = 'Ohne Erfolg';
+    badge.textContent = count(run?.run_number) ? 'Pilot ' + run.run_number + ' · ' + label : label;
+    badge.dataset.state = run?.status === 'in_progress' ? 'running' : 'other';
+    function linkRun(parent, item) {
+      if (count(item?.id) && item.id > 0) {
+        const label = count(item.run_number) ? ' · Lauf #' + item.run_number : ' · Lauf öffnen';
+        add(parent,'a',label).href = runs + item.id;
+      }
+    }
+    live.textContent = run && states[run.status] ? 'Letzter Pilot · ' + states[run.status] : 'Laufstatus unbekannt';
+    if (run?.status === 'completed' && run.conclusion !== 'success') live.textContent += ' · ohne erfolgreichen Abschluss';
+    linkRun(live,run);
+    if (run && states[run.status] === 'Wartet') {
+      const active = observedRuns.find(item=>item?.status === 'in_progress' && item.id !== run.id);
+      if (active) linkRun(add(live,'span',' · Aktuell laufender Pilot'),active);
+    }
+  }
+  function refreshStatus(force=false) {
+    if (pendingStatus) return pendingStatus;
+    if (!force && Date.now()-statusAt < 30000) return Promise.resolve();
+    pendingStatus = read(api + '/actions/workflows/' + workflow + '/runs?branch=main&per_page=5')
+      .then(renderStatus,()=>renderStatus(null))
+      .finally(()=>{ statusAt = Date.now(); pendingStatus = null; });
+    return pendingStatus;
+  }
   async function update() {
     if (loading) return;
     loading = true;
     refresh.disabled = true;
     live.textContent = 'Laufstatus wird geladen …';
-    const [status, report] = await Promise.allSettled([
-      read(api + '/actions/workflows/' + workflow + '/runs?branch=main&per_page=5'),
+    const [, report] = await Promise.allSettled([
+      refreshStatus(true),
       read(api + '/contents/solana-meme.json?ref=paper-dashboard-data',true)
     ]);
     try {
-      const recent = status.value?.workflow_runs;
-      const observedRuns = Array.isArray(recent) ? recent : [];
-      const run = observedRuns[0];
-      const states = {queued:'Wartet',pending:'Wartet',requested:'Wartet',waiting:'Wartet',
-        in_progress:'Läuft',completed:'Beendet'};
-      function linkRun(parent, item) {
-        if (count(item?.id) && item.id > 0) {
-          const label = count(item.run_number) ? ' · Lauf #' + item.run_number : ' · Lauf öffnen';
-          add(parent,'a',label).href = runs + item.id;
-        }
-      }
-      live.textContent = run && states[run.status] ? 'Letzter Pilot · ' + states[run.status] : 'Laufstatus unbekannt';
-      if (run?.status === 'completed' && run.conclusion !== 'success') live.textContent += ' · ohne erfolgreichen Abschluss';
-      linkRun(live,run);
-      if (run && states[run.status] === 'Wartet') {
-        const active = observedRuns.find(item=>item?.status === 'in_progress' && item.id !== run.id);
-        if (active) linkRun(add(live,'span',' · Aktuell laufender Pilot'),active);
-      }
       const s = report.value;
       if (!(s?.schema === 1 && count(s.runId) && s.runId > 0 && Number.isFinite(Date.parse(s.at))
           && count(s.pools) && count(s.open) && count(s.closed) && Number.isFinite(s.realized)
@@ -77,7 +96,7 @@ export function mountSolanaReport(section) {
       notice.hidden = true;
       hasReport = true;
       const sourceRun = observedRuns.find(item=>item?.id === s.runId);
-      const label = run?.id === s.runId ? 'Abschlussbericht' : 'Letzter verfügbarer Abschlussbericht';
+      const label = observedRuns[0]?.id === s.runId ? 'Abschlussbericht' : 'Letzter verfügbarer Abschlussbericht';
       const number = count(sourceRun?.run_number) ? ' · Lauf #' + sourceRun.run_number : '';
       const finished = new Date(s.at).toLocaleString('de-AT',{timeZone:'Europe/Vienna',
         day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
@@ -85,19 +104,23 @@ export function mountSolanaReport(section) {
       title.href = runs + s.runId;
       const list = add(body,'dl','');
       list.className = 'strategy-summary';
-      function field(label,value) {
-        const group = add(list,'div','');
+      function field(label,value,parent=list) {
+        const group = add(parent,'div','');
         add(group,'dt',label);
         return add(group,'dd',String(value));
       }
-      field('Kontowert',amount(s.equity));
       field('Realisierter PnL',amount(s.realized)).className =
         s.realized > 0 ? 'tone-safe' : s.realized < 0 ? 'tone-danger' : '';
       field('Offene Positionen',s.open);
+      field('Kontowert',amount(s.equity));
       field('Geschlossene Trades',s.closed);
-      field('Beobachtete Pools',s.pools);
-      if (count(s.withdrawn)) field('Signal zurückgenommen · Pools',s.withdrawn);
-      if (count(s.expired)) field('Signal abgelaufen · Pools',s.expired);
+      const diagnostics = add(body,'details','');
+      add(diagnostics,'summary','Signal- und Pooldetails');
+      const counters = add(diagnostics,'dl','');
+      counters.className = 'strategy-summary';
+      field('Beobachtete Pools',s.pools,counters);
+      if (count(s.withdrawn)) field('Signal zurückgenommen · Pools',s.withdrawn,counters);
+      if (count(s.expired)) field('Signal abgelaufen · Pools',s.expired,counters);
       if (s.fiveMinuteComparison) {
         const rows = ['10000','5000'].map(key=>s.fiveMinuteComparison[key]);
         if (rows.every(row=>row && [row.signals,row.priced,row.missing].every(count)
@@ -168,4 +191,5 @@ export function mountSolanaReport(section) {
   }
   section.addEventListener('toggle',() => { if (section.open) update(); });
   refresh.addEventListener('click',update);
+  return refreshStatus;
 }

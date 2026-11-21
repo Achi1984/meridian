@@ -14,6 +14,7 @@ let catalogStatus = document.getElementById('strategy-load-status');
 let arenaRoot = document.getElementById('strategy-arena-root');
 let arena = null;
 let advisorController = null;
+let refreshSolanaStatus = null;
 let paperCockpit = null;
 let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
@@ -49,7 +50,7 @@ function mountWorkspace(){
   advisorController = createAdvisorSection(advisor);
   advisorController.setActive(Boolean(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')));
   const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot',advisor);
-  mountSolanaReport(solana);
+  refreshSolanaStatus = mountSolanaReport(solana);
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';
@@ -113,6 +114,7 @@ function requestWorkspaceLoad(){
   pendingWorkspaceLoad = true;
   const active=document.querySelector('#nav button[data-v="strategies"][aria-current="page"]');
   if(active){
+    refreshSolanaStatus?.();
     advisorController?.setActive(true);
     paperCockpit?.setActive(true);
     spotPaperCockpit?.setActive(true);
