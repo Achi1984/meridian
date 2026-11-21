@@ -94,6 +94,21 @@ export function mountSolanaReport(section) {
           }
         }
       }
+      const study = s.persistenceAt5000;
+      if (study && [study.signals,study.confirmed,study.rejected,study.missingConfirmation,
+          study.priced,study.missingOutcome].every(count)
+          && study.signals === study.confirmed + study.rejected + study.missingConfirmation
+          && study.confirmed === study.priced + study.missingOutcome
+          && (study.priced ? Number.isFinite(study.medianPct) : study.medianPct === null)) {
+        const detail = add(body,'details','');
+        add(detail,'summary','Signalbestätigung · 5.000 USD');
+        add(detail,'p',study.signals + ' Signale · ' + study.confirmed + ' bestätigt · ' +
+            study.rejected + ' verworfen · ' + study.missingConfirmation + ' ohne Kurs nach 60–120 Sekunden');
+        add(detail,'p','Fünf Minuten ab Bestätigung · ' + study.priced + ' mit Folgekurs · ' +
+            study.missingOutcome + ' ohne Folgekurs');
+        const median = study.priced ? study.medianPct.toLocaleString('de-AT',{maximumFractionDigits:2}) + ' %' : 'nicht ermittelbar';
+        add(detail,'p','Mediane Kursänderung vor Kosten · ' + median);
+      }
     } finally {
       loading = false;
       refresh.disabled = false;

@@ -54,6 +54,7 @@ jobs:
           account = summary['account']
           if account['startUsdc'] != 1000 or summary['ticks'] != 60:
               raise ValueError('Incomplete or unexpected paper session')
+          funnel = {}
           comparison = None
           exceptions = {}
           if (session/'funnel.json').is_file():
@@ -80,6 +81,16 @@ jobs:
                         expired=count(exceptions['signalExpired']) if 'signalExpired' in exceptions else None)
           if comparison is not None:
               report['fiveMinuteComparison'] = comparison
+          if 'persistenceAt5000' in funnel:
+              row = funnel['persistenceAt5000']
+              study = {key: count(row[key]) for key in
+                       ('signals','confirmed','rejected','missingConfirmation','priced','missingOutcome')}
+              if (study['signals'] != study['confirmed'] + study['rejected'] + study['missingConfirmation']
+                      or study['confirmed'] != study['priced'] + study['missingOutcome']
+                      or (row['medianPct'] is None) != (study['priced'] == 0)):
+                  raise ValueError('Inconsistent confirmation counts')
+              study['medianPct'] = None if row['medianPct'] is None else amount(row['medianPct'])
+              report['persistenceAt5000'] = study
           with open(os.environ['GITHUB_OUTPUT'],'a') as output:
               print('report='+json.dumps(report,allow_nan=False),file=output)
           PY
