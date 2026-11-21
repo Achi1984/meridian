@@ -18,6 +18,7 @@ class Pair:
         self.positions = {}
         self.reference_qty = self.previous_bid = None
         self.sold_into = False
+        self.tripled_at = {}
 
     def tick(self,index,final,quote=spot_quote,fetch=get):
         mint = self.row['mint']
@@ -45,6 +46,24 @@ class Pair:
             return
         if self.reference_qty is None:
             return
+        for name,at in list(self.tripled_at.items()):
+            age = time.time()-at
+            if 60<=age<=180:
+                qty = self.positions[name][0]
+                try:
+                    proceeds = bid(qty)
+                except ERRORS:
+                    pass
+                else:
+                    age = time.time()-at
+                    if age<=180:
+                        emit('tripleRecheck',mint=mint,arm=name,qty=qty,usdcRaw=proceeds,
+                             stillTriple=proceeds-2*FEE>=3*SIZE,ageSeconds=age)
+                        del self.tripled_at[name]
+                        continue
+            if final or age>180:
+                emit('tripleRecheckMissing',mint=mint,arm=name,ageSeconds=age)
+                del self.tripled_at[name]
         for name,(qty,result) in self.positions.items():
             if result is not None:
                 continue
@@ -56,7 +75,13 @@ class Pair:
             net = proceeds-SIZE-2*FEE
             if final or net>=2*SIZE or net<=-.30*SIZE:
                 self.positions[name][1] = net
-                emit('exit',mint=mint,arm=name,netUsdc=net/UNIT)
+                emit('exit',mint=mint,arm=name,netUsdc=net/UNIT,usdcRaw=proceeds,qty=qty)
+                if net>=2*SIZE:
+                    self.tripled_at[name] = time.time()
+                    emit('quotedTriple',mint=mint,arm=name,usdcRaw=proceeds,qty=qty)
+                    if final:
+                        emit('tripleRecheckMissing',mint=mint,arm=name,ageSeconds=0)
+                        del self.tripled_at[name]
         if final or 'wave' in self.positions:
             return
         current = bid(self.reference_qty)
@@ -102,7 +127,7 @@ def scan(watch):
         if (age<0 or age>3600 or r['liquidity']<5000 or r['sells']<3
                 or r['dex'] not in ('pump-fun','pumpswap')):
             continue
-        if age>=120 and r['buys']>=3*r['sells']:
+        if age>=120 and r['buys']>=1.5*r['sells']:
             eligible.append(r)
         elif len(following)<25:
             following[r['pool']] = (r['mint'],r['quote'])
@@ -125,7 +150,14 @@ def run():
                 raise
             time.sleep(max(60,int(delay)))
             continue
+        bands = set()
         for row in candidates:
+            band = 'strong' if row['buys']>=3*row['sells'] else 'moderate'
+            if band in bands or row['mint'] in studies:
+                continue
+            bands.add(band)
+            emit('cohortSelection',mint=row['mint'],pool=row['pool'],band=band,
+                 entryLiquidityUsd=row['liquidity'],buys=row['buys'],sells=row['sells'])
             studies.setdefault(row['mint'],Pair(row))
             if len(studies)==2:
                 break
