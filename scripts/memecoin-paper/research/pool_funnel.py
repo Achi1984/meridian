@@ -14,6 +14,7 @@ def audit(events, summary):
     failures = defaultdict(set)
     quote_errors = Counter()
     confirmation_quotes = []
+    exit_windows = defaultdict(dict)
     unavailable_sides = Counter()
     counts = Counter()
     single_failure = defaultdict(set)
@@ -65,6 +66,17 @@ def audit(events, summary):
                 stages['passedQuote'].add(pool)
         elif kind == 'botBuy':
             stages['bought'].add(pool)
+        elif kind in ('confirmationExitQuote', 'confirmationExitMissing'):
+            key = (pool, row['mint'], row['confirmedAt'], row['tokenQty'])
+            horizon = row['horizonSeconds']
+            if horizon not in (240, 300) or horizon in exit_windows[key]:
+                raise ValueError('Invalid or duplicate exit window')
+            value = None
+            if kind == 'confirmationExitQuote':
+                value = row['usdcRaw']
+                if type(value) is not int or value <= 0 or not horizon <= row['ageSeconds'] < horizon+60:
+                    raise ValueError('Invalid exit quote')
+            exit_windows[key][horizon] = value
         elif kind == 'confirmationRoundTrip':
             confirmation_quotes.append(row['usdcRaw'])
         elif kind == 'confirmationQuoteUnavailable':
@@ -94,7 +106,15 @@ def audit(events, summary):
         str(limit): sum(value * 100 >= SIZE * (100 - limit) for value in confirmation_quotes)
         for limit in (1, 2, 5)
     }
-    return dict(confirmationExecution=execution if summary.get('probeConfirmations') else None,
+    paired = [(row[240], row[300]) for row in exit_windows.values()
+              if row.get(240) is not None and row.get(300) is not None]
+    deltas = [later-earlier for earlier, later in paired]
+    comparison_exits = dict(observed=len(exit_windows), paired=len(paired),
+                            incomplete=len(exit_windows)-len(paired),
+                            fiveBetter=sum(d > 0 for d in deltas), equal=deltas.count(0),
+                            fourBetter=sum(d < 0 for d in deltas),
+                            medianDifferenceUsdc=median(deltas)/1_000_000 if deltas else None)
+    return dict(exitWindowComparison=comparison_exits, confirmationExecution=execution if summary.get('probeConfirmations') else None,
                 persistenceAt5000=followup, onlyFailedCheckAmongNeverConfirmed={
                     name: len(pools-stages['signal']) for name,pools in single_failure.items()},
                 liquidityFloorComparison=comparison, ticks=summary['ticks'], distinctPools=dict(discovered=len(first), **{
@@ -129,6 +149,10 @@ def render(report):
     if report['confirmationExecution'] is not None:
         lines.extend(['', 'Immediate buy and resale quotes for 20 USDC (before network fees):',
                       json.dumps(report['confirmationExecution'], sort_keys=True)])
+    windows = report['exitWindowComparison']
+    if windows['observed']:
+        lines.extend(['', 'Paired four- and five-minute resale quotes (five minus four, USDC):',
+                      json.dumps(windows, sort_keys=True)])
     return '\n'.join(lines)
 
 
