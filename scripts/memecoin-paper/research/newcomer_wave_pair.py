@@ -1,10 +1,11 @@
 """Prospective matched newcomer comparison. Fixed mint list, public quotes, no orders."""
+from datetime import datetime
 import json
 import time
 
 from meme_paper_account import FEE, UNIT
 from newcomer_research import ERRORS, discover, flow
-from new_pool_watch import GT, SIZE, USDC, get, spot_quote
+from new_pool_watch import GT, SIZE, USDC, get, snapshot, spot_quote
 
 
 def emit(kind, **fields):
@@ -79,16 +80,46 @@ def summary(studies,arm):
                 equityIfUnresolvedWorthZero=1000+realized-unresolved*(SIZE+FEE)/UNIT)
 
 
+def scan(watch):
+    fresh = {r['pool']:r for r in discover(min_age=0)}
+    missing = [p for p in watch if p not in fresh]
+    if missing:
+        try:
+            items = get(GT+'/pools/multi/'+','.join(missing),120)['data']
+            for item in items:
+                try:
+                    r = snapshot(item)
+                except ERRORS:
+                    continue
+                if watch.get(r['pool']) == (r['mint'], r['quote']):
+                    fresh[r['pool']] = r
+        except ERRORS as exc:
+            emit('refreshUnavailable',reason=type(exc).__name__)
+    now = time.time()
+    eligible, following = [], {}
+    for r in sorted(fresh.values(),key=lambda r:r['volume'],reverse=True):
+        age = now-datetime.fromisoformat(r['created']).timestamp()
+        if (age<0 or age>3600 or r['liquidity']<5000 or r['sells']<3
+                or r['dex'] not in ('pump-fun','pumpswap')):
+            continue
+        if age>=120 and r['buys']>=3*r['sells']:
+            eligible.append(r)
+        elif len(following)<25:
+            following[r['pool']] = (r['mint'],r['quote'])
+    watch.clear()
+    watch.update(following)
+    return eligible
+
+
 def run():
-    studies = {}
+    studies, watch = {}, {}
     for attempt in range(3):
-        candidates = discover()
+        candidates = scan(watch)
         for row in candidates:
-            if row['buys'] >= 3*row['sells']:
-                studies.setdefault(row['mint'],Pair(row))
+            studies.setdefault(row['mint'],Pair(row))
             if len(studies)==2:
                 break
-        emit('discovery', attempt=attempt+1, eligiblePools=len(candidates), selected=len(studies))
+        emit('discovery', attempt=attempt+1, eligiblePools=len(candidates), watching=len(watch), selected=len(studies))
         if studies or attempt==2:
             break
         time.sleep(60)

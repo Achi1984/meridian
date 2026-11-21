@@ -41,14 +41,14 @@ def flow(rows, mint, quote, end):
                 netUsd=net, largestRecentBuyerShare=max(latest.values())/total if total else None)
 
 
-def discover():
+def discover(min_age=120):
     pools = {}
     for page in (1, 2, 3):
         for item in get(f'{GT}/new_pools?page={page}',120)['data']:
             try:
                 row = snapshot(item)
                 age = time.time()-datetime.fromisoformat(row['created']).timestamp()
-                if (120 <= age <= 3600 and row['dex'] in ('pump-fun','pumpswap') and
+                if (min_age <= age <= 3600 and row['dex'] in ('pump-fun','pumpswap') and
                         row['quote'] in (USDC,WSOL) and row['mint'] not in (USDC,WSOL)
                         and row['liquidity'] >= 5000 and row['sells'] >= 3):
                     pools[row['pool']] = row
