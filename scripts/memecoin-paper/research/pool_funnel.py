@@ -5,6 +5,7 @@ import json
 from statistics import median
 from pathlib import Path
 
+from meme_paper_account import FEE, UNIT
 from new_pool_watch import PersistenceStudy, SIZE, failed_checks, launchpad_candidate
 
 
@@ -114,6 +115,11 @@ def audit(events, summary):
                             fiveBetter=sum(d > 0 for d in deltas), equal=deltas.count(0),
                             fourBetter=sum(d < 0 for d in deltas),
                             medianDifferenceUsdc=median(deltas)/1_000_000 if deltas else None)
+    threshold = SIZE + 2 * FEE
+    comparison_exits['breakEven'] = dict(
+        requiredUsdc=threshold / UNIT,
+        fourCovered=sum(early >= threshold for early, _ in paired),
+        fiveCovered=sum(late >= threshold for _, late in paired))
     return dict(exitWindowComparison=comparison_exits, confirmationExecution=execution if summary.get('probeConfirmations') else None,
                 persistenceAt5000=followup, onlyFailedCheckAmongNeverConfirmed={
                     name: len(pools-stages['signal']) for name,pools in single_failure.items()},
