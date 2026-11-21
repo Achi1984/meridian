@@ -10,6 +10,7 @@ const TOKEN_PROGRAMS = new Set([LEGACY_TOKEN_PROGRAM, TOKEN_2022_PROGRAM]);
 const BASE58_ALPHABET = "123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz";
 const BASE58_VALUES = new Map([...BASE58_ALPHABET].map((character, index) => [character, index]));
 const TOKEN_ACCOUNT_BYTES = 165;
+const MAX_HISTORICAL_REQUEST_BYTES = 4_096;
 const DECODE_BATCH_SIZE = 256;
 const MAX_READ_ITERATIONS = 65_536;
 const MAX_EMPTY_READS = 256;
@@ -532,14 +533,52 @@ function decodeClassicCensusMint(mintRpc, boundIdentity, bounds, work, readTime)
   return validateMintEvidence(mintEvidence, boundIdentity);
 }
 
-function checkedHistoricalBody(receipt, bounds) {
+function checkedHistoricalRequest(receipt, method, address, expectedSlot, mint) {
+  const {bytes, sha256} = receipt ?? {};
+  if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 ||
+      bytes.byteLength > MAX_HISTORICAL_REQUEST_BYTES) fail("INVALID_HISTORICAL_REQUEST_BYTES");
+  const captured = Buffer.from(bytes);
+  if (createHash("sha256").update(captured).digest("hex") !== sha256) {
+    fail("HISTORICAL_REQUEST_DIGEST_MISMATCH");
+  }
+  let request;
+  try {
+    request = JSON.parse(new TextDecoder("utf-8", {fatal: true}).decode(captured));
+  } catch { fail("INVALID_HISTORICAL_REQUEST"); }
+  if (!isRecord(request) || Object.keys(request).length !== 4 ||
+      request.jsonrpc !== "2.0" ||
+      !(typeof request.id === "string" || Number.isSafeInteger(request.id)) ||
+      request.method !== method || !Array.isArray(request.params) ||
+      request.params.length !== 2 || request.params[0] !== address) {
+    fail("HISTORICAL_REQUEST_MISMATCH");
+  }
+  const config = request.params[1];
+  const allowed = ["slot", "encoding", "commitment"];
+  if (method === RPC_METHOD) allowed.push("filters", "withContext");
+  if (!isRecord(config) || Object.keys(config).some(key => !allowed.includes(key)) ||
+      config.slot !== expectedSlot || config.encoding !== "base64" ||
+      (config.commitment !== undefined && config.commitment !== "finalized")) {
+    fail("HISTORICAL_REQUEST_MISMATCH");
+  }
+  if (method === RPC_METHOD) {
+    const filter = config.filters?.[0];
+    const memcmp = filter?.memcmp;
+    if (config.withContext !== true || !Array.isArray(config.filters) ||
+        config.filters.length !== 1 || !isRecord(filter) || Object.keys(filter).length !== 1 ||
+        !isRecord(memcmp) || Object.keys(memcmp).length !== 2 ||
+        memcmp.offset !== 0 || memcmp.bytes !== mint) fail("HISTORICAL_REQUEST_MISMATCH");
+  }
+  return request.id;
+}
+
+function checkedHistoricalBody(receipt, bounds, expectedId) {
   const {bytes, sha256} = receipt ?? {};
   if (!(bytes instanceof Uint8Array) || bytes.byteLength === 0 ||
       bytes.byteLength > bounds.maxResponseBytes) fail("INVALID_RESPONSE_BYTES");
   const captured = Buffer.from(bytes);
   const actual = createHash("sha256").update(captured).digest("hex");
   if (actual !== sha256) fail("RESPONSE_DIGEST_MISMATCH");
-  return parseCensusRpc(captured);
+  return parseCensusRpc(captured, expectedId);
 }
 
 // Offline diagnostic for exact-slot, standard-shaped RPC responses.
@@ -556,8 +595,13 @@ export async function diagnoseHistoricalOwnerCensus({
     deadline.check();
     if ((accounts?.bytes?.byteLength ?? 0) + (mint?.bytes?.byteLength ?? 0) >
         MAX_BOUNDS.maxResponseBytes) fail("RESPONSE_BYTE_LIMIT");
-    const census = checkedHistoricalBody(accounts, MAX_BOUNDS);
-    const mintRpc = checkedHistoricalBody(mint, MAX_BOUNDS);
+    const requestBinding = accounts?.request !== undefined || mint?.request !== undefined;
+    const accountRequestId = requestBinding ? checkedHistoricalRequest(accounts?.request,
+      RPC_METHOD, LEGACY_TOKEN_PROGRAM, expectedSlot, boundIdentity.mint) : undefined;
+    const mintRequestId = requestBinding ? checkedHistoricalRequest(mint?.request,
+      "getAccountInfo", boundIdentity.mint, expectedSlot) : undefined;
+    const census = checkedHistoricalBody(accounts, MAX_BOUNDS, accountRequestId);
+    const mintRpc = checkedHistoricalBody(mint, MAX_BOUNDS, mintRequestId);
     if (census.context.slot !== expectedSlot || mintRpc.context.slot !== expectedSlot) {
       fail("HISTORICAL_SLOT_MISMATCH");
     }
@@ -573,6 +617,7 @@ export async function diagnoseHistoricalOwnerCensus({
     return {
       status: "UNKNOWN", reason: "SOURCE_COMPLETENESS_UNAUTHENTICATED",
       identity: boundIdentity, slot: expectedSlot, coverage: {complete: false},
+      ...(requestBinding ? {requestBinding: "MATCHED"} : {}),
       diagnostic: {
         supplyReconciled: true, mintSupplyAtoms: mintEvidence.supply.toString(),
         accountCount: totals.accountCount, zeroBalanceAccountCount: totals.zeroBalanceAccountCount,

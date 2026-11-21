@@ -91,6 +91,18 @@ availability, production readiness, paid access, or billing behavior. A later
 network integration would require separate review; current Paper assembly and
 provider allowlists are unchanged.
 
+## Historical request binding
+
+The offline `diagnoseHistoricalOwnerCensus` accepts a `request` receipt
+(`{bytes, sha256}`) alongside each captured response. Provide both requests to
+check request and response IDs, the exact slot, base64 encoding, the classic
+SPL program and mint-only filter for `getProgramAccounts`, and the mint
+address for `getAccountInfo`. The scan requires a contextual response.
+A successful result adds `requestBinding: "MATCHED"`. Response-only captures
+remain usable for reconciliation and omit that field. Every result remains
+`UNKNOWN` with `coverage.complete: false`. Request matching and supply
+reconciliation cannot authenticate the provider or establish exhaustive coverage.
+
 ## Official references
 
 Documentation and layout references reviewed **2026-11-02**:
