@@ -5,7 +5,7 @@ import json
 from statistics import median
 from pathlib import Path
 
-from new_pool_watch import SIZE, failed_checks, launchpad_candidate
+from new_pool_watch import PersistenceStudy, SIZE, failed_checks, launchpad_candidate
 
 
 def audit(events, summary):
@@ -17,6 +17,7 @@ def audit(events, summary):
     single_failure = defaultdict(set)
     # First qualifying observation per pool, with a fixed five-minute follow-up.
     signals = {floor: {} for floor in (10000, 5000)}
+    persistence = PersistenceStudy()
     returns = {floor: {} for floor in signals}
     for row in events:
         kind = row['event']
@@ -29,6 +30,7 @@ def audit(events, summary):
             stages['revisited'].add(pool)
             age = row.get('observedAge', row['at']-original['at'])
             observed = row.get('observedAt', row['at'])
+            persistence.observe(original,row,age,observed)
             for floor, cohort in signals.items():
                 if pool in cohort and pool not in returns[floor]:
                     at, price, mint, quote = cohort[pool]
@@ -72,7 +74,13 @@ def audit(events, summary):
         comparison[str(floor)] = dict(signalPools=len(cohort), pricedAtFiveMinutes=len(outcomes),
             missingAtFiveMinutes=len(cohort)-len(outcomes),
             medianPriceChangePct=median(outcomes) if outcomes else None)
-    return dict(onlyFailedCheckAmongNeverConfirmed={
+    confirmed = len(persistence.confirmed)
+    rejected_count = len(persistence.rejected)
+    followup = dict(signals=len(persistence.signals),confirmed=confirmed,rejected=rejected_count,
+                    missingConfirmation=len(persistence.signals)-confirmed-rejected_count,
+                    priced=len(persistence.returns),missingOutcome=confirmed-len(persistence.returns),
+                    medianPct=median(persistence.returns.values()) if persistence.returns else None)
+    return dict(persistenceAt5000=followup, onlyFailedCheckAmongNeverConfirmed={
                     name: len(pools-stages['signal']) for name,pools in single_failure.items()},
                 liquidityFloorComparison=comparison, ticks=summary['ticks'], distinctPools=dict(discovered=len(first), **{
         name: len(stages[name]) for name in ('revisited','inWindow','launchpad','signal',
@@ -100,6 +108,9 @@ def render(report):
         label = '—' if change is None else f'{change:.2f}%'
         lines.append(f"| {floor} | {row['signalPools']} | {row['pricedAtFiveMinutes']} | "
                      f"{row['missingAtFiveMinutes']} | {label} |")
+    study = report['persistenceAt5000']
+    lines.extend(['', '5k persistence study (60–120 seconds to confirm, five minutes from confirmation):',
+                  json.dumps(study, sort_keys=True)])
     return '\n'.join(lines)
 
 

@@ -109,6 +109,46 @@ def spot_quote(src, dst, amount):
     return minimum
 
 
+class PersistenceStudy:
+    """Observe one fixed confirmation and one later outcome for each 5k signal."""
+    def __init__(self):
+        self.signals = {}
+        self.rejected = set()
+        self.confirmed = {}
+        self.returns = {}
+
+    def observe(self, first, row, age, now):
+        pool = row['pool']
+        if pool not in self.signals:
+            if (launchpad_candidate(first,row,now)
+                    and not failed_checks(first,row,age,liquidity_floor=5000)):
+                self.signals[pool] = (now,row['price'])
+            return
+        if pool in self.rejected or pool in self.returns:
+            return
+        if (row['mint'],row['quote']) != (first['mint'],first['quote']) or row['price'] <= 0:
+            return
+        if pool in self.confirmed:
+            at, price = self.confirmed[pool]
+            if 300 <= now-at <= 360:
+                self.returns[pool] = 100*(row['price']/price-1)
+            return
+        at, price = self.signals[pool]
+        if 60 <= now-at <= 120:
+            if (row['price'] >= price and launchpad_candidate(first,row,now)
+                    and not failed_checks(first,row,age,liquidity_floor=5000)):
+                self.confirmed[pool] = (now,row['price'])
+            else:
+                self.rejected.add(pool)
+
+    def due(self, now):
+        pending = [(at+60,p) for p,(at,_) in self.signals.items()
+                   if p not in self.confirmed and p not in self.rejected and 60 <= now-at <= 120]
+        pending.extend((at+300,p) for p,(at,_) in self.confirmed.items()
+                       if p not in self.returns and 300 <= now-at <= 360)
+        return [pool for _,pool in sorted(pending)]
+
+
 def run(out, ticks, *, claude=False, account=None):
     entry_quote = quote if account is None else spot_quote
     shadow = Shadow(claude)
@@ -117,6 +157,7 @@ def run(out, ticks, *, claude=False, account=None):
     first, last, attempted, pending = {}, {}, set(), {}
     comparison_signals = {}
     comparison_priced = set()
+    persistence = PersistenceStudy()
     errors = (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, OSError)
     with (out/'events.jsonl').open('x', buffering=1) as ledger:
         def event(kind, **fields):
@@ -138,6 +179,8 @@ def run(out, ticks, *, claude=False, account=None):
                 else:
                     born, original = first[pool]
                     event('seenAgain', observedAge=t-born, observedAt=t, **x)
+                    if account is not None:
+                        persistence.observe(original,x,t-born,t)
                     if account is not None and launchpad_candidate(original,x,t):
                         if (pool not in comparison_signals
                                 and not failed_checks(original,x,t-born,liquidity_floor=5000)):
@@ -175,7 +218,7 @@ def run(out, ticks, *, claude=False, account=None):
                                 if p not in comparison_priced and 300 <= now-at <= 360),
                                key=lambda p:(comparison_signals[p][0],p))
             # Reuse the existing provider batch; oldest due observations are read first.
-            due = list(dict.fromkeys(followups + due))[:25]
+            due = list(dict.fromkeys(followups + persistence.due(now) + due))[:25]
             candidates = {}
             if due:
                 try:
