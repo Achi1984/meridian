@@ -187,6 +187,21 @@ export function mountSolanaReport(section) {
             ' ohne Rückverkaufskurs · ' + quotes.skipped + ' übersprungen');
         add(detail,'p','Medianer Rückfluss vor Netzwerkgebühren · ' +
             (quotes.quoted ? amount(quotes.medianReturnUsdc) : 'nicht ermittelbar'));
+        let limits = quotes.withinCostPct;
+        if (limits === undefined && quotes.quoted === 1) {
+          // With one pair the reported median is the individual quote.
+          limits = Object.fromEntries([1,2,5].map(limit =>
+            [limit, Number(quotes.medianReturnUsdc >= (100-limit)/5)]));
+        }
+        if (quotes.quoted > 0 && limits && [limits[1],limits[2],limits[5]].every(count)
+            && limits[1] <= limits[2] && limits[2] <= limits[5] && limits[5] === quotes.passed) {
+          add(detail,'h3','Verlust beim sofortigen Rückverkauf');
+          const counts = add(detail,'dl','');
+          counts.className = 'strategy-summary';
+          for (const limit of [1,2,5]) {
+            field('Höchstens ' + limit + ' %',limits[limit] + ' von ' + quotes.quoted,counts);
+          }
+        }
         if (quotes.quoted > 0) {
           const difference = quotes.medianReturnUsdc - 20;
           const percent = (difference / 20).toLocaleString('de-AT',{
