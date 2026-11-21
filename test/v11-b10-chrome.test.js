@@ -70,7 +70,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       assert.equal(initial.scrollY,0,'initial portfolio visibility is measured without scrolling');
       assert.ok(initial.viewport<=size.width&&initial.viewport>=size.width-20,'unexpected usable viewport '+size.width);
       assert.ok(initial.body<=initial.viewport+1&&initial.root<=initial.viewport+1,'initial page overflow '+size.width);
-      assert.equal(initial.statusOpen,false);assert.match(initial.statusText,/Unbekannt/);
+      assert.equal(initial.statusOpen,false);assert.equal(initial.statusText,'');
       assert.equal(initial.commandHeading,'Command');assert.equal(initial.primaryImmediatelyAfterHeading,'command-portfolio');
       assert.ok(initial.portfolioBeforeRisk,'portfolio must precede explanatory risk content');
       assert.ok(initial.header<Math.min(360,size.height*0.65),'bounded readable header: '+initial.header+'px');
@@ -92,6 +92,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       await evaluate('document.querySelector(".command-source-details").open=true;document.querySelector("#autonomy-status summary").focus()');
       await key('Enter','Enter',13);
       assert.equal(await evaluate('document.getElementById("autonomy-status").open'),true,'Enter opens status disclosure');
+      assert.match(await evaluate('document.querySelector("#autonomy-status summary").innerText'),/Unbekannt/);
       assert.equal(await evaluate('document.activeElement.matches("#autonomy-status summary")'),true);
       assert.match(await evaluate('document.querySelector("#autonomy-status .details-body").innerText'),/Kein aktuelles Betriebssignal/);
       assert.match(await evaluate('document.querySelector("#autonomy-status .details-body").innerText'),/Der Versionsstand ist kein Lebenszeichen/);
