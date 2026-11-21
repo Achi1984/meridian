@@ -175,6 +175,21 @@ export function mountSolanaReport(section) {
         const median = study.priced ? study.medianPct.toLocaleString('de-AT',{maximumFractionDigits:2}) + ' %' : 'nicht ermittelbar';
         add(detail,'p','Mediane Kursänderung vor Kosten · ' + median);
       }
+      const windows = s.exitWindowComparison;
+      if (windows && [windows.observed,windows.paired,windows.incomplete,
+          windows.fourBetter,windows.fiveBetter,windows.equal].every(count)
+          && windows.observed === windows.paired + windows.incomplete
+          && windows.paired === windows.fourBetter + windows.fiveBetter + windows.equal
+          && (windows.paired ? Number.isFinite(windows.medianDifferenceUsdc) : windows.medianDifferenceUsdc === null)) {
+        const detail = add(body,'details','');
+        add(detail,'summary','Rückverkauf nach 4 oder 5 Minuten');
+        add(detail,'p',windows.paired + ' vollständige Kurspaare · ' + windows.incomplete + ' unvollständig');
+        if (windows.paired) {
+          add(detail,'p','Mehr USDC nach 4 Minuten: ' + windows.fourBetter +
+              ' · nach 5 Minuten: ' + windows.fiveBetter + ' · gleicher Betrag: ' + windows.equal);
+          add(detail,'p','Median der Differenz (5 minus 4 Minuten): ' + amount(windows.medianDifferenceUsdc));
+        }
+      }
       const quotes = s.confirmationExecution;
       if (quotes && study && [quotes.quoted,quotes.passed,quotes.skipped,quotes.buyMissing,quotes.sellMissing].every(count)
           && quotes.passed <= quotes.quoted
