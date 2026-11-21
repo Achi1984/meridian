@@ -29,8 +29,8 @@ def canonical(obj):
     return json.dumps(obj,sort_keys=True,separators=(',',':'),allow_nan=False)
 
 
-def ask(data, key):
-    body = dict(model=MODEL, max_tokens=128, system=PROMPT,
+def ask(data, key, *, prompt=PROMPT):
+    body = dict(model=MODEL, max_tokens=128, system=prompt,
                 messages=[dict(role='user',content=canonical(data))],
                 output_config=dict(format=dict(type='json_schema',schema=SCHEMA)))
     conn = HTTPSConnection('api.anthropic.com',timeout=8)
