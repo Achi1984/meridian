@@ -102,6 +102,17 @@ jobs:
                   raise ValueError('Inconsistent confirmation counts')
               study['medianPct'] = None if row['medianPct'] is None else amount(row['medianPct'])
               report['persistenceAt5000'] = study
+          if 'exitWindowComparison' in funnel:
+              row = funnel['exitWindowComparison']
+              windows = {key: count(row[key]) for key in
+                         ('observed','paired','incomplete','fourBetter','fiveBetter','equal')}
+              diff = row['medianDifferenceUsdc']
+              if (windows['observed'] != windows['paired'] + windows['incomplete']
+                      or windows['paired'] != windows['fourBetter'] + windows['fiveBetter'] + windows['equal']
+                      or (diff is None) != (windows['paired'] == 0)):
+                  raise ValueError('Inconsistent paired exit observations')
+              windows['medianDifferenceUsdc'] = None if diff is None else amount(diff)
+              report['exitWindowComparison'] = windows
           execution = funnel.get('confirmationExecution')
           if execution is not None:
               failures = execution['unavailableBySide']
