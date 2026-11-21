@@ -477,7 +477,20 @@
       .topbar .identity .mark{display:none}
       .topbar .version-toggle,.topbar .app-access-lock{padding-inline:8px}
       .topbar .terminal-entry{margin-top:4px}
-      #view-strategies>.card{padding:8px 14px;margin:8px 0}
+      #view-strategies>details.card{padding:0 14px;margin:8px 0}
+      #view-strategies>details.card[open]{padding-bottom:12px}
+      #view-strategies>details.card>summary{
+        display:grid;grid-template-columns:minmax(0,1fr) auto;align-content:center;gap:2px 12px;
+        margin-inline:-14px;padding:10px 14px!important;min-height:56px!important
+      }
+      #view-strategies>details.card>summary::after{
+        content:"";grid-column:2;grid-row:1 / span 2;align-self:center;
+        width:8px;height:8px;border:solid currentColor;border-width:0 2px 2px 0;
+        transform:rotate(45deg);margin:-4px 3px 0 0
+      }
+      #view-strategies>details.card[open]>summary::after{transform:rotate(225deg);margin-top:4px}
+      #view-strategies>details.card>summary:focus-visible{outline-offset:-3px}
+      #solana-meme-paper>summary>.pilot-status{grid-column:1;grid-row:2}
     }
     @media(max-width:375px){
       .topbar .header-inner{display:grid;grid-template-columns:1fr;gap:4px}
