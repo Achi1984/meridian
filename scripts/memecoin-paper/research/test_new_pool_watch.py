@@ -29,3 +29,17 @@ class NewPoolTests(unittest.TestCase):
             with self.assertRaises(RuntimeError):
                 run(Path(folder),1)
             self.assertEqual(json.loads((Path(folder)/'summary.json').read_text())['events']['feedError'],1)
+
+    def test_research_quote_records_conservative_output_or_missing_side(self):
+        import new_pool_watch as watch
+        for replies,kind in [([123,19000000],'confirmationRoundTrip'),
+                             ([123,ValueError('route')],'confirmationQuoteUnavailable')]:
+            rows=[]
+            with patch.object(watch.time,'time',return_value=101),patch.object(watch,'spot_quote',side_effect=replies) as quotes:
+                watch.confirmed_quote_probe('p','m',100,lambda k,**v:rows.append((k,v)))
+            self.assertEqual(quotes.call_args_list[-1].args,('m',watch.USDC,123))
+            self.assertEqual(rows[0][0],kind)
+            if kind=='confirmationRoundTrip':
+                self.assertTrue(rows[0][1]['passesGate'])
+            else:
+                self.assertEqual(rows[0][1]['side'],'sell')
