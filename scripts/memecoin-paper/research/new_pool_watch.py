@@ -13,6 +13,7 @@ from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
 from meme_paper_account import FEE, UNIT, MemeAccount
+from runner_study import RunnerStudy, runner_signal
 from pool_shadow import Shadow, features
 
 GT = 'https://api.geckoterminal.com/api/v2/networks/solana'
@@ -236,6 +237,7 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
     probed = set()
     exit_probes = {}
     inflow = InflowQuotes()
+    runners = RunnerStudy(spot_quote, USDC, SIZE)
     errors = (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, OSError)
     with (out/'events.jsonl').open('x', buffering=1) as ledger:
         def event(kind, **fields):
@@ -258,6 +260,9 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                     born, original = first[pool]
                     event('seenAgain', observedAge=t-born, observedAt=t, **x)
                     if account is not None:
+                        if (probe_confirmations and tick < ticks-6
+                                and runner_signal(original, x, t-born, t, (USDC, WSOL))):
+                            runners.enter(x, event)
                         persistence.observe(original,x,t-born,t)
                         if probe_confirmations and early_inflow(original, x, t-born, t):
                             inflow_at.setdefault(pool, t)
@@ -306,6 +311,7 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                                 and 300 <= now-at <= 360), key=inflow_at.get)
             due = list(dict.fromkeys(followups + persistence.due(now) + inflow_due + due))[:25]
             candidates = {}
+            runners.mark(event, final=tick+1 == ticks)
             inflow.exits(event)
             if due:
                 try:
