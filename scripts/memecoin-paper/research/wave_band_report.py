@@ -12,9 +12,11 @@ ARMS = ('early', 'wave')
 
 def report(streams):
     totals = defaultdict(Counter)
+    comparisons = defaultdict(Counter)
     seen_runs = set()
     for events in streams:
-        bands, positions, closed = {}, {}, set()
+        bands, positions, closed = {}, {}, {}
+        observation_gaps = set()
         end = set()
         cohort = None
         for row in events:
@@ -28,6 +30,7 @@ def report(streams):
             elif kind == 'cohort':
                 if cohort is not None:
                     raise ValueError('Duplicate session')
+                policy = row.get('holdingPolicy','commonSessionEnd')
                 cohort = set(row['mints'])
                 identity = row['at'],tuple(sorted(cohort))
                 if identity in seen_runs:
@@ -37,11 +40,15 @@ def report(streams):
                     raise ValueError('Selection missing from cohort')
                 for m in cohort:
                     for a in ARMS:
-                        totals[bands.get(m,'unclassified'),a]['observed'] += 1
+                        totals[policy,bands.get(m,'unclassified'),a]['observed'] += 1
+            elif kind == 'observationUnavailable':
+                if cohort is None or mint not in cohort:
+                    raise ValueError('Observation outside cohort')
+                observation_gaps.add(mint)
             elif kind in ('entry','exit','costRejected'):
                 if cohort is None or mint not in cohort or arm not in ARMS:
                     raise ValueError('Trade outside cohort')
-                stats = totals[bands.get(mint,'unclassified'),arm]
+                stats = totals[policy,bands.get(mint,'unclassified'),arm]
                 if kind=='entry':
                     if key in positions:
                         raise ValueError('Duplicate entry')
@@ -50,10 +57,11 @@ def report(streams):
                 elif kind=='exit':
                     if key not in positions or key in closed:
                         raise ValueError('Unmatched exit')
-                    closed.add(key)
                     stats['closed'] += 1
                     net = D(str(row['netUsdc']))
+                    closed[key] = net
                     stats['net'] += net
+                    stats['best'] = max(stats.get('best',net),net)
                     stats['wins'] += net>0
                     stats['triples'] += net >= 2*(positions[key]-D(FEE)/UNIT)
                 else:
@@ -68,16 +76,41 @@ def report(streams):
                 end.add(arm)
         if cohort is None or end!=set(ARMS):
             raise ValueError('Incomplete paper run')
-        for mint,arm in positions.keys()-closed:
-            stats = totals[bands.get(mint,'unclassified'),arm]
+        for mint in cohort:
+            pair = comparisons[policy,bands.get(mint,'unclassified')]
+            early, wave = (mint,'early'), (mint,'wave')
+            if any(k in positions and k not in closed for k in (early,wave)):
+                pair['unresolved'] += 1
+                continue
+            if early not in positions and wave not in positions:
+                if mint in observation_gaps:
+                    pair['noEntryWithObservationGap'] += 1
+                else:
+                    pair['neitherEntered'] += 1
+                continue
+            group = 'both' if early in positions and wave in positions else 'earlyOnly' if early in positions else 'waveOnly'
+            delta = closed.get(wave,0)-closed.get(early,0)
+            pair[group] += 1
+            pair[group+'Delta'] += delta
+        for mint,arm in positions.keys()-closed.keys():
+            stats = totals[policy,bands.get(mint,'unclassified'),arm]
             stats['unresolved'] += 1
             stats['unpricedCost'] += positions[mint,arm]
     output = []
-    for (band,arm),stats in sorted(totals.items()):
-        output.append(dict(band=band,arm=arm,**{k:stats[k] for k in
+    for (policy,band,arm),stats in sorted(totals.items()):
+        output.append(dict(holdingPolicy=policy,band=band,arm=arm,**{k:stats[k] for k in
                     ('observed','entries','closed','wins','triples','costRejections','unresolved')},
                     realizedUsdc=float(stats['net']),
+                    bestClosedUsdc=float(stats['best']) if stats['closed'] else None,
+                    realizedWithoutBestUsdc=float(stats['net']-stats['best']) if stats['closed']>1 else None,
                     netIfUnpricedWorthZeroUsdc=float(stats['net']-stats['unpricedCost'])))
+        if arm=='wave':
+            pair = comparisons[policy,band]
+            output[-1]['waveMinusEarly'] = {
+                'noEntryWithObservationGap':pair['noEntryWithObservationGap'],
+                'neitherEntered':pair['neitherEntered'], 'unresolved':pair['unresolved'],
+                'groups':{g:dict(count=pair[g],deltaUsdc=float(pair[g+'Delta']) if pair[g] else None)
+                          for g in ('both','earlyOnly','waveOnly')}}
     return output
 
 
