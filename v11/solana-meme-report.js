@@ -39,17 +39,27 @@ export function mountSolanaReport(section) {
     live.textContent = 'Laufstatus wird geladen …';
     body.replaceChildren();
     const [status, report] = await Promise.allSettled([
-      read(api + '/actions/workflows/' + workflow + '/runs?branch=main&per_page=1'),
+      read(api + '/actions/workflows/' + workflow + '/runs?branch=main&per_page=5'),
       read(api + '/contents/solana-meme.json?ref=paper-dashboard-data',true)
     ]);
     try {
-      const run = status.value?.workflow_runs?.[0];
-      const states = {queued:'Wartet',in_progress:'Läuft',completed:'Beendet',waiting:'Wartet'};
+      const recent = status.value?.workflow_runs;
+      const observedRuns = Array.isArray(recent) ? recent : [];
+      const run = observedRuns[0];
+      const states = {queued:'Wartet',pending:'Wartet',requested:'Wartet',waiting:'Wartet',
+        in_progress:'Läuft',completed:'Beendet'};
+      function linkRun(parent, item) {
+        if (count(item?.id) && item.id > 0) {
+          const label = count(item.run_number) ? ' · Lauf #' + item.run_number : ' · Lauf öffnen';
+          add(parent,'a',label).href = runs + item.id;
+        }
+      }
       live.textContent = run && states[run.status] ? 'Letzter Pilot · ' + states[run.status] : 'Laufstatus unbekannt';
       if (run?.status === 'completed' && run.conclusion !== 'success') live.textContent += ' · ohne erfolgreichen Abschluss';
-      if (count(run?.id)) {
-        const link = add(live,'a',' · Lauf öffnen');
-        link.href = runs + run.id;
+      linkRun(live,run);
+      if (run && states[run.status] === 'Wartet') {
+        const active = observedRuns.find(item=>item?.status === 'in_progress' && item.id !== run.id);
+        if (active) linkRun(add(body,'p','Aktuell laufender Pilot'),active);
       }
       const s = report.value;
       if (!(s?.schema === 1 && count(s.runId) && s.runId > 0 && Number.isFinite(Date.parse(s.at))
@@ -58,7 +68,12 @@ export function mountSolanaReport(section) {
         add(body,'p','Kein bestätigter Abschlussbericht verfügbar.');
         return;
       }
-      const title = add(body,'a','Abschlussbericht · ' + new Date(s.at).toLocaleString('de-AT'));
+      const sourceRun = observedRuns.find(item=>item?.id === s.runId);
+      const label = count(run?.id) && run.id > s.runId ? 'Letzter verfügbarer Abschlussbericht' : 'Abschlussbericht';
+      const number = count(sourceRun?.run_number) ? ' · Lauf #' + sourceRun.run_number : '';
+      const finished = new Date(s.at).toLocaleString('de-AT',{timeZone:'Europe/Vienna',
+        day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
+      const title = add(body,'a',label + number + ' · ' + finished);
       title.href = runs + s.runId;
       const list = add(body,'dl','');
       list.className = 'strategy-summary';
