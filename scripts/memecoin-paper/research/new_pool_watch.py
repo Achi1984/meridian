@@ -309,10 +309,27 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                 except errors as exc:
                     event('refreshError', reason=type(exc).__name__)
             try:
-                observe(get(GT+'/new_pools?page=1',120)['data'], candidates)
+                page = get(GT+'/new_pools?page=1',120)['data']
+                observe(page, candidates)
                 event('feedRead')
             except errors as exc:
                 event('feedError', reason=type(exc).__name__)
+            if probe_confirmations and account is not None:
+                try:
+                    extra = get(GT+'/new_pools?page=2',120)['data']
+                    added = 0
+                    for item in extra:
+                        try:
+                            row = snapshot(item)
+                        except errors:
+                            continue
+                        if (row['pool'] not in first and row['liquidity'] >= 10000
+                                and launchpad_candidate(row, row, int(time.time()))):
+                            observe([item], candidates)
+                            added += 1
+                    event('liquidDiscoveryPage', addedPools=added)
+                except errors as exc:
+                    event('liquidDiscoveryUnavailable', reason=type(exc).__name__)
             for mint,(opened,qty) in list(pending.items()):
                 if int(time.time())-opened >= 300:
                     try:
