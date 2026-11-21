@@ -33,3 +33,13 @@ class BandReportTests(unittest.TestCase):
         legacy,equal = [r for r in rows if r['arm']=='early']
         self.assertIsNone(legacy['realizedWithoutBestUsdc'])
         self.assertEqual((equal['realizedUsdc'],equal['realizedWithoutBestUsdc']),(7,-3))
+
+    def test_no_entry_with_observation_gap_counted_once_per_mint(self):
+        rows = [dict(event='cohort',at=1,mints=['a','b'])]
+        rows.extend([dict(event='observationUnavailable',mint='a')] * 2)
+        rows.extend(dict(event='summary',arm=arm,entries=0,closed=0,unresolved=0)
+                    for arm in ('early','wave'))
+        pair = report([rows])[1]['waveMinusEarly']
+        self.assertEqual(pair['noEntryWithObservationGap'],1)
+        self.assertEqual(pair['neitherEntered'],1)
+        self.assertEqual(sum(group['count'] for group in pair['groups'].values()),0)

@@ -16,6 +16,7 @@ def report(streams):
     seen_runs = set()
     for events in streams:
         bands, positions, closed = {}, {}, {}
+        observation_gaps = set()
         end = set()
         cohort = None
         for row in events:
@@ -40,6 +41,10 @@ def report(streams):
                 for m in cohort:
                     for a in ARMS:
                         totals[policy,bands.get(m,'unclassified'),a]['observed'] += 1
+            elif kind == 'observationUnavailable':
+                if cohort is None or mint not in cohort:
+                    raise ValueError('Observation outside cohort')
+                observation_gaps.add(mint)
             elif kind in ('entry','exit','costRejected'):
                 if cohort is None or mint not in cohort or arm not in ARMS:
                     raise ValueError('Trade outside cohort')
@@ -78,7 +83,10 @@ def report(streams):
                 pair['unresolved'] += 1
                 continue
             if early not in positions and wave not in positions:
-                pair['neitherEntered'] += 1
+                if mint in observation_gaps:
+                    pair['noEntryWithObservationGap'] += 1
+                else:
+                    pair['neitherEntered'] += 1
                 continue
             group = 'both' if early in positions and wave in positions else 'earlyOnly' if early in positions else 'waveOnly'
             delta = closed.get(wave,0)-closed.get(early,0)
@@ -99,6 +107,7 @@ def report(streams):
         if arm=='wave':
             pair = comparisons[policy,band]
             output[-1]['waveMinusEarly'] = {
+                'noEntryWithObservationGap':pair['noEntryWithObservationGap'],
                 'neitherEntered':pair['neitherEntered'], 'unresolved':pair['unresolved'],
                 'groups':{g:dict(count=pair[g],deltaUsdc=float(pair[g+'Delta']) if pair[g] else None)
                           for g in ('both','earlyOnly','waveOnly')}}
