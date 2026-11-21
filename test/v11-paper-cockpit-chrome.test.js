@@ -222,6 +222,11 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         }
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details'), el=>[el.id,el.open])`),
           [['solana-meme-paper',false],['paper-advisor',false],['paper-reports-section',false],['paper-research-section',false]]);
+        if (evidence && size.width===390) {
+          mkdirSync(evidence,{recursive:true});
+          const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+          writeFileSync(join(evidence,'strategies-overview-390.png'),Buffer.from(image.data,'base64'));
+        }
         await evaluate(`document.querySelector('#paper-advisor').open=true;document.querySelector('#paper-reports-section').open=true`);
         const tile = await evaluate(`(()=>{
           const root=document.querySelector('#paper-advisor');
