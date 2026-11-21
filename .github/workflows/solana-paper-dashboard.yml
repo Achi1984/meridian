@@ -123,6 +123,13 @@ jobs:
                       or (diff is None) != (windows['paired'] == 0)):
                   raise ValueError('Inconsistent paired exit observations')
               windows['medianDifferenceUsdc'] = None if diff is None else amount(diff)
+              if 'breakEven' in row:
+                  coverage = row['breakEven']
+                  required = amount(coverage['requiredUsdc'])
+                  four, five = (count(coverage[key]) for key in ('fourCovered','fiveCovered'))
+                  if required <= 0 or max(four, five) > windows['paired']:
+                      raise ValueError('Invalid paired exit break-even totals')
+                  windows['breakEven'] = dict(requiredUsdc=required,fourCovered=four,fiveCovered=five)
               report['exitWindowComparison'] = windows
           execution = funnel.get('confirmationExecution')
           if execution is not None:
