@@ -11,6 +11,8 @@ class BandReportTests(unittest.TestCase):
         rows += [dict(event='summary',arm=a,entries=1,closed=int(a=='early'),unresolved=int(a=='wave')) for a in ('early','wave')]
         early,wave = report([rows])
         self.assertEqual((early['triples'],early['netIfUnpricedWorthZeroUsdc']), (1,40))
+        self.assertEqual(wave['waveMinusEarly']['unresolved'],1)
+        self.assertIsNone(wave['waveMinusEarly']['groups']['both']['deltaUsdc'])
         self.assertEqual((wave['unresolved'],wave['netIfUnpricedWorthZeroUsdc']), (1,-20.05))
 
     def test_incomplete_log_rejected(self):
@@ -26,6 +28,8 @@ class BandReportTests(unittest.TestCase):
                     dict(event='summary',arm='wave',entries=0,closed=0,unresolved=0)]
         policy = dict(holdingPolicy='tenMinutesFromEntry')
         rows = report([run(1,{},13),run(2,policy,10),run(3,policy,-3)])
+        wave = [r for r in rows if r['arm']=='wave' and r['holdingPolicy']=='tenMinutesFromEntry'][0]
+        self.assertEqual(wave['waveMinusEarly']['groups']['earlyOnly'],dict(count=2,deltaUsdc=-7))
         legacy,equal = [r for r in rows if r['arm']=='early']
         self.assertIsNone(legacy['realizedWithoutBestUsdc'])
         self.assertEqual((equal['realizedUsdc'],equal['realizedWithoutBestUsdc']),(7,-3))

@@ -12,9 +12,10 @@ ARMS = ('early', 'wave')
 
 def report(streams):
     totals = defaultdict(Counter)
+    comparisons = defaultdict(Counter)
     seen_runs = set()
     for events in streams:
-        bands, positions, closed = {}, {}, set()
+        bands, positions, closed = {}, {}, {}
         end = set()
         cohort = None
         for row in events:
@@ -51,9 +52,9 @@ def report(streams):
                 elif kind=='exit':
                     if key not in positions or key in closed:
                         raise ValueError('Unmatched exit')
-                    closed.add(key)
                     stats['closed'] += 1
                     net = D(str(row['netUsdc']))
+                    closed[key] = net
                     stats['net'] += net
                     stats['best'] = max(stats.get('best',net),net)
                     stats['wins'] += net>0
@@ -70,7 +71,20 @@ def report(streams):
                 end.add(arm)
         if cohort is None or end!=set(ARMS):
             raise ValueError('Incomplete paper run')
-        for mint,arm in positions.keys()-closed:
+        for mint in cohort:
+            pair = comparisons[policy,bands.get(mint,'unclassified')]
+            early, wave = (mint,'early'), (mint,'wave')
+            if any(k in positions and k not in closed for k in (early,wave)):
+                pair['unresolved'] += 1
+                continue
+            if early not in positions and wave not in positions:
+                pair['neitherEntered'] += 1
+                continue
+            group = 'both' if early in positions and wave in positions else 'earlyOnly' if early in positions else 'waveOnly'
+            delta = closed.get(wave,0)-closed.get(early,0)
+            pair[group] += 1
+            pair[group+'Delta'] += delta
+        for mint,arm in positions.keys()-closed.keys():
             stats = totals[policy,bands.get(mint,'unclassified'),arm]
             stats['unresolved'] += 1
             stats['unpricedCost'] += positions[mint,arm]
@@ -82,6 +96,12 @@ def report(streams):
                     bestClosedUsdc=float(stats['best']) if stats['closed'] else None,
                     realizedWithoutBestUsdc=float(stats['net']-stats['best']) if stats['closed']>1 else None,
                     netIfUnpricedWorthZeroUsdc=float(stats['net']-stats['unpricedCost'])))
+        if arm=='wave':
+            pair = comparisons[policy,band]
+            output[-1]['waveMinusEarly'] = {
+                'neitherEntered':pair['neitherEntered'], 'unresolved':pair['unresolved'],
+                'groups':{g:dict(count=pair[g],deltaUsdc=float(pair[g+'Delta']) if pair[g] else None)
+                          for g in ('both','earlyOnly','waveOnly')}}
     return output
 
 
