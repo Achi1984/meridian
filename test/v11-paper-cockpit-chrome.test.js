@@ -220,6 +220,9 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           if (await evaluate(`Boolean(document.querySelector('#paper-advisor .advisor-headline'))`)) break;
           await new Promise(resolve=>setTimeout(resolve,10));
         }
+        assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details'), el=>[el.id,el.open])`),
+          [['solana-meme-paper',false],['paper-advisor',false],['paper-reports-section',false],['paper-research-section',false]]);
+        await evaluate(`document.querySelector('#paper-advisor').open=true;document.querySelector('#paper-reports-section').open=true`);
         const tile = await evaluate(`(()=>{
           const root=document.querySelector('#paper-advisor');
           return {overflow:root.scrollWidth>root.clientWidth+1, title:root.querySelector('.advisor-headline h3')?.textContent,
@@ -511,7 +514,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`);
         assert.equal(focus,true);
         await key('Tab','Tab',9);
-        for (const selector of ['#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]']) {
+        for (const selector of ['#solana-meme-paper > summary','#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]','#paper-reports-section > summary']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
             true, 'live pilot control is reachable in document order: '+selector);
           await key('Tab','Tab',9);

@@ -816,6 +816,11 @@ function restoreDashboardClarity(source){
   return source;
 }
 function restoreB2(source){
+  const layout=source.match(/  <style id="dashboard-reading-order">[^]*?<\/style>\n/)?.[0];
+  assert.equal(gitBlob(layout),'655b2f72254d4cfbd11295cf412900536bfe5724');
+  source=source.replace(layout,'');
+  const development=source.match(/    <details id="autonomy-status"[^]*?    <\/details>\n/)?.[0];
+  source=source.replace(development,'').replace('    <section id="version-panel"',development+'    <section id="version-panel"');
   source=source.replace("        <li><strong>Meridian 11 · B19</strong><span class=\"version-status\">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>\n","").replace("11 · Vorschau B19<","11 · Vorschau B18<").replace("Diese Vorschau · B19:</b> Klarere Live-Paperbot-Auswertung. <b>Vorige Vorschau · B18","Diese Vorschau · B18");
   const compact=source.match(/  <style id="dashboard-compact-b18">[^]*?<\/style>\n/)?.[0];
   assert.ok(compact);

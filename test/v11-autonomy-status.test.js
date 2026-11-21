@@ -5,7 +5,7 @@ const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 const strip=html.match(/<details id="autonomy-status"[\s\S]*?<\/details>/)?.[0];
 test('autonomy status is persistent and unknown without telemetry',()=>{
  assert.ok(strip);
- assert.ok(html.indexOf(strip)<html.indexOf('<main '));
+ assert.ok(html.indexOf(strip)>html.indexOf('<details class="command-source-details">') && html.indexOf(strip)<html.indexOf('<section id="data-state-preview"'));
  assert.match(strip,/data-state="unknown" data-source="none"/);
  assert.match(strip,/Kein aktuelles Betriebssignal/);
  assert.match(strip,/Aktuelle Aufgabe:<\/b> Nicht verifiziert/);

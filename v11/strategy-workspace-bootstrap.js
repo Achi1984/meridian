@@ -39,17 +39,16 @@ function mountWorkspace(){
   arenaRoot = document.getElementById('strategy-arena-root');
   if(!catalogRoot?.parentNode || document.getElementById('paper-research-section')) return false;
   arena = createStrategyArenaView(arenaRoot);
-  const workspace=catalogRoot.parentNode;
   const botReports=collapsedSection('paper-bot-overview-section','Paper-Bot-Übersicht');
-  botReports.open=true;
+
   const botOverviewRoot=document.createElement('section');
   botOverviewRoot.id='paper-bot-overview-root';
   botReports.append(botOverviewRoot);
-  const advisor = collapsedSection('paper-advisor','BTC/EUR · Live-Paperbot',botReports);
-  advisor.open = true;
+  const advisor = collapsedSection('paper-advisor','Bitcoin · Paperbot',botReports);
+
   advisorController = createAdvisorSection(advisor);
   advisorController.setActive(Boolean(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')));
-  const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot');
+  const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot',advisor);
   mountSolanaReport(solana);
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
@@ -65,7 +64,7 @@ function mountWorkspace(){
   );
   const host8hRoot=document.createElement('section');
   host8hRoot.id='spot-paper-host8h-root';
-  workspace.insertBefore(host8hRoot,botReports);
+
   spotPaperHost8hDashboard=mountSpotPaperHost8hDashboard(host8hRoot,document,window);
 
   const history=collapsedSection('paper-history-section','Frühere Paper-Berichte');
@@ -78,6 +77,8 @@ function mountWorkspace(){
   history.append(paperRoot);
   paperCockpit=mountPaperCockpit(paperRoot,document,window);
 
+  const reports=collapsedSection('paper-reports-section','Berichte und Vergleiche',botReports);
+  reports.append(host8hRoot,botReports,pairedReports,history);
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
