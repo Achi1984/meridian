@@ -43,3 +43,40 @@ class NewPoolTests(unittest.TestCase):
                 self.assertTrue(rows[0][1]['passesGate'])
             else:
                 self.assertEqual(rows[0][1]['side'],'sell')
+
+    def test_inflow_without_followup_pool_mark(self):
+        import new_pool_watch as w
+        first = dict(pool='p',mint='m',quote=WSOL,dex='pump-fun',created='1970-01-01T00:00:00Z',
+                     liquidity=3000,price=1,buys=6,sells=3)
+        row = dict(first, liquidity=3500, price=1.05)
+        self.assertTrue(w.early_inflow(first,row,60,60))
+        self.assertFalse(w.early_inflow(first,dict(row,price=1.11),60,60))
+        study = w.InflowQuotes()
+        events = []
+        def record(kind, **fields):
+            events.append((kind,fields))
+        with patch.object(w.time,'time',return_value=100) as clock, patch.object(
+                w,'spot_quote',side_effect=[1000,OSError(),21_000_000]) as quotes:
+            study.enter(row,record)
+            study.enter(row,record)
+            clock.return_value=279
+            study.exits(record)
+            self.assertEqual(quotes.call_count,1)
+            clock.return_value=280
+            study.exits(record)
+            clock.return_value=340
+            study.exits(record)
+        self.assertEqual(quotes.call_args.args,('m',USDC,1000))
+        self.assertEqual(events[-1][1]['netAfterAssumedFeesUsdc'],0.90)
+        self.assertFalse(study.pending)
+
+    def test_inflow_unpriced_after_window(self):
+        import new_pool_watch as w
+        study = w.InflowQuotes()
+        study.pending['p']=('m',123,0)
+        with patch.object(w.time,'time',return_value=301),patch.object(w,'spot_quote') as quote:
+            events=[]
+            study.exits(lambda kind, **fields: events.append(kind))
+            quote.assert_not_called()
+        self.assertEqual(events,['inflowUnpriced'])
+        self.assertFalse(study.quoted_net)
