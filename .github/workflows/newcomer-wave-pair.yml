@@ -1,0 +1,27 @@
+name: Solana newcomer paired paper test
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/newcomer-wave-pair.yml']
+permissions:
+  contents: read
+jobs:
+  paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: scripts/memecoin-paper/research
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest test_newcomer_wave_pair test_newcomer_research
+      - run: python3 newcomer_wave_pair.py | tee wave-pair.jsonl
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: newcomer-wave-pair
+          path: scripts/memecoin-paper/research/wave-pair.jsonl
