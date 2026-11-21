@@ -16,3 +16,16 @@ class BandReportTests(unittest.TestCase):
     def test_incomplete_log_rejected(self):
         with self.assertRaises(ValueError):
             report([[dict(event='cohort',at=10,mints=[])]])
+
+    def test_holding_policies_and_winner_concentration(self):
+        def run(at,policy,net):
+            return [dict(event='cohort',at=at,mints=['m'],**policy),
+                    dict(event='entry',mint='m',arm='early',usdc=20),
+                    dict(event='exit',mint='m',arm='early',netUsdc=net),
+                    dict(event='summary',arm='early',entries=1,closed=1,unresolved=0),
+                    dict(event='summary',arm='wave',entries=0,closed=0,unresolved=0)]
+        policy = dict(holdingPolicy='tenMinutesFromEntry')
+        rows = report([run(1,{},13),run(2,policy,10),run(3,policy,-3)])
+        legacy,equal = [r for r in rows if r['arm']=='early']
+        self.assertIsNone(legacy['realizedWithoutBestUsdc'])
+        self.assertEqual((equal['realizedUsdc'],equal['realizedWithoutBestUsdc']),(7,-3))
