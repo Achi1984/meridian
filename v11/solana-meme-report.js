@@ -187,6 +187,13 @@ export function mountSolanaReport(section) {
         if (windows.paired) {
           add(detail,'p','Mehr USDC nach 4 Minuten: ' + windows.fourBetter +
               ' · nach 5 Minuten: ' + windows.fiveBetter + ' · gleicher Betrag: ' + windows.equal);
+          const coverage = windows.breakEven;
+          if (coverage && Number.isFinite(coverage.requiredUsdc) && coverage.requiredUsdc > 0
+              && [coverage.fourCovered,coverage.fiveCovered].every(n=>count(n) && n <= windows.paired)) {
+            add(detail,'p','Einsatz und geschätzte Gebühren gedeckt (ab ' + amount(coverage.requiredUsdc) +
+                '): nach 4 Minuten ' + coverage.fourCovered + ' von ' + windows.paired +
+                ', nach 5 Minuten ' + coverage.fiveCovered + ' von ' + windows.paired + '.');
+          }
           add(detail,'p','Median der Differenz (5 minus 4 Minuten): ' + amount(windows.medianDifferenceUsdc));
         }
       }
