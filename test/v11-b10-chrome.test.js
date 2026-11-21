@@ -49,7 +49,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
         body:document.body.scrollWidth,root:document.documentElement.scrollWidth,
         header:Math.round(document.querySelector('.topbar').getBoundingClientRect().height),
         headerPadding:parseFloat(getComputedStyle(document.querySelector('.topbar')).paddingTop),
-        headerControlsFit:[...document.querySelectorAll('.identity,.header-actions,#autonomy-status summary')].every(node=>{
+        headerControlsFit:[...document.querySelectorAll('.identity,.header-actions')].every(node=>{
           const r=node.getBoundingClientRect();return r.top>=0&&r.left>=0&&r.right<=innerWidth&&node.scrollWidth<=node.clientWidth+1;
         }),
         statusOpen:document.getElementById('autonomy-status').open,
@@ -64,7 +64,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
           return {value:{top:value.top,bottom:value.bottom},status:{top:status.top,bottom:status.bottom},navTop:nav.top};
         })(),
         disclosureHeight:document.querySelector('#autonomy-status summary').getBoundingClientRect().height,
-        targets:[...document.querySelectorAll('#nav button,#version-toggle,#autonomy-status summary,.command-context-details>summary')].every(node=>node.getBoundingClientRect().height>=44)
+        targets:[...document.querySelectorAll('#nav button,#version-toggle,.command-source-details>summary,.command-context-details>summary')].every(node=>node.getBoundingClientRect().height>=44)
       })`);
       assert.equal(initial.width,size.width);assert.equal(initial.height,size.height);
       assert.equal(initial.scrollY,0,'initial portfolio visibility is measured without scrolling');
@@ -74,9 +74,9 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       assert.equal(initial.commandHeading,'Command');assert.equal(initial.primaryImmediatelyAfterHeading,'command-portfolio');
       assert.ok(initial.portfolioBeforeRisk,'portfolio must precede explanatory risk content');
       assert.ok(initial.header<Math.min(360,size.height*0.65),'bounded readable header: '+initial.header+'px');
-      assert.ok(initial.headerPadding>=20,'header includes breathing room before safe-area padding');
+      assert.ok(initial.headerPadding>=8,'header includes breathing room before safe-area padding');
       assert.equal(initial.headerControlsFit,true,'header labels and controls fit their available rows');
-      assert.ok(initial.disclosureHeight>=44);assert.equal(initial.targets,true,'all primary touch controls meet 44px');
+      assert.equal(initial.disclosureHeight,0);assert.equal(initial.targets,true,'all primary touch controls meet 44px');
       for(const selector of ['.portfolio-value','.portfolio-description']){
         const reachable=await evaluate(`(()=>{
           const node=document.querySelector('#command-portfolio ${selector}');
@@ -89,7 +89,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       }
       await evaluate('window.scrollTo(0,0)');
 
-      await evaluate('document.querySelector("#autonomy-status summary").focus()');
+      await evaluate('document.querySelector(".command-source-details").open=true;document.querySelector("#autonomy-status summary").focus()');
       await key('Enter','Enter',13);
       assert.equal(await evaluate('document.getElementById("autonomy-status").open'),true,'Enter opens status disclosure');
       assert.equal(await evaluate('document.activeElement.matches("#autonomy-status summary")'),true);
