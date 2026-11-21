@@ -17,3 +17,16 @@ class DiscoveryTest(unittest.TestCase):
         self.assertEqual(scan(watch),[])
         self.assertEqual(scan(watch),[dict(row,buys=10)])
         self.assertEqual(scan({'p':('m','q')}),[])
+
+    @patch('newcomer_wave_pair.emit')
+    @patch('newcomer_wave_pair.flow')
+    def test_wave_can_enter_after_cost_rejection(self, flow, emit):
+        from unittest.mock import Mock
+        from newcomer_wave_pair import Pair, SIZE
+        s = Pair(dict(mint='m',pool='p',quote='q'))
+        flow.side_effect = [dict(netUsd=[0,-10]),dict(netUsd=[0,10],newRecentBuyers=4,largestRecentBuyerShare=.4)]
+        quote = Mock(side_effect=[100,.9*SIZE,.85*SIZE,.96*SIZE,99,.98*SIZE])
+        for i in range(3):
+            s.tick(i,False,quote,lambda *args:{'data':[]})
+        self.assertNotIn('early',s.positions)
+        self.assertIn('wave',s.positions)

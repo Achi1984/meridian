@@ -32,8 +32,8 @@ class Pair:
             qty = quote(USDC,mint,SIZE)
             mark = bid(qty)
             if mark < .95*SIZE:
-                emit('costRejected',mint=mint,arm=name)
-                return
+                emit('costRejected',mint=mint,arm=name,usdcRaw=mark)
+                return qty
             self.positions[name] = [qty,None]
             emit('entry',mint=mint,arm=name,qty=qty,usdc=SIZE/UNIT)
             return qty
@@ -142,7 +142,7 @@ def run():
                     study.tick(i,i==10)
                 except ERRORS as exc:
                     emit('observationUnavailable',mint=study.row['mint'],reason=type(exc).__name__)
-            if not any(s.positions for s in studies.values()):
+            if not any(s.reference_qty for s in studies.values()):
                 break
             if i<10:
                 time.sleep(max(0,60-(time.monotonic()-start)))
