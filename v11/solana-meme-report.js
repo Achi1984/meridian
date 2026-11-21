@@ -48,7 +48,12 @@ export function mountSolanaReport(section) {
     const states = {queued:'Wartet',pending:'Wartet',requested:'Wartet',waiting:'Wartet',
       in_progress:'Läuft',completed:'Beendet'};
     let label = states[run?.status] || 'Status unbekannt';
-    if (run?.status === 'completed' && run.conclusion !== 'success') label = 'Ohne Erfolg';
+    if (run?.status === 'completed') {
+      const conclusions = {success:'Beendet',cancelled:'Abgebrochen',failure:'Fehlgeschlagen',
+        timed_out:'Zeitlimit erreicht',skipped:'Übersprungen',neutral:'Neutral beendet',
+        action_required:'Eingriff erforderlich',stale:'Veraltet'};
+      label = Object.hasOwn(conclusions,run.conclusion) ? conclusions[run.conclusion] : 'Ergebnis unbekannt';
+    }
     badge.textContent = count(run?.run_number) ? 'Pilot ' + run.run_number + ' · ' + label : label;
     badge.dataset.state = run?.status === 'in_progress' ? 'running' : 'other';
     function linkRun(parent, item) {
@@ -57,8 +62,7 @@ export function mountSolanaReport(section) {
         add(parent,'a',label).href = runs + item.id;
       }
     }
-    live.textContent = run && states[run.status] ? 'Letzter Pilot · ' + states[run.status] : 'Laufstatus unbekannt';
-    if (run?.status === 'completed' && run.conclusion !== 'success') live.textContent += ' · ohne erfolgreichen Abschluss';
+    live.textContent = run && states[run.status] ? 'Letzter Pilot · ' + label : 'Laufstatus unbekannt';
     linkRun(live,run);
     if (run && states[run.status] === 'Wartet') {
       const active = observedRuns.find(item=>item?.status === 'in_progress' && item.id !== run.id);
