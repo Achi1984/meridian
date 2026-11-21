@@ -154,6 +154,7 @@ def confirmed_quote_probe(pool, mint, observed_at, event):
     if not 0 <= int(time.time()) - observed_at <= 30:
         event('confirmationQuoteSkipped',pool=pool,reason='stale')
         return
+    qty = None
     side = 'buy'
     try:
         qty = spot_quote(USDC,mint,SIZE)
@@ -161,9 +162,10 @@ def confirmed_quote_probe(pool, mint, observed_at, event):
         returned = spot_quote(mint,USDC,qty)
     except (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, OSError) as exc:
         event('confirmationQuoteUnavailable',pool=pool,mint=mint,side=side,reason=type(exc).__name__)
-        return
+        return qty
     event('confirmationRoundTrip',pool=pool,mint=mint,usdcRaw=returned,
           passesGate=returned*100 >= SIZE*95, confirmedAt=observed_at)
+    return qty
 
 
 def early_inflow(first, row, age, now):
@@ -229,6 +231,7 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
     comparison_priced = set()
     persistence = PersistenceStudy()
     probed = set()
+    exit_probes = {}
     inflow = InflowQuotes()
     errors = (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, OSError)
     with (out/'events.jsonl').open('x', buffering=1) as ledger:
@@ -354,9 +357,30 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                     probed.add(pool)
                     at,_ = persistence.confirmed[pool]
                     if len(probed) <= 12:
-                        confirmed_quote_probe(pool, first[pool][1]['mint'], at, event)
+                        mint = first[pool][1]['mint']
+                        qty = confirmed_quote_probe(pool, mint, at, event)
+                        if qty:
+                            for horizon in (240, 300):
+                                exit_probes[pool, horizon] = (mint, qty, at)
                     else:
                         event('confirmationQuoteSkipped',pool=pool,reason='sessionLimit')
+                for (pool, horizon), (mint, qty, at) in list(exit_probes.items()):
+                    age = int(time.time()) - at
+                    if age < horizon and tick+1 < ticks:
+                        continue
+                    del exit_probes[pool, horizon]
+                    fields = dict(pool=pool, mint=mint, horizonSeconds=horizon,
+                                  ageSeconds=age, tokenQty=qty, confirmedAt=at)
+                    if not horizon <= age < horizon+60:
+                        event('confirmationExitMissing', **fields,
+                              reason='sessionEnd' if age < horizon else 'missedWindow')
+                        continue
+                    try:
+                        returned = spot_quote(mint, USDC, qty)
+                    except errors as exc:
+                        event('confirmationExitMissing', **fields, reason=type(exc).__name__)
+                    else:
+                        event('confirmationExitQuote', **fields, usdcRaw=returned)
             summary = dict(ticks=tick+1,pools=len(first),openProbes=len(pending),events=dict(counts))
             if account is not None:
                 summary['account'] = account.status(int(time.time()))
