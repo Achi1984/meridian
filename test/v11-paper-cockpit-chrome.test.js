@@ -227,6 +227,13 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           await new Promise(resolve=>setTimeout(resolve,20));
         }
         assert.equal(await evaluate(`document.querySelector('#solana-meme-paper > summary').innerText.includes('Pilot 5 · Läuft')`),true);
+        if(size.mobile){
+          const fullWidthHeaders=await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details > summary')).every(summary=>{
+            const bounds=summary.getBoundingClientRect();
+            return bounds.height>=56 && Math.abs(bounds.width-summary.parentElement.clientWidth)<=1;
+          })`);
+          assert.equal(fullWidthHeaders,true,'mobile disclosure targets span the card width and are at least 56px tall');
+        }
         const overviewEvidence=evidence || process.env.V11_A2_EVIDENCE_DIR;
         if (overviewEvidence && size.width===390) {
           mkdirSync(overviewEvidence,{recursive:true});
