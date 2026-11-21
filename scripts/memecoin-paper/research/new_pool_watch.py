@@ -12,7 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
-from meme_paper_account import MemeAccount
+from meme_paper_account import FEE, UNIT, MemeAccount
 from pool_shadow import Shadow, features
 
 GT = 'https://api.geckoterminal.com/api/v2/networks/solana'
@@ -166,6 +166,59 @@ def confirmed_quote_probe(pool, mint, observed_at, event):
           passesGate=returned*100 >= SIZE*95, confirmedAt=observed_at)
 
 
+def early_inflow(first, row, age, now):
+    return (60 <= age <= 900 and launchpad_candidate(first, row, now)
+            and (first['mint'], first['quote']) == (row['mint'], row['quote'])
+            and row['quote'] in (USDC, WSOL) and row['mint'] not in (USDC, WSOL)
+            and first['liquidity'] > 0 and row['liquidity'] >= max(3000, 1.10 * first['liquidity'])
+            and first['price'] > 0 and 1 <= row['price']/first['price'] < 1.10
+            and row['sells'] >= 3 and row['buys'] >= 1.5 * row['sells'])
+
+
+class InflowQuotes:
+    def __init__(self):
+        self.seen = set()
+        self.pending = {}
+        self.quoted_net = []
+
+    def enter(self, row, event):
+        pool, mint = row['pool'], row['mint']
+        if pool in self.seen:
+            return
+        self.seen.add(pool)
+        if len(self.seen) > 12:
+            event('inflowSkipped', pool=pool, reason='sessionLimit')
+            return
+        try:
+            qty = spot_quote(USDC, mint, SIZE)
+        except (OSError, ValueError, KeyError, TypeError) as exc:
+            event('inflowBuyUnavailable', pool=pool, mint=mint, reason=type(exc).__name__)
+            return
+        self.pending[pool] = (mint, qty, int(time.time()))
+        event('inflowBuyQuote', pool=pool, mint=mint, tokensRaw=qty, usdcRaw=SIZE)
+
+    def exits(self, event, final=False):
+        for pool, (mint, qty, opened) in list(self.pending.items()):
+            age = int(time.time()) - opened
+            if 180 <= age <= 300:
+                try:
+                    returned = spot_quote(mint, USDC, qty)
+                except (OSError, ValueError, KeyError, TypeError) as exc:
+                    event('inflowSellUnavailable', pool=pool, age=age, reason=type(exc).__name__)
+                else:
+                    age = int(time.time()) - opened
+                    if age <= 300:
+                        net = returned - SIZE - 2*FEE
+                        self.quoted_net.append(net)
+                        event('inflowExitQuote', pool=pool, mint=mint, age=age, usdcRaw=returned,
+                              netAfterAssumedFeesUsdc=net/UNIT)
+                        del self.pending[pool]
+                        continue
+            if final or age > 300:
+                event('inflowUnpriced', pool=pool, age=age)
+                del self.pending[pool]
+
+
 def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
     entry_quote = quote if account is None else spot_quote
     shadow = Shadow(claude)
@@ -176,6 +229,7 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
     comparison_priced = set()
     persistence = PersistenceStudy()
     probed = set()
+    inflow = InflowQuotes()
     errors = (HTTPError, URLError, TimeoutError, ValueError, KeyError, TypeError, OSError)
     with (out/'events.jsonl').open('x', buffering=1) as ledger:
         def event(kind, **fields):
@@ -199,6 +253,8 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                     event('seenAgain', observedAge=t-born, observedAt=t, **x)
                     if account is not None:
                         persistence.observe(original,x,t-born,t)
+                        if probe_confirmations and early_inflow(original, x, t-born, t):
+                            inflow.enter(x, event)
                     if account is not None and launchpad_candidate(original,x,t):
                         if (pool not in comparison_signals
                                 and not failed_checks(original,x,t-born,liquidity_floor=5000)):
@@ -238,6 +294,7 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
             # Reuse the existing provider batch; oldest due observations are read first.
             due = list(dict.fromkeys(followups + persistence.due(now) + due))[:25]
             candidates = {}
+            inflow.exits(event)
             if due:
                 try:
                     items = get(GT+'/pools/multi/'+','.join(due),120)['data']
@@ -319,6 +376,12 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                 event('botExitUnresolved', mint=position['mint'], pool=position['pool'])
             summary['exitRetryRounds'] = retry
             summary['account'] = account.status(int(time.time()))
+        inflow.exits(event, final=True)
+        if probe_confirmations and account is not None:
+            summary['earlyInflow'] = dict(signals=len(inflow.seen), entryQuotes=counts['inflowBuyQuote'],
+                buyUnavailable=counts['inflowBuyUnavailable'], skipped=counts['inflowSkipped'],
+                pricedExits=len(inflow.quoted_net), unresolved=counts['inflowUnpriced'],
+                pricedNetUsdc=sum(inflow.quoted_net)/UNIT if inflow.quoted_net else None)
         for mint in pending:
             event('unresolvedAtEnd',mint=mint)
         summary.update(events=dict(counts))
@@ -333,7 +396,7 @@ if __name__=='__main__':
     parser.add_argument('--ticks',type=int,choices=range(1,61),default=60,metavar='1..60')
     parser.add_argument('--claude',action='store_true',help='Enable up to ten advisory Claude calls')
     parser.add_argument('--paper-account',type=Path,help='Trade the Pump.fun paper strategy in this SQLite account')
-    parser.add_argument('--probe-confirmations',action='store_true',help='Quote up to 12 confirmed research pools')
+    parser.add_argument('--probe-confirmations',action='store_true',help='Probe up to 12 confirmations and 12 early liquidity inflows separately')
     args=parser.parse_args()
     if args.paper_account and args.claude:
         parser.error('Claude comparison belongs to the quote-probe cohort')
