@@ -13,6 +13,8 @@ def audit(events, summary):
     stages = defaultdict(set)
     failures = defaultdict(set)
     quote_errors = Counter()
+    confirmation_quotes = []
+    unavailable_sides = Counter()
     counts = Counter()
     single_failure = defaultdict(set)
     # First qualifying observation per pool, with a fixed five-minute follow-up.
@@ -63,6 +65,10 @@ def audit(events, summary):
                 stages['passedQuote'].add(pool)
         elif kind == 'botBuy':
             stages['bought'].add(pool)
+        elif kind == 'confirmationRoundTrip':
+            confirmation_quotes.append(row['usdcRaw'])
+        elif kind == 'confirmationQuoteUnavailable':
+            unavailable_sides[row['side']] += 1
         elif kind == 'quoteUnavailable':
             quote_errors[row.get('side', 'unknown')] += 1
     if dict(counts) != summary['events'] or len(first) != summary['pools']:
@@ -80,7 +86,11 @@ def audit(events, summary):
                     missingConfirmation=len(persistence.signals)-confirmed-rejected_count,
                     priced=len(persistence.returns),missingOutcome=confirmed-len(persistence.returns),
                     medianPct=median(persistence.returns.values()) if persistence.returns else None)
-    return dict(persistenceAt5000=followup, onlyFailedCheckAmongNeverConfirmed={
+    execution = dict(quoted=len(confirmation_quotes), passed=sum(v*100 >= SIZE*95 for v in confirmation_quotes),
+                     unavailableBySide=dict(unavailable_sides), skipped=counts['confirmationQuoteSkipped'],
+                     medianReturnUsdc=median(confirmation_quotes)/1_000_000 if confirmation_quotes else None)
+    return dict(confirmationExecution=execution if summary.get('probeConfirmations') else None,
+                persistenceAt5000=followup, onlyFailedCheckAmongNeverConfirmed={
                     name: len(pools-stages['signal']) for name,pools in single_failure.items()},
                 liquidityFloorComparison=comparison, ticks=summary['ticks'], distinctPools=dict(discovered=len(first), **{
         name: len(stages[name]) for name in ('revisited','inWindow','launchpad','signal',
@@ -111,6 +121,9 @@ def render(report):
     study = report['persistenceAt5000']
     lines.extend(['', '5k persistence study (60–120 seconds to confirm, five minutes from confirmation):',
                   json.dumps(study, sort_keys=True)])
+    if report['confirmationExecution'] is not None:
+        lines.extend(['', 'Immediate buy and resale quotes for 20 USDC (before network fees):',
+                      json.dumps(report['confirmationExecution'], sort_keys=True)])
     return '\n'.join(lines)
 
 
