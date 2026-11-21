@@ -113,6 +113,11 @@ jobs:
                       != report['persistenceAt5000']['confirmed']):
                   raise ValueError('Inconsistent confirmation quote totals')
               metrics['medianReturnUsdc'] = None if median is None else amount(median)
+              if 'withinCostPct' in execution:
+                  limits = {key: count(execution['withinCostPct'][key]) for key in ('1','2','5')}
+                  if not limits['1'] <= limits['2'] <= limits['5'] == metrics['passed']:
+                      raise ValueError('Inconsistent cost ceiling counts')
+                  metrics['withinCostPct'] = limits
               report['confirmationExecution'] = metrics
           with open(os.environ['GITHUB_OUTPUT'],'a') as output:
               print('report='+json.dumps(report,allow_nan=False),file=output)

@@ -1585,7 +1585,7 @@ async function browserRun(call,start,width,height,server){
   assert.match(paperSnapshot.text,/2 Signalpools · 1 mit Folgekurs · 1 ohne Folgekurs/);
   assert.match(paperSnapshot.text,/nicht ermittelbar/);
   assert.match(paperSnapshot.text,/-1,25 %/);
-  assert.deepEqual(paperSnapshot.values,['0,00 USDC','1','Unbewertet','0','12']);
+  assert.deepEqual(paperSnapshot.values,['0,00 USDC','1','Unbewertet','0','12','0 von 1','0 von 1','0 von 1']);
   assert.equal(paperSnapshot.fits,true,'Solana paper report fits the strategy panel');
   const rendered=await evaluate(`document.querySelector('#strategy-catalog').textContent`);
   assert.equal((await evaluate(`document.querySelectorAll('#strategy-catalog .strategy-family').length`)),12);
