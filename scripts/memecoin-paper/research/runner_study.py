@@ -22,6 +22,7 @@ class RunnerStudy:
         self.quote, self.usdc, self.size = quote, usdc, size
         self.attempted = set()
         self.open = {}
+        self.trailing_peak = {}
 
     def enter(self, row, event):
         mint = row['mint']
@@ -38,6 +39,7 @@ class RunnerStudy:
             event('runnerEntryTooCostly', mint=mint, usdcRaw=bid)
             return
         self.open[mint] = [qty, False]
+        self.trailing_peak[mint] = bid - 2 * FEE
         event('runnerPaperEntry', mint=mint, pool=row['pool'], qty=qty, costRaw=self.size)
 
     def mark(self, event, final):
@@ -51,7 +53,17 @@ class RunnerStudy:
             if net >= self.size and not doubled:
                 self.open[mint][1] = True
                 event('runnerDoubleSeen', mint=mint, netUsdc=net / UNIT)
+            if mint in self.trailing_peak:
+                value = self.size + net
+                peak = max(self.trailing_peak[mint], value)
+                self.trailing_peak[mint] = peak
+                if peak >= 1.5 * self.size and value <= .8 * peak:
+                    event('runnerTrailingExit', mint=mint, usdcRaw=bid, netUsdc=net/UNIT,
+                          peakNetUsdc=(peak-self.size)/UNIT)
+                    del self.trailing_peak[mint]
             if net >= 2 * self.size or net <= -.30 * self.size or final:
                 reason = 'triple' if net >= 2*self.size else 'stop' if net <= -.30*self.size else 'sessionEnd'
                 event('runnerPaperExit', mint=mint, reason=reason, netUsdc=net/UNIT, usdcRaw=bid)
+                # Without an earlier trail, the paired variant shares this exit.
+                self.trailing_peak.pop(mint, None)
                 del self.open[mint]
