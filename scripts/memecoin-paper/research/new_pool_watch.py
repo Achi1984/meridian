@@ -230,6 +230,7 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
     comparison_signals = {}
     comparison_priced = set()
     persistence = PersistenceStudy()
+    retried_mints = set()
     probed = set()
     exit_probes = {}
     inflow = InflowQuotes()
@@ -368,7 +369,16 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                             elif account.buy(mint,pool,qty,sell,decision_at):
                                 event('botBuy',mint=mint,pool=pool,tokensRaw=qty,usdcRaw=SIZE)
                 except errors as exc:
-                    event('quoteUnavailable', mint=mint,side=side,reason=type(exc).__name__)
+                    status = exc.code if isinstance(exc, HTTPError) else None
+                    event('quoteUnavailable', mint=mint, side=side, reason=type(exc).__name__,
+                          httpStatus=status)
+                    transient = (status in (408, 500, 502, 503, 504) if status is not None
+                                 else isinstance(exc, (TimeoutError, URLError, ConnectionError)))
+                    if account is not None and transient and mint not in retried_mints:
+                        # A subsequent tick must select a freshly observed candidate again.
+                        retried_mints.add(mint)
+                        attempted.discard(mint)
+                        event('quoteRetryEligible', pool=pool, mint=mint, side=side)
             if probe_confirmations:
                 for pool in sorted(persistence.confirmed.keys()-probed):
                     probed.add(pool)
