@@ -26,6 +26,17 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
           path: report
+      # Pilot 7 recorded both exit windows before its runner included the paired audit.
+      - uses: actions/checkout@v4
+        if: github.event.workflow_run.id == 44924811437
+        with:
+          ref: ${{ github.sha }}
+          path: audit-source
+          persist-credentials: false
+          sparse-checkout: scripts/memecoin-paper/research
+      - name: Rebuild pilot 7 comparison from its recorded events
+        if: github.event.workflow_run.id == 44924811437
+        run: python3 -E -s audit-source/scripts/memecoin-paper/research/pool_funnel.py report/session
       - name: Read completed simulation totals
         id: dashboard
         env:
