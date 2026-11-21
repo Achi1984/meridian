@@ -201,6 +201,7 @@ async function restartLookup(server, collected, oldTransport) {
   }
   assert.equal(restored.canonicalBytes(), before);
   fence(restored, collected);
+  await projectReadOnly(restored, collected);
   return restored;
 }
 
@@ -227,6 +228,8 @@ async function projectReadOnly(server, collected) {
   assert.equal(result.metadata.replaceAttempts, 0);
   const row = JSON.parse(result.serializedDTO).rows[0];
   assert.equal(row.taskState, 'UNKNOWN');
+  assert.equal(row.taskLabel, 'Stored receipt posting fence; delivery unconfirmed');
+  assert.equal(row.nextAction, 'Offline snapshot only; no dispatch, retry, or owner decision inferred');
   for (const key of ['providerRequested', 'providerVerified', 'modelRequested', 'modelVerified',
     'coordinatorMode', 'freshness']) assert.equal(row[key], 'UNKNOWN', key);
   for (const key of ['providerEvidence', 'modelEvidence', 'coordinatorEvidence', 'evidenceUrl']) {
@@ -271,8 +274,7 @@ test('connected HTTP transport path survives reconstruction, refuses publication
   assert.equal(restored.counts.verify, 1);
   assert.equal(restored.counts.lookup, 0);
   assert.equal(restored.counts.graphql, 9);
-  const restarted = await restartLookup(restored, fresh, second.transport);
-  await projectReadOnly(restarted, fresh);
+  await restartLookup(restored, fresh, second.transport);
 
   await t.test('actual unverified capture cannot substitute for synthetic trusted evidence', async () => {
     const rejectedServer = createFakeGithub();
