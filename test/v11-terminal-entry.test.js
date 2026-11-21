@@ -1552,7 +1552,8 @@ async function browserRun(call,start,width,height,server){
     try {
       window.fetch=async url=>{
         const data=String(url).includes('/actions/')
-          ? {workflow_runs:[{id:22,status:'in_progress'}]}
+          ? {workflow_runs:[{id:23,run_number:5,status:'pending'},
+              {id:22,run_number:4,status:'in_progress'},{id:21,run_number:3,status:'completed'}]}
           : {schema:1,runId:21,at:'2026-11-20T12:00:00Z',pools:12,open:1,closed:0,realized:0,equity:null,
               confirmationExecution:{quoted:1,passed:0,skipped:0,buyMissing:0,sellMissing:0,medianReturnUsdc:18.75},
               persistenceAt5000:{signals:3,confirmed:1,rejected:1,missingConfirmation:1,priced:0,missingOutcome:1,medianPct:null},
@@ -1567,7 +1568,9 @@ async function browserRun(call,start,width,height,server){
         fits:section.scrollWidth<=section.clientWidth+1};
     } finally {window.fetch=fetchOriginal;section.open=false;}
   })()`,true);
-  assert.match(paperSnapshot.text,/Letzter Pilot · Läuft/);
+  assert.match(paperSnapshot.text,/Letzter Pilot · Wartet · Lauf #5/);
+  assert.match(paperSnapshot.text,/Aktuell laufender Pilot · Lauf #4/);
+  assert.match(paperSnapshot.text,/Letzter verfügbarer Abschlussbericht · Lauf #3/);
   assert.match(paperSnapshot.text,/18,75 USDC/);
   assert.match(paperSnapshot.text,/1 mit beiden Kursen · davon 0 mit mindestens 19 USDC Rückfluss/);
   assert.match(paperSnapshot.text,/3 Signale · 1 bestätigt · 1 verworfen · 1 ohne Kurs/);
