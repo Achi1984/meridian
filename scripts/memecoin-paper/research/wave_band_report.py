@@ -28,6 +28,7 @@ def report(streams):
             elif kind == 'cohort':
                 if cohort is not None:
                     raise ValueError('Duplicate session')
+                policy = row.get('holdingPolicy','commonSessionEnd')
                 cohort = set(row['mints'])
                 identity = row['at'],tuple(sorted(cohort))
                 if identity in seen_runs:
@@ -37,11 +38,11 @@ def report(streams):
                     raise ValueError('Selection missing from cohort')
                 for m in cohort:
                     for a in ARMS:
-                        totals[bands.get(m,'unclassified'),a]['observed'] += 1
+                        totals[policy,bands.get(m,'unclassified'),a]['observed'] += 1
             elif kind in ('entry','exit','costRejected'):
                 if cohort is None or mint not in cohort or arm not in ARMS:
                     raise ValueError('Trade outside cohort')
-                stats = totals[bands.get(mint,'unclassified'),arm]
+                stats = totals[policy,bands.get(mint,'unclassified'),arm]
                 if kind=='entry':
                     if key in positions:
                         raise ValueError('Duplicate entry')
@@ -54,6 +55,7 @@ def report(streams):
                     stats['closed'] += 1
                     net = D(str(row['netUsdc']))
                     stats['net'] += net
+                    stats['best'] = max(stats.get('best',net),net)
                     stats['wins'] += net>0
                     stats['triples'] += net >= 2*(positions[key]-D(FEE)/UNIT)
                 else:
@@ -69,14 +71,16 @@ def report(streams):
         if cohort is None or end!=set(ARMS):
             raise ValueError('Incomplete paper run')
         for mint,arm in positions.keys()-closed:
-            stats = totals[bands.get(mint,'unclassified'),arm]
+            stats = totals[policy,bands.get(mint,'unclassified'),arm]
             stats['unresolved'] += 1
             stats['unpricedCost'] += positions[mint,arm]
     output = []
-    for (band,arm),stats in sorted(totals.items()):
-        output.append(dict(band=band,arm=arm,**{k:stats[k] for k in
+    for (policy,band,arm),stats in sorted(totals.items()):
+        output.append(dict(holdingPolicy=policy,band=band,arm=arm,**{k:stats[k] for k in
                     ('observed','entries','closed','wins','triples','costRejections','unresolved')},
                     realizedUsdc=float(stats['net']),
+                    bestClosedUsdc=float(stats['best']) if stats['closed'] else None,
+                    realizedWithoutBestUsdc=float(stats['net']-stats['best']) if stats['closed']>1 else None,
                     netIfUnpricedWorthZeroUsdc=float(stats['net']-stats['unpricedCost'])))
     return output
 
