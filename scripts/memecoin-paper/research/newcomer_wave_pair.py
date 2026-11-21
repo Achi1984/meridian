@@ -114,7 +114,17 @@ def scan(watch):
 def run():
     studies, watch = {}, {}
     for attempt in range(3):
-        candidates = scan(watch)
+        try:
+            candidates = scan(watch)
+        except ERRORS as exc:
+            emit('discoveryUnavailable',attempt=attempt+1,reason=type(exc).__name__,status=getattr(exc,'code',None))
+            if attempt==2:
+                raise
+            delay = (getattr(exc,'headers',{}) or {}).get('Retry-After','60')
+            if not delay.isdigit() or int(delay)>180:
+                raise
+            time.sleep(max(60,int(delay)))
+            continue
         for row in candidates:
             studies.setdefault(row['mint'],Pair(row))
             if len(studies)==2:
