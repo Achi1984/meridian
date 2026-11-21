@@ -94,6 +94,22 @@ export function mountSolanaReport(section) {
           }
         }
       }
+      const inflow = s.earlyInflow;
+      if (inflow && [inflow.signals,inflow.entryQuotes,inflow.buyUnavailable,inflow.skipped,
+          inflow.pricedExits,inflow.unresolved].every(count)
+          && inflow.signals === inflow.entryQuotes + inflow.buyUnavailable + inflow.skipped
+          && inflow.entryQuotes === inflow.pricedExits + inflow.unresolved
+          && (inflow.pricedExits ? Number.isFinite(inflow.pricedNetUsdc) : inflow.pricedNetUsdc === null)) {
+        const detail = add(body,'details','');
+        add(detail,'summary','Frühe Liquiditätszuflüsse · Jupiter');
+        add(detail,'p',inflow.signals + ' Signale · ' + inflow.entryQuotes + ' mit Kaufkurs für 20 USDC · ' +
+            inflow.buyUnavailable + ' ohne Kaufkurs · ' + inflow.skipped + ' übersprungen');
+        add(detail,'p','Nach 3–5 Minuten: ' + inflow.pricedExits + ' mit Rückverkaufskurs · ' +
+            inflow.unresolved + ' ohne Rückverkaufskurs');
+        add(detail,'p','Geschätztes Netto aus bewerteten Kurspaaren: ' +
+            (inflow.pricedExits ? amount(inflow.pricedNetUsdc) : 'nicht ermittelbar'));
+        add(detail,'p','Die Schätzung berücksichtigt 0,10 USDC Netzwerkgebühren je Kurspaar.');
+      }
       const study = s.persistenceAt5000;
       if (study && [study.signals,study.confirmed,study.rejected,study.missingConfirmation,
           study.priced,study.missingOutcome].every(count)
