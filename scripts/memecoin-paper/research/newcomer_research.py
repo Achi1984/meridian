@@ -41,7 +41,7 @@ def flow(rows, mint, quote, end):
                 netUsd=net, largestRecentBuyerShare=max(latest.values())/total if total else None)
 
 
-def run():
+def discover():
     pools = {}
     for page in (1, 2, 3):
         for item in get(f'{GT}/new_pools?page={page}',120)['data']:
@@ -54,9 +54,14 @@ def run():
                     pools[row['pool']] = row
             except ERRORS:
                 continue
+    return sorted(pools.values(),key=lambda r:r['volume'],reverse=True)
+
+
+def run():
+    pools = discover()
     key = os.getenv('ANTHROPIC_API_KEY')
     print(json.dumps(dict(eligiblePools=len(pools), modelConfigured=bool(key))),flush=True)
-    for row in sorted(pools.values(),key=lambda r:r['volume'],reverse=True)[:4]:
+    for row in pools[:4]:
         mint = row['mint']
         report = dict(mint=mint, pool=row['pool'], dex=row['dex'], created=row['created'])
         try:
