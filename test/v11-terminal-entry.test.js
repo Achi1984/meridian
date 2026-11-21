@@ -818,7 +818,7 @@ function restoreDashboardClarity(source){
 function restoreB2(source){
   source=source.replace('      <details class="command-context-details">',"      <section class=\"card command-strategies\" aria-labelledby=\"command-strategies-heading\">\n        <div class=\"card-head\"><h2 id=\"command-strategies-heading\">Paper &amp; Forschung</h2><span class=\"limited\">Nur lesend</span></div>\n        <p>Live-Paperbot und Forschungsberichte findest du unter Strategien.</p>\n      </section>\n"+'      <details class="command-context-details">');
   const layout=source.match(/  <style id="dashboard-reading-order">[^]*?<\/style>\n/)?.[0];
-  assert.equal(gitBlob(layout),'655b2f72254d4cfbd11295cf412900536bfe5724');
+  assert.equal(gitBlob(layout),'0199e95058d9879cfcc38cd7248769a1a843868c');
   source=source.replace(layout,'');
   const development=source.match(/    <details id="autonomy-status"[^]*?    <\/details>\n/)?.[0];
   source=source.replace(development,'').replace('    <section id="version-panel"',development+'    <section id="version-panel"');

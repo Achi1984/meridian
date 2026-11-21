@@ -49,7 +49,8 @@ test('version history: native keyboard, focus and compact viewport at five width
    assert.ok(header.sourceClosed,'development status stays in closed source details');
    assert.ok(header.root<=width+1,'header does not introduce horizontal scrolling');
    if(width<=600){
-    assert.ok(header.identity.right<=header.version.left && header.identity.top<header.version.bottom,'compact mobile header fits one row');
+    if(width<=375) assert.ok(header.version.top>=header.identity.bottom,'narrow header actions fit below identity');
+    else assert.ok(header.identity.right<=header.version.left && header.identity.top<header.version.bottom,'compact mobile header fits one row');
    }
    const before=await evaluate(`JSON.stringify({value:document.querySelector('.portfolio-value').textContent,sources:[...document.querySelectorAll('.trust-cell span')].map(x=>x.textContent),decision:document.querySelector('[data-decision-owner]').textContent})`);
    assert.equal(await evaluate(`document.getElementById('version-panel').hidden`),true);
