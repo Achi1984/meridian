@@ -9,7 +9,7 @@ permissions:
 jobs:
   paired:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 40
     defaults:
       run:
         working-directory: scripts/memecoin-paper/research
@@ -17,7 +17,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - run: python3 -m unittest test_newcomer_wave_pair test_newcomer_research
+      - run: python3 -m unittest test_newcomer_wave_pair test_newcomer_research test_newcomer_refresh
       - run: python3 newcomer_wave_pair.py | tee wave-pair.jsonl
         shell: bash
       - name: Summarize buy-pressure bands and entry arms

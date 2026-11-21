@@ -8,6 +8,10 @@ from newcomer_research import ERRORS, discover, flow
 from new_pool_watch import GT, SIZE, USDC, get, snapshot, spot_quote
 
 
+HOLD_SECONDS = 600
+EXIT_GRACE = 120
+
+
 def emit(kind, **fields):
     print(json.dumps(dict(at=int(time.time()),event=kind,**fields)),flush=True)
 
@@ -19,6 +23,8 @@ class Pair:
         self.reference_qty = self.previous_bid = None
         self.sold_into = False
         self.tripled_at = {}
+        self.opened_at = {}
+        self.expired = set()
 
     def tick(self,index,final,quote=spot_quote,fetch=get):
         mint = self.row['mint']
@@ -36,6 +42,7 @@ class Pair:
                 emit('costRejected',mint=mint,arm=name,usdcRaw=mark)
                 return qty
             self.positions[name] = [qty,None]
+            self.opened_at[name] = time.monotonic()
             emit('entry',mint=mint,arm=name,qty=qty,usdc=SIZE/UNIT)
             return qty
 
@@ -65,24 +72,33 @@ class Pair:
                 emit('tripleRecheckMissing',mint=mint,arm=name,ageSeconds=age)
                 del self.tripled_at[name]
         for name,(qty,result) in self.positions.items():
-            if result is not None:
+            if result is not None or name in self.expired:
                 continue
             try:
                 proceeds = bid(qty)
             except ERRORS as exc:
+                if time.monotonic()-self.opened_at[name] >= HOLD_SECONDS+EXIT_GRACE:
+                    self.expired.add(name)
                 emit('missingExitQuote',mint=mint,arm=name,reason=type(exc).__name__)
                 continue
             net = proceeds-SIZE-2*FEE
-            if final or net>=2*SIZE or net<=-.30*SIZE:
+            age = time.monotonic()-self.opened_at[name]
+            if age>HOLD_SECONDS+EXIT_GRACE:
+                self.expired.add(name)
+                emit('lateExitQuote',mint=mint,arm=name,heldSeconds=age,usdcRaw=proceeds)
+                continue
+            if age>=HOLD_SECONDS or net>=2*SIZE or net<=-.30*SIZE:
                 self.positions[name][1] = net
-                emit('exit',mint=mint,arm=name,netUsdc=net/UNIT,usdcRaw=proceeds,qty=qty)
+                reason = 'target' if net>=2*SIZE else 'stop' if net<=-.30*SIZE else 'time'
+                emit('exit',mint=mint,arm=name,netUsdc=net/UNIT,usdcRaw=proceeds,qty=qty,
+                     heldSeconds=age,reason=reason)
                 if net>=2*SIZE:
                     self.tripled_at[name] = time.time()
                     emit('quotedTriple',mint=mint,arm=name,usdcRaw=proceeds,qty=qty)
                     if final:
                         emit('tripleRecheckMissing',mint=mint,arm=name,ageSeconds=0)
                         del self.tripled_at[name]
-        if final or 'wave' in self.positions:
+        if index>=10 or final or 'wave' in self.positions:
             return
         current = bid(self.reference_qty)
         recovered = current > self.previous_bid
@@ -165,18 +181,21 @@ def run():
         if studies or attempt==2:
             break
         time.sleep(60)
-    emit('cohort',mints=list(studies))
+    emit('cohort',mints=list(studies),holdingPolicy='tenMinutesFromEntry')
     if studies:
-        for i in range(11):
+        for i in range(25):
             start = time.monotonic()
             for study in studies.values():
                 try:
-                    study.tick(i,i==10)
+                    study.tick(i,i==24)
                 except ERRORS as exc:
                     emit('observationUnavailable',mint=study.row['mint'],reason=type(exc).__name__)
             if not any(s.reference_qty for s in studies.values()):
                 break
-            if i<10:
+            if i>=10 and not any(s.tripled_at or any(result is None and name not in s.expired
+                    for name,(_,result) in s.positions.items()) for s in studies.values()):
+                break
+            if i<24:
                 time.sleep(max(0,60-(time.monotonic()-start)))
     for arm in ('early','wave'):
         emit('summary',**summary(studies.values(),arm))

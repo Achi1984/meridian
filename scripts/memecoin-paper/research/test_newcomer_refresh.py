@@ -1,4 +1,5 @@
 import unittest
+import time
 from unittest.mock import patch
 from newcomer_wave_pair import scan
 
@@ -38,6 +39,7 @@ class DiscoveryTest(unittest.TestCase):
         from newcomer_wave_pair import Pair, SIZE, FEE
         pair = Pair(dict(mint='m',pool='p'))
         pair.reference_qty = 100
+        pair.opened_at['wave'] = time.monotonic()
         pair.positions['wave'] = [100,None]
         clock.return_value = 1000
         quote = Mock(side_effect=[3*SIZE+2*FEE,2*SIZE])
