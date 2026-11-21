@@ -457,6 +457,28 @@
     #command-portfolio[data-state="not_loaded"] .trust-cell:has([data-command-depot-status]){display:none}
     #command-portfolio[data-state="not_loaded"] .trust-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
   </style>
+  <style id="dashboard-reading-order">
+    .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px}
+    .topbar .brand small{display:none}
+    #view-strategies>.card>summary{font-size:1rem;letter-spacing:0}
+    #paper-reports-section>.card{margin:8px 0}
+    #solana-meme-paper .strategy-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+    #solana-meme-paper .strategy-summary dd{font-size:1rem}
+    #solana-meme-paper .strategy-summary dt{font-size:.75rem}
+    @media(max-width:600px){
+      .header-inner{flex-direction:row;align-items:center;gap:8px}
+      .topbar .header-actions{display:flex;align-items:center;gap:6px;margin-left:auto}
+      .topbar .identity .mark{display:none}
+      .topbar .version-toggle,.topbar .app-access-lock{padding-inline:8px}
+      .topbar .terminal-entry{margin-top:4px}
+      #view-strategies>.card{padding:8px 14px;margin:8px 0}
+    }
+    @media(max-width:375px){
+      .topbar .header-inner{display:grid;grid-template-columns:1fr;gap:4px}
+      .topbar .header-actions{margin-left:0;justify-content:space-between}
+      #command-portfolio .trust-cell{display:grid;justify-content:start;gap:2px}
+    }
+  </style>
 </head>
 <body>
 <section id="app-access-gate" class="app-access-gate" aria-labelledby="app-access-heading">
@@ -489,16 +511,6 @@
     <nav class="terminal-entry" aria-label="M11-Strategien">
       <a class="strategy-entry-link" href="#view-strategies" data-open-strategies>Strategien öffnen</a>
     </nav>
-    <details id="autonomy-status" class="autonomy-strip" aria-labelledby="autonomy-heading" data-state="unknown" data-source="none">
-      <summary><span id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong><small class="disclosure-hint"> · Details</small></span><span aria-hidden="true">+</span></summary>
-      <div class="details-body">
-        <p>Kein aktuelles Betriebssignal. <b>Aktuelle Aufgabe:</b> Nicht verifiziert. <b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb nicht.</p>
-        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>
-        <p><b>Diese Vorschau · B19:</b> Klarere Live-Paperbot-Auswertung. <b>Vorige Vorschau · B18:</b> Kompakte Navigation und Botansicht. <b>Vorige Vorschau · B17:</b> Kompaktes Dashboard mit Live-Paperbot. <b>Vorige Vorschau · B16:</b> Wallet-Abdeckung und bestätigte Futures-Grid-Daten getrennt; TP-Status mit oberer Grid-Grenze verglichen. Rein lesend, keine Handelsfreigabe. <b>Vorige Vorschau · B14:</b> Research-Ausgaben unverifiziert. <b>Vorige Vorschau · B11:</b> Manuelle Bot-Snapshots; Testvorschau · Geräteabnahme ausstehend.</p>
-        <p><b>Vorige Vorschau · B10:</b> Kompaktes Layout. <b>Vorige Vorschau · B9:</b> Depotbewertung und Verlauf · <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>. Kontrollierte Testvorschau · Geräteabnahme ausstehend.</p>
-        <p><b>Zuletzt belegte UI-Änderung · B1:</b> <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Nachweis #702</a>. Der Versionsstand ist kein Lebenszeichen.</p>
-      </div>
-    </details>
     <section id="version-panel" class="version-panel" aria-labelledby="version-history-heading" hidden>
       <div class="version-panel-heading">
         <h2 id="version-history-heading">Versionen im Überblick</h2>
@@ -562,10 +574,6 @@
         <h2>Keine bestätigte Risikoprüfung</h2>
         <p>Fehlende Daten sind keine Entwarnung.</p>
       </section>
-      <section class="card command-strategies" aria-labelledby="command-strategies-heading">
-        <div class="card-head"><h2 id="command-strategies-heading">Paper &amp; Forschung</h2><span class="limited">Nur lesend</span></div>
-        <p>Live-Paperbot und Forschungsberichte findest du unter Strategien.</p>
-      </section>
       <details class="command-context-details">
         <summary><span>Einordnung &amp; Grenzen</span><span aria-hidden="true">+</span></summary>
         <div class="details-body">
@@ -578,6 +586,16 @@
           <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>
           <p><b>Daten:</b> Keine automatischen Abfragen, keine Handelsfreigabe. Bot-Snapshots erst nach ausdrücklicher manueller Abfrage.</p>
           <p><b>Grundlage:</b> MERIDIAN 11 Architekturentscheid #603. Die geprüfte v10-Engine bleibt separat.</p>
+    <details id="autonomy-status" class="autonomy-strip" aria-labelledby="autonomy-heading" data-state="unknown" data-source="none">
+      <summary><span id="autonomy-heading">Autonome Entwicklung · <strong>Unbekannt</strong><small class="disclosure-hint"> · Details</small></span><span aria-hidden="true">+</span></summary>
+      <div class="details-body">
+        <p>Kein aktuelles Betriebssignal. <b>Aktuelle Aufgabe:</b> Nicht verifiziert. <b>Letztes Lebenszeichen:</b> Nicht verfügbar. Diese Anzeige überwacht den Betrieb nicht.</p>
+        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>
+        <p><b>Diese Vorschau · B19:</b> Klarere Live-Paperbot-Auswertung. <b>Vorige Vorschau · B18:</b> Kompakte Navigation und Botansicht. <b>Vorige Vorschau · B17:</b> Kompaktes Dashboard mit Live-Paperbot. <b>Vorige Vorschau · B16:</b> Wallet-Abdeckung und bestätigte Futures-Grid-Daten getrennt; TP-Status mit oberer Grid-Grenze verglichen. Rein lesend, keine Handelsfreigabe. <b>Vorige Vorschau · B14:</b> Research-Ausgaben unverifiziert. <b>Vorige Vorschau · B11:</b> Manuelle Bot-Snapshots; Testvorschau · Geräteabnahme ausstehend.</p>
+        <p><b>Vorige Vorschau · B10:</b> Kompaktes Layout. <b>Vorige Vorschau · B9:</b> Depotbewertung und Verlauf · <a href="https://github.com/Achi1984/meridian/issues/766">B9-Umfang #766</a>. Kontrollierte Testvorschau · Geräteabnahme ausstehend.</p>
+        <p><b>Zuletzt belegte UI-Änderung · B1:</b> <time datetime="2026-10-11T19:30:28Z">11.10.2026, 21:30 Uhr Wien</time> · <a href="https://github.com/Achi1984/meridian/pull/702">Nachweis #702</a>. Der Versionsstand ist kein Lebenszeichen.</p>
+      </div>
+    </details>
           <section id="data-state-preview" class="data-state-preview" aria-labelledby="state-preview-heading">
             <h2 id="state-preview-heading">Datenstatus · Darstellungsbeispiele</h2>
             <p>Nur Ansichtsmuster ohne Kontozugriff. Sie verändern weder die geladene Depotbewertung noch den Risikostatus.</p>

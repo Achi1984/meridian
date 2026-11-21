@@ -37,19 +37,19 @@ test('version history: native keyboard, focus and compact viewport at five width
    };
    await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,screenWidth:width,screenHeight:height});
    await unlockAppThroughGate(call);
-   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),shortcut:rect('.strategy-entry-link'),status:rect('#autonomy-status'),brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
-   assert.ok(header.identity.top>=20,'identity has breathing room below the safe area');
-   assert.ok(header.brandVisible&&header.historyVisible,'identity and version descriptions remain visible');
+   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),shortcut:rect('.strategy-entry-link'),sourceClosed:document.querySelector('#autonomy-status').closest('.command-source-details')?.open===false,brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
+   assert.ok(header.identity.top>=8,'identity has breathing room below the safe area');
+   assert.ok(!header.brandVisible&&header.historyVisible,'compact brand and version history label');
    for(const target of [header.version,header.lock]){
     assert.ok(target.width>=44&&target.height>=44,'header actions retain touch targets');
     assert.ok(target.left>=16&&target.right<=width-16+1,'header actions stay inside horizontal safe padding');
    }
-   assert.ok(header.version.right+11<=header.lock.left,'build and lock controls have a clear gap');
+   assert.ok(header.version.right+5<=header.lock.left,'build and lock controls have a clear gap');
    assert.ok(header.shortcut.height>=44 && header.shortcut.width>=44,'strategy shortcut has a visible touch target');
-   assert.ok(header.status.top>=header.lock.bottom+7,'status is separated from navigation');
+   assert.ok(header.sourceClosed,'development status stays in closed source details');
    assert.ok(header.root<=width+1,'header does not introduce horizontal scrolling');
    if(width<=600){
-    if(!await evaluate('matchMedia("(min-width:376px)").matches')) assert.ok(header.version.top>=header.identity.bottom+15,'narrow mobile identity occupies its own row');
+    if(width<=375) assert.ok(header.version.top>=header.identity.bottom,'narrow header actions fit below identity');
     else assert.ok(header.identity.right<=header.version.left && header.identity.top<header.version.bottom,'compact mobile header fits one row');
    }
    const before=await evaluate(`JSON.stringify({value:document.querySelector('.portfolio-value').textContent,sources:[...document.querySelectorAll('.trust-cell span')].map(x=>x.textContent),decision:document.querySelector('[data-decision-owner]').textContent})`);
@@ -72,8 +72,6 @@ test('version history: native keyboard, focus and compact viewport at five width
    assert.equal(await evaluate(`document.activeElement.id`),'app-access-lock','app lock remains in the native header tab order');
    await key('Tab','Tab',9);
    assert.equal(await evaluate(`document.activeElement.classList.contains('strategy-entry-link')`),true,'native strategy navigation remains keyboard reachable');
-   await key('Tab','Tab',9);
-   assert.equal(await evaluate(`document.activeElement.matches('#autonomy-status summary')`),true,'autonomy disclosure is keyboard reachable');
    await key('Tab','Tab',9);
    assert.equal(await evaluate(`document.activeElement.id`),'version-close','close control is keyboard reachable');
    await key('Enter','Enter',13);
