@@ -89,6 +89,11 @@ def audit(events, summary):
     execution = dict(quoted=len(confirmation_quotes), passed=sum(v*100 >= SIZE*95 for v in confirmation_quotes),
                      unavailableBySide=dict(unavailable_sides), skipped=counts['confirmationQuoteSkipped'],
                      medianReturnUsdc=median(confirmation_quotes)/1_000_000 if confirmation_quotes else None)
+    # Count individual quoted round trips before network fees, including the exact cutoff.
+    execution['withinCostPct'] = {
+        str(limit): sum(value * 100 >= SIZE * (100 - limit) for value in confirmation_quotes)
+        for limit in (1, 2, 5)
+    }
     return dict(confirmationExecution=execution if summary.get('probeConfirmations') else None,
                 persistenceAt5000=followup, onlyFailedCheckAmongNeverConfirmed={
                     name: len(pools-stages['signal']) for name,pools in single_failure.items()},
