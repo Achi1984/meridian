@@ -227,6 +227,8 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
     out.mkdir(parents=True,exist_ok=True)
     counts = Counter()
     first, last, attempted, pending = {}, {}, set(), {}
+    inflow_at = {}
+    inflow_priced = set()
     comparison_signals = {}
     comparison_priced = set()
     persistence = PersistenceStudy()
@@ -258,7 +260,11 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                     if account is not None:
                         persistence.observe(original,x,t-born,t)
                         if probe_confirmations and early_inflow(original, x, t-born, t):
+                            inflow_at.setdefault(pool, t)
                             inflow.enter(x, event)
+                        if (pool in inflow_at and 300 <= t-inflow_at[pool] <= 360 and x['price'] > 0
+                                and (x['mint'], x['quote']) == (original['mint'], original['quote'])):
+                            inflow_priced.add(pool)
                     if account is not None and launchpad_candidate(original,x,t):
                         if (pool not in comparison_signals
                                 and not failed_checks(original,x,t-born,liquidity_floor=5000)):
@@ -296,7 +302,9 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                                 if p not in comparison_priced and 300 <= now-at <= 360),
                                key=lambda p:(comparison_signals[p][0],p))
             # Reuse the existing provider batch; oldest due observations are read first.
-            due = list(dict.fromkeys(followups + persistence.due(now) + due))[:25]
+            inflow_due = sorted((p for p, at in inflow_at.items() if p not in inflow_priced
+                                and 300 <= now-at <= 360), key=inflow_at.get)
+            due = list(dict.fromkeys(followups + persistence.due(now) + inflow_due + due))[:25]
             candidates = {}
             inflow.exits(event)
             if due:
