@@ -109,6 +109,19 @@ export function mountSolanaReport(section) {
         const median = study.priced ? study.medianPct.toLocaleString('de-AT',{maximumFractionDigits:2}) + ' %' : 'nicht ermittelbar';
         add(detail,'p','Mediane Kursänderung vor Kosten · ' + median);
       }
+      const quotes = s.confirmationExecution;
+      if (quotes && study && [quotes.quoted,quotes.passed,quotes.skipped,quotes.buyMissing,quotes.sellMissing].every(count)
+          && quotes.passed <= quotes.quoted
+          && quotes.quoted + quotes.skipped + quotes.buyMissing + quotes.sellMissing === study.confirmed
+          && (quotes.quoted ? Number.isFinite(quotes.medianReturnUsdc) : quotes.medianReturnUsdc === null)) {
+        const detail = add(body,'details','');
+        add(detail,'summary','Kauf und Rückverkauf · 20 USDC');
+        add(detail,'p',quotes.quoted + ' mit beiden Kursen · davon ' + quotes.passed + ' mit mindestens 19 USDC Rückfluss');
+        add(detail,'p',quotes.buyMissing + ' ohne Kaufkurs · ' + quotes.sellMissing +
+            ' ohne Rückverkaufskurs · ' + quotes.skipped + ' übersprungen');
+        add(detail,'p','Medianer Rückfluss vor Netzwerkgebühren · ' +
+            (quotes.quoted ? amount(quotes.medianReturnUsdc) : 'nicht ermittelbar'));
+      }
     } finally {
       loading = false;
       refresh.disabled = false;
