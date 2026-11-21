@@ -79,6 +79,17 @@ jobs:
                         realized=amount(account['realizedPnlUsdc']), equity=None if equity is None else amount(equity),
                         withdrawn=count(exceptions['signalWithdrawn']) if 'signalWithdrawn' in exceptions else None,
                         expired=count(exceptions['signalExpired']) if 'signalExpired' in exceptions else None)
+          if 'earlyInflow' in summary:
+              row = summary['earlyInflow']
+              study = {key: count(row[key]) for key in
+                       ('signals','entryQuotes','buyUnavailable','skipped','pricedExits','unresolved')}
+              net = row['pricedNetUsdc']
+              if (study['signals'] != study['entryQuotes'] + study['buyUnavailable'] + study['skipped']
+                      or study['entryQuotes'] != study['pricedExits'] + study['unresolved']
+                      or (net is None) != (study['pricedExits'] == 0)):
+                  raise ValueError('Inconsistent early inflow totals')
+              study['pricedNetUsdc'] = None if net is None else amount(net)
+              report['earlyInflow'] = study
           if comparison is not None:
               report['fiveMinuteComparison'] = comparison
           if 'persistenceAt5000' in funnel:

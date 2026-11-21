@@ -24,6 +24,9 @@ export function mountSolanaReport(section) {
     return child;
   };
   const live = add(section,'p','Laufstatus wird beim Öffnen geladen.');
+  live.setAttribute('role','status');
+  const notice = add(section,'p','');
+  notice.hidden = true;
   const body = add(section,'div','');
   const refresh = add(section,'button','Aktualisieren');
   refresh.type = 'button';
@@ -32,12 +35,12 @@ export function mountSolanaReport(section) {
   source.href = 'https://github.com/' + repo + '/actions/workflows/' + workflow;
   source.style.cssText = 'display:inline-flex;align-items:center;min-height:44px;padding:0 10px';
   let loading = false;
+  let hasReport = false;
   async function update() {
     if (loading) return;
     loading = true;
     refresh.disabled = true;
     live.textContent = 'Laufstatus wird geladen …';
-    body.replaceChildren();
     const [status, report] = await Promise.allSettled([
       read(api + '/actions/workflows/' + workflow + '/runs?branch=main&per_page=5'),
       read(api + '/contents/solana-meme.json?ref=paper-dashboard-data',true)
@@ -59,17 +62,22 @@ export function mountSolanaReport(section) {
       linkRun(live,run);
       if (run && states[run.status] === 'Wartet') {
         const active = observedRuns.find(item=>item?.status === 'in_progress' && item.id !== run.id);
-        if (active) linkRun(add(body,'p','Aktuell laufender Pilot'),active);
+        if (active) linkRun(add(live,'span',' · Aktuell laufender Pilot'),active);
       }
       const s = report.value;
       if (!(s?.schema === 1 && count(s.runId) && s.runId > 0 && Number.isFinite(Date.parse(s.at))
           && count(s.pools) && count(s.open) && count(s.closed) && Number.isFinite(s.realized)
           && (s.equity === null || Number.isFinite(s.equity)))) {
-        add(body,'p','Kein bestätigter Abschlussbericht verfügbar.');
+        notice.textContent = hasReport ? 'Abruf fehlgeschlagen. Angezeigt wird der zuletzt geladene Bericht.' :
+          'Kein bestätigter Abschlussbericht verfügbar.';
+        notice.hidden = false;
         return;
       }
+      body.replaceChildren();
+      notice.hidden = true;
+      hasReport = true;
       const sourceRun = observedRuns.find(item=>item?.id === s.runId);
-      const label = count(run?.id) && run.id > s.runId ? 'Letzter verfügbarer Abschlussbericht' : 'Abschlussbericht';
+      const label = run?.id === s.runId ? 'Abschlussbericht' : 'Letzter verfügbarer Abschlussbericht';
       const number = count(sourceRun?.run_number) ? ' · Lauf #' + sourceRun.run_number : '';
       const finished = new Date(s.at).toLocaleString('de-AT',{timeZone:'Europe/Vienna',
         day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
@@ -108,6 +116,22 @@ export function mountSolanaReport(section) {
             add(comparison,'p','Mediane Kursänderung · ' + value);
           }
         }
+      }
+      const inflow = s.earlyInflow;
+      if (inflow && [inflow.signals,inflow.entryQuotes,inflow.buyUnavailable,inflow.skipped,
+          inflow.pricedExits,inflow.unresolved].every(count)
+          && inflow.signals === inflow.entryQuotes + inflow.buyUnavailable + inflow.skipped
+          && inflow.entryQuotes === inflow.pricedExits + inflow.unresolved
+          && (inflow.pricedExits ? Number.isFinite(inflow.pricedNetUsdc) : inflow.pricedNetUsdc === null)) {
+        const detail = add(body,'details','');
+        add(detail,'summary','Frühe Liquiditätszuflüsse · Jupiter');
+        add(detail,'p',inflow.signals + ' Signale · ' + inflow.entryQuotes + ' mit Kaufkurs für 20 USDC · ' +
+            inflow.buyUnavailable + ' ohne Kaufkurs · ' + inflow.skipped + ' übersprungen');
+        add(detail,'p','Nach 3–5 Minuten: ' + inflow.pricedExits + ' mit Rückverkaufskurs · ' +
+            inflow.unresolved + ' ohne Rückverkaufskurs');
+        add(detail,'p','Geschätztes Netto aus bewerteten Kurspaaren: ' +
+            (inflow.pricedExits ? amount(inflow.pricedNetUsdc) : 'nicht ermittelbar'));
+        add(detail,'p','Die Schätzung berücksichtigt 0,10 USDC Netzwerkgebühren je Kurspaar.');
       }
       const study = s.persistenceAt5000;
       if (study && [study.signals,study.confirmed,study.rejected,study.missingConfirmation,
