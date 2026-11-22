@@ -38,8 +38,15 @@ class Pair:
             return cache[qty]
 
         def enter(name):
-            qty = quote(USDC,mint,SIZE)
-            mark = bid(qty)
+            leg = 'buy'
+            try:
+                qty = quote(USDC,mint,SIZE)
+                leg = 'initialResale'
+                mark = bid(qty)
+            except ERRORS as exc:
+                emit('entryQuoteUnavailable', mint=mint, arm=name, leg=leg,
+                     reason=type(exc).__name__, status=getattr(exc, 'code', None))
+                raise
             if mark < .95*SIZE:
                 emit('costRejected',mint=mint,arm=name,usdcRaw=mark)
                 return qty
