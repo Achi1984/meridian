@@ -21,19 +21,20 @@ def emit(kind, **fields):
 
 
 def provider_error_fields(exc):
+    fields = dict(reason=type(exc).__name__, status=getattr(exc, 'code', None))
     if not isinstance(exc, HTTPError):
-        return {}
+        return fields
     try:
         body = exc.read(4097)
         if len(body) > 4096:
-            return {}
+            return fields
         payload = json.loads(body)
     except (ValueError, OSError, HTTPException, RecursionError):
-        return {}
+        return fields
     code = payload.get('errorCode') if isinstance(payload, dict) else None
     if isinstance(code, str) and re.fullmatch(r'[A-Z][A-Z0-9_]{0,63}', code):
-        return {'providerErrorCode': code}
-    return {}
+        fields['providerErrorCode'] = code
+    return fields
 
 
 class Pair:
@@ -64,7 +65,6 @@ class Pair:
                 mark = bid(qty)
             except ERRORS as exc:
                 emit('entryQuoteUnavailable', mint=mint, arm=name, leg=leg,
-                     reason=type(exc).__name__, status=getattr(exc, 'code', None),
                      **provider_error_fields(exc))
                 raise
             if mark < .95*SIZE:
@@ -107,9 +107,11 @@ class Pair:
             try:
                 proceeds = bid(qty)
             except ERRORS as exc:
-                if time.monotonic()-self.opened_at[name] >= HOLD_SECONDS+EXIT_GRACE:
+                held = time.monotonic() - self.opened_at[name]
+                if held >= HOLD_SECONDS+EXIT_GRACE:
                     self.expired.add(name)
-                emit('missingExitQuote',mint=mint,arm=name,reason=type(exc).__name__)
+                emit('missingExitQuote', mint=mint, arm=name, qty=qty, heldSeconds=held,
+                     **provider_error_fields(exc))
                 continue
             net = proceeds-SIZE-2*FEE
             age = time.monotonic()-self.opened_at[name]
@@ -234,7 +236,8 @@ class HalfRunner(Pair):
             try:
                 mark = quote(mint, USDC, amount)
             except ERRORS as exc:
-                emit('runnerMissingQuote', mint=mint, qty=amount, reason=type(exc).__name__)
+                emit('runnerMissingQuote', mint=mint, qty=amount, heldSeconds=age(),
+                     leg='partialSale' if splitting else 'remainderSale', **provider_error_fields(exc))
             else:
                 held = age()
                 if held <= deadline:

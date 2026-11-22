@@ -20,7 +20,7 @@ def inventory_path(events, baseline):
     cash = -SIZE - FEE
     values = [0]
     sale = mark = partial_hold = outcome = None
-    missing = 0
+    missing = []
     for row in events:
         kind = row['event']
         if row.get('arm') == 'early':
@@ -50,7 +50,9 @@ def inventory_path(events, baseline):
         amount = remaining if partial_hold is not None else initial//2
         require(row['qty'] == amount and amount > 0, 'Runner sale quantity mismatch')
         if kind == 'runnerMissingQuote':
-            missing += 1
+            missing.append(dict(leg='partialSale' if partial_hold is None else 'remainderSale',
+                                qty=amount, heldSeconds=row.get('heldSeconds'), reason=row.get('reason'),
+                                status=row.get('status'), providerErrorCode=row.get('providerErrorCode')))
             mark = None
         elif kind == 'runnerMark':
             held = row['heldSeconds']
@@ -89,7 +91,7 @@ def inventory_path(events, baseline):
         peak = max(peak, value)
         drawdown = max(drawdown, peak-value)
     return dict(**outcome, partialHeldSeconds=partial_hold, sampledDrawdownUsdc=drawdown/UNIT,
-                missingRunnerQuotes=missing)
+                missingRunnerQuotes=len(missing), missingRunnerQuoteDetails=missing)
 
 
 def compare(streams, legacy_times=()):

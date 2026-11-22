@@ -77,3 +77,18 @@ class WaveTest(unittest.TestCase):
                     study.tick(0, False, Mock(side_effect=[101, error]))
                 self.assertEqual(emit.call_args.kwargs.get('providerErrorCode'), expected)
                 self.assertEqual(study.positions, {})
+
+    @patch('newcomer_wave_pair.emit')
+    @patch('newcomer_wave_pair.time.monotonic', return_value=720)
+    def test_failed_full_exit_records_route_and_expires(self, clock, emit):
+        s = Pair(dict(mint='m'))
+        s.reference_qty = 100
+        s.positions['wave'] = [100, None]
+        s.opened_at['wave'] = 0
+        error = HTTPError('https://example.invalid', 400, '', {}, BytesIO(b'{"errorCode":"NO_ROUTES_FOUND"}'))
+        quote = Mock(side_effect=error)
+        s.tick(12, True, quote)
+        emit.assert_called_with('missingExitQuote', mint='m', arm='wave', qty=100, heldSeconds=720,
+                                reason='HTTPError', status=400, providerErrorCode='NO_ROUTES_FOUND')
+        self.assertEqual(s.expired, {'wave'})
+        self.assertEqual(quote.call_count, 1)
