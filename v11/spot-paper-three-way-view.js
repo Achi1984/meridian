@@ -8,9 +8,9 @@ function node(document, parent, tag, text = '', className = '') {
   parent.append(element);
   return element;
 }
-function metric(value) {
+function metric(value, unit = ' ct') {
   if (value?.value === null || value?.value === undefined) return 'Unbekannt';
-  return `${value.value} ct`;
+  return `${value.value}${unit}`;
 }
 function field(document, parent, label, value) {
   const cell = document.createElement('div');
@@ -27,7 +27,7 @@ function renderArm(document, parent, name, arm) {
   field(document, card, 'Netto-Eigenkapital', metric(arm.finalNetEquityCents));
   field(document, card, 'Netto-PnL realisiert', metric(arm.realizedPnlCents));
   field(document, card, 'Netto-PnL unrealisiert', metric(arm.unrealizedPnlCents));
-  field(document, card, 'Fills / Round Trips', `${metric(arm.fillCount)} / ${metric(arm.completedRoundTripCount)}`);
+  field(document, card, 'Fills / Round Trips', `${metric(arm.fillCount, '')} / ${metric(arm.completedRoundTripCount, '')}`);
   field(document, card, 'Stichproben-Drawdown', metric(arm.maxSampledEquityDrawdownCents));
   field(document, card, 'Bestand', arm.positionStatus || 'Unbekannt');
   parent.append(card);
