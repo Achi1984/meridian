@@ -1,4 +1,4 @@
-import {servePilotFixture, pilotEndpoint} from './helpers/pilot-log-fixture.mjs';
+import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
@@ -398,13 +398,13 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           const host=document.getElementById('spot-paper-host8h-root');
           const history=document.getElementById('paper-history-section');
           const research=document.getElementById('paper-research-section');
-          return {hostVisible:host.getBoundingClientRect().height>0,
+          return {reportsClosed:host.closest('#paper-reports-section')?.open===false,
             hostFirst:!!(host.compareDocumentPosition(history)&Node.DOCUMENT_POSITION_FOLLOWING),
             historyClosed:!history.open,researchClosed:!research.open,
             legacyGrouped:!!history.querySelector('#spot-paper-cockpit-root')&&!!history.querySelector('#paper-cockpit-root'),
             researchGrouped:!!research.querySelector('#paper-readiness-root')&&!!research.querySelector('#strategy-catalog')&&!!research.querySelector('#strategy-arena-root')};
         })()`);
-        assert.deepEqual(paperLayout,{hostVisible:true,hostFirst:true,historyClosed:true,researchClosed:true,legacyGrouped:true,researchGrouped:true});
+        assert.deepEqual(paperLayout,{reportsClosed:true,hostFirst:true,historyClosed:true,researchClosed:true,legacyGrouped:true,researchGrouped:true});
         await evaluate(`document.querySelector('#paper-research-section > summary').click()`);
         const comparisonMounted=await evaluate(`new Promise(resolve=>{
           const deadline=performance.now()+2500;
@@ -1311,7 +1311,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(pairedReads,1,'active Strategies entry performs exactly one authorized paired read');
         assert.equal(progressReads,1,'active Strategies entry performs exactly one authorized progress read');
         assert.ok(arena.network.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
-          [pilotEndpoint,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
+          [pilotEndpoint,pilotStatusEndpoint,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
         'all external requests are blocked except the exact bounded report/progress endpoints');
         if(evidence){
           await evaluate(`document.querySelector('#strategy-arena-root .arena-model-card').scrollIntoView({block:'start'})`);

@@ -1,4 +1,4 @@
-import {servePilotFixture, pilotEndpoint} from './helpers/pilot-log-fixture.mjs';
+import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {existsSync, mkdirSync, writeFileSync} from 'node:fs';
 import {join} from 'node:path';
@@ -308,7 +308,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
             }
           })().catch(error => { failure = error; });
         });
-        await call('Fetch.enable', {patterns: [{urlPattern: pilotEndpoint, requestStage: 'Request'},
+        await call('Fetch.enable', {patterns: [{urlPattern: pilotStatusEndpoint, requestStage: 'Request'}, {urlPattern: pilotEndpoint, requestStage: 'Request'},
           {urlPattern: SPOT_PAPER_REPORT_ENDPOINT, requestStage: 'Request'},
           {urlPattern: SPOT_PAPER_PAIRED_REPORT_ENDPOINT, requestStage: 'Request'},
           {urlPattern: SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT, requestStage: 'Request'}
@@ -379,6 +379,7 @@ test('real M11 workspace authenticates both manual sources and renders paired fi
           }
           assert.equal(entryPanel?.state, entryState,
             'active entry renders its bounded read result');
+          await evaluate(`document.querySelector('#paper-reports-section > summary').click()`);
           await evaluate(`document.querySelector('#paper-bot-overview-section > summary').click()`);
           await evaluate(`document.querySelector('#paired-paper-report-section > summary').click()`);
           const initial = await evaluate(`({

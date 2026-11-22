@@ -1,4 +1,4 @@
-import {servePilotFixture, pilotEndpoint} from './helpers/pilot-log-fixture.mjs';
+import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -220,6 +220,27 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           if (await evaluate(`Boolean(document.querySelector('#paper-advisor .advisor-headline'))`)) break;
           await new Promise(resolve=>setTimeout(resolve,10));
         }
+        assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details'), el=>[el.id,el.open])`),
+          [['solana-meme-paper',false],['paper-advisor',false],['paper-reports-section',false],['paper-research-section',false]]);
+        for(let i=0;i<100;i++){
+          if(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status')?.textContent==='Pilot 5 · Läuft'`))break;
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        assert.equal(await evaluate(`document.querySelector('#solana-meme-paper > summary').innerText.includes('Pilot 5 · Läuft')`),true);
+        if(size.mobile){
+          const fullWidthHeaders=await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details > summary')).every(summary=>{
+            const bounds=summary.getBoundingClientRect();
+            return bounds.height>=56 && Math.abs(bounds.width-summary.parentElement.clientWidth)<=1;
+          })`);
+          assert.equal(fullWidthHeaders,true,'mobile disclosure targets span the card width and are at least 56px tall');
+        }
+        const overviewEvidence=evidence || process.env.V11_A2_EVIDENCE_DIR;
+        if (overviewEvidence && size.width===390) {
+          mkdirSync(overviewEvidence,{recursive:true});
+          const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
+          writeFileSync(join(overviewEvidence,'strategies-overview-390.png'),Buffer.from(image.data,'base64'));
+        }
+        await evaluate(`document.querySelector('#paper-advisor').open=true;document.querySelector('#paper-reports-section').open=true`);
         const tile = await evaluate(`(()=>{
           const root=document.querySelector('#paper-advisor');
           return {overflow:root.scrollWidth>root.clientWidth+1, title:root.querySelector('.advisor-headline h3')?.textContent,
@@ -430,7 +451,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
-        const approvedExternal=new Set([pilotEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
+        const approvedExternal=new Set([pilotEndpoint,pilotStatusEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
           SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
           SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
         assert.ok(resources.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
@@ -511,7 +532,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`);
         assert.equal(focus,true);
         await key('Tab','Tab',9);
-        for (const selector of ['#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]']) {
+        for (const selector of ['#solana-meme-paper > summary','#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]','#paper-reports-section > summary']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
             true, 'live pilot control is reachable in document order: '+selector);
           await key('Tab','Tab',9);

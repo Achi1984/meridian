@@ -816,6 +816,12 @@ function restoreDashboardClarity(source){
   return source;
 }
 function restoreB2(source){
+  source=source.replace('      <details class="command-context-details">',"      <section class=\"card command-strategies\" aria-labelledby=\"command-strategies-heading\">\n        <div class=\"card-head\"><h2 id=\"command-strategies-heading\">Paper &amp; Forschung</h2><span class=\"limited\">Nur lesend</span></div>\n        <p>Live-Paperbot und Forschungsberichte findest du unter Strategien.</p>\n      </section>\n"+'      <details class="command-context-details">');
+  const layout=source.match(/  <style id="dashboard-reading-order">[^]*?<\/style>\n/)?.[0];
+  assert.equal(gitBlob(layout),'7f1a238f6de51396c0efcb0c23c8e15f4670b5bc');
+  source=source.replace(layout,'');
+  const development=source.match(/    <details id="autonomy-status"[^]*?    <\/details>\n/)?.[0];
+  source=source.replace(development,'').replace('    <section id="version-panel"',development+'    <section id="version-panel"');
   source=source.replace("        <li><strong>Meridian 11 · B19</strong><span class=\"version-status\">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>\n","").replace("11 · Vorschau B19<","11 · Vorschau B18<").replace("Diese Vorschau · B19:</b> Klarere Live-Paperbot-Auswertung. <b>Vorige Vorschau · B18","Diese Vorschau · B18");
   const compact=source.match(/  <style id="dashboard-compact-b18">[^]*?<\/style>\n/)?.[0];
   assert.ok(compact);
@@ -1552,7 +1558,8 @@ async function browserRun(call,start,width,height,server){
     try {
       window.fetch=async url=>{
         const data=String(url).includes('/actions/')
-          ? {workflow_runs:[{id:22,status:'in_progress'}]}
+          ? {workflow_runs:[{id:23,run_number:5,status:'pending'},
+              {id:22,run_number:4,status:'in_progress'},{id:21,run_number:3,status:'completed'}]}
           : {schema:1,runId:21,at:'2026-11-20T12:00:00Z',pools:12,open:1,closed:0,realized:0,equity:null,
               confirmationExecution:{quoted:1,passed:0,skipped:0,buyMissing:0,sellMissing:0,medianReturnUsdc:18.75},
               persistenceAt5000:{signals:3,confirmed:1,rejected:1,missingConfirmation:1,priced:0,missingOutcome:1,medianPct:null},
@@ -1563,11 +1570,14 @@ async function browserRun(call,start,width,height,server){
       section.open=true;
       for(let i=0;i<50&&!section.querySelector('dd');i++)await new Promise(resolve=>setTimeout(resolve,20));
       section.querySelectorAll('details').forEach(detail=>{detail.open=true;});
-      return {text:section.innerText,values:[...section.querySelectorAll('dd')].map(x=>x.textContent),
+      return {badge:section.querySelector('summary .pilot-status').textContent,text:section.innerText,values:[...section.querySelectorAll('dd')].map(x=>x.textContent),
         fits:section.scrollWidth<=section.clientWidth+1};
     } finally {window.fetch=fetchOriginal;section.open=false;}
   })()`,true);
-  assert.match(paperSnapshot.text,/Letzter Pilot · Läuft/);
+  assert.equal(paperSnapshot.badge,'Pilot 5 · Wartet');
+  assert.match(paperSnapshot.text,/Letzter Pilot · Wartet · Lauf #5/);
+  assert.match(paperSnapshot.text,/Aktuell laufender Pilot · Lauf #4/);
+  assert.match(paperSnapshot.text,/Letzter verfügbarer Abschlussbericht · Lauf #3/);
   assert.match(paperSnapshot.text,/18,75 USDC/);
   assert.match(paperSnapshot.text,/1 mit beiden Kursen · davon 0 mit mindestens 19 USDC Rückfluss/);
   assert.match(paperSnapshot.text,/3 Signale · 1 bestätigt · 1 verworfen · 1 ohne Kurs/);
@@ -1575,7 +1585,7 @@ async function browserRun(call,start,width,height,server){
   assert.match(paperSnapshot.text,/2 Signalpools · 1 mit Folgekurs · 1 ohne Folgekurs/);
   assert.match(paperSnapshot.text,/nicht ermittelbar/);
   assert.match(paperSnapshot.text,/-1,25 %/);
-  assert.deepEqual(paperSnapshot.values,['Unbewertet','0,00 USDC','1','0','12']);
+  assert.deepEqual(paperSnapshot.values,['0,00 USDC','1','Unbewertet','0','12','0 von 1','0 von 1','0 von 1']);
   assert.equal(paperSnapshot.fits,true,'Solana paper report fits the strategy panel');
   const rendered=await evaluate(`document.querySelector('#strategy-catalog').textContent`);
   assert.equal((await evaluate(`document.querySelectorAll('#strategy-catalog .strategy-family').length`)),12);

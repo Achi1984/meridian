@@ -23,7 +23,12 @@ export function mountSolanaReport(section) {
     parent.append(child);
     return child;
   };
+  const badge = add(section.querySelector('summary'),'small','Status wird geladen');
+  badge.className = 'pilot-status';
   const live = add(section,'p','Laufstatus wird beim Öffnen geladen.');
+  live.setAttribute('role','status');
+  const notice = add(section,'p','');
+  notice.hidden = true;
   const body = add(section,'div','');
   const refresh = add(section,'button','Aktualisieren');
   refresh.type = 'button';
@@ -32,49 +37,94 @@ export function mountSolanaReport(section) {
   source.href = 'https://github.com/' + repo + '/actions/workflows/' + workflow;
   source.style.cssText = 'display:inline-flex;align-items:center;min-height:44px;padding:0 10px';
   let loading = false;
+  let hasReport = false;
+  let pendingStatus;
+  let statusAt = 0;
+  let observedRuns = [];
+  function renderStatus(status) {
+    const recent = status?.workflow_runs;
+    observedRuns = Array.isArray(recent) ? recent : [];
+    const run = observedRuns[0];
+    const states = {queued:'Wartet',pending:'Wartet',requested:'Wartet',waiting:'Wartet',
+      in_progress:'Läuft',completed:'Beendet'};
+    let label = states[run?.status] || 'Status unbekannt';
+    if (run?.status === 'completed') {
+      const conclusions = {success:'Beendet',cancelled:'Abgebrochen',failure:'Fehlgeschlagen',
+        timed_out:'Zeitlimit erreicht',skipped:'Übersprungen',neutral:'Neutral beendet',
+        action_required:'Eingriff erforderlich',stale:'Veraltet'};
+      label = Object.hasOwn(conclusions,run.conclusion) ? conclusions[run.conclusion] : 'Ergebnis unbekannt';
+    }
+    badge.textContent = count(run?.run_number) ? 'Pilot ' + run.run_number + ' · ' + label : label;
+    badge.dataset.state = run?.status === 'in_progress' ? 'running' : 'other';
+    function linkRun(parent, item) {
+      if (count(item?.id) && item.id > 0) {
+        const label = count(item.run_number) ? ' · Lauf #' + item.run_number : ' · Lauf öffnen';
+        add(parent,'a',label).href = runs + item.id;
+      }
+    }
+    live.textContent = run && states[run.status] ? 'Letzter Pilot · ' + label : 'Laufstatus unbekannt';
+    linkRun(live,run);
+    if (run && states[run.status] === 'Wartet') {
+      const active = observedRuns.find(item=>item?.status === 'in_progress' && item.id !== run.id);
+      if (active) linkRun(add(live,'span',' · Aktuell laufender Pilot'),active);
+    }
+  }
+  function refreshStatus(force=false) {
+    if (pendingStatus) return pendingStatus;
+    if (!force && Date.now()-statusAt < 30000) return Promise.resolve();
+    pendingStatus = read(api + '/actions/workflows/' + workflow + '/runs?branch=main&per_page=5')
+      .then(renderStatus,()=>renderStatus(null))
+      .finally(()=>{ statusAt = Date.now(); pendingStatus = null; });
+    return pendingStatus;
+  }
   async function update() {
     if (loading) return;
     loading = true;
     refresh.disabled = true;
     live.textContent = 'Laufstatus wird geladen …';
-    body.replaceChildren();
-    const [status, report] = await Promise.allSettled([
-      read(api + '/actions/workflows/' + workflow + '/runs?branch=main&per_page=1'),
+    const [, report] = await Promise.allSettled([
+      refreshStatus(true),
       read(api + '/contents/solana-meme.json?ref=paper-dashboard-data',true)
     ]);
     try {
-      const run = status.value?.workflow_runs?.[0];
-      const states = {queued:'Wartet',in_progress:'Läuft',completed:'Beendet',waiting:'Wartet'};
-      live.textContent = run && states[run.status] ? 'Letzter Pilot · ' + states[run.status] : 'Laufstatus unbekannt';
-      if (run?.status === 'completed' && run.conclusion !== 'success') live.textContent += ' · ohne erfolgreichen Abschluss';
-      if (count(run?.id)) {
-        const link = add(live,'a',' · Lauf öffnen');
-        link.href = runs + run.id;
-      }
       const s = report.value;
       if (!(s?.schema === 1 && count(s.runId) && s.runId > 0 && Number.isFinite(Date.parse(s.at))
           && count(s.pools) && count(s.open) && count(s.closed) && Number.isFinite(s.realized)
           && (s.equity === null || Number.isFinite(s.equity)))) {
-        add(body,'p','Kein bestätigter Abschlussbericht verfügbar.');
+        notice.textContent = hasReport ? 'Abruf fehlgeschlagen. Angezeigt wird der zuletzt geladene Bericht.' :
+          'Kein bestätigter Abschlussbericht verfügbar.';
+        notice.hidden = false;
         return;
       }
-      const title = add(body,'a','Abschlussbericht · ' + new Date(s.at).toLocaleString('de-AT'));
+      body.replaceChildren();
+      notice.hidden = true;
+      hasReport = true;
+      const sourceRun = observedRuns.find(item=>item?.id === s.runId);
+      const label = observedRuns[0]?.id === s.runId ? 'Abschlussbericht' : 'Letzter verfügbarer Abschlussbericht';
+      const number = count(sourceRun?.run_number) ? ' · Lauf #' + sourceRun.run_number : '';
+      const finished = new Date(s.at).toLocaleString('de-AT',{timeZone:'Europe/Vienna',
+        day:'2-digit',month:'2-digit',year:'numeric',hour:'2-digit',minute:'2-digit',timeZoneName:'short'});
+      const title = add(body,'a',label + number + ' · ' + finished);
       title.href = runs + s.runId;
       const list = add(body,'dl','');
       list.className = 'strategy-summary';
-      function field(label,value) {
-        const group = add(list,'div','');
+      function field(label,value,parent=list) {
+        const group = add(parent,'div','');
         add(group,'dt',label);
         return add(group,'dd',String(value));
       }
-      field('Kontowert',amount(s.equity));
       field('Realisierter PnL',amount(s.realized)).className =
         s.realized > 0 ? 'tone-safe' : s.realized < 0 ? 'tone-danger' : '';
       field('Offene Positionen',s.open);
+      field('Kontowert',amount(s.equity));
       field('Geschlossene Trades',s.closed);
-      field('Beobachtete Pools',s.pools);
-      if (count(s.withdrawn)) field('Signal zurückgenommen · Pools',s.withdrawn);
-      if (count(s.expired)) field('Signal abgelaufen · Pools',s.expired);
+      const diagnostics = add(body,'details','');
+      add(diagnostics,'summary','Signal- und Pooldetails');
+      const counters = add(diagnostics,'dl','');
+      counters.className = 'strategy-summary';
+      field('Beobachtete Pools',s.pools,counters);
+      if (count(s.withdrawn)) field('Signal zurückgenommen · Pools',s.withdrawn,counters);
+      if (count(s.expired)) field('Signal abgelaufen · Pools',s.expired,counters);
       if (s.fiveMinuteComparison) {
         const rows = ['10000','5000'].map(key=>s.fiveMinuteComparison[key]);
         if (rows.every(row=>row && [row.signals,row.priced,row.missing].every(count)
@@ -94,6 +144,22 @@ export function mountSolanaReport(section) {
           }
         }
       }
+      const inflow = s.earlyInflow;
+      if (inflow && [inflow.signals,inflow.entryQuotes,inflow.buyUnavailable,inflow.skipped,
+          inflow.pricedExits,inflow.unresolved].every(count)
+          && inflow.signals === inflow.entryQuotes + inflow.buyUnavailable + inflow.skipped
+          && inflow.entryQuotes === inflow.pricedExits + inflow.unresolved
+          && (inflow.pricedExits ? Number.isFinite(inflow.pricedNetUsdc) : inflow.pricedNetUsdc === null)) {
+        const detail = add(body,'details','');
+        add(detail,'summary','Frühe Liquiditätszuflüsse · Jupiter');
+        add(detail,'p',inflow.signals + ' Signale · ' + inflow.entryQuotes + ' mit Kaufkurs für 20 USDC · ' +
+            inflow.buyUnavailable + ' ohne Kaufkurs · ' + inflow.skipped + ' übersprungen');
+        add(detail,'p','Nach 3–5 Minuten: ' + inflow.pricedExits + ' mit Rückverkaufskurs · ' +
+            inflow.unresolved + ' ohne Rückverkaufskurs');
+        add(detail,'p','Geschätztes Netto aus bewerteten Kurspaaren: ' +
+            (inflow.pricedExits ? amount(inflow.pricedNetUsdc) : 'nicht ermittelbar'));
+        add(detail,'p','Die Schätzung berücksichtigt 0,10 USDC Netzwerkgebühren je Kurspaar.');
+      }
       const study = s.persistenceAt5000;
       if (study && [study.signals,study.confirmed,study.rejected,study.missingConfirmation,
           study.priced,study.missingOutcome].every(count)
@@ -109,6 +175,28 @@ export function mountSolanaReport(section) {
         const median = study.priced ? study.medianPct.toLocaleString('de-AT',{maximumFractionDigits:2}) + ' %' : 'nicht ermittelbar';
         add(detail,'p','Mediane Kursänderung vor Kosten · ' + median);
       }
+      const windows = s.exitWindowComparison;
+      if (windows && [windows.observed,windows.paired,windows.incomplete,
+          windows.fourBetter,windows.fiveBetter,windows.equal].every(count)
+          && windows.observed === windows.paired + windows.incomplete
+          && windows.paired === windows.fourBetter + windows.fiveBetter + windows.equal
+          && (windows.paired ? Number.isFinite(windows.medianDifferenceUsdc) : windows.medianDifferenceUsdc === null)) {
+        const detail = add(body,'details','');
+        add(detail,'summary','Rückverkauf nach 4 oder 5 Minuten');
+        add(detail,'p',windows.paired + ' vollständige Kurspaare · ' + windows.incomplete + ' unvollständig');
+        if (windows.paired) {
+          add(detail,'p','Mehr USDC nach 4 Minuten: ' + windows.fourBetter +
+              ' · nach 5 Minuten: ' + windows.fiveBetter + ' · gleicher Betrag: ' + windows.equal);
+          const coverage = windows.breakEven;
+          if (coverage && Number.isFinite(coverage.requiredUsdc) && coverage.requiredUsdc > 0
+              && [coverage.fourCovered,coverage.fiveCovered].every(n=>count(n) && n <= windows.paired)) {
+            add(detail,'p','Einsatz und geschätzte Gebühren gedeckt (ab ' + amount(coverage.requiredUsdc) +
+                '): nach 4 Minuten ' + coverage.fourCovered + ' von ' + windows.paired +
+                ', nach 5 Minuten ' + coverage.fiveCovered + ' von ' + windows.paired + '.');
+          }
+          add(detail,'p','Median der Differenz (5 minus 4 Minuten): ' + amount(windows.medianDifferenceUsdc));
+        }
+      }
       const quotes = s.confirmationExecution;
       if (quotes && study && [quotes.quoted,quotes.passed,quotes.skipped,quotes.buyMissing,quotes.sellMissing].every(count)
           && quotes.passed <= quotes.quoted
@@ -121,6 +209,29 @@ export function mountSolanaReport(section) {
             ' ohne Rückverkaufskurs · ' + quotes.skipped + ' übersprungen');
         add(detail,'p','Medianer Rückfluss vor Netzwerkgebühren · ' +
             (quotes.quoted ? amount(quotes.medianReturnUsdc) : 'nicht ermittelbar'));
+        let limits = quotes.withinCostPct;
+        if (limits === undefined && quotes.quoted === 1) {
+          // With one pair the reported median is the individual quote.
+          limits = Object.fromEntries([1,2,5].map(limit =>
+            [limit, Number(quotes.medianReturnUsdc >= (100-limit)/5)]));
+        }
+        if (quotes.quoted > 0 && limits && [limits[1],limits[2],limits[5]].every(count)
+            && limits[1] <= limits[2] && limits[2] <= limits[5] && limits[5] === quotes.passed) {
+          add(detail,'h3','Verlust beim sofortigen Rückverkauf');
+          const counts = add(detail,'dl','');
+          counts.className = 'strategy-summary';
+          for (const limit of [1,2,5]) {
+            field('Höchstens ' + limit + ' %',limits[limit] + ' von ' + quotes.quoted,counts);
+          }
+        }
+        if (quotes.quoted > 0) {
+          const difference = quotes.medianReturnUsdc - 20;
+          const percent = (difference / 20).toLocaleString('de-AT',{
+            style:'percent',maximumFractionDigits:2,minimumFractionDigits:2
+          });
+          add(detail,'p','Differenz zum Einsatz von 20 USDC · ' + amount(difference) + ' (' + percent + ')');
+          add(detail,'p','Grundlage sind Kauf- und Rückverkaufsangebote vor Netzwerkgebühren.');
+        }
       }
     } finally {
       loading = false;
@@ -129,4 +240,5 @@ export function mountSolanaReport(section) {
   }
   section.addEventListener('toggle',() => { if (section.open) update(); });
   refresh.addEventListener('click',update);
+  return refreshStatus;
 }
