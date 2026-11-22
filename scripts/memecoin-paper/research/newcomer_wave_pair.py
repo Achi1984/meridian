@@ -1,4 +1,5 @@
 """Prospective matched newcomer comparison. Fixed mint list, public quotes, no orders."""
+import argparse
 from datetime import datetime
 import json
 import time
@@ -17,7 +18,8 @@ def emit(kind, **fields):
 
 
 class Pair:
-    def __init__(self,row):
+    def __init__(self,row,persistence=False):
+        self.persistence = persistence
         self.row = row
         self.positions = {}
         self.reference_qty = self.previous_bid = None
@@ -102,6 +104,16 @@ class Pair:
                         del self.tripled_at[name]
         if index>=10 or final or 'wave' in self.positions:
             return
+        if self.persistence and index == 1 and 'early' in self.positions:
+            try:
+                confirmation = bid(self.reference_qty)
+                passed = confirmation >= self.previous_bid
+                emit('persistenceCheck',mint=mint,qty=self.reference_qty,initialRaw=self.previous_bid,
+                     confirmationRaw=confirmation,passed=passed)
+                if passed:
+                    enter('persistent')
+            except ERRORS as exc:
+                emit('persistenceUnavailable',mint=mint,arm='persistent',reason=type(exc).__name__)
         current = bid(self.reference_qty)
         recovered = current > self.previous_bid
         self.previous_bid = current
@@ -154,7 +166,8 @@ def scan(watch):
     return eligible
 
 
-def run():
+def run(persistence=False):
+    arms = ('early','wave','persistent') if persistence else ('early','wave')
     studies, watch = {}, {}
     for attempt in range(3):
         try:
@@ -176,14 +189,14 @@ def run():
             bands.add(band)
             emit('cohortSelection',mint=row['mint'],pool=row['pool'],band=band,
                  entryLiquidityUsd=row['liquidity'],buys=row['buys'],sells=row['sells'])
-            studies.setdefault(row['mint'],Pair(row))
+            studies.setdefault(row['mint'],Pair(row,persistence))
             if len(studies)==2:
                 break
         emit('discovery', attempt=attempt+1, eligiblePools=len(candidates), watching=len(watch), selected=len(studies))
         if studies or attempt==2:
             break
         time.sleep(60)
-    emit('cohort',mints=list(studies),holdingPolicy='tenMinutesFromEntry')
+    emit('cohort',mints=list(studies),holdingPolicy='tenMinutesFromEntry',arms=arms)
     if studies:
         for i in range(25):
             start = time.monotonic()
@@ -199,9 +212,11 @@ def run():
                 break
             if i<24:
                 time.sleep(max(0,60-(time.monotonic()-start)))
-    for arm in ('early','wave'):
+    for arm in arms:
         emit('summary',**summary(studies.values(),arm))
 
 
 if __name__=='__main__':
-    run()
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('--persistence',action='store_true')
+    run(parser.parse_args().persistence)

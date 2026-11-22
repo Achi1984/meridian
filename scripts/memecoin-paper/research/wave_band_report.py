@@ -17,7 +17,9 @@ def report(streams):
     for events in streams:
         bands, positions, closed = {}, {}, {}
         observation_gaps = set()
+        persistence_gaps = set()
         end = set()
+        arms = ARMS
         cohort = None
         for row in events:
             kind = row['event']
@@ -32,6 +34,9 @@ def report(streams):
             elif kind == 'cohort':
                 if cohort is not None:
                     raise ValueError('Duplicate session')
+                arms = tuple(row.get('arms', ARMS))
+                if arms not in (ARMS, ARMS + ('persistent',)):
+                    raise ValueError('Unknown experiment arms')
                 policy = row.get('holdingPolicy','commonSessionEnd')
                 cohort = set(row['mints'])
                 identity = row['at'],tuple(sorted(cohort))
@@ -41,14 +46,16 @@ def report(streams):
                 if bands.keys()-cohort:
                     raise ValueError('Selection missing from cohort')
                 for m in cohort:
-                    for a in ARMS:
+                    for a in arms:
                         totals[policy,bands.get(m,'unclassified'),a]['observed'] += 1
+            elif kind == 'persistenceUnavailable':
+                persistence_gaps.add(mint)
             elif kind == 'observationUnavailable':
                 if cohort is None or mint not in cohort:
                     raise ValueError('Observation outside cohort')
                 observation_gaps.add(mint)
             elif kind in ('entry','exit','costRejected'):
-                if cohort is None or mint not in cohort or arm not in ARMS:
+                if cohort is None or mint not in cohort or arm not in arms:
                     raise ValueError('Trade outside cohort')
                 stats = totals[policy,bands.get(mint,'unclassified'),arm]
                 if kind=='entry':
@@ -69,7 +76,7 @@ def report(streams):
                 else:
                     stats['costRejections'] += 1
             elif kind=='summary':
-                if arm not in ARMS or arm in end:
+                if arm not in arms or arm in end:
                     raise ValueError('Invalid account summary')
                 account = [k for k in positions if k[1]==arm]
                 if (row['entries']!=len(account) or row['closed']!=sum(k in closed for k in account)
@@ -79,28 +86,29 @@ def report(streams):
                 if 'realizedUsdc' in row and realized != D(str(row['realizedUsdc'])):
                     raise ValueError('Account realized net disagrees with exit events')
                 end.add(arm)
-        if cohort is None or end!=set(ARMS):
+        if cohort is None or end!=set(arms):
             raise ValueError('Incomplete paper run')
         for mint in cohort:
-            pair = comparisons[policy,bands.get(mint,'unclassified')]
-            early, wave = (mint,'early'), (mint,'wave')
-            if any(k in positions and k not in closed for k in (early,wave)):
-                pair['unresolved'] += 1
-                continue
-            if early not in positions and wave not in positions:
-                if mint in observation_gaps:
-                    pair['noEntryWithObservationGap'] += 1
-                else:
-                    pair['neitherEntered'] += 1
-                continue
-            group = 'both' if early in positions and wave in positions else 'earlyOnly' if early in positions else 'waveOnly'
-            delta = closed.get(wave,0)-closed.get(early,0)
-            pair[group] += 1
-            pair[group+'Delta'] += delta
-            if group == 'both':
-                pair['bestPairedDelta'] = max(pair.get('bestPairedDelta', delta), delta)
-            if mint in observation_gaps:
-                pair[group+'WithGap'] += 1
+            for challenger in arms[1:]:
+                pair = comparisons[policy,bands.get(mint,'unclassified'),challenger]
+                early, other = (mint,'early'), (mint,challenger)
+                if any(k in positions and k not in closed for k in (early,other)):
+                    pair['unresolved'] += 1
+                    continue
+                if early not in positions and other not in positions:
+                    if mint in observation_gaps or (challenger == 'persistent' and mint in persistence_gaps):
+                        pair['noEntryWithObservationGap'] += 1
+                    else:
+                        pair['neitherEntered'] += 1
+                    continue
+                group = 'both' if early in positions and other in positions else 'earlyOnly' if early in positions else challenger+'Only'
+                delta = closed.get(other,0)-closed.get(early,0)
+                pair[group] += 1
+                pair[group+'Delta'] += delta
+                if group == 'both':
+                    pair['bestPairedDelta'] = max(pair.get('bestPairedDelta', delta), delta)
+                if mint in observation_gaps or (challenger == 'persistent' and mint in persistence_gaps):
+                    pair[group+'WithGap'] += 1
         for mint,arm in positions.keys()-closed.keys():
             stats = totals[policy,bands.get(mint,'unclassified'),arm]
             stats['unresolved'] += 1
@@ -113,17 +121,17 @@ def report(streams):
                     bestClosedUsdc=float(stats['best']) if stats['closed'] else None,
                     realizedWithoutBestUsdc=float(stats['net']-stats['best']) if stats['closed']>1 else None,
                     netIfUnpricedWorthZeroUsdc=float(stats['net']-stats['unpricedCost'])))
-        if arm=='wave':
-            pair = comparisons[policy,band]
-            output[-1]['waveMinusEarly'] = {
+        if arm!='early':
+            pair = comparisons[policy,band,arm]
+            output[-1][arm+'MinusEarly'] = {
                 'noEntryWithObservationGap':pair['noEntryWithObservationGap'],
                 'neitherEntered':pair['neitherEntered'], 'unresolved':pair['unresolved'],
                 'bestPairedDeltaUsdc':float(pair['bestPairedDelta']) if pair['both'] else None,
                 'deltaWithoutBestPairUsdc':float(pair['bothDelta']-pair['bestPairedDelta'])
                                           if pair['both']>1 else None,
-                'withObservationGap':{g:pair[g+'WithGap'] for g in ('both','earlyOnly','waveOnly')},
+                'withObservationGap':{g:pair[g+'WithGap'] for g in ('both','earlyOnly',arm+'Only')},
                 'groups':{g:dict(count=pair[g],deltaUsdc=float(pair[g+'Delta']) if pair[g] else None)
-                          for g in ('both','earlyOnly','waveOnly')}}
+                          for g in ('both','earlyOnly',arm+'Only')}}
     return output
 
 
