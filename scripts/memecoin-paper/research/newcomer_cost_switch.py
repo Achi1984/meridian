@@ -50,7 +50,10 @@ def evaluate(rows):
                               sampledDrawdownUsdc=drawdown / UNIT if marks or state == 'noEntry' else None,
                               heldSeconds=sale.get('heldSeconds') if sale else None,
                               exitReason=sale.get('reason') if sale else None,
-                              marks=len(marks))
+                              marks=len(marks),
+                              missingExitQuoteDetails=[
+                                  {key: r.get(key) for key in ('qty', 'heldSeconds', 'reason', 'status', 'providerErrorCode')}
+                                  for r in events_arm if r['event'] == 'missingExitQuote'])
         rejected = any(r['event'] == 'costRejected' and r.get('arm') == 'early' for r in events)
         if entry_mark is not None:
             chosen = 'early' if 100 * entry_mark >= 97 * SIZE else 'wave'
