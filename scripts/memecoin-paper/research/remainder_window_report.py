@@ -45,7 +45,14 @@ def shorter_window(rows, runner):
     return dict(runner)
 
 
-def replay(streams, legacy_times=()):
+def conditional_exit(baseline, split):
+    if (baseline['state'] == 'closed' and baseline['exitReason'] == 'time'
+            and baseline['netUsdc'] > 0):
+        return split
+    return baseline
+
+
+def replay(streams, legacy_times=(), profit_gate=False):
     audited = compare(streams, legacy_times)
     sessions = {}
     for rows in streams:
@@ -56,15 +63,21 @@ def replay(streams, legacy_times=()):
                 raise ValueError('Ambiguous mint and cohort timestamp')
             sessions[key] = [r for r in rows if r.get('mint') == mint]
     deltas = {'baseline': [], 'runner': []}
+    if profit_gate:
+        deltas['fifteenMinute'] = []
     for item in audited['observations']:
         rows = sessions[item['at'], item['mint']]
         shorter = shorter_window(rows, item['runner'])
         item['fifteenMinute'] = shorter
+        candidate = shorter
+        if profit_gate:
+            candidate = conditional_exit(item['baseline'], shorter)
+            item['conditionalFifteenMinute'] = candidate
         for name, values in deltas.items():
             ref = item[name]
-            if (not item['repeated'] and shorter['state'] in ('sharedExit','splitClosed')
+            if (not item['repeated'] and candidate['state'] in ('closed','sharedExit','splitClosed')
                     and ref['state'] in ('closed','sharedExit','splitClosed')):
-                values.append(round((shorter['netUsdc']-ref['netUsdc'])*UNIT))
+                values.append(round((candidate['netUsdc']-ref['netUsdc'])*UNIT))
     return dict(observations=audited['observations'], paired={
         name: dict(count=len(values), deltaUsdc=sum(values)/UNIT if values else None,
                    withoutBestUsdc=(sum(values)-max(values))/UNIT if len(values)>1 else None)
@@ -75,6 +88,8 @@ if __name__ == '__main__':
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument('logs', nargs='+', type=Path)
     cli.add_argument('--legacy-cohort-at', type=int, action='append', default=[])
+    cli.add_argument('--profit-gate', action='store_true',
+                     help='Extend only profitable normal time exits; compare with unconditional 15m')
     args = cli.parse_args()
     streams = [[json.loads(line) for line in path.read_text().splitlines()] for path in args.logs]
-    print(json.dumps(replay(streams, args.legacy_cohort_at), indent=2))
+    print(json.dumps(replay(streams, args.legacy_cohort_at, args.profit_gate), indent=2))
