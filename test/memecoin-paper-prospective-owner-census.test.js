@@ -647,6 +647,48 @@ test("both responses must match the requested historical slot", async () => {
   }
 });
 
+function requestReceipt(method, params, id) {
+  const bytes = Buffer.from(JSON.stringify({jsonrpc: "2.0", id, method, params}));
+  return {bytes, sha256: hash(bytes)};
+}
+
+test("historical capture binds both exact requests without authenticating coverage", async () => {
+  const config = {slot: 100, encoding: "base64"};
+  const accountsConfig = {...config, withContext: true,
+    filters: [{memcmp: {offset: 0, bytes: IDENTITY.mint}}]};
+  const program = token().account.owner;
+  const accountsRequest = requestReceipt("getProgramAccounts", [program, accountsConfig], 11);
+  const mintRequest = requestReceipt("getAccountInfo", [IDENTITY.mint, config], "mint");
+  const captured = {...input(),
+    accounts: {...receipt([token()], 100, 11), request: accountsRequest},
+    mint: {...receipt(mint(), 100, "mint"), request: mintRequest}};
+  const matched = await diagnoseHistoricalOwnerCensus(captured);
+  assert.equal(matched.requestBinding, "MATCHED");
+  assert.equal(matched.diagnostic.supplyReconciled, true);
+  assert.equal(matched.status, "UNKNOWN");
+  assert.equal(matched.coverage.complete, false);
+  assert.equal(matched.executionAuthorized, false);
+
+  for (const [field, request, reason] of [
+    ["mint", undefined, "INVALID_HISTORICAL_REQUEST_BYTES"],
+    ["mint", {...mintRequest, sha256: "0".repeat(64)}, "HISTORICAL_REQUEST_DIGEST_MISMATCH"],
+    ["mint", requestReceipt("getAccountInfo", [key(99), config], "mint"),
+      "HISTORICAL_REQUEST_MISMATCH"],
+    ["mint", requestReceipt("getAccountInfo", [IDENTITY.mint, config], "wrong-id"),
+      "INVALID_RPC_RESPONSE"],
+    ["accounts", requestReceipt("getProgramAccounts", [program, {...accountsConfig, slot: 101}], 11),
+      "HISTORICAL_REQUEST_MISMATCH"],
+    ["accounts", requestReceipt("getProgramAccounts", [program, {...accountsConfig,
+      filters: [...accountsConfig.filters, {dataSize: 165}]}], 11), "HISTORICAL_REQUEST_MISMATCH"]
+  ]) {
+    const result = await diagnoseHistoricalOwnerCensus({...captured,
+      [field]: {...captured[field], request}});
+    assert.equal(result.reason, reason);
+    assert.equal(result.requestBinding, undefined);
+    assert.equal(result.diagnostic, undefined);
+  }
+});
+
 test("digest, raw supply, account uniqueness and program are checked", async () => {
   for (const [overrides, reason] of [
     [{accounts: {...input().accounts, sha256: "0".repeat(64)}}, "RESPONSE_DIGEST_MISMATCH"],
