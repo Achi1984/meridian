@@ -1,4 +1,5 @@
 import unittest
+from urllib.error import HTTPError
 from unittest.mock import Mock, patch
 from newcomer_wave_pair import FEE, SIZE, Pair, summary
 
@@ -48,3 +49,18 @@ class WaveTest(unittest.TestCase):
         s.opened_at = {'wave':0}
         s.tick(12,False,Mock(return_value=3*SIZE))
         self.assertEqual(summary([s],'wave')['unresolved'],1)
+
+    @patch('newcomer_wave_pair.emit')
+    def test_entry_quote_failure_identifies_leg_without_opening_position(self, emit):
+        for leg, prior in [('buy', []), ('initialResale', [101])]:
+            with self.subTest(leg=leg):
+                error = HTTPError('https://example.invalid', 429, 'Slow down', {}, None)
+                quote = Mock(side_effect=[*prior, error])
+                study = Pair(dict(mint='m'))
+                with self.assertRaises(HTTPError):
+                    study.tick(0, False, quote)
+                emit.assert_called_with('entryQuoteUnavailable', mint='m', arm='early',
+                                        leg=leg, reason='HTTPError', status=429)
+                self.assertEqual(quote.call_count, len(prior) + 1)
+                self.assertEqual(study.positions, {})
+                self.assertIsNone(study.reference_qty)
