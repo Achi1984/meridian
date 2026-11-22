@@ -9,6 +9,9 @@ from meme_paper_account import FEE, UNIT
 from new_pool_watch import PersistenceStudy, SIZE, failed_checks, launchpad_candidate
 
 
+ENTRY_CHECKS = ('tokenPair', 'priceMomentum', 'liquidity', 'volume', 'orderFlow')
+
+
 def audit(events, summary):
     first = {}
     stages = defaultdict(set)
@@ -19,6 +22,8 @@ def audit(events, summary):
     unavailable_sides = Counter()
     counts = Counter()
     single_failure = defaultdict(set)
+    passed_individually = defaultdict(set)
+    positive_liquidity = set()
     # First qualifying observation per pool, with a fixed five-minute follow-up.
     signals = {floor: {} for floor in (10000, 5000)}
     persistence = PersistenceStudy()
@@ -48,6 +53,11 @@ def audit(events, summary):
                 continue
             stages['launchpad'].add(pool)
             failed = failed_checks(original, row, age)
+            for check in ENTRY_CHECKS:
+                if check not in failed:
+                    passed_individually[check].add(pool)
+            if row['liquidity'] > 0:
+                positive_liquidity.add(pool)
             if len(failed) == 1:
                 single_failure[failed[0]].add(pool)
             for floor, cohort in signals.items():
@@ -120,7 +130,12 @@ def audit(events, summary):
         requiredUsdc=threshold / UNIT,
         fourCovered=sum(early >= threshold for early, _ in paired),
         fiveCovered=sum(late >= threshold for _, late in paired))
-    return dict(exitWindowComparison=comparison_exits, confirmationExecution=execution if summary.get('probeConfirmations') else None,
+    diagnostics = dict(
+        neverPassed={check: len(stages['launchpad'] - passed_individually[check])
+                     for check in ENTRY_CHECKS},
+        onlyZeroLiquidity=len(stages['launchpad'] - positive_liquidity),
+        invalidObservations=counts['invalidObservation'])
+    return dict(entryDiagnostics=diagnostics, exitWindowComparison=comparison_exits, confirmationExecution=execution if summary.get('probeConfirmations') else None,
                 persistenceAt5000=followup, onlyFailedCheckAmongNeverConfirmed={
                     name: len(pools-stages['signal']) for name,pools in single_failure.items()},
                 liquidityFloorComparison=comparison, ticks=summary['ticks'], distinctPools=dict(discovered=len(first), **{
@@ -135,6 +150,11 @@ def audit(events, summary):
 def render(report):
     lines = ['### Paper entry funnel', '', '| Stage | Distinct pools |', '|---|---:|']
     lines.extend(f'| {stage} | {count} |' for stage, count in report['distinctPools'].items())
+    diagnostics = report['entryDiagnostics']
+    lines.extend(['', 'Distinct eligible launchpad pools that never passed each check (overlap possible):',
+                  json.dumps(diagnostics['neverPassed'], sort_keys=True),
+                  f"Pools with only zero reported liquidity in the entry window: {diagnostics['onlyZeroLiquidity']}",
+                  f"Invalid input observations across all feeds (rows, not pools): {diagnostics['invalidObservations']}"])
     lines.extend(['', 'Failed checks among launchpad pools that never confirmed (overlap possible): ' +
                   json.dumps(report['failedAtLeastOnceAmongNeverConfirmed'], sort_keys=True),
                   '','Quote errors by side: ' + json.dumps(report['quoteErrorsBySide'], sort_keys=True)])
