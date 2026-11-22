@@ -2,7 +2,10 @@
 import argparse
 from datetime import datetime
 import json
+import re
 import time
+from http.client import HTTPException
+from urllib.error import HTTPError
 
 from meme_paper_account import FEE, UNIT
 from newcomer_research import ERRORS, discover, flow
@@ -15,6 +18,22 @@ EXIT_GRACE = 120
 
 def emit(kind, **fields):
     print(json.dumps(dict(at=int(time.time()),event=kind,**fields)),flush=True)
+
+
+def provider_error_fields(exc):
+    if not isinstance(exc, HTTPError):
+        return {}
+    try:
+        body = exc.read(4097)
+        if len(body) > 4096:
+            return {}
+        payload = json.loads(body)
+    except (ValueError, OSError, HTTPException, RecursionError):
+        return {}
+    code = payload.get('errorCode') if isinstance(payload, dict) else None
+    if isinstance(code, str) and re.fullmatch(r'[A-Z][A-Z0-9_]{0,63}', code):
+        return {'providerErrorCode': code}
+    return {}
 
 
 class Pair:
@@ -45,7 +64,8 @@ class Pair:
                 mark = bid(qty)
             except ERRORS as exc:
                 emit('entryQuoteUnavailable', mint=mint, arm=name, leg=leg,
-                     reason=type(exc).__name__, status=getattr(exc, 'code', None))
+                     reason=type(exc).__name__, status=getattr(exc, 'code', None),
+                     **provider_error_fields(exc))
                 raise
             if mark < .95*SIZE:
                 emit('costRejected',mint=mint,arm=name,usdcRaw=mark)
