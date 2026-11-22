@@ -1,5 +1,5 @@
 import unittest
-from remainder_window_report import shorter_window
+from remainder_window_report import conditional_exit, shorter_window
 
 
 class RemainderWindowTests(unittest.TestCase):
@@ -23,3 +23,17 @@ class RemainderWindowTests(unittest.TestCase):
         rows = self.rows(800)
         rows[-1]['usdcRaw'] = 5000000
         self.assertEqual(shorter_window(rows, {})['netUsdc'], -5.15)
+
+
+class ProfitGateTests(unittest.TestCase):
+    def test_gate_uses_only_baseline_exit_and_strict_positive_net(self):
+        split = dict(state='unresolved', remainingQty=50)
+        for reason, net, extend in [('time', 0, False), ('time', -1, False),
+                                    ('time', .000001, True), ('target', 40, False)]:
+            baseline = dict(state='closed', exitReason=reason, netUsdc=net)
+            self.assertIs(conditional_exit(baseline, split), split if extend else baseline)
+
+    def test_unpriced_and_skipped_entries_remain_separate(self):
+        for state in ('unresolved', 'noEntry', 'noEntryWithGap'):
+            baseline = dict(state=state)
+            self.assertIs(conditional_exit(baseline, {}), baseline)
