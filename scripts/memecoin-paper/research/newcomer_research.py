@@ -41,22 +41,27 @@ def flow(rows, mint, quote, end):
                 netUsd=net, largestRecentBuyerShare=max(latest.values())/total if total else None)
 
 
-def run():
+def discover(min_age=120):
     pools = {}
     for page in (1, 2, 3):
         for item in get(f'{GT}/new_pools?page={page}',120)['data']:
             try:
                 row = snapshot(item)
                 age = time.time()-datetime.fromisoformat(row['created']).timestamp()
-                if (120 <= age <= 3600 and row['dex'] in ('pump-fun','pumpswap') and
+                if (min_age <= age <= 3600 and row['dex'] in ('pump-fun','pumpswap') and
                         row['quote'] in (USDC,WSOL) and row['mint'] not in (USDC,WSOL)
                         and row['liquidity'] >= 5000 and row['sells'] >= 3):
                     pools[row['pool']] = row
             except ERRORS:
                 continue
+    return sorted(pools.values(),key=lambda r:r['volume'],reverse=True)
+
+
+def run():
+    pools = discover()
     key = os.getenv('ANTHROPIC_API_KEY')
     print(json.dumps(dict(eligiblePools=len(pools), modelConfigured=bool(key))),flush=True)
-    for row in sorted(pools.values(),key=lambda r:r['volume'],reverse=True)[:4]:
+    for row in pools[:4]:
         mint = row['mint']
         report = dict(mint=mint, pool=row['pool'], dex=row['dex'], created=row['created'])
         try:
