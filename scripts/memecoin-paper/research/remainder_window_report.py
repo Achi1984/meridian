@@ -11,8 +11,9 @@ from newcomer_wave_pair import EXIT_GRACE
 REMAINDER_SECONDS = 900
 
 
-def shorter_window(rows, runner):
+def shorter_window(rows, runner, protect_full_exit=False):
     sale = None
+    full_exit_net = None
     initial = peak = drawdown = 0
     for row in rows:
         kind = row['event']
@@ -20,6 +21,9 @@ def shorter_window(rows, runner):
             initial = row['qty']
         if row.get('arm') == 'early' and kind == 'resaleMark':
             net = row['usdcRaw'] - SIZE - 2*FEE
+        elif kind == 'exit' and row.get('arm') == 'early':
+            full_exit_net = row['usdcRaw'] - SIZE - 2*FEE
+            continue
         elif kind == 'runnerPartialSale':
             sale = row
             continue
@@ -31,7 +35,8 @@ def shorter_window(rows, runner):
             allocated = SIZE * row['qty'] / initial
             proceeds = row['usdcRaw'] - FEE
             exit_due = held >= REMAINDER_SECONDS or proceeds <= .7*allocated or proceeds >= 3*allocated
-            if exit_due:
+            guard_hit = protect_full_exit and full_exit_net is not None and net <= full_exit_net
+            if exit_due or guard_hit:
                 return dict(state='splitClosed', heldSeconds=held, netUsdc=net/UNIT,
                             sampledDrawdownUsdc=max(drawdown, peak-net)/UNIT)
         else:
@@ -52,7 +57,7 @@ def conditional_exit(baseline, split):
     return baseline
 
 
-def replay(streams, legacy_times=(), profit_gate=False):
+def replay(streams, legacy_times=(), profit_gate=False, protect_full_exit=False):
     audited = compare(streams, legacy_times)
     sessions = {}
     for rows in streams:
@@ -63,6 +68,9 @@ def replay(streams, legacy_times=(), profit_gate=False):
                 raise ValueError('Ambiguous mint and cohort timestamp')
             sessions[key] = [r for r in rows if r.get('mint') == mint]
     deltas = {'baseline': [], 'runner': []}
+    if protect_full_exit:
+        profit_gate = True
+        deltas['conditionalFifteenMinute'] = []
     if profit_gate:
         deltas['fifteenMinute'] = []
     for item in audited['observations']:
@@ -73,6 +81,9 @@ def replay(streams, legacy_times=(), profit_gate=False):
         if profit_gate:
             candidate = conditional_exit(item['baseline'], shorter)
             item['conditionalFifteenMinute'] = candidate
+        if protect_full_exit:
+            candidate = conditional_exit(item['baseline'], shorter_window(rows, item['runner'], True))
+            item['guardedFifteenMinute'] = candidate
         for name, values in deltas.items():
             ref = item[name]
             if (not item['repeated'] and candidate['state'] in ('closed','sharedExit','splitClosed')
@@ -90,6 +101,9 @@ if __name__ == '__main__':
     cli.add_argument('--legacy-cohort-at', type=int, action='append', default=[])
     cli.add_argument('--profit-gate', action='store_true',
                      help='Extend only profitable normal time exits; compare with unconditional 15m')
+    cli.add_argument('--protect-full-exit', action='store_true',
+                     help='On profitable time exits, sell the remainder on the first sampled bid '
+                          'that brings combined net proceeds down to or below the full exit benchmark')
     args = cli.parse_args()
     streams = [[json.loads(line) for line in path.read_text().splitlines()] for path in args.logs]
-    print(json.dumps(replay(streams, args.legacy_cohort_at, args.profit_gate), indent=2))
+    print(json.dumps(replay(streams, args.legacy_cohort_at, args.profit_gate, args.protect_full_exit), indent=2))

@@ -19,6 +19,20 @@ class RemainderWindowTests(unittest.TestCase):
         result = shorter_window(self.rows(1021), {})
         self.assertEqual((result['remainingQty'], result['zeroRecoveryUsdc']), (51, -10.1))
 
+    def test_guard_sells_at_observed_quote_after_a_gap(self):
+        rows = self.rows(750)
+        rows.insert(1, dict(event='exit', arm='early', usdcRaw=21000000))
+        rows.insert(-1, dict(event='runnerMissingQuote', qty=51))
+        rows.append(dict(rows[-1], heldSeconds=920, usdcRaw=14000000))
+        guarded = shorter_window(rows, {}, protect_full_exit=True)
+        self.assertEqual((guarded['heldSeconds'], guarded['netUsdc']), (750, .85))
+        self.assertEqual(shorter_window(rows, {})['netUsdc'], 3.85)
+
+    def test_guard_keeps_unquoted_remainder_unresolved(self):
+        rows = self.rows(1021)
+        rows.insert(1, dict(event='exit', arm='early', usdcRaw=21000000))
+        self.assertEqual(shorter_window(rows, {}, True)['zeroRecoveryUsdc'], -10.1)
+
     def test_shared_early_barrier(self):
         rows = self.rows(800)
         rows[-1]['usdcRaw'] = 5000000
