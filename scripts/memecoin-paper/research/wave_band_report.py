@@ -21,6 +21,8 @@ def report(streams):
         end = set()
         arms = ARMS
         cohort = None
+        half_runner = False
+        runner_terminals = set()
         for row in events:
             kind = row['event']
             if end and kind != 'summary':
@@ -37,6 +39,7 @@ def report(streams):
                 arms = tuple(row.get('arms', ARMS))
                 if arms not in (ARMS, ARMS + ('persistent',)):
                     raise ValueError('Unknown experiment arms')
+                half_runner = row.get('halfRunner') is True
                 policy = row.get('holdingPolicy','commonSessionEnd')
                 cohort = set(row['mints'])
                 identity = row['at'],tuple(sorted(cohort))
@@ -75,6 +78,10 @@ def report(streams):
                     stats['triples'] += net >= 2*(positions[key]-D(FEE)/UNIT)
                 else:
                     stats['costRejections'] += 1
+            elif half_runner and kind in ('runnerSharedExit', 'runnerExit', 'runnerUnresolved'):
+                if (mint, 'early') not in positions or mint in runner_terminals:
+                    raise ValueError('Unmatched or duplicate half-runner terminal receipt')
+                runner_terminals.add(mint)
             elif kind=='summary':
                 if arm not in arms or arm in end:
                     raise ValueError('Invalid account summary')
@@ -86,8 +93,17 @@ def report(streams):
                 if 'realizedUsdc' in row and realized != D(str(row['realizedUsdc'])):
                     raise ValueError('Account realized net disagrees with exit events')
                 end.add(arm)
-        if cohort is None or end!=set(arms):
-            raise ValueError('Incomplete paper run')
+        if cohort is None:
+            raise ValueError('Incomplete paper run (missing cohort)')
+        if end != set(arms):
+            missing = ', '.join(arm for arm in arms if arm not in end)
+            open_entries = sorted(f'{mint}/{arm}' for mint, arm in positions.keys() - closed.keys())
+            raise ValueError(
+                f'Incomplete paper run (missing summaries: {missing}; '
+                f'entries without exit receipts: {", ".join(open_entries) or "none"})'
+            )
+        if half_runner and runner_terminals != {mint for mint, arm in positions if arm == 'early'}:
+            raise ValueError('Incomplete paper run (missing half-runner terminal receipt)')
         for mint in cohort:
             for challenger in arms[1:]:
                 pair = comparisons[policy,bands.get(mint,'unclassified'),challenger]

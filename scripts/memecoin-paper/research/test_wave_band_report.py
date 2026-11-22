@@ -19,6 +19,18 @@ class BandReportTests(unittest.TestCase):
         with self.assertRaises(ValueError):
             report([[dict(event='cohort',at=10,mints=[])]])
 
+    def test_half_runner_requires_terminal_receipt_for_each_early_entry(self):
+        rows = [dict(event='cohort', at=1, mints=['m'], halfRunner=True),
+                dict(event='entry', mint='m', arm='early', usdc=20)]
+        with self.assertRaisesRegex(ValueError, 'entries without exit receipts: m/early'):
+            report([rows])
+        rows.extend([dict(event='summary', arm='early', entries=1, closed=0, unresolved=1),
+                     dict(event='summary', arm='wave', entries=0, closed=0, unresolved=0)])
+        with self.assertRaisesRegex(ValueError, 'missing half-runner terminal'):
+            report([rows])
+        rows.insert(2, dict(event='runnerUnresolved', mint='m'))
+        self.assertEqual(report([rows])[0]['unresolved'], 1)
+
     def test_holding_policies_and_winner_concentration(self):
         def run(at,policy,net):
             return [dict(event='cohort',at=at,mints=['m'],**policy),
