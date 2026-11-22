@@ -242,6 +242,10 @@ class HalfRunner(Pair):
                     if splitting:
                         self.half_sale = mark
                         emit('runnerPartialSale', mint=mint, qty=amount, usdcRaw=mark, feeRaw=FEE)
+                        if final:
+                            self.finished = True
+                            emit('runnerUnresolved', mint=mint, remainingQty=qty-amount,
+                                 cashRaw=mark-SIZE-2*FEE)
                         return
                     value = cash + mark - FEE
                     allocated = SIZE*amount/qty
@@ -286,7 +290,7 @@ def run(persistence=False, half_runner=False):
         if studies or attempt==2:
             break
         time.sleep(60)
-    emit('cohort',mints=list(studies),holdingPolicy='tenMinutesFromEntry',arms=arms)
+    emit('cohort',mints=list(studies),holdingPolicy='tenMinutesFromEntry',arms=arms,halfRunner=half_runner)
     if studies:
         for i in range(25):
             start = time.monotonic()

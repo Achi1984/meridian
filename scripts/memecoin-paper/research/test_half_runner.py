@@ -23,3 +23,12 @@ class RunnerTest(unittest.TestCase):
             runner.observe(False, None)
             self.assertEqual(emit.call_args.kwargs['remainingQty'], 100)
             self.assertEqual(emit.call_args.kwargs['cashRaw'], -SIZE-FEE)
+
+    def test_partial_sale_on_final_tick_accounts_for_remainder(self):
+        runner = HalfRunner({'mint': 'test'})
+        runner.positions['early'] = [101, 0]
+        runner.opened_at['early'] = 0
+        with patch('newcomer_wave_pair.time.monotonic', return_value=601), patch('newcomer_wave_pair.emit') as emit:
+            runner.observe(True, lambda mint, currency, qty: SIZE//2)
+        self.assertTrue(runner.finished)
+        emit.assert_called_with('runnerUnresolved', mint='test', remainingQty=51, cashRaw=-SIZE//2-2*FEE)
