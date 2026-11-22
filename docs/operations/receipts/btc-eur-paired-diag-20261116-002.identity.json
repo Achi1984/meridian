@@ -1,0 +1,217 @@
+{
+  "schemaVersion": "MERIDIAN_PAIRED_PAPER_DISABLED_CANDIDATE_V1",
+  "candidateStatus": "PROVISIONAL_EXTERNAL_EVIDENCE_PENDING",
+  "candidateRunId": "btc-eur-paired-diag-20261116-002",
+  "acceptedImage": {
+    "immutableImageId": "sha256:9e5f7a26a9c3827d4f0935da31568d39d38c0507a24c0999674b3c70877cdae1",
+    "localTag": "meridian-spot-paper-paired-acceptance:ae9241418543",
+    "sourceSha": "ae924141854362257738322ac9a1022cd47e0b02",
+    "sourceArchiveSha256": "39ee4d8f21c1f4e59e6a5a812be13e98dce879ec1ca86964717e26021e9b5843",
+    "baseImageRef": "node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb8363f609372293",
+    "baseImageId": "sha256:11cedc39e663e7c5d5cb9cc77a461a0d2adc25537b94e6831a6108f09cb2001b",
+    "registryDigest": "registry.northflank.com/meridian/meridian-paired-paper-build@sha256:936bda34bfe1445be9ecee9be0324d33f55ba2966b9822ac4c2bad44fdf1f91e"
+  },
+  "sourceVerification": {
+    "referenceBuild": "curvy-coach-4375",
+    "buildUrl": "https://app.northflank.com/t/achi1984s-team/project/meridian/services/meridian-paired-paper-build/builds/curvy-coach-4375",
+    "observedSourceSha": "ae924141854362257738322ac9a1022cd47e0b02",
+    "registryPublicationProven": true,
+    "localAcceptanceDerivedFrom": "btc-eur-paired-diag-20261110-001.identity.json",
+    "taggedImageReference": "registry.northflank.com/meridian/meridian-paired-paper-build:curvy-coach-4375",
+    "taggedImageUrl": "https://app.northflank.com/t/achi1984s-team/project/meridian/images/meridian-paired-paper-build:curvy-coach-4375"
+  },
+  "identityCommand": {
+    "mode": "identity-only",
+    "executionContext": "LOCAL_OFFLINE_SOURCE",
+    "persistentVolumeMounted": false,
+    "hostPaperRunStarted": false,
+    "historicalIdentityReproduced": true,
+    "freshDataDirectoryUnchanged": true
+  },
+  "identity": {
+    "schemaVersion": "SPOT_PAPER_PAIRED_EXPECTED_IDENTITY_V1",
+    "runId": "btc-eur-paired-diag-20261116-002",
+    "pair": "BTC/EUR",
+    "sourceSha256": "c2549c37e05a64960991bda9a9c7658bcd4fb712587ce0079f75470ff3bcfa0d",
+    "configSha256": "f2418867d2331b64e4adbf348a76eeeec6a298102b5c3e4191458b5e390618d3",
+    "researchSourceSha256": "dc7be719198ff3c936354c75352dfb782eaece65761b4fb47ba5d3fc0f756e25",
+    "feedSourceId": "KRAKEN_PUBLIC_SPOT_XBTEUR",
+    "comparisonEngineId": "SPOT_PAPER_SMA_COMPARISON_V1",
+    "modelPairId": "BTC_EUR_CONFIRM2_VS_5M_TREND_AND_CASH_V1",
+    "models": [
+      {
+        "role": "baseline",
+        "modelId": "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_RESEARCH_V1",
+        "accountId": "btc-eur-paired-diag-20261116-002-baseline"
+      },
+      {
+        "role": "challenger",
+        "modelId": "BTC_EUR_SMA_CONFIRM2_COOLDOWN10_5M_SMA20_TREND_RESEARCH_V1",
+        "accountId": "btc-eur-paired-diag-20261116-002-challenger"
+      },
+      {
+        "role": "cash",
+        "modelId": "CASH_CONTROL_V1",
+        "accountId": "btc-eur-paired-diag-20261116-002-cash"
+      }
+    ]
+  },
+  "preservedSelection": {
+    "accountContractId": "BTC_EUR_PAIRED_PAPER_EEA_SPOT_V2",
+    "accountContract": {
+      "version": 2,
+      "feeBpsPerSide": 20,
+      "feeBasis": "EEA_SPOT_ONLY_TAKER_ASSUMPTION",
+      "feeAsOf": "2026-11-09",
+      "accountTier": "UNKNOWN",
+      "ratesVerified": false,
+      "slippageBpsPerSide": 10
+    },
+    "budgetsAndBounds": {
+      "initialCashCents": 100000,
+      "maxEntryCents": 10000,
+      "maxExposureCents": 10000,
+      "maxSessionLossCents": 2000,
+      "stopLossBps": 200,
+      "maxDurationMs": 28800000,
+      "maxCycles": 480,
+      "maxRequests": 960,
+      "maxBytes": 67108864,
+      "maxResponseBytes": 262144,
+      "requestTimeoutMs": 5000,
+      "pollIntervalMs": 60000
+    }
+  },
+  "guardrails": {
+    "hostUniquenessCheck": "PENDING",
+    "hostPaperRun": false,
+    "feedStarted": false,
+    "journalCreated": false,
+    "credentialsUsed": false,
+    "volumeMutated": false,
+    "registryPush": false,
+    "activation": false,
+    "promotion": false
+  },
+  "externalEvidence": {
+    "registryDigest": {
+      "repositoryDigest": "registry.northflank.com/meridian/meridian-paired-paper-build@sha256:936bda34bfe1445be9ecee9be0324d33f55ba2966b9822ac4c2bad44fdf1f91e",
+      "evidenceRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/services/meridian-paired-paper-build/builds/curvy-coach-4375/logs",
+      "verifier": "Northflank BuildKit manifest export and completed registry push, cross-checked against the published Image entry",
+      "observedAt": "2026-11-10T18:04:00.329Z"
+    },
+    "hostGlobalExclusivity": {
+      "scope": "global",
+      "candidateRunId": "btc-eur-paired-diag-20261116-002",
+      "result": "CLEAR",
+      "observedAt": "2026-11-16T17:33:31.016Z",
+      "verifier": "Meridian project owner confirmed the sole assigned host. Launch operator verified Northflank job history and dedicated volume evidence.",
+      "evidenceRef": "https://github.com/Achi1984/meridian/blob/3eb00ebbf5c5cc9ede7fd2bd4190c46a2aaf70dd/docs/operations/BTC_EUR_PAIRED_DIAG_002_REHEARSAL.md#exclusivity-before-run",
+      "operationalScope": "Single assigned host: Northflank job meridian-btc-eur-diag-002-rehearsal in achi1984s-team/meridian. The project owner explicitly confirmed this sole assignment and authorized one start.",
+      "jobRunsRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/runs",
+      "readbackRunId": "d4dade47-7044-4a87-8315-57f6bd25165d"
+    },
+    "mountIdentity": {
+      "schemaVersion": "MERIDIAN_MOUNT_IDENTITY_EVIDENCE_V1",
+      "result": "CLEAR",
+      "dataRoot": "/evidence-root",
+      "realpath": "/evidence-root",
+      "runDirectory": "/evidence-root/btc-eur-paired-diag-20261116-002",
+      "runDirectoryExistedBeforeStart": false,
+      "volumeId": "meridian-btc-eur-diag-002-rehearsal",
+      "instanceId": "meridian-btc-eur-diag-002-rehearsal-6afb336f7726c1507e683czkdq9",
+      "runtimeUser": {
+        "uid": 1000
+      },
+      "writable": true,
+      "readback": true,
+      "evidenceRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe/logs?runs=10402a2a-e63e-4146-99e9-0f09a80edf9f",
+      "verifier": "Northflank run log and dedicated ReadWriteOnce volume assignment cross-checked by operator",
+      "observedAt": "2026-11-16T16:46:51.731Z"
+    },
+    "sigtermDrill": {
+      "schemaVersion": "MERIDIAN_SIGTERM_DRILL_EVIDENCE_V1",
+      "result": "PASS",
+      "signal": "SIGTERM",
+      "checkpointBefore": {
+        "sequence": 1,
+        "digest": "sha256:66419beecc0d77d3fc3c4a6011759bd687e9d8b65c3b21d7384bdec3f82ec320"
+      },
+      "checkpointAfter": {
+        "sequence": 2,
+        "digest": "sha256:8ef859cf3d9cc8f6bdd989fbd96170c149e5fe4d6d3ec2501410bd58e9b8209d"
+      },
+      "terminalStatus": "STOPPED",
+      "graceMs": 1177,
+      "evidenceDigestUnchanged": true,
+      "evidenceRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe/logs?runs=df37bd09-7db7-44c7-9ee9-31d887f55182",
+      "verifier": "Northflank platform logs and independent read-only replacement job cross-checked by operator",
+      "observedAt": "2026-11-16T17:10:55.768Z"
+    }
+  },
+  "hostedRehearsal": {
+    "result": "TERMINAL_CHECKPOINT_NOT_COMMITTED",
+    "rootEntry": "lost+found",
+    "manualRunId": "10402a2a-e63e-4146-99e9-0f09a80edf9f",
+    "stopRequestedAt": "2026-11-16T16:47:39.064Z",
+    "platformProcessTerminatedAt": "2026-11-16T16:47:40.087Z",
+    "platformStopSignalDeliveryVerified": false,
+    "readbackRunId": "af6053ea-ea66-4dfb-a0c1-0983ac4f2fbb",
+    "readbackRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe/logs?runs=af6053ea-ea66-4dfb-a0c1-0983ac4f2fbb",
+    "readback": {
+      "status": "WRITER_LOCK_PRESENT",
+      "sequence": 1,
+      "terminal": false,
+      "lock": true,
+      "pending": true,
+      "reconciliation": "UNKNOWN_PENDING_PUBLICATION",
+      "candidateDirectoryPresent": false
+    }
+  },
+  "hostedRehearsalR2": {
+    "result": "STOP_AND_DURABLE_READBACK_VERIFIED",
+    "configuredGraceSeconds": 60,
+    "manualRunId": "df37bd09-7db7-44c7-9ee9-31d887f55182",
+    "namespace": "/evidence-root/platform-r2",
+    "stopRequestedAt": "2026-11-16T17:10:13.793Z",
+    "osSigtermAt": "2026-11-16T17:10:14.946Z",
+    "platformProcessExitedAt": "2026-11-16T17:10:14.969Z",
+    "platformProcessExitCode": 0,
+    "observedStopRequestToExitMs": 1177,
+    "applicationStopMs": 13,
+    "priorEvidenceUnchanged": true,
+    "readbackRunId": "d4dade47-7044-4a87-8315-57f6bd25165d",
+    "readbackRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe/logs?runs=d4dade47-7044-4a87-8315-57f6bd25165d",
+    "readback": {
+      "sequence": 2,
+      "terminal": true,
+      "lock": false,
+      "pending": false,
+      "reconciliation": "READ_ONLY_VERIFIED",
+      "candidateDirectoryPresent": false
+    }
+  },
+  "prelaunchHostInventory": {
+    "status": "OWNER_CONFIRMED_SOLE_ASSIGNED_HOST",
+    "observedAt": "2026-11-16T17:31:46.841Z",
+    "team": "achi1984s-team",
+    "project": "meridian",
+    "job": "meridian-btc-eur-diag-002-rehearsal",
+    "jobRunsRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/runs",
+    "readbackRunId": "d4dade47-7044-4a87-8315-57f6bd25165d",
+    "notes": "The dedicated volume has one attachment. The independent readback reported the candidate directory absent. The job history showed completed rehearsal runs only."
+  },
+  "hostedPaperLaunch": {
+    "platform": "Northflank",
+    "runId": "b1cab3ae-4362-4cb4-b09b-fcd7a8a1b025",
+    "candidateRunId": "btc-eur-paired-diag-20261116-002",
+    "statusAtVerification": "RUNNING",
+    "containerEntrypointLoggedAt": "2026-11-16T17:34:11.542Z",
+    "expectedSourceSha": "ae924141854362257738322ac9a1022cd47e0b02",
+    "externalTimeoutSeconds": 28920,
+    "manualAttempts": 1,
+    "automaticRetries": 0,
+    "evidenceRef": "https://app.northflank.com/t/achi1984s-team/project/meridian/jobs/meridian-btc-eur-diag-002-rehearsal/observe?runs=b1cab3ae-4362-4cb4-b09b-fcd7a8a1b025",
+    "reportStatus": "PENDING_TERMINAL_READBACK"
+  }
+}
