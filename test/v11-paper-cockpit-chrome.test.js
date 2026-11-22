@@ -228,11 +228,16 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         }
         assert.equal(await evaluate(`document.querySelector('#solana-meme-paper > summary').innerText.includes('Pilot 5 · Läuft')`),true);
         if(size.mobile){
-          const fullWidthHeaders=await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details > summary')).every(summary=>{
-            const bounds=summary.getBoundingClientRect();
-            return bounds.height>=56 && Math.abs(bounds.width-summary.parentElement.clientWidth)<=1;
+          // Read resting hit boxes once the view's entrance transform has finished.
+          await evaluate(`Promise.all(document.querySelector('#view-strategies').getAnimations().map(a=>a.finished)).then(()=>true)`);
+          const headers=await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details > summary'),summary=>{
+            const {width,height}=summary.getBoundingClientRect();
+            return {id:summary.parentElement.id,width,height,cardWidth:summary.parentElement.clientWidth};
           })`);
-          assert.equal(fullWidthHeaders,true,'mobile disclosure targets span the card width and are at least 56px tall');
+          for(const header of headers){
+            assert.ok(header.height>=56 && Math.abs(header.width-header.cardWidth)<=1,
+              'mobile disclosure geometry at '+size.width+'px: '+JSON.stringify(header));
+          }
         }
         const overviewEvidence=evidence || process.env.V11_A2_EVIDENCE_DIR;
         if (overviewEvidence && size.width===390) {

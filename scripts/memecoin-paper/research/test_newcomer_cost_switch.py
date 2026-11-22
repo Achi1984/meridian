@@ -35,3 +35,18 @@ class CostSwitchTest(unittest.TestCase):
         self.assertIsNone(sample()['chosen'])
         self.assertIsNone(sample()['paths']['wave']['netUsdc'])
         self.assertEqual(sample(rejection=True)['chosen'], 'wave')
+
+    def test_closed_exit_reconciles_with_quantity_quote_and_costs(self):
+        for arm in ('early', 'wave'):
+            base = dict(mint='m', arm=arm, qty=77)
+            start = [dict(event='cohortSelection', mint='m', band='strong', entryLiquidityUsd=25000),
+                     dict(event='cohort', at=1, mints=['m'], holdingPolicy='tenMinutesFromEntry'),
+                     dict(event='entry', usdc=20, **base),
+                     dict(event='resaleMark', tick=1, usdcRaw=21000000, **base)]
+            sale = dict(event='exit', netUsdc=.9, usdcRaw=21000000, **base)
+            end = [dict(event='summary', arm=a, entries=int(a == arm), closed=int(a == arm),
+                        unresolved=0) for a in ('early', 'wave')]
+            self.assertEqual(evaluate(start + [sale] + end)[0]['paths'][arm]['netUsdc'], .9)
+            for mismatch in [dict(qty=78), dict(usdcRaw=22000000), dict(netUsdc=1)]:
+                with self.subTest(arm=arm, mismatch=mismatch), self.assertRaisesRegex(ValueError, 'Exit'):
+                    evaluate(start + [dict(sale, **mismatch)] + end)

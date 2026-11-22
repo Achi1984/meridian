@@ -27,6 +27,11 @@ def evaluate(rows):
             if entry and (Decimal(str(entry['usdc'])) * UNIT != SIZE or
                           any(row['qty'] != entry['qty'] for row in marks)):
                 raise ValueError('Position size or marked quantity mismatch')
+            if sale:
+                if (not marks or sale['qty'] != entry['qty']
+                        or sale['usdcRaw'] != marks[-1]['usdcRaw']
+                        or Decimal(str(sale['netUsdc'])) * UNIT != sale['usdcRaw'] - SIZE - 2 * FEE):
+                    raise ValueError('Exit disagrees with recorded liquidation quote or costs')
             if arm == 'early':
                 entry_mark = next((row['usdcRaw'] for row in marks if row['tick'] == 0), None)
             gap = any(row['event'] == 'observationUnavailable' for row in events)
