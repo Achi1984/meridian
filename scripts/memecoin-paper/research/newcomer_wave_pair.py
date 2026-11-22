@@ -2,7 +2,10 @@
 import argparse
 from datetime import datetime
 import json
+import re
 import time
+from http.client import HTTPException
+from urllib.error import HTTPError
 
 from meme_paper_account import FEE, UNIT
 from newcomer_research import ERRORS, discover, flow
@@ -15,6 +18,22 @@ EXIT_GRACE = 120
 
 def emit(kind, **fields):
     print(json.dumps(dict(at=int(time.time()),event=kind,**fields)),flush=True)
+
+
+def provider_error_fields(exc):
+    if not isinstance(exc, HTTPError):
+        return {}
+    try:
+        body = exc.read(4097)
+        if len(body) > 4096:
+            return {}
+        payload = json.loads(body)
+    except (ValueError, OSError, HTTPException, RecursionError):
+        return {}
+    code = payload.get('errorCode') if isinstance(payload, dict) else None
+    if isinstance(code, str) and re.fullmatch(r'[A-Z][A-Z0-9_]{0,63}', code):
+        return {'providerErrorCode': code}
+    return {}
 
 
 class Pair:
@@ -45,7 +64,8 @@ class Pair:
                 mark = bid(qty)
             except ERRORS as exc:
                 emit('entryQuoteUnavailable', mint=mint, arm=name, leg=leg,
-                     reason=type(exc).__name__, status=getattr(exc, 'code', None))
+                     reason=type(exc).__name__, status=getattr(exc, 'code', None),
+                     **provider_error_fields(exc))
                 raise
             if mark < .95*SIZE:
                 emit('costRejected',mint=mint,arm=name,usdcRaw=mark)
@@ -173,7 +193,70 @@ def scan(watch):
     return eligible
 
 
-def run(persistence=False):
+class HalfRunner(Pair):
+    """Shadow the immediate entry and extend half only after a normal time exit."""
+    def __init__(self, row, persistence=False):
+        super().__init__(row, persistence)
+        self.half_sale = None
+        self.finished = False
+
+    def tick(self, index, final, quote=spot_quote, fetch=get):
+        try:
+            super().tick(index, final, quote, fetch)
+        finally:
+            self.observe(final, quote)
+
+    def observe(self, final, quote):
+        position = self.positions.get('early')
+        if self.finished or position is None:
+            return
+        qty, net = position
+        mint = self.row['mint']
+        if 'early' in self.expired:
+            self.finished = True
+            emit('runnerUnresolved', mint=mint, remainingQty=qty, cashRaw=-SIZE-FEE)
+            return
+        if net is None:
+            if final:
+                self.finished = True
+                emit('runnerUnresolved', mint=mint, remainingQty=qty, cashRaw=-SIZE-FEE)
+            return
+        if net >= 2*SIZE or net <= -.30*SIZE or qty < 2:
+            self.finished = True
+            emit('runnerSharedExit', mint=mint, netRaw=net)
+            return
+        age = lambda: time.monotonic() - self.opened_at['early']
+        splitting = self.half_sale is None
+        amount = qty//2 if splitting else qty-qty//2
+        deadline = (600 if splitting else 1200) + EXIT_GRACE
+        cash = -SIZE-FEE if splitting else self.half_sale-SIZE-2*FEE
+        if age() <= deadline:
+            try:
+                mark = quote(mint, USDC, amount)
+            except ERRORS as exc:
+                emit('runnerMissingQuote', mint=mint, qty=amount, reason=type(exc).__name__)
+            else:
+                held = age()
+                if held <= deadline:
+                    emit('runnerMark', mint=mint, qty=amount, usdcRaw=mark, heldSeconds=held)
+                    if splitting:
+                        self.half_sale = mark
+                        emit('runnerPartialSale', mint=mint, qty=amount, usdcRaw=mark, feeRaw=FEE)
+                        return
+                    value = cash + mark - FEE
+                    allocated = SIZE*amount/qty
+                    if held >= 1200 or mark-FEE <= .70*allocated or mark-FEE >= 3*allocated:
+                        self.finished = True
+                        emit('runnerExit', mint=mint, qty=amount, usdcRaw=mark,
+                             netRaw=value, baselineNetRaw=net, heldSeconds=held)
+                        return
+        if final or age() > deadline:
+            self.finished = True
+            emit('runnerUnresolved', mint=mint, remainingQty=qty if splitting else amount,
+                 cashRaw=cash)
+
+
+def run(persistence=False, half_runner=False):
     arms = ('early','wave','persistent') if persistence else ('early','wave')
     studies, watch = {}, {}
     for attempt in range(3):
@@ -196,7 +279,7 @@ def run(persistence=False):
             bands.add(band)
             emit('cohortSelection',mint=row['mint'],pool=row['pool'],band=band,
                  entryLiquidityUsd=row['liquidity'],buys=row['buys'],sells=row['sells'])
-            studies.setdefault(row['mint'],Pair(row,persistence))
+            studies.setdefault(row['mint'],(HalfRunner if half_runner else Pair)(row,persistence))
             if len(studies)==2:
                 break
         emit('discovery', attempt=attempt+1, eligiblePools=len(candidates), watching=len(watch), selected=len(studies))
@@ -214,7 +297,7 @@ def run(persistence=False):
                     emit('observationUnavailable',mint=study.row['mint'],reason=type(exc).__name__)
             if not any(s.reference_qty for s in studies.values()):
                 break
-            if i>=10 and not any(s.tripled_at or any(result is None and name not in s.expired
+            if i>=10 and not any(half_runner and "early" in s.positions and not s.finished for s in studies.values()) and not any(s.tripled_at or any(result is None and name not in s.expired
                     for name,(_,result) in s.positions.items()) for s in studies.values()):
                 break
             if i<24:
@@ -226,4 +309,6 @@ def run(persistence=False):
 if __name__=='__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--persistence',action='store_true')
-    run(parser.parse_args().persistence)
+    parser.add_argument('--half-runner', action='store_true')
+    args = parser.parse_args()
+    run(args.persistence, args.half_runner)

@@ -1,3 +1,4 @@
+from io import BytesIO
 import unittest
 from urllib.error import HTTPError
 from unittest.mock import Mock, patch
@@ -64,3 +65,15 @@ class WaveTest(unittest.TestCase):
                 self.assertEqual(quote.call_count, len(prior) + 1)
                 self.assertEqual(study.positions, {})
                 self.assertIsNone(study.reference_qty)
+
+    @patch('newcomer_wave_pair.emit')
+    def test_resale_route_error_is_optional_and_never_opens_position(self, emit):
+        for body, expected in [(b'{"errorCode":"NO_ROUTES_FOUND"}', 'NO_ROUTES_FOUND'),
+                               (b'<html>', None), (b' ' * 4097, None)]:
+            with self.subTest(expected=expected):
+                error = HTTPError('https://example.invalid', 400, '', {}, BytesIO(body))
+                study = Pair(dict(mint='m'))
+                with self.assertRaises(HTTPError):
+                    study.tick(0, False, Mock(side_effect=[101, error]))
+                self.assertEqual(emit.call_args.kwargs.get('providerErrorCode'), expected)
+                self.assertEqual(study.positions, {})
