@@ -69,8 +69,17 @@ function storedState(claim) {
   if (claim.status === 'COMMITTED' && claim.lastStage === 'RECEIPT_DELIVERED') {
     return {taskState: 'DONE', taskLabel: 'Stored receipt cycle completed; not runtime completion'};
   }
+  if (claim.status === 'REVIEWED' && claim.lastStage === 'RECEIPT_PREPARING') {
+    return {taskState: 'UNKNOWN', taskLabel: 'Stored receipt preparation; publication unconfirmed'};
+  }
   if (claim.status === 'REVIEWED' && claim.completionState === 'REVISION_REQUIRED') {
     return {taskState: 'BLOCKED', taskLabel: 'Stored review requires revision; not a current runtime assessment'};
+  }
+  if (claim.status === 'RECEIPT_POSTING' && claim.lastStage === 'RECEIPT_POSTING') {
+    return {taskState: 'UNKNOWN', taskLabel: 'Stored receipt posting fence; delivery unconfirmed'};
+  }
+  if (claim.status === 'UNKNOWN' && claim.lastStage === 'RECEIPT_DELIVERY_UNKNOWN') {
+    return {taskState: 'UNKNOWN', taskLabel: 'Stored receipt delivery outcome unknown; no retry authority'};
   }
   return {taskState: 'UNKNOWN', taskLabel: 'Stored operation state; current runtime unknown'};
 }
