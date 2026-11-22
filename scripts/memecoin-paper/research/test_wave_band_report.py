@@ -43,3 +43,35 @@ class BandReportTests(unittest.TestCase):
         self.assertEqual(pair['noEntryWithObservationGap'],1)
         self.assertEqual(pair['neitherEntered'],1)
         self.assertEqual(sum(group['count'] for group in pair['groups'].values()),0)
+
+    def test_paired_concentration_and_one_sided_gaps(self):
+        def run(at, wave):
+            events = [dict(event='cohort', at=at, mints=['m'])]
+            arms = {'early': 3, 'wave': wave}
+            for arm, net in arms.items():
+                if net is None:
+                    events.append(dict(event='observationUnavailable', mint='m'))
+                else:
+                    events.extend([dict(event='entry', mint='m', arm=arm, usdc=20),
+                                   dict(event='exit', mint='m', arm=arm, netUsdc=net)])
+            for arm, net in arms.items():
+                events.append(dict(event='summary', arm=arm, entries=int(net is not None),
+                                   closed=int(net is not None), unresolved=0, realizedUsdc=net or 0))
+            return events
+        samples = [run(1, 8), run(2, 1), run(3, None)]
+        pair = report(samples)[1]['waveMinusEarly']
+        self.assertEqual(pair['bestPairedDeltaUsdc'], 5)
+        self.assertEqual(pair['deltaWithoutBestPairUsdc'], -2)
+        self.assertEqual(pair['withObservationGap']['earlyOnly'], 1)
+        self.assertIsNone(report(samples[:1])[1]['waveMinusEarly']['deltaWithoutBestPairUsdc'])
+        samples[0][-1]['realizedUsdc'] = 0
+        with self.assertRaisesRegex(ValueError, 'realized net'):
+            report(samples)
+
+    def test_terminal_summary_cannot_precede_a_later_trade(self):
+        events = [dict(event='cohort', at=1, mints=['m']),
+                  dict(event='summary', arm='early', entries=0, closed=0, unresolved=0),
+                  dict(event='entry', mint='m', arm='early', usdc=20),
+                  dict(event='summary', arm='wave', entries=0, closed=0, unresolved=0)]
+        with self.assertRaisesRegex(ValueError, 'terminal'):
+            report([events])
