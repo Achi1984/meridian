@@ -44,6 +44,7 @@ class Pair:
             self.positions[name] = [qty,None]
             self.opened_at[name] = time.monotonic()
             emit('entry',mint=mint,arm=name,qty=qty,usdc=SIZE/UNIT)
+            emit('resaleMark',mint=mint,arm=name,tick=index,qty=qty,usdcRaw=mark)
             return qty
 
         if index==0:
@@ -87,6 +88,7 @@ class Pair:
                 self.expired.add(name)
                 emit('lateExitQuote',mint=mint,arm=name,heldSeconds=age,usdcRaw=proceeds)
                 continue
+            emit('resaleMark',mint=mint,arm=name,tick=index,qty=qty,usdcRaw=proceeds)
             if age>=HOLD_SECONDS or net>=2*SIZE or net<=-.30*SIZE:
                 self.positions[name][1] = net
                 reason = 'target' if net>=2*SIZE else 'stop' if net<=-.30*SIZE else 'time'
