@@ -17,12 +17,14 @@ jobs:
         with:
           persist-credentials: false
       - name: Verify quote and receipt rules
-        run: python3 -m unittest test_half_runner test_half_runner_report test_remainder_window_report
+        run: python3 -m unittest test_half_runner test_half_runner_report test_remainder_window_report test_entry_wait_report
       - name: Collect one matched public-quote session
         shell: bash
         run: python3 newcomer_wave_pair.py --half-runner | tee wave-pair.jsonl
       - name: Compare H10 and guarded exits
         run: python3 remainder_window_report.py --protect-full-exit wave-pair.jsonl > guarded-exit-results.json
+      - name: Attribute avoided losses and missed profits from waiting
+        run: python3 entry_wait_report.py wave-pair.jsonl > entry-wait-results.json
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -30,3 +32,4 @@ jobs:
           path: |
             scripts/memecoin-paper/research/wave-pair.jsonl
             scripts/memecoin-paper/research/guarded-exit-results.json
+            scripts/memecoin-paper/research/entry-wait-results.json
