@@ -74,3 +74,13 @@ class ProfitTargetTests(unittest.TestCase):
         result = replay([rows])
         self.assertEqual(result['independentClosedPairs'], 0)
         self.assertEqual(result['observations'][0]['target']['state'], 'noEntryWithGap')
+
+    def test_post_target_changes_use_hit_quote_and_only_subsequent_marks(self):
+        rows = sample(1, [26000000, 23000000, 25000000, 19000000])
+        rows.insert(5, dict(event='lateExitQuote', mint='m', arm='early'))
+        item = replay([rows])['observations'][0]
+        self.assertEqual(item['target']['afterTarget'], dict(observedQuotes=2, missingOrLateQuotes=1,
+                         bestChangeUsdc=2, worstChangeUsdc=-4))
+        terminal = replay([sample(1, [19000000, 23000000])])['observations'][0]['target']
+        self.assertIsNone(terminal['afterTarget']['bestChangeUsdc'])
+        self.assertEqual(terminal['afterTarget']['observedQuotes'], 0)
