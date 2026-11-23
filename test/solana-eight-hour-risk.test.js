@@ -63,6 +63,12 @@ test('refresh loads the run checkpoint and keeps it across a failed or older ref
   assert.ok(report.children.some(node=>node.textContent.includes('Soforteinstieg')));
   assert.equal(report.children.filter(node=>node.tag==='h4').length,3);
   assert.ok(report.children.some(node=>node.textContent.includes('Positionsgröße · 2')));
+  assert.ok(report.children.some(node=>node.textContent==='Kontowert A gegenüber B · Bewertung offen'));
+  response = {...snapshot, updatedAt:snapshot.updatedAt+1, accounts:{
+    A:{...account,equityUsdc:990}, B:{...account,equityUsdc:1000}, C:{...account,equityUsdc:1025}}};
+  await refresh();
+  assert.ok(report.children.some(node=>node.textContent==='Kontowert A gegenüber B · -10'));
+  assert.ok(report.children.some(node=>node.textContent==='Kontowert C gegenüber B · 25'));
   const original = [...report.children];
   response = { ...snapshot, runId:1 };
   await refresh();
