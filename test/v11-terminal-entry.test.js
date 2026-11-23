@@ -818,7 +818,7 @@ function restoreDashboardClarity(source){
 function restoreB2(source){
   source=source.replace('      <details class="command-context-details">',"      <section class=\"card command-strategies\" aria-labelledby=\"command-strategies-heading\">\n        <div class=\"card-head\"><h2 id=\"command-strategies-heading\">Paper &amp; Forschung</h2><span class=\"limited\">Nur lesend</span></div>\n        <p>Live-Paperbot und Forschungsberichte findest du unter Strategien.</p>\n      </section>\n"+'      <details class="command-context-details">');
   const layout=source.match(/  <style id="dashboard-reading-order">[^]*?<\/style>\n/)?.[0];
-  assert.equal(gitBlob(layout),'7f1a238f6de51396c0efcb0c23c8e15f4670b5bc');
+  assert.equal(gitBlob(layout),'e2731249d6ceb5b0b4e17f9e27aeac48905cace1');
   source=source.replace(layout,'');
   const development=source.match(/    <details id="autonomy-status"[^]*?    <\/details>\n/)?.[0];
   source=source.replace(development,'').replace('    <section id="version-panel"',development+'    <section id="version-panel"');
@@ -1557,7 +1557,12 @@ async function browserRun(call,start,width,height,server){
     const fetchOriginal=window.fetch;
     try {
       window.fetch=async url=>{
-        const data=String(url).includes('/actions/')
+        const reportAccount={cashUsdc:993.78,equityUsdc:993.78,realizedUsdc:-6.22,closedTrades:1,openPositions:[]};
+        const data=String(url).includes('solana-abc-')
+          ? {runId:45210142704,startedAt:1795449172,endsAt:1795477972,updatedAt:1795452653,
+             accounts:Object.fromEntries(['trailing','standard','fixed'].map((policy,i)=>[['A','B','C'][i],{...reportAccount,policy}]))}
+          : String(url).endsWith('/jobs') ? {jobs:[{name:'first',status:'in_progress'}]}
+          : String(url).includes('/actions/')
           ? {workflow_runs:[{id:23,run_number:5,status:'pending'},
               {id:22,run_number:4,status:'in_progress'},{id:21,run_number:3,status:'completed'}]}
           : {schema:1,runId:21,at:'2026-11-20T12:00:00Z',pools:12,open:1,closed:0,realized:0,equity:null,
@@ -1569,11 +1574,18 @@ async function browserRun(call,start,width,height,server){
       };
       section.open=true;
       for(let i=0;i<50&&!section.querySelector('dd');i++)await new Promise(resolve=>setTimeout(resolve,20));
+      const compact={rows:section.querySelectorAll('tbody tr').length,text:section.innerText,
+        fits:section.scrollWidth<=section.clientWidth+1};
       section.querySelectorAll('details').forEach(detail=>{detail.open=true;});
-      return {badge:section.querySelector('summary .pilot-status').textContent,text:section.innerText,values:[...section.querySelectorAll('dd')].map(x=>x.textContent),
+      return {compact,badge:section.querySelector('.pilot-status').textContent,text:section.innerText,values:[...section.querySelectorAll('dd')].map(x=>x.textContent),
         fits:section.scrollWidth<=section.clientWidth+1};
     } finally {window.fetch=fetchOriginal;section.open=false;}
   })()`,true);
+  assert.equal(paperSnapshot.compact.rows,3);
+  assert.ok(paperSnapshot.compact.fits);
+  assert.match(paperSnapshot.compact.text,/Erste vier Stunden · läuft/);
+  assert.match(paperSnapshot.compact.text,/10 % Nettoziel/);
+  assert.doesNotMatch(paperSnapshot.compact.text,/Signal- und Pooldetails|Lokalen Bericht laden|Letzter Pilot|Guthaben/);
   assert.equal(paperSnapshot.badge,'Pilot 5 · Wartet');
   assert.match(paperSnapshot.text,/Letzter Pilot · Wartet · Lauf #5/);
   assert.match(paperSnapshot.text,/Aktuell laufender Pilot · Lauf #4/);

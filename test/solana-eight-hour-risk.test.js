@@ -39,6 +39,7 @@ test('refresh loads the run checkpoint and keeps it across a failed or older ref
     nodes.push(node);
     return node;
   };
+  const contents = node => [node, ...node.children.flatMap(contents)];
   const account = {cashUsdc:980, equityUsdc:null, realizedUsdc:0, closedTrades:0,
     openPositions:[{}], missingExitQuotes:2};
   const snapshot = {runId:45185444796, startedAt:1795440944, endsAt:1795469744,
@@ -51,24 +52,27 @@ test('refresh loads the run checkpoint and keeps it across a failed or older ref
   const refresh = mountEightHourComparison({children:[]},add,read,String);
   await refresh();
   const newReport = nodes.find(node=>node.tag==='div');
-  assert.ok(newReport.children.some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
+  assert.ok(contents(newReport).some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
   response = snapshot;
   await refresh();
-  assert.ok(newReport.children.some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
+  assert.ok(contents(newReport).some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
   const select = nodes.find(node=>node.tag==='select');
   select.value = String(snapshot.runId);
   select.change();
   await refresh();
   const report = nodes.filter(node=>node.tag==='div').at(-1);
-  assert.ok(report.children.some(node=>node.textContent.includes('Soforteinstieg')));
-  assert.equal(report.children.filter(node=>node.tag==='h4').length,3);
-  assert.ok(report.children.some(node=>node.textContent.includes('Positionsgröße · 2')));
-  assert.ok(report.children.some(node=>node.textContent==='Kontowert A gegenüber B · Bewertung offen'));
+  assert.ok(contents(report).some(node=>node.textContent.includes('Soforteinstieg')));
+  assert.equal(contents(report).filter(node=>node.scope==='row').length,3);
+  assert.ok(!contents(report).some(node=>node.textContent.includes('Positionsgröße')));
+  const detail = nodes.filter(node=>node.tag==='details').at(-1);
+  assert.ok(!detail.open);
+  assert.ok(contents(detail).some(node=>node.textContent.includes('Positionsgröße · 2')));
+  assert.ok(contents(detail).some(node=>node.textContent==='Kontowert A gegenüber B · Bewertung offen'));
   response = {...snapshot, updatedAt:snapshot.updatedAt+1, accounts:{
     A:{...account,equityUsdc:990}, B:{...account,equityUsdc:1000}, C:{...account,equityUsdc:1025}}};
   await refresh();
-  assert.ok(report.children.some(node=>node.textContent==='Kontowert A gegenüber B · -10'));
-  assert.ok(report.children.some(node=>node.textContent==='Kontowert C gegenüber B · 25'));
+  assert.ok(contents(detail).some(node=>node.textContent==='Kontowert A gegenüber B · -10'));
+  assert.ok(contents(detail).some(node=>node.textContent==='Kontowert C gegenüber B · 25'));
   const original = [...report.children];
   response = { ...snapshot, runId:1 };
   await refresh();
