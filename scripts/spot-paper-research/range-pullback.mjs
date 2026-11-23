@@ -61,59 +61,51 @@ export function advanceRangePullback(previous, incoming, { decisionAt, held = pr
     throw new Error("INVALID_RANGE_PULLBACK_STATE");
   }
   const state = structuredClone(previous);
-  const signals = [];
+  const initialWindow = state.candles.length === 0;
   let missedDecisionWindow = false;
+  let newCandleCount = 0;
   for (const candle of incoming) {
     const last = state.candles.at(-1);
     if (last && candle.timestamp <= last.timestamp) continue;
     if (last && candle.timestamp !== last.timestamp + MINUTE) {
       state.candles = [];
-      state.held = held;
-      state.entryAt = null;
-      state.entryPriceNano = null;
-      state.entryAtrNano = null;
       missedDecisionWindow = true;
     }
     state.candles.push(candle);
     if (state.candles.length > MAX_HISTORY) state.candles.shift();
-    const data = indicators(state.candles);
-    if (!data) continue;
-    const close = BigInt(candle.closeNano);
-    const priorClose = BigInt(state.candles.at(-2).closeNano);
-    if (state.held) {
-      const target = close >= data.sma20;
-      const stop = state.entryPriceNano !== null && state.entryAtrNano !== null &&
-        close <= state.entryPriceNano - 2n * state.entryAtrNano;
-      const timeStop = state.entryAt !== null && candle.timestamp - state.entryAt >= 120 * MINUTE;
-      if (target || stop || timeStop) {
-        const strategyReason = target ? "MEAN_REVERSION_TARGET" : stop ? "ATR_STOP" : "TIME_STOP";
-        signals.push({ id: `${SPOT_PAPER_RANGE_PULLBACK_ID}:EXIT:${candle.timestamp}`,
-          direction: "EXIT", candleAt: candle.timestamp, closeNano: candle.closeNano,
-          decisionAt, strategyReason });
-        state.held = false;
-        state.entryAt = null;
-        state.entryPriceNano = null;
-        state.entryAtrNano = null;
-        state.cooldownUntil = decisionAt + RANGE_PULLBACK_COOLDOWN_MS;
-      }
-      continue;
+    newCandleCount++;
+  }
+  const result = { state, signals: [], newCandleCount, missedDecisionWindow };
+  if (initialWindow || !newCandleCount) return result;
+  const candle = state.candles.at(-1);
+  const data = indicators(state.candles);
+  const close = BigInt(candle.closeNano);
+  let signal;
+  if (held) {
+    const target = data !== null && close >= data.sma20;
+    const stop = state.entryPriceNano !== null && state.entryAtrNano !== null &&
+      close <= BigInt(state.entryPriceNano) - 2n * BigInt(state.entryAtrNano);
+    const timeStop = state.entryAt !== null && decisionAt - state.entryAt >= 120 * MINUTE;
+    if (target || stop || timeStop) {
+      signal = { direction: "EXIT",
+        strategyReason: target ? "MEAN_REVERSION_TARGET" : stop ? "ATR_STOP" : "TIME_STOP" };
     }
-    if (decisionAt < state.cooldownUntil) continue;
+  } else if (data && decisionAt >= state.cooldownUntil && !missedDecisionWindow) {
+    const priorClose = BigInt(state.candles.at(-2).closeNano);
     const range = (data.sma20 > data.sma60 ? data.sma20 - data.sma60 : data.sma60 - data.sma20) * 2n <= data.atr14 * 3n;
     const slope = (data.sma60 > data.oldSma60 ? data.sma60 - data.oldSma60 : data.oldSma60 - data.sma60) * 2n <= data.atr14;
     const pullback = close * 100n <= data.sma20 * 100n - data.atr14 * 150n;
     const oversold = data.rsiNumerator <= 35n * data.rsiDenominator;
     if (range && slope && pullback && oversold && close > priorClose) {
-      signals.push({ id: `${SPOT_PAPER_RANGE_PULLBACK_ID}:ENTRY:${candle.timestamp}`,
-        direction: "ENTRY", candleAt: candle.timestamp, closeNano: candle.closeNano,
-        decisionAt, strategyReason: "RANGE_PULLBACK_ATR_RSI" });
-      state.held = true;
-      state.entryAt = candle.timestamp;
-      state.entryPriceNano = candle.closeNano;
-      state.entryAtrNano = Number(data.atr14);
+      signal = { direction: "ENTRY", strategyReason: "RANGE_PULLBACK_ATR_RSI",
+        entryAtrNano: String(data.atr14) };
     }
   }
-  state.lastSignalAt = signals.at(-1)?.candleAt ?? state.lastSignalAt;
-  return { state, signals, newCandleCount: incoming.filter(c => state.candles.some(x => x.timestamp === c.timestamp)).length,
-    missedDecisionWindow };
+  if (signal) {
+    result.signals.push({ ...signal,
+      id: `${SPOT_PAPER_RANGE_PULLBACK_ID}:${signal.direction}:${candle.timestamp}`,
+      candleAt: candle.timestamp, closeNano: candle.closeNano, decisionAt });
+    state.lastSignalAt = candle.timestamp;
+  }
+  return result;
 }
