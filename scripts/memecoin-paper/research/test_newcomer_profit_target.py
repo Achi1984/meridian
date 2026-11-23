@@ -23,6 +23,18 @@ class ProfitTargetTests(unittest.TestCase):
         self.assertEqual(row['target']['heldSeconds'], 120)
         self.assertEqual(row['deltaUsdc'], 8.5)
 
+    def test_wave_entry_tick_is_never_an_exit(self):
+        rows = sample(1, [25000000, 22500000, 16000000])
+        for row in rows:
+            if 'arm' in row:
+                row['arm'] = 'wave' if row['arm'] == 'early' else 'early'
+            if 'tick' in row:
+                row['tick'] += 4
+        item = replay([rows], 'wave')['observations'][0]
+        self.assertEqual(item['target']['netUsdc'], 2.4)
+        self.assertEqual(item['target']['heldSeconds'], 60)
+        self.assertEqual(item['missingWaveExitQuotes'], 0)
+
     def test_missing_baseline_sale_keeps_delta_unknown(self):
         result = replay([sample(1, [19500000,22100000], False)])
         self.assertEqual(result['observations'][0]['target']['netUsdc'], 2)
