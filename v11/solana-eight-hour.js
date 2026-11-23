@@ -13,8 +13,12 @@ export function accountRows(snapshot) {
         !(a.equityUsdc === null || Number.isFinite(a.equityUsdc)) ||
         !Number.isSafeInteger(a.closedTrades) || a.closedTrades < 0 ||
         !Array.isArray(a.openPositions)) throw Error('account');
-    return [key + ' · ' + name, a.cashUsdc, a.equityUsdc, a.realizedUsdc,
-      a.closedTrades, a.openPositions.length];
+    const withoutBest = a.realizedWithoutBestMintUsdc;
+    const drawdown = a.sampledMaxDrawdownUsdc;
+    if (withoutBest != null && !Number.isFinite(withoutBest)) throw Error('concentration');
+    if (drawdown != null && (!Number.isFinite(drawdown) || drawdown < 0)) throw Error('drawdown');
+    return {name:key + ' · ' + name, cash:a.cashUsdc, equity:a.equityUsdc, net:a.realizedUsdc,
+      closed:a.closedTrades, open:a.openPositions.length, withoutBest, drawdown};
   });
 }
 
@@ -44,10 +48,15 @@ export function mountEightHourComparison(section, add, read, amount) {
       result.replaceChildren();
       const at = new Date(snapshot.updatedAt * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
       add(result,'p','Lokaler Bericht · ' + at + ' (Wien)');
-      for (const [name,cash,equity,net,closed,open] of rows) {
+      for (const {name,cash,equity,net,closed,open,withoutBest,drawdown} of rows) {
         add(result,'h4',name);
         add(result,'p','Guthaben ' + amount(cash) + ' · Kontowert ' + amount(equity) +
           ' · Realisiert ' + amount(net) + ' · Geschlossen ' + closed + ' · Offen ' + open);
+        if (withoutBest !== undefined) {
+          add(result,'p',withoutBest === null ? 'Vergleich ab zwei abgeschlossenen Coins verfügbar.' :
+            'Realisiert ohne besten Coin · ' + amount(withoutBest));
+        }
+        if (drawdown != null) add(result,'p','Größter beobachteter Rückgang des Kontowerts · ' + amount(drawdown));
       }
     } catch {
       if (current === revision) result.textContent = 'Datei konnte nicht als A/B/C-Kontobericht gelesen werden.';
