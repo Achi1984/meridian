@@ -17,7 +17,9 @@ export function accountRows(snapshot) {
     const drawdown = a.sampledMaxDrawdownUsdc;
     if (withoutBest != null && !Number.isFinite(withoutBest)) throw Error('concentration');
     if (drawdown != null && (!Number.isFinite(drawdown) || drawdown < 0)) throw Error('drawdown');
-    return {name:key + ' · ' + name, cash:a.cashUsdc, equity:a.equityUsdc, net:a.realizedUsdc,
+    const missing = a.missingExitQuotes;
+    if (missing !== undefined && (!Number.isSafeInteger(missing) || missing < 0)) throw Error('quotes');
+    return {missing, name:key + ' · ' + name, cash:a.cashUsdc, equity:a.equityUsdc, net:a.realizedUsdc,
       closed:a.closedTrades, open:a.openPositions.length, withoutBest, drawdown};
   });
 }
@@ -34,35 +36,55 @@ export function mountEightHourComparison(section, add, read, amount) {
   input.accept = '.json,application/json';
   const result = add(root,'div','Noch kein Kontobericht geladen.');
   result.setAttribute('aria-live','polite');
+  let displayedAt = -1;
   let revision = 0;
+  function render(snapshot, source) {
+    const rows = accountRows(snapshot);
+    result.replaceChildren();
+    const at = new Date(snapshot.updatedAt * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
+    add(result,'p',source + ' · ' + at + ' (Wien)');
+    for (const {name,cash,equity,net,closed,open,withoutBest,drawdown,missing} of rows) {
+      add(result,'h4',name);
+      add(result,'p','Guthaben ' + amount(cash) + ' · Kontowert ' + amount(equity) +
+        ' · Realisiert ' + amount(net) + ' · Geschlossen ' + closed + ' · Offen ' + open);
+      if (missing > 0) add(result,'p','Fehlende Rückverkaufsquoten für die Positionsgröße · ' + missing);
+      if (withoutBest !== undefined) {
+        add(result,'p',withoutBest === null ? 'Vergleich ab zwei abgeschlossenen Coins verfügbar.' :
+          'Realisiert ohne besten Coin · ' + amount(withoutBest));
+      }
+      if (drawdown != null) add(result,'p','Größter beobachteter Rückgang des Kontowerts · ' + amount(drawdown));
+    }
+    displayedAt = snapshot.updatedAt;
+  }
+  const notice = add(root,'p','');
   input.addEventListener('change',async () => {
     const current = ++revision;
     const file = input.files[0];
-    result.textContent = 'Noch kein Kontobericht geladen.';
+    notice.textContent = '';
     if (!file) return;
     try {
       if (file.size > 2_000_000) throw Error('size');
       const snapshot = JSON.parse(await file.text());
-      if (current !== revision) return;
-      const rows = accountRows(snapshot);
-      result.replaceChildren();
-      const at = new Date(snapshot.updatedAt * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
-      add(result,'p','Lokaler Bericht · ' + at + ' (Wien)');
-      for (const {name,cash,equity,net,closed,open,withoutBest,drawdown} of rows) {
-        add(result,'h4',name);
-        add(result,'p','Guthaben ' + amount(cash) + ' · Kontowert ' + amount(equity) +
-          ' · Realisiert ' + amount(net) + ' · Geschlossen ' + closed + ' · Offen ' + open);
-        if (withoutBest !== undefined) {
-          add(result,'p',withoutBest === null ? 'Vergleich ab zwei abgeschlossenen Coins verfügbar.' :
-            'Realisiert ohne besten Coin · ' + amount(withoutBest));
-        }
-        if (drawdown != null) add(result,'p','Größter beobachteter Rückgang des Kontowerts · ' + amount(drawdown));
-      }
+      if (current === revision) render(snapshot,'Lokaler Bericht');
     } catch {
-      if (current === revision) result.textContent = 'Datei konnte nicht als A/B/C-Kontobericht gelesen werden.';
+      if (current === revision) notice.textContent = 'Datei konnte nicht als A/B/C-Kontobericht gelesen werden.';
     }
   });
-  return async function refresh() {
+  async function refreshReport() {
+    const current = revision;
+    try {
+      const snapshot = await read('https://api.github.com/repos/Achi1984/meridian/contents/solana-abc-' +
+        runId + '.json?ref=paper-dashboard-data', true);
+      if (snapshot.runId !== runId || snapshot.startedAt !== 1795440944) throw Error('run');
+      if (current !== revision) return;
+      if (snapshot.updatedAt > displayedAt) render(snapshot,'Bestätigter Laufbericht');
+      notice.textContent = '';
+    } catch {
+      if (current === revision) notice.textContent = displayedAt < 0 ? 'Noch kein bestätigter Laufbericht abrufbar.' :
+        'Abruf fehlgeschlagen. Der angezeigte Bericht behält seinen Zeitstand.';
+    }
+  }
+  async function refreshJobs() {
     try {
       const jobs = await read('https://api.github.com/repos/' + runPath + '/jobs');
       const phases = [['first','Erste vier Stunden'],['finish','Zweite vier Stunden']];
@@ -76,5 +98,6 @@ export function mountEightHourComparison(section, add, read, amount) {
     } catch {
       status.textContent = 'Laufstatus derzeit nicht abrufbar.';
     }
-  };
+  }
+  return () => Promise.all([refreshReport(), refreshJobs()]);
 }
