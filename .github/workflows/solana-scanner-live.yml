@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
-    paths: ['.github/workflows/solana-scanner-live.yml']
+    paths: ['.github/workflows/solana-scanner-live.yml', 'scripts/memecoin-paper/research/scanner_snapshot.py']
 permissions: {}
 concurrency:
   group: solana-scanner-live

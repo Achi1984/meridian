@@ -2,7 +2,7 @@
 import json
 from pathlib import Path
 
-from newcomer_scanner import scan
+from newcomer_scanner import market_reader, scan
 
 
 def snapshot(collect=scan):
@@ -19,7 +19,7 @@ def snapshot(collect=scan):
             warnings.append(fields['source'])
         elif kind == 'scannerSummary':
             summary.update(fields)
-    collect(record)
+    collect(record, fetch=market_reader(interval=13), ranked_windows_only=True)
     if (summary.get('sampled') != len(candidates) or not summary.get('asOf')
             or any(r['asOf'] != summary['asOf'] for r in candidates)):
         raise ValueError('Incomplete scanner observation')
