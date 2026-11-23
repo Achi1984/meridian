@@ -1,16 +1,15 @@
 {
-  "runId": 45185444796,
   "startedAt": 1795440944,
   "endsAt": 1795469744,
-  "updatedAt": 1795455469,
-  "lastEvent": "handoff",
-  "session": 21,
+  "updatedAt": 1795469744,
+  "lastEvent": "finished",
+  "session": 43,
   "accounts": {
     "A": {
-      "cashUsdc": 892.553841,
+      "cashUsdc": 770.618715,
       "equityUsdc": null,
-      "realizedUsdc": -87.396159,
-      "closedTrades": 19,
+      "realizedUsdc": -169.231285,
+      "closedTrades": 31,
       "openPositions": [
         {
           "mint": "CsfATN6gMDkNWadXK5D1TBA3osmEKkQjr2xBdEPdZASb",
@@ -18,34 +17,79 @@
           "bid": null,
           "markAt": null,
           "marks": 3
+        },
+        {
+          "mint": "xWmSdXiqCx7Qvw9WAHZTzEFFCMG1fWXCSujzbmXpump",
+          "qty": 1980549896946,
+          "bid": null,
+          "markAt": null,
+          "marks": 1
+        },
+        {
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "qty": 1240289009648,
+          "bid": null,
+          "markAt": null,
+          "marks": 10
         }
       ],
-      "missingExitQuotes": 11,
+      "missingExitQuotes": 24,
       "sampledMaxDrawdownUsdc": 65.362935,
-      "cashIfOpenWorthZeroUsdc": 892.553841,
-      "realizedWithoutBestMintUsdc": -100.709948
+      "cashIfOpenWorthZeroUsdc": 770.618715,
+      "realizedWithoutBestMintUsdc": -183.117469
     },
     "B": {
-      "cashUsdc": 1029.094043,
-      "equityUsdc": 1029.094043,
-      "realizedUsdc": 29.094043,
-      "closedTrades": 8,
-      "openPositions": [],
-      "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 33.36833,
-      "cashIfOpenWorthZeroUsdc": 1029.094043,
-      "realizedWithoutBestMintUsdc": -26.55258
+      "cashUsdc": 962.437075,
+      "equityUsdc": null,
+      "realizedUsdc": 2.537075,
+      "closedTrades": 13,
+      "openPositions": [
+        {
+          "mint": "NuKJU263z16LFrxUHu2XDumMzcDdCr6ziBfvFoVVLR2",
+          "qty": 27641833331017,
+          "bid": null,
+          "markAt": null,
+          "marks": 7
+        },
+        {
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "qty": 1164241144933,
+          "bid": null,
+          "markAt": null,
+          "marks": 8
+        }
+      ],
+      "missingExitQuotes": 7,
+      "sampledMaxDrawdownUsdc": 51.435567,
+      "cashIfOpenWorthZeroUsdc": 962.437075,
+      "realizedWithoutBestMintUsdc": -53.109548
     },
     "C": {
-      "cashUsdc": 1064.115802,
-      "equityUsdc": 1064.115802,
-      "realizedUsdc": 64.115802,
-      "closedTrades": 8,
-      "openPositions": [],
-      "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 4.83174,
-      "cashIfOpenWorthZeroUsdc": 1064.115802,
-      "realizedWithoutBestMintUsdc": 30.038923
+      "cashUsdc": 1018.305018,
+      "equityUsdc": null,
+      "realizedUsdc": 58.405018,
+      "closedTrades": 13,
+      "openPositions": [
+        {
+          "mint": "NuKJU263z16LFrxUHu2XDumMzcDdCr6ziBfvFoVVLR2",
+          "qty": 27641833331017,
+          "bid": null,
+          "markAt": null,
+          "marks": 7
+        },
+        {
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "qty": 1164241144933,
+          "bid": null,
+          "markAt": null,
+          "marks": 8
+        }
+      ],
+      "missingExitQuotes": 7,
+      "sampledMaxDrawdownUsdc": 21.553142,
+      "cashIfOpenWorthZeroUsdc": 1018.305018,
+      "realizedWithoutBestMintUsdc": 24.328139
     }
-  }
+  },
+  "runId": 45185444796
 }
