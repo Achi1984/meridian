@@ -1,0 +1,25 @@
+name: Solana newcomer volume scanner (paper)
+on: workflow_dispatch
+permissions:
+  contents: read
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    defaults:
+      run:
+        working-directory: scripts/memecoin-paper/research
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest test_newcomer_scanner test_newcomer_wave_pair
+      - run: python3 -u newcomer_wave_pair.py --scanner | tee scanner.jsonl
+        shell: bash
+      - run: python3 scanner_summary.py scanner.jsonl >> "$GITHUB_STEP_SUMMARY"
+        if: always()
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: newcomer-scanner-journal
+          path: scripts/memecoin-paper/research/scanner.jsonl
