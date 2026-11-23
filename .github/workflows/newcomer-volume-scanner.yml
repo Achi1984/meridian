@@ -1,9 +1,6 @@
 name: Solana newcomer volume scanner (paper)
 on:
   workflow_dispatch:
-  push:
-    branches: [main]
-    paths: ['.github/workflows/newcomer-volume-scanner.yml']
 permissions:
   contents: read
 jobs:
