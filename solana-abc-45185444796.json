@@ -2,42 +2,50 @@
   "runId": 45185444796,
   "startedAt": 1795440944,
   "endsAt": 1795469744,
-  "updatedAt": 1795447068,
-  "lastEvent": "sessionEnd",
-  "session": 11,
+  "updatedAt": 1795455469,
+  "lastEvent": "handoff",
+  "session": 21,
   "accounts": {
     "A": {
-      "cashUsdc": 939.354151,
-      "equityUsdc": 939.354151,
-      "realizedUsdc": -60.645849,
-      "closedTrades": 6,
-      "openPositions": [],
-      "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 63.613113,
-      "cashIfOpenWorthZeroUsdc": 939.354151,
-      "realizedWithoutBestMintUsdc": -73.959638
+      "cashUsdc": 892.553841,
+      "equityUsdc": null,
+      "realizedUsdc": -87.396159,
+      "closedTrades": 19,
+      "openPositions": [
+        {
+          "mint": "CsfATN6gMDkNWadXK5D1TBA3osmEKkQjr2xBdEPdZASb",
+          "qty": 967800165522,
+          "bid": null,
+          "markAt": null,
+          "marks": 3
+        }
+      ],
+      "missingExitQuotes": 11,
+      "sampledMaxDrawdownUsdc": 65.362935,
+      "cashIfOpenWorthZeroUsdc": 892.553841,
+      "realizedWithoutBestMintUsdc": -100.709948
     },
     "B": {
-      "cashUsdc": 1004.803467,
-      "equityUsdc": 1004.803467,
-      "realizedUsdc": 4.803467,
-      "closedTrades": 2,
+      "cashUsdc": 1029.094043,
+      "equityUsdc": 1029.094043,
+      "realizedUsdc": 29.094043,
+      "closedTrades": 8,
       "openPositions": [],
       "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 2.412279,
-      "cashIfOpenWorthZeroUsdc": 1004.803467,
-      "realizedWithoutBestMintUsdc": 1.970949
+      "sampledMaxDrawdownUsdc": 33.36833,
+      "cashIfOpenWorthZeroUsdc": 1029.094043,
+      "realizedWithoutBestMintUsdc": -26.55258
     },
     "C": {
-      "cashUsdc": 1005.498133,
-      "equityUsdc": 1005.498133,
-      "realizedUsdc": 5.498133,
-      "closedTrades": 2,
+      "cashUsdc": 1064.115802,
+      "equityUsdc": 1064.115802,
+      "realizedUsdc": 64.115802,
+      "closedTrades": 8,
       "openPositions": [],
       "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 0.719049,
-      "cashIfOpenWorthZeroUsdc": 1005.498133,
-      "realizedWithoutBestMintUsdc": 2.449506
+      "sampledMaxDrawdownUsdc": 4.83174,
+      "cashIfOpenWorthZeroUsdc": 1064.115802,
+      "realizedWithoutBestMintUsdc": 30.038923
     }
   }
 }
