@@ -1,0 +1,43 @@
+{
+  "runId": 45185444796,
+  "startedAt": 1795440944,
+  "endsAt": 1795469744,
+  "updatedAt": 1795447068,
+  "lastEvent": "sessionEnd",
+  "session": 11,
+  "accounts": {
+    "A": {
+      "cashUsdc": 939.354151,
+      "equityUsdc": 939.354151,
+      "realizedUsdc": -60.645849,
+      "closedTrades": 6,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 63.613113,
+      "cashIfOpenWorthZeroUsdc": 939.354151,
+      "realizedWithoutBestMintUsdc": -73.959638
+    },
+    "B": {
+      "cashUsdc": 1004.803467,
+      "equityUsdc": 1004.803467,
+      "realizedUsdc": 4.803467,
+      "closedTrades": 2,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 2.412279,
+      "cashIfOpenWorthZeroUsdc": 1004.803467,
+      "realizedWithoutBestMintUsdc": 1.970949
+    },
+    "C": {
+      "cashUsdc": 1005.498133,
+      "equityUsdc": 1005.498133,
+      "realizedUsdc": 5.498133,
+      "closedTrades": 2,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 0.719049,
+      "cashIfOpenWorthZeroUsdc": 1005.498133,
+      "realizedWithoutBestMintUsdc": 2.449506
+    }
+  }
+}
