@@ -1,5 +1,6 @@
 """Volume leaderboards for a sampled universe of new Solana launchpad mints."""
 import time
+from math import ceil
 from itertools import chain
 from datetime import datetime
 from urllib.error import HTTPError
@@ -19,7 +20,7 @@ def timestamp(value):
     return date.timestamp()
 
 
-def sample(end, fetch):
+def sample(end, fetch, warn=None):
     # Combine active and freshly launched mints; a recently migrated pool alone
     # cannot establish mint age. Use the first pool timestamp from Jupiter.
     mints = {}
@@ -36,8 +37,19 @@ def sample(end, fetch):
     pages = (f'{GT}/new_pools?page={page}' for page in (1, 2, 3))
     batches = (GT+'/pools/multi/'+','.join(addresses[i:i+30])
                for i in range(0, len(addresses), 30))
-    for url in chain(pages, batches):
-        for item in fetch(url, 120)['data']:
+    feeds = chain((('newPools', u) for u in pages), (('firstPool', u) for u in batches),
+                  [('trending', GT+'/trending_pools?page=1')])
+    sources = {}
+    for source, url in feeds:
+        try:
+            items = fetch(url, 120)['data']
+        except ERRORS as exc:
+            if source != 'trending' or warn is None:
+                raise
+            warn('scannerSourceUnavailable', source=source, reason=type(exc).__name__,
+                 status=getattr(exc, 'code', None))
+            continue
+        for item in items:
             try:
                 row = snapshot(item)
             except ERRORS:
@@ -47,7 +59,8 @@ def sample(end, fetch):
                     or row['dex'] not in ('pump-fun', 'pumpswap')
                     or row['liquidity'] < 5000 or timestamp(row['created']) >= end):
                 continue
-            if mint not in pools or row['liquidity'] > pools[mint]['liquidity']:
+            sources.setdefault(mint, set()).add(source)
+            if mint not in pools or (row['liquidity'], row['pool']) > (pools[mint]['liquidity'], pools[mint]['pool']):
                 pools[mint] = row
     missing = sorted(pools.keys() - mints.keys())
     for i in range(0, len(missing), 100):
@@ -59,7 +72,7 @@ def sample(end, fetch):
         token = mints.get(mint, {})
         first = (token.get('firstPool') or {}).get('createdAt')
         if first and 0 <= end-timestamp(first) <= 86400:
-            row.update(symbol=token.get('symbol'), firstPoolAt=first)
+            row.update(symbol=token.get('symbol'), firstPoolAt=first, discoverySources=sorted(sources[mint]))
             eligible.append(row)
     return eligible
 
@@ -92,6 +105,24 @@ def metrics(row, candles, trades, end):
     return result
 
 
+def rank_complete_windows(records, end):
+    for record in records:
+        # Even the first candle of a pool can cover only part of a minute.
+        first_full = ceil(timestamp(record['row']['created'])/60)*60
+        record['earliest30mAt'] = first_full+1800
+        record['ranks'] = {}
+    for minutes in WINDOWS:
+        ranked = []
+        for record in records:
+            window = record['windows'].get(minutes, {})
+            if (record['earliest30mAt']-1800 <= end-60*minutes
+                    and window.get('observedMinutes') == minutes and window.get('volumeUsd', 0) > 0):
+                ranked.append(record)
+        ranked.sort(key=lambda r: (-r['windows'][minutes]['volumeUsd'], r['row']['mint']))
+        for rank, record in enumerate(ranked[:10], 1):
+            record['ranks'][minutes] = rank
+
+
 def market_reader():
     next_request = 0
     def fetch(url, max_age):
@@ -115,7 +146,7 @@ def scan(emit, fetch=None, quote=spot_quote, now=time.time):
         fetch = market_reader()
     end = int(now()//60)*60
     records = []
-    for row in sample(end, fetch):
+    for row in sample(end, fetch, emit):
         path = f"{GT}/pools/{row['pool']}"
         result = dict(row=row, windows={}, ranks={}, reasons=[])
         records.append(result)
@@ -128,18 +159,16 @@ def scan(emit, fetch=None, quote=spot_quote, now=time.time):
             if isinstance(exc, HTTPError) and exc.code == 429:
                 raise
             result['reasons'].append('marketDataUnavailable')
-    for minutes in WINDOWS:
-        ranked = [r for r in records if r['windows'].get(minutes, {}).get('volumeUsd', 0) > 0]
-        ranked.sort(key=lambda r: (-r['windows'][minutes]['volumeUsd'], r['row']['mint']))
-        for rank, record in enumerate(ranked[:10], 1):
-            record['ranks'][minutes] = rank
+    rank_complete_windows(records, end)
     selected = []
     for record in records:
         row, ranks, reasons = record['row'], record['ranks'], record['reasons']
         if 5 not in ranks or 30 not in ranks:
             reasons.append('outsidePairedTopTen')
-        if record['windows'].get(30, {}).get('observedMinutes', 0) < 30:
+        if record['earliest30mAt'] > end:
             reasons.append('shortHistory')
+        elif record['windows'].get(30, {}).get('observedMinutes') != 30:
+            reasons.append('missing30mData')
         if ranks:
             try:
                 qty = quote(USDC, row['mint'], SIZE)
@@ -156,5 +185,5 @@ def scan(emit, fetch=None, quote=spot_quote, now=time.time):
     for record in records:
         emit('scannerCandidate', asOf=end, **record)
     emit('scannerSummary', asOf=end, sampled=len(records), qualified=len(selected),
-         scope='Jupiter discovery intersecting GeckoTerminal first pools and three new-pool pages; deepest sampled pool per mint')
+         scope='Jupiter discovery intersecting GeckoTerminal first pools, three new-pool pages and the available trending feed; deepest sampled pool per mint')
     return [row for _, row in sorted(selected, key=lambda item: item[0])]

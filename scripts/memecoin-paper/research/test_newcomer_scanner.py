@@ -37,3 +37,37 @@ class ScannerTests(unittest.TestCase):
         self.assertIn('quoteUnavailable', events[0]['reasons'])
         self.assertEqual(events[10]['ranks'], {})
         self.assertAlmostEqual(events[1]['netResaleUsdc'], 19.9)
+
+    def test_partial_30m_cannot_displace_complete_pool(self):
+        from newcomer_scanner import rank_complete_windows
+        def record(mint, created, vol):
+            return dict(row=dict(mint=mint, created=created),
+                        windows={5: dict(observedMinutes=5, volumeUsd=vol),
+                                 30: dict(observedMinutes=30, volumeUsd=vol)})
+        complete = [record(str(i), '1970-01-01T00:30:00Z', 100+i) for i in range(10)]
+        young = record('young','1970-01-01T00:30:01Z',10000)
+        incomplete = record('gap','1970-01-01T00:20:00Z',10001)
+        del incomplete['windows'][30]
+        rank_complete_windows([young,incomplete]+complete, 3600)
+        self.assertEqual(young['earliest30mAt'],3660)
+        self.assertIn(5,young['ranks'])
+        self.assertNotIn(30,young['ranks'])
+        self.assertNotIn(30,incomplete['ranks'])
+        self.assertTrue(all(30 in e['ranks'] for e in complete))
+
+    def test_trending_discovers_older_launch_and_deduplicates(self):
+        from newcomer_scanner import GT, WSOL, sample
+        row = dict(self.row, mint='m', quote=WSOL, dex='pumpswap', liquidity=6000)
+        def fetch(url, age):
+            if '/search?' in url:
+                return [dict(id='m',firstPool=dict(createdAt=row['created']))]
+            if '/trending_pools' in url:
+                return {'data':[row,dict(row,pool='deeper',liquidity=9000)]}
+            if url.startswith(GT):
+                return {'data':[]}
+            return []
+        with patch('newcomer_scanner.snapshot',side_effect=lambda r:r):
+            records = sample(3600,fetch)
+        self.assertEqual(len(records),1)
+        self.assertEqual(records[0]['pool'],'deeper')
+        self.assertEqual(records[0]['discoverySources'],['trending'])
