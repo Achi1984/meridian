@@ -1,14 +1,17 @@
-const runId = 45185444796;
-const runPath = 'Achi1984/meridian/actions/runs/' + runId;
-const variants = {A:'Soforteinstieg', B:'Käufer-Erholung', C:'Käufer-Erholung mit 10 % Nettoziel'};
+const original = {id:45185444796, start:1795440944, title:'Referenzlauf · Einstiege',
+  names:{A:'Soforteinstieg', B:'Käufer-Erholung', C:'Käufer-Erholung mit 10 % Nettoziel'}};
+const recovery = {id:45210142704, start:1795449172, title:'Neustart · Ausstiege nach Käufer-Erholung',
+  names:{A:'Nachlaufender Gewinnausstieg', B:'Standardausstieg', C:'10 % Nettoziel'},
+  policies:{A:'trailing', B:'standard', C:'fixed'}};
 
-export function accountRows(snapshot) {
+export function accountRows(snapshot, campaign = original) {
   const {startedAt, endsAt, updatedAt} = snapshot;
   if (![startedAt, endsAt, updatedAt].every(Number.isSafeInteger) ||
       endsAt - startedAt !== 8 * 3600 || updatedAt < startedAt ||
       !Number.isFinite(new Date(updatedAt * 1000).getTime())) throw Error('timestamp');
-  return Object.entries(variants).map(([key, name]) => {
+  return Object.entries(campaign.names).map(([key, name]) => {
     const a = snapshot.accounts[key];
+    if (campaign.policies && a.policy !== campaign.policies[key]) throw Error('policy');
     if (![a.cashUsdc, a.realizedUsdc].every(Number.isFinite) ||
         !(a.equityUsdc === null || Number.isFinite(a.equityUsdc)) ||
         !Number.isSafeInteger(a.closedTrades) || a.closedTrades < 0 ||
@@ -25,8 +28,26 @@ export function accountRows(snapshot) {
 }
 
 export function mountEightHourComparison(section, add, read, amount) {
-  const root = add(section,'section','');
-  add(root,'h3','Acht-Stunden-Vergleich · 23. November');
+  const panel = add(section,'section','');
+  add(panel,'h3','Acht-Stunden-Vergleich · 23. November');
+  const label = add(panel,'label','Paperlauf ');
+  const select = add(label,'select','');
+  for (const campaign of [recovery, original]) add(select,'option',campaign.title).value = String(campaign.id);
+  const body = add(panel,'section','');
+  let refresh = mountCampaign(body, add, read, amount, recovery);
+  select.addEventListener('change',() => {
+    body.replaceChildren();
+    const campaign = select.value === String(original.id) ? original : recovery;
+    refresh = mountCampaign(body, add, read, amount, campaign);
+    void refresh();
+  });
+  return () => refresh();
+}
+
+function mountCampaign(parent, add, read, amount, campaign) {
+  const runId = campaign.id;
+  const runPath = 'Achi1984/meridian/actions/runs/' + runId;
+  const root = add(parent,'section','');
   const status = add(root,'p','Laufstatus wird beim Öffnen geladen.');
   status.setAttribute('role','status');
   add(root,'a','Laufprotokoll und Berichte auf GitHub').href = 'https://github.com/' + runPath;
@@ -39,7 +60,9 @@ export function mountEightHourComparison(section, add, read, amount) {
   let displayedAt = -1;
   let revision = 0;
   function render(snapshot, source) {
-    const rows = accountRows(snapshot);
+    if (snapshot.startedAt !== campaign.start ||
+        (snapshot.runId !== undefined && snapshot.runId !== runId)) throw Error('run');
+    const rows = accountRows(snapshot, campaign);
     result.replaceChildren();
     const at = new Date(snapshot.updatedAt * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
     add(result,'p',source + ' · ' + at + ' (Wien)');
@@ -75,7 +98,7 @@ export function mountEightHourComparison(section, add, read, amount) {
     try {
       const snapshot = await read('https://api.github.com/repos/Achi1984/meridian/contents/solana-abc-' +
         runId + '.json?ref=paper-dashboard-data', true);
-      if (snapshot.runId !== runId || snapshot.startedAt !== 1795440944) throw Error('run');
+      if (snapshot.runId !== runId || snapshot.startedAt !== campaign.start) throw Error('run');
       if (current !== revision) return;
       if (snapshot.updatedAt > displayedAt) render(snapshot,'Bestätigter Laufbericht');
       notice.textContent = '';
