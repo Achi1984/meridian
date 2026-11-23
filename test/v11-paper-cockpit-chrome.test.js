@@ -226,7 +226,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           if(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status')?.textContent==='Pilot 5 · Läuft'`))break;
           await new Promise(resolve=>setTimeout(resolve,20));
         }
-        assert.equal(await evaluate(`document.querySelector('#solana-meme-paper > summary').innerText.includes('Pilot 5 · Läuft')`),true);
+        assert.equal(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status').closest('details').open===false`),true);
         if(size.mobile){
           // Read resting hit boxes once the view's entrance transform has finished.
           await evaluate(`Promise.all(document.querySelector('#view-strategies').getAnimations().map(a=>a.finished)).then(()=>true)`);

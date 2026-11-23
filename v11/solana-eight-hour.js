@@ -1,6 +1,6 @@
-const original = {id:45185444796, start:1795440944, title:'Referenzlauf · Einstiege',
+const original = {id:45185444796, start:1795440944, title:'Einstiege · Referenzlauf',
   names:{A:'Soforteinstieg', B:'Käufer-Erholung', C:'Käufer-Erholung mit 10 % Nettoziel'}};
-const recovery = {id:45210142704, start:1795449172, title:'Neustart · Ausstiege nach Käufer-Erholung',
+const recovery = {id:45210142704, start:1795449172, title:'Ausstiege · Käufer-Erholung',
   names:{A:'Nachlaufender Gewinnausstieg', B:'Standardausstieg', C:'10 % Nettoziel'},
   policies:{A:'trailing', B:'standard', C:'fixed'}};
 
@@ -29,7 +29,7 @@ export function accountRows(snapshot, campaign = original) {
 
 export function mountEightHourComparison(section, add, read, amount) {
   const panel = add(section,'section','');
-  add(panel,'h3','Acht-Stunden-Vergleich · 23. November');
+  panel.className = 'solana-comparison';
   const label = add(panel,'label','Paperlauf ');
   const select = add(label,'select','');
   for (const campaign of [recovery, original]) add(select,'option',campaign.title).value = String(campaign.id);
@@ -50,13 +50,16 @@ function mountCampaign(parent, add, read, amount, campaign) {
   const root = add(parent,'section','');
   const status = add(root,'p','Laufstatus wird beim Öffnen geladen.');
   status.setAttribute('role','status');
-  add(root,'a','Laufprotokoll und Berichte auf GitHub').href = 'https://github.com/' + runPath;
-  const label = add(root,'label','Kontostand aus status.json anzeigen ');
+  const result = add(root,'div','Noch kein Kontobericht geladen.');
+  result.setAttribute('aria-live','polite');
+  const details = add(root,'details','');
+  add(details,'summary','Kontodetails und Quellen');
+  const metrics = add(details,'section','');
+  add(details,'a','Laufprotokoll auf GitHub').href = 'https://github.com/' + runPath;
+  const label = add(details,'label','Lokalen Bericht laden ');
   const input = add(label,'input','');
   input.type = 'file';
   input.accept = '.json,application/json';
-  const result = add(root,'div','Noch kein Kontobericht geladen.');
-  result.setAttribute('aria-live','polite');
   let displayedAt = -1;
   let revision = 0;
   function render(snapshot, source) {
@@ -65,25 +68,36 @@ function mountCampaign(parent, add, read, amount, campaign) {
     const rows = accountRows(snapshot, campaign);
     result.replaceChildren();
     const at = new Date(snapshot.updatedAt * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
-    add(result,'p',source + ' · ' + at + ' (Wien)');
+    const table = add(result,'table','');
+    const header = add(add(table,'thead',''),'tr','');
+    for (const title of ['Strategie', 'Realisiert']) add(header,'th',title).scope = 'col';
+    const body = add(table,'tbody','');
+    for (const row of rows) {
+      const line = add(body,'tr','');
+      add(line,'th',row.name).scope = 'row';
+      const pnl = add(line,'td',(row.net > 0 ? '+' : '') + amount(row.net));
+      pnl.className = row.net > 0 ? 'tone-safe' : row.net < 0 ? 'tone-danger' : '';
+    }
+    add(result,'small',source + ' · ' + at + ' (Wien)');
+    metrics.replaceChildren();
     const benchmark = rows[1];
     for (const index of [0, 2]) {
       const candidate = rows[index];
       const label = candidate.key + ' gegenüber B';
       const delta = candidate.equity === null || benchmark.equity === null
         ? 'Bewertung offen' : amount(candidate.equity - benchmark.equity);
-      add(result,'p','Kontowert ' + label + ' · ' + delta);
+      add(metrics,'p','Kontowert ' + label + ' · ' + delta);
     }
     for (const {name,cash,equity,net,closed,open,withoutBest,drawdown,missing} of rows) {
-      add(result,'h4',name);
-      add(result,'p','Guthaben ' + amount(cash) + ' · Kontowert ' + amount(equity) +
+      add(metrics,'h4',name);
+      add(metrics,'p','Guthaben ' + amount(cash) + ' · Kontowert ' + amount(equity) +
         ' · Realisiert ' + amount(net) + ' · Geschlossen ' + closed + ' · Offen ' + open);
-      if (missing > 0) add(result,'p','Fehlende Rückverkaufsquoten für die Positionsgröße · ' + missing);
+      if (missing > 0) add(metrics,'p','Fehlende Rückverkaufsquoten für die Positionsgröße · ' + missing);
       if (withoutBest !== undefined) {
-        add(result,'p',withoutBest === null ? 'Vergleich ab zwei abgeschlossenen Coins verfügbar.' :
+        add(metrics,'p',withoutBest === null ? 'Vergleich ab zwei abgeschlossenen Coins verfügbar.' :
           'Realisiert ohne besten Coin · ' + amount(withoutBest));
       }
-      if (drawdown != null) add(result,'p','Größter beobachteter Rückgang des Kontowerts · ' + amount(drawdown));
+      if (drawdown != null) add(metrics,'p','Größter beobachteter Rückgang des Kontowerts · ' + amount(drawdown));
     }
     displayedAt = snapshot.updatedAt;
   }
@@ -122,10 +136,11 @@ function mountCampaign(parent, add, read, amount, campaign) {
       const states = {in_progress:'läuft',queued:'wartet',pending:'wartet',waiting:'wartet',
         success:'abgeschlossen',failure:'fehlgeschlagen',cancelled:'abgebrochen',skipped:'übersprungen',
         timed_out:'Zeitlimit erreicht'};
-      status.textContent = phases.map(([id,title]) => {
-        const job = jobs.jobs.find(item => item.name === id);
-        return title + ' · ' + (job ? states[job.conclusion || job.status] || 'unbekannt' : 'noch nicht gemeldet');
-      }).join(' | ');
+      const phase = jobs.jobs.find(item => item.name === 'finish') || jobs.jobs.find(item => item.name === 'first');
+      const first = jobs.jobs.find(item => item.name === 'first');
+      const current = first && first.status !== 'completed' ? first : phase;
+      status.textContent = current ? phases.find(([id]) => id === current.name)[1] + ' · ' +
+        (states[current.conclusion || current.status] || 'unbekannt') : 'Laufstatus ausstehend';
     } catch {
       status.textContent = 'Laufstatus derzeit nicht abrufbar.';
     }
