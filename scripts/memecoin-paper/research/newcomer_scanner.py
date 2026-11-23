@@ -123,14 +123,14 @@ def rank_complete_windows(records, end):
             record['ranks'][minutes] = rank
 
 
-def market_reader():
+def market_reader(interval=3):
     next_request = 0
     def fetch(url, max_age):
         nonlocal next_request
         for attempt in range(3):
             if url.startswith(GT):
                 time.sleep(max(0, next_request-time.monotonic()))
-                next_request = time.monotonic()+3
+                next_request = time.monotonic()+interval
             try:
                 return get(url, max_age)
             except HTTPError as exc:
@@ -141,7 +141,7 @@ def market_reader():
     return fetch
 
 
-def scan(emit, fetch=None, quote=spot_quote, now=time.time):
+def scan(emit, fetch=None, quote=spot_quote, now=time.time, *, ranked_windows_only=False):
     if fetch is None:
         fetch = market_reader()
     end = int(now()//60)*60
@@ -150,6 +150,8 @@ def scan(emit, fetch=None, quote=spot_quote, now=time.time):
         path = f"{GT}/pools/{row['pool']}"
         result = dict(row=row, windows={}, ranks={}, reasons=[])
         records.append(result)
+        if ranked_windows_only and ceil(timestamp(row['created'])/60)*60 > end-300:
+            continue
         try:
             candles = fetch(path+f'/ohlcv/minute?aggregate=1&currency=usd&limit=60'
                             f'&include_empty_intervals=true&before_timestamp={end}', 120)
