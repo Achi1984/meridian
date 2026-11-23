@@ -3,12 +3,17 @@ import argparse
 import json
 from pathlib import Path
 
-from newcomer_eight_hour import Account, FEE, UNIT
+from newcomer_eight_hour import Account, FEE, SIZE, UNIT
 
 
-def audit(events, status):
+# First eligible entry for the forward test: 23 November 2026, 18:00 Vienna.
+SHADOW_START = 1795453200
+
+
+def audit(events, status, shadow_start=SHADOW_START):
     accounts = {key: Account(policy) for key, policy in
                 [('A', 'trailing'), ('B', 'standard'), ('C', 'fixed')]}
+    accounts['D'] = Account('lossStop15')
     entries = {}
     start = next(events, None)
     if not start or start['event'] != 'start' or start['at'] != status['startedAt']:
@@ -31,8 +36,18 @@ def audit(events, status):
                 raise ValueError('Repeated recovery entry in one session')
             entries[key] = dict(session=session, mint=mint, enteredAt=row['at'], exits={})
         for name, account in accounts.items():
+            event = row
+            if name == 'D':
+                entry = entries.get(key)
+                if entry is None or entry['enteredAt'] < shadow_start:
+                    continue
+                pos = account.open.get(key)
+                if pos and pos['marks'] and row['event'] == 'resaleMark':
+                    net_bid = row['usdcRaw'] - SIZE - 2*FEE
+                    if 100*net_bid <= -15*SIZE:
+                        event = dict(row, event='exit')
             closed, net = account.closed, account.by_mint[mint]
-            account.update(row, session)
+            account.update(event, session)
             if account.closed > closed:
                 entry = entries[key]
                 held = row['at'] - entry['enteredAt']
@@ -44,21 +59,24 @@ def audit(events, status):
     if (last['at'], last['event'], last['session']) != (status['updatedAt'], status['lastEvent'], status['session']):
         raise ValueError('Report and journal end at different events')
     for name, account in accounts.items():
-        if account.snapshot() != status['accounts'][name]:
+        if name != 'D' and account.snapshot() != status['accounts'][name]:
             raise ValueError(f'Account {name} disagrees with the journal')
     result = {}
-    exit_groups = [entry['exits'] for entry in entries.values()]
-    for name in ('A', 'C'):
+    for name in ('A', 'C', 'D'):
+        exit_groups = [entry['exits'] for entry in entries.values()
+                       if name != 'D' or entry['enteredAt'] >= shadow_start]
         matched = [exits[name]['pnlRaw'] - exits['B']['pnlRaw']
                    for exits in exit_groups
                    if name in exits and 'B' in exits]
-        result[name] = dict(matched=len(matched), excluded=len(entries)-len(matched),
+        result[name] = dict(matched=len(matched), excluded=len(exit_groups)-len(matched),
                             better=sum(d > 0 for d in matched), same=matched.count(0),
                             worse=sum(d < 0 for d in matched),
                             deltaUsdc=sum(matched)/UNIT if matched else None)
     for entry in entries.values():
         for receipt in entry['exits'].values():
             receipt['netPnlUsdc'] = receipt.pop('pnlRaw') / UNIT
+    result['shadowStart'] = shadow_start
+    result['shadowAccount'] = accounts['D'].snapshot()
     result['positions'] = list(entries.values())
     return result
 
