@@ -80,19 +80,24 @@ function mountCampaign(parent, add, read, amount, campaign) {
     result.replaceChildren();
     const at = vienna(snapshot.updatedAt);
     const table = add(result,'table','');
+    table.setAttribute('style','table-layout:fixed;overflow-wrap:anywhere');
     const header = add(add(table,'thead',''),'tr','');
-    for (const title of ['Strategie / Position', 'Kontowert / realisiert']) add(header,'th',title).scope = 'col';
+    for (const title of ['Strategie', 'Kontowert / PnL']) {
+      const cell = add(header,'th',title);
+      cell.scope = 'col';
+      cell.setAttribute('style','white-space:normal');
+    }
     const body = add(table,'tbody','');
     for (const row of rows) {
       const line = add(body,'tr','');
       const strategy = add(line,'th',row.name);
       strategy.scope = 'row';
-      add(strategy,'small',row.open ? row.open + ' offen' : 'Keine Position');
+      add(strategy,'small',row.open ? row.open + ' offen' : 'Keine Position').setAttribute('style','display:block');
       const last = row.trades.at(-1);
-      add(strategy,'small',last ? (last.action === 'exit' ? 'Verkauf' : 'Kauf') + ' · ' + vienna(last.at) :
-        'Entscheidungszeit offen');
+      if (last) add(strategy,'small',(last.action === 'exit' ? 'Verkauf' : 'Kauf') + ' · ' + vienna(last.at)).setAttribute('style','display:block');
       const balance = add(line,'td',row.equity === null ? 'Bewertung offen' : amount(row.equity));
       const pnl = add(balance,'span',(row.net > 0 ? '+' : '') + amount(row.net));
+      pnl.setAttribute('style','display:block');
       pnl.className = row.net > 0 ? 'tone-safe' : row.net < 0 ? 'tone-danger' : '';
     }
     add(result,'small',source + ' · ' + at + ' (Wien)');
@@ -109,10 +114,12 @@ function mountCampaign(parent, add, read, amount, campaign) {
     }
     for (const {name,cash,equity,net,closed,open,withoutBest,drawdown,missing,trades} of rows) {
       add(metrics,'h4',name);
+      if (!trades.length) add(metrics,'p','Im Bericht fehlen einzelne Handelsentscheidungen.');
       add(metrics,'p','Guthaben ' + amount(cash) + ' · Kontowert ' + amount(equity) +
         ' · Realisiert ' + amount(net) + ' · Geschlossen ' + closed + ' · Offen ' + open);
       if (trades.length) {
         const ledger = add(metrics,'details','');
+        ledger.setAttribute('style','overflow-wrap:anywhere');
         add(ledger,'summary','Paper-Trades (' + closed + ' abgeschlossen)');
         for (const trade of [...trades].reverse()) {
           add(ledger,'p',vienna(trade.at) + ' · ' + (trade.action === 'exit' ? 'Verkauf' : 'Kauf') +
