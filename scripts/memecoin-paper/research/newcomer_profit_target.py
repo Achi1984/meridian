@@ -49,6 +49,7 @@ def replay(streams, arm='early'):
     report(streams)
     observations = []
     deltas = []
+    earlier_exits = 0
     seen = set()
     for rows in sorted(streams, key=lambda stream: next(r['at'] for r in stream if r['event'] == 'cohort')):
         for item in evaluate(rows):
@@ -61,6 +62,10 @@ def replay(streams, arm='early'):
                 delta = round(target['netUsdc'] - baseline['netUsdc'], 6)
                 if mint not in seen:
                     deltas.append(round(delta * UNIT))
+                    if target['exitReason'] == 'profitTarget' and target['heldSeconds'] is not None:
+                        sale = next(r for r in events if r.get('arm') == arm and r['event'] == 'exit')
+                        entry = next(r for r in events if r.get('arm') == arm and r['event'] == 'entry')
+                        earlier_exits += entry['at'] + target['heldSeconds'] < sale['at']
             observations.append(dict(cohortAt=item['cohortAt'], mint=mint, repeatedMint=mint in seen,
                                      baseline=baseline, target=target, deltaUsdc=delta,
                                      **{gap_field: sum(r['event'] == 'missingExitQuote' and r.get('arm') == arm
@@ -68,6 +73,11 @@ def replay(streams, arm='early'):
                                      observationGaps=sum(r['event'] == 'observationUnavailable' for r in events)))
             seen.add(mint)
     return dict(observations=observations, independentClosedPairs=len(deltas),
+                earlierTargetExits=earlier_exits,
+                higherNet=sum(value > 0 for value in deltas),
+                lowerNet=sum(value < 0 for value in deltas),
+                equalNet=deltas.count(0),
+                deltaWithoutLargestLossUsdc=(sum(deltas)-min(deltas))/UNIT if len(deltas)>1 else None,
                 deltaUsdc=sum(deltas)/UNIT if deltas else None,
                 deltaWithoutBestUsdc=(sum(deltas)-max(deltas))/UNIT if len(deltas)>1 else None)
 
