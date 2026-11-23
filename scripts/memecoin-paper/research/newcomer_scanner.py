@@ -92,7 +92,27 @@ def metrics(row, candles, trades, end):
     return result
 
 
-def scan(emit, fetch=get, quote=spot_quote, now=time.time):
+def market_reader():
+    next_request = 0
+    def fetch(url, max_age):
+        nonlocal next_request
+        for attempt in range(3):
+            if url.startswith(GT):
+                time.sleep(max(0, next_request-time.monotonic()))
+                next_request = time.monotonic()+3
+            try:
+                return get(url, max_age)
+            except HTTPError as exc:
+                wait = (exc.headers or {}).get('Retry-After', '60')
+                if exc.code != 429 or attempt == 2 or not wait.isdigit() or int(wait) > 180:
+                    raise
+                time.sleep(max(5, int(wait)))
+    return fetch
+
+
+def scan(emit, fetch=None, quote=spot_quote, now=time.time):
+    if fetch is None:
+        fetch = market_reader()
     end = int(now()//60)*60
     records = []
     for row in sample(end, fetch):
@@ -133,6 +153,7 @@ def scan(emit, fetch=get, quote=spot_quote, now=time.time):
                 reasons.append('quoteUnavailable')
         if not reasons:
             selected.append((ranks[5], row))
+    for record in records:
         emit('scannerCandidate', asOf=end, **record)
     emit('scannerSummary', asOf=end, sampled=len(records), qualified=len(selected),
          scope='Jupiter discovery intersecting GeckoTerminal first pools and three new-pool pages; deepest sampled pool per mint')

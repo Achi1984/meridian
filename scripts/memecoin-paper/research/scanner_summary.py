@@ -6,7 +6,14 @@ from newcomer_scanner import WINDOWS
 
 
 def render(events):
-    candidates = [e for e in events if e['event'] == 'scannerCandidate']
+    events = list(events)
+    summaries = [e for e in events if e['event'] == 'scannerSummary']
+    if not summaries:
+        print('Scanner incomplete. No verified leaderboard.')
+        return
+    summary = summaries[-1]
+    print(f"Sampled {summary['sampled']} mints; qualified {summary['qualified']}. {summary['scope']}.")
+    candidates = [e for e in events if e['event'] == 'scannerCandidate' and e['asOf'] == summary['asOf']]
     for minutes in WINDOWS:
         window = str(minutes)
         print(f'### Top 10 · {minutes} min')
