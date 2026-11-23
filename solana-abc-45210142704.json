@@ -1,0 +1,40 @@
+{
+  "runId": 45210142704,
+  "startedAt": 1795449172,
+  "updatedAt": 1795449832,
+  "endsAt": 1795477972,
+  "source": {
+    "kind": "compact-job-log",
+    "jobId": 137816431321,
+    "event": "entry"
+  },
+  "accounts": {
+    "A": {
+      "policy": "trailing",
+      "cashUsdc": 1000,
+      "equityUsdc": 1000,
+      "realizedUsdc": 0,
+      "closedTrades": 0,
+      "openPositions": [],
+      "realizedWithoutBestMintUsdc": null
+    },
+    "B": {
+      "policy": "standard",
+      "cashUsdc": 1000,
+      "equityUsdc": 1000,
+      "realizedUsdc": 0,
+      "closedTrades": 0,
+      "openPositions": [],
+      "realizedWithoutBestMintUsdc": null
+    },
+    "C": {
+      "policy": "fixed",
+      "cashUsdc": 1000,
+      "equityUsdc": 1000,
+      "realizedUsdc": 0,
+      "closedTrades": 0,
+      "openPositions": [],
+      "realizedWithoutBestMintUsdc": null
+    }
+  }
+}
