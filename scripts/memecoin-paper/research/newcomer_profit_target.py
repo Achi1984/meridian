@@ -1,4 +1,4 @@
-"""Replay the frozen +10% net target on immediate entries from completed paper sessions."""
+"""Replay the frozen +10% net target on immediate or recovery entries from completed paper sessions."""
 import argparse
 import json
 from pathlib import Path
@@ -25,13 +25,14 @@ def target_exit(events, baseline):
         elif kind == 'resaleMark':
             if (not entry or sold or row['at'] < previous_at or row['tick'] <= previous_tick
                     or row['qty'] != entry['qty'] or row['usdcRaw'] <= 0):
-                raise ValueError('Invalid immediate-entry resale path')
+                raise ValueError('Invalid entry resale path')
+            post_entry_mark = previous_tick >= 0
             previous_at, previous_tick = row['at'], row['tick']
             if target is None:
                 net = row['usdcRaw'] - SIZE - 2 * FEE
                 peak = max(peak, net)
                 drawdown = max(drawdown, peak - net)
-                if row['tick'] > 0 and 10 * net >= SIZE:
+                if post_entry_mark and 10 * net >= SIZE:
                     target = dict(state='closed', netUsdc=net / UNIT, exitReason='profitTarget',
                                   heldSeconds=row['at'] - entry['at'], sampledDrawdownUsdc=drawdown / UNIT,
                                   zeroRecoveryNetUsdc=net / UNIT)
@@ -41,7 +42,10 @@ def target_exit(events, baseline):
     return target
 
 
-def replay(streams):
+def replay(streams, arm='early'):
+    if arm not in ('early', 'wave'):
+        raise ValueError('Unknown entry arm')
+    gap_field = 'missingEarlyExitQuotes' if arm == 'early' else 'missingWaveExitQuotes'
     report(streams)
     observations = []
     deltas = []
@@ -50,17 +54,17 @@ def replay(streams):
         for item in evaluate(rows):
             mint = item['mint']
             events = [r for r in rows if r.get('mint') == mint]
-            early = item['paths']['early']
-            target = target_exit([r for r in events if r.get('arm') == 'early'], early)
+            baseline = item['paths'][arm]
+            target = target_exit([r for r in events if r.get('arm') == arm], baseline)
             delta = None
-            if early['state'] == target['state'] == 'closed':
-                delta = round(target['netUsdc'] - early['netUsdc'], 6)
+            if baseline['state'] == target['state'] == 'closed':
+                delta = round(target['netUsdc'] - baseline['netUsdc'], 6)
                 if mint not in seen:
                     deltas.append(round(delta * UNIT))
             observations.append(dict(cohortAt=item['cohortAt'], mint=mint, repeatedMint=mint in seen,
-                                     baseline=early, target=target, deltaUsdc=delta,
-                                     missingEarlyExitQuotes=sum(r['event'] == 'missingExitQuote'
-                                         and r.get('arm') == 'early' for r in events),
+                                     baseline=baseline, target=target, deltaUsdc=delta,
+                                     **{gap_field: sum(r['event'] == 'missingExitQuote' and r.get('arm') == arm
+                                                       for r in events)},
                                      observationGaps=sum(r['event'] == 'observationUnavailable' for r in events)))
             seen.add(mint)
     return dict(observations=observations, independentClosedPairs=len(deltas),
@@ -71,5 +75,7 @@ def replay(streams):
 if __name__ == '__main__':
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument('logs', type=Path, nargs='+', help='One evaluation period per invocation')
+    cli.add_argument('--arm', choices=('early', 'wave'), default='early')
+    args = cli.parse_args()
     print(json.dumps(replay([[json.loads(line) for line in path.read_text().splitlines()]
-                             for path in cli.parse_args().logs]), indent=2))
+                             for path in args.logs], args.arm), indent=2))
