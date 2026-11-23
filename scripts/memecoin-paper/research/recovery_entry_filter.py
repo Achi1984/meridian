@@ -3,7 +3,9 @@ import argparse
 import json
 from pathlib import Path
 
-from recovery_exit_audit import audit
+from collections import Counter
+
+from recovery_exit_audit import SHADOW_START, audit
 
 # 23 November 2026, 18:15 Vienna. Earlier observations are development data.
 FORWARD_START = 1795454100
@@ -36,22 +38,43 @@ def decisions(events, cutoff=FORWARD_START):
 
 
 def compare(events, status, cutoff=FORWARD_START):
-    positions = audit(iter(events), status)['positions']
+    positions = audit(iter(events), status, shadow_start=min(cutoff, SHADOW_START))['positions']
     rules = decisions(events, cutoff)
     skipped = []
     included = []
     unresolved = []
+    included_by_mint = Counter()
+    paired_standard = []
+    paired_stop = []
+    paired_filtered = []
+    paired_combined = []
     for p in positions:
         key = p['session'], p['mint']
         if key not in rules:
             continue
+        skip = rules[key] == 'skipExtended'
         receipt = p['exits'].get('B')
+        stop = p['exits'].get('D')
+        if receipt is not None and stop is not None:
+            baseline_net = receipt['netPnlUsdc']
+            stop_net = stop['netPnlUsdc']
+            paired_standard.append(baseline_net)
+            paired_stop.append(stop_net)
+            paired_filtered.append(0 if skip else baseline_net)
+            paired_combined.append(0 if skip else stop_net)
         if receipt is None:
             unresolved.append(dict(session=key[0], mint=key[1], decision=rules[key]))
         elif rules[key] == 'skipExtended':
             skipped.append(receipt['netPnlUsdc'])
         else:
             included.append(receipt['netPnlUsdc'])
+            included_by_mint[p['mint']] += receipt['netPnlUsdc']
+    paired = len(paired_standard)
+    combined = dict(matched=paired, unmatched=len(rules)-paired)
+    for label, values in [('standard', paired_standard), ('stopOnly', paired_stop),
+                          ('filterOnly', paired_filtered), ('filterAndStop', paired_combined)]:
+        combined[label+'Usdc'] = round(sum(values),6) if paired else None
+    combined['stopDeltaOnKeptUsdc'] = round(sum(paired_combined)-sum(paired_filtered),6) if paired else None
     return dict(eligible=len(rules), skipped=sum(v=='skipExtended' for v in rules.values()),
                 fallback=sum(v=='followBaselineNoFreshReference' for v in rules.values()),
                 unresolvedBaseline=unresolved, closedBaseline=len(included)+len(skipped),
@@ -59,7 +82,8 @@ def compare(events, status, cutoff=FORWARD_START):
                 filteredRealizedUsdc=round(sum(included),6),
                 avoidedLossUsdc=round(-sum(x for x in skipped if x < 0),6),
                 missedProfitUsdc=round(sum(x for x in skipped if x > 0),6),
-                withoutBestIncludedUsdc=round(sum(included)-max(included),6) if len(included)>1 else None)
+                withoutBestIncludedUsdc=round(sum(included)-max(included_by_mint.values()),6)
+                if len(included_by_mint)>1 else None, matchedExitComparison=combined)
 
 
 if __name__ == '__main__':
