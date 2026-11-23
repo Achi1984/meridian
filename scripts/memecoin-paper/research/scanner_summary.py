@@ -1,6 +1,7 @@
 """Render scanner journal leaderboards for the Actions run summary."""
 import json
 import sys
+from datetime import datetime, timezone
 
 from newcomer_scanner import WINDOWS
 
@@ -25,6 +26,22 @@ def render(events):
     summary = summaries[-1]
     print(f"Sampled {summary['sampled']} mints; qualified {summary['qualified']}. {summary['scope']}.")
     candidates = [e for e in events if e['event'] == 'scannerCandidate' and e['asOf'] == summary['asOf']]
+    for event in events:
+        if event['event'] == 'scannerSourceUnavailable':
+            print(f"Discovery source unavailable: {event['source']}.")
+    young = sorted((e for e in candidates if e.get('earliest30mAt', 0) > summary['asOf']),
+                   key=lambda e: (e['earliest30mAt'], e['row']['mint']))
+    if young:
+        print('### Watching for 30 minutes of history')
+        print('| Mint | Earliest full window (UTC) |')
+        print('|---|---|')
+        for e in young:
+            mint = e['row']['mint']
+            ready = datetime.fromtimestamp(e['earliest30mAt'], timezone.utc)
+            print(f"| [{mint}](https://jup.ag/tokens/{mint}) | {ready:%Y-%m-%d %H:%M} |")
+    gaps = sum('missing30mData' in e['reasons'] for e in candidates)
+    if gaps:
+        print(f"Old enough but missing complete 30-minute data: {gaps}.")
     for minutes in WINDOWS:
         window = str(minutes)
         print(f'### Top 10 · {minutes} min')
