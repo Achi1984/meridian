@@ -28,3 +28,33 @@ test('rejects invalid reported risk values', () => {
   assert.throws(()=>comparison({realizedWithoutBestMintUsdc:'7'}));
   assert.throws(()=>comparison({sampledMaxDrawdownUsdc:-1}));
 });
+
+test('refresh loads the run checkpoint and keeps it across a failed or older refresh', async () => {
+  const {mountEightHourComparison} = await import('../v11/solana-eight-hour.js');
+  const nodes = [];
+  const add = (parent, tag, textContent) => {
+    const node = {tag, textContent, children:[], setAttribute(){}, addEventListener(){},
+      replaceChildren(){this.children=[]; this.textContent='';}};
+    parent.children.push(node);
+    nodes.push(node);
+    return node;
+  };
+  const account = {cashUsdc:980, equityUsdc:null, realizedUsdc:0, closedTrades:0,
+    openPositions:[{}], missingExitQuotes:2};
+  const snapshot = {runId:45185444796, startedAt:1795440944, endsAt:1795469744,
+    updatedAt:1795447068, accounts:{A:account,B:account,C:account}};
+  let response = snapshot;
+  const read = async url => url.endsWith('/jobs') ? {jobs:[]} : response;
+  const refresh = mountEightHourComparison({children:[]},add,read,String);
+  await refresh();
+  const report = nodes.find(node=>node.tag==='div');
+  assert.equal(report.children.filter(node=>node.tag==='h4').length,3);
+  assert.ok(report.children.some(node=>node.textContent.includes('Positionsgröße · 2')));
+  const original = [...report.children];
+  response = { ...snapshot, runId:1 };
+  await refresh();
+  assert.deepEqual(report.children,original);
+  response = { ...snapshot, updatedAt:snapshot.updatedAt-1 };
+  await refresh();
+  assert.deepEqual(report.children,original);
+});
