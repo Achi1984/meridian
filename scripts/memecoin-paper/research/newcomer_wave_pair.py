@@ -72,7 +72,7 @@ class Pair:
                 return qty
             self.positions[name] = [qty,None]
             self.opened_at[name] = time.monotonic()
-            emit('entry',mint=mint,arm=name,qty=qty,usdc=SIZE/UNIT)
+            emit('entry',mint=mint,arm=name,qty=qty,usdc=SIZE/UNIT,initialResaleRaw=mark)
             emit('resaleMark',mint=mint,arm=name,tick=index,qty=qty,usdcRaw=mark)
             return qty
 
