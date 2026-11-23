@@ -14,6 +14,8 @@ def target_exit(events, baseline):
     previous_at = None
     sold = False
     target = None
+    later_changes = []
+    later_gaps = 0
     peak = drawdown = 0
     for row in events:
         kind = row['event']
@@ -22,6 +24,8 @@ def target_exit(events, baseline):
             previous_at = entry['at']
         elif kind == 'exit':
             sold = True
+        elif kind in ('missingExitQuote', 'lateExitQuote') and target is not None and not sold:
+            later_gaps += 1
         elif kind == 'resaleMark':
             if (not entry or sold or row['at'] < previous_at or row['tick'] <= previous_tick
                     or row['qty'] != entry['qty'] or row['usdcRaw'] <= 0):
@@ -33,12 +37,18 @@ def target_exit(events, baseline):
                 peak = max(peak, net)
                 drawdown = max(drawdown, peak - net)
                 if post_entry_mark and 10 * net >= SIZE:
+                    target_bid = row['usdcRaw']
                     target = dict(state='closed', netUsdc=net / UNIT, exitReason='profitTarget',
                                   heldSeconds=row['at'] - entry['at'], sampledDrawdownUsdc=drawdown / UNIT,
                                   zeroRecoveryNetUsdc=net / UNIT)
+            else:
+                later_changes.append(row['usdcRaw'] - target_bid)
     if target is None:
         return {key: baseline[key] for key in ('state', 'netUsdc', 'exitReason', 'heldSeconds',
                                                 'sampledDrawdownUsdc', 'zeroRecoveryNetUsdc')}
+    target['afterTarget'] = dict(observedQuotes=len(later_changes), missingOrLateQuotes=later_gaps,
+                                 bestChangeUsdc=max(later_changes)/UNIT if later_changes else None,
+                                 worstChangeUsdc=min(later_changes)/UNIT if later_changes else None)
     return target
 
 
