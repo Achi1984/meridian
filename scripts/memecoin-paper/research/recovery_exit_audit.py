@@ -3,7 +3,7 @@ import argparse
 import json
 from pathlib import Path
 
-from newcomer_eight_hour import Account, UNIT
+from newcomer_eight_hour import Account, FEE, UNIT
 
 
 def audit(events, status):
@@ -29,24 +29,37 @@ def audit(events, status):
         if row['event'] == 'entry':
             if key in entries:
                 raise ValueError('Repeated recovery entry in one session')
-            entries[key] = {}
+            entries[key] = dict(session=session, mint=mint, enteredAt=row['at'], exits={})
         for name, account in accounts.items():
             closed, net = account.closed, account.by_mint[mint]
             account.update(row, session)
             if account.closed > closed:
-                entries[key][name] = account.by_mint[mint] - net
+                entry = entries[key]
+                held = row['at'] - entry['enteredAt']
+                if held < 0:
+                    raise ValueError('Exit precedes entry')
+                entry['exits'][name] = dict(exitedAt=row['at'], heldSeconds=held,
+                                           proceedsUsdc=(row['usdcRaw']-FEE)/UNIT,
+                                           pnlRaw=account.by_mint[mint]-net)
     if (last['at'], last['event'], last['session']) != (status['updatedAt'], status['lastEvent'], status['session']):
         raise ValueError('Report and journal end at different events')
     for name, account in accounts.items():
         if account.snapshot() != status['accounts'][name]:
             raise ValueError(f'Account {name} disagrees with the journal')
     result = {}
+    exit_groups = [entry['exits'] for entry in entries.values()]
     for name in ('A', 'C'):
-        matched = [out[name] - out['B'] for out in entries.values() if name in out and 'B' in out]
+        matched = [exits[name]['pnlRaw'] - exits['B']['pnlRaw']
+                   for exits in exit_groups
+                   if name in exits and 'B' in exits]
         result[name] = dict(matched=len(matched), excluded=len(entries)-len(matched),
                             better=sum(d > 0 for d in matched), same=matched.count(0),
                             worse=sum(d < 0 for d in matched),
                             deltaUsdc=sum(matched)/UNIT if matched else None)
+    for entry in entries.values():
+        for receipt in entry['exits'].values():
+            receipt['netPnlUsdc'] = receipt.pop('pnlRaw') / UNIT
+    result['positions'] = list(entries.values())
     return result
 
 
