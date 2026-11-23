@@ -1,6 +1,12 @@
 name: Solana newcomer volume scanner (paper)
 on:
   workflow_dispatch:
+    inputs:
+      mode:
+        description: Paper study
+        type: choice
+        options: [momentum, paired]
+        default: momentum
 permissions:
   contents: read
 jobs:
@@ -14,8 +20,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - run: python3 -m unittest test_newcomer_scanner test_newcomer_wave_pair
-      - run: python3 -u newcomer_wave_pair.py --scanner | tee scanner.jsonl
+      - run: python3 -m unittest test_newcomer_scanner test_newcomer_wave_pair test_volume_momentum
+      - run: python3 -u volume_momentum.py | tee scanner.jsonl
+        shell: bash
+        if: inputs.mode == 'momentum'
+      - if: inputs.mode == 'paired'
+        run: python3 -u newcomer_wave_pair.py --scanner | tee scanner.jsonl
         shell: bash
       - run: python3 scanner_summary.py scanner.jsonl >> "$GITHUB_STEP_SUMMARY"
         if: always()

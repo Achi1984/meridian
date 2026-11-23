@@ -7,6 +7,16 @@ from newcomer_scanner import WINDOWS
 
 def render(events):
     events = list(events)
+    momentum = next((e for e in reversed(events) if e['event'] == 'momentumSummary'), None)
+    if momentum:
+        print('### 20 USDC volume momentum (paper)')
+        print('| Arm | Closed | Open | Realized USDC | Without best mint |')
+        print('|---|---:|---:|---:|---:|')
+        for label in ('standard', 'filterOnly', 'filterAndFade'):
+            arm = momentum[label]
+            print(f"| {label} | {arm['closed']} | {arm['unresolved']} | {arm['netUsdc']} | {arm['withoutBestUsdc']} |")
+        for label in ('filterComparison', 'exitComparison', 'oneQuoteLater'):
+            print(f"\n{label}: `{json.dumps(momentum[label])}`")
     summaries = [e for e in events if e['event'] == 'scannerSummary']
     if not summaries:
         print('Scanner incomplete. No verified leaderboard.')
