@@ -263,12 +263,16 @@ class HalfRunner(Pair):
                  cashRaw=cash)
 
 
-def run(persistence=False, half_runner=False):
+def run(persistence=False, half_runner=False, scanner=False):
     arms = ('early','wave','persistent') if persistence else ('early','wave')
     studies, watch = {}, {}
     for attempt in range(3):
         try:
-            candidates = scan(watch)
+            if scanner:
+                from newcomer_scanner import scan as scan_rankings
+                candidates = scan_rankings(emit)
+            else:
+                candidates = scan(watch)
         except ERRORS as exc:
             emit('discoveryUnavailable',attempt=attempt+1,reason=type(exc).__name__,status=getattr(exc,'code',None))
             if attempt==2:
@@ -281,7 +285,7 @@ def run(persistence=False, half_runner=False):
         bands = set()
         for row in candidates:
             band = 'strong' if row['buys']>=3*row['sells'] else 'moderate'
-            if band in bands or row['mint'] in studies:
+            if (not scanner and band in bands) or row['mint'] in studies:
                 continue
             bands.add(band)
             emit('cohortSelection',mint=row['mint'],pool=row['pool'],band=band,
@@ -290,7 +294,7 @@ def run(persistence=False, half_runner=False):
             if len(studies)==2:
                 break
         emit('discovery', attempt=attempt+1, eligiblePools=len(candidates), watching=len(watch), selected=len(studies))
-        if studies or attempt==2:
+        if scanner or studies or attempt==2:
             break
         time.sleep(60)
     emit('cohort',mints=list(studies),holdingPolicy='tenMinutesFromEntry',arms=arms,halfRunner=half_runner)
@@ -317,5 +321,6 @@ if __name__=='__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--persistence',action='store_true')
     parser.add_argument('--half-runner', action='store_true')
+    parser.add_argument('--scanner', action='store_true', help='Use the 5m/30m volume shortlist')
     args = parser.parse_args()
-    run(args.persistence, args.half_runner)
+    run(args.persistence, args.half_runner, args.scanner)
