@@ -1,39 +1,53 @@
 {
   "runId": 45210142704,
   "startedAt": 1795449172,
-  "updatedAt": 1795449832,
+  "updatedAt": 1795450732,
   "endsAt": 1795477972,
   "source": {
     "kind": "compact-job-log",
     "jobId": 137816431321,
-    "event": "entry"
+    "event": "entry",
+    "positionDetails": "count only",
+    "cashBasis": "starting cash less first 20 USDC entry and 0.05 USDC entry charge"
   },
   "accounts": {
     "A": {
       "policy": "trailing",
-      "cashUsdc": 1000,
-      "equityUsdc": 1000,
+      "cashUsdc": 979.95,
+      "equityUsdc": null,
       "realizedUsdc": 0,
       "closedTrades": 0,
-      "openPositions": [],
+      "openPositions": [
+        {
+          "detailsAvailable": false
+        }
+      ],
       "realizedWithoutBestMintUsdc": null
     },
     "B": {
       "policy": "standard",
-      "cashUsdc": 1000,
-      "equityUsdc": 1000,
+      "cashUsdc": 979.95,
+      "equityUsdc": null,
       "realizedUsdc": 0,
       "closedTrades": 0,
-      "openPositions": [],
+      "openPositions": [
+        {
+          "detailsAvailable": false
+        }
+      ],
       "realizedWithoutBestMintUsdc": null
     },
     "C": {
       "policy": "fixed",
-      "cashUsdc": 1000,
-      "equityUsdc": 1000,
+      "cashUsdc": 979.95,
+      "equityUsdc": null,
       "realizedUsdc": 0,
       "closedTrades": 0,
-      "openPositions": [],
+      "openPositions": [
+        {
+          "detailsAvailable": false
+        }
+      ],
       "realizedWithoutBestMintUsdc": null
     }
   }
