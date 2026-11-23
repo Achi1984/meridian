@@ -44,6 +44,7 @@ def compare(events, status, cutoff=FORWARD_START):
     included = []
     unresolved = []
     included_by_mint = Counter()
+    skip_delta_by_mint = Counter()
     paired_standard = []
     paired_stop = []
     paired_filtered = []
@@ -66,6 +67,7 @@ def compare(events, status, cutoff=FORWARD_START):
             unresolved.append(dict(session=key[0], mint=key[1], decision=rules[key]))
         elif rules[key] == 'skipExtended':
             skipped.append(receipt['netPnlUsdc'])
+            skip_delta_by_mint[p['mint']] -= receipt['netPnlUsdc']
         else:
             included.append(receipt['netPnlUsdc'])
             included_by_mint[p['mint']] += receipt['netPnlUsdc']
@@ -75,7 +77,14 @@ def compare(events, status, cutoff=FORWARD_START):
                           ('filterOnly', paired_filtered), ('filterAndStop', paired_combined)]:
         combined[label+'Usdc'] = round(sum(values),6) if paired else None
     combined['stopDeltaOnKeptUsdc'] = round(sum(paired_combined)-sum(paired_filtered),6) if paired else None
-    return dict(eligible=len(rules), skipped=sum(v=='skipExtended' for v in rules.values()),
+    delta = sum(skip_delta_by_mint.values())
+    best = max(skip_delta_by_mint.values(), default=0)
+    sensitivity = dict(closedSkippedMints=len(skip_delta_by_mint),
+                       netAdvantageUsdc=round(delta,6) if included or skipped else None,
+                       largestPositiveMintDeltaUsdc=round(best,6) if best > 0 else None,
+                       advantageWithoutTopPositiveMintUsdc=round(delta-best,6)
+                       if best > 0 and len(set(included_by_mint) | set(skip_delta_by_mint)) > 1 else None)
+    return dict(filterSensitivity=sensitivity, eligible=len(rules), skipped=sum(v=='skipExtended' for v in rules.values()),
                 fallback=sum(v=='followBaselineNoFreshReference' for v in rules.values()),
                 unresolvedBaseline=unresolved, closedBaseline=len(included)+len(skipped),
                 baselineRealizedUsdc=round(sum(included)+sum(skipped),6),
