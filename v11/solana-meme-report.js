@@ -15,7 +15,7 @@ async function read(url, raw = false) {
   return response.json();
 }
 
-import {mountEightHourComparison} from './solana-eight-hour.js?v=B19-M11';
+import {mountEightHourComparison} from './solana-eight-hour.js?v=B19-M11-FIX1';
 
 export function mountSolanaReport(section) {
   const doc = section.ownerDocument;
