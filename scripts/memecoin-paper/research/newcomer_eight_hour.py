@@ -11,8 +11,8 @@ import newcomer_wave_pair as collector
 
 
 class Account:
-    def __init__(self, target=False):
-        self.target = target
+    def __init__(self, policy):
+        self.policy = policy
         self.cash = self.peak = START
         self.drawdown = self.closed = self.missing = 0
         self.open = {}
@@ -24,7 +24,7 @@ class Account:
         kind = row['event']
         if kind == 'entry' and self.cash >= SIZE + FEE:
             self.cash -= SIZE + FEE
-            self.open[key] = dict(mint=mint, qty=row['qty'], bid=None, markAt=None, marks=0)
+            self.open[key] = dict(mint=mint, qty=row['qty'], bid=None, markAt=None, marks=0, peakNet=0)
         pos = self.open.get(key)
         if pos is None:
             return
@@ -33,7 +33,14 @@ class Account:
                 raise ValueError('Exit quantity differs from entry')
             bid = row['usdcRaw']
             pos.update(bid=bid, markAt=row['at'])
-            close_target = self.target and pos['marks'] > 0 and 10*(bid-SIZE-2*FEE) >= SIZE
+            net = bid - SIZE - 2*FEE
+            close_target = False
+            if pos['marks'] > 0:
+                if self.policy == 'trailing':
+                    close_target = 10*pos['peakNet'] >= SIZE and 2*net <= pos['peakNet']
+                    pos['peakNet'] = max(pos['peakNet'], net)
+                elif self.policy == 'fixed':
+                    close_target = 10*net >= SIZE
             if kind == 'exit' or close_target:
                 self.cash += bid-FEE
                 self.closed += 1
@@ -57,7 +64,7 @@ class Account:
     def snapshot(self):
         equity = self.equity()
         net = sum(self.by_mint.values())
-        return dict(cashUsdc=self.cash/UNIT, equityUsdc=None if equity is None else equity/UNIT,
+        return dict(policy=self.policy, cashUsdc=self.cash/UNIT, equityUsdc=None if equity is None else equity/UNIT,
                     realizedUsdc=net/UNIT, closedTrades=self.closed, openPositions=list(self.open.values()),
                     missingExitQuotes=self.missing, sampledMaxDrawdownUsdc=self.drawdown/UNIT,
                     cashIfOpenWorthZeroUsdc=self.cash/UNIT,
@@ -68,12 +75,13 @@ class Account:
 def run(directory, segment):
     directory.mkdir(exist_ok=True, parents=True)
     journal = directory/'events.jsonl'
-    accounts = {name: Account(name == 'C') for name in 'ABC'}
+    accounts = {name: Account(policy) for name, policy in
+                [('A', 'trailing'), ('B', 'standard'), ('C', 'fixed')]}
 
     def apply(row):
-        names = {'early': ('A',), 'wave': ('B','C')}.get(row.get('arm'), ())
-        for name in names:
-            accounts[name].update(row, row['session'])
+        if row.get('arm') == 'wave':
+            for account in accounts.values():
+                account.update(row, row['session'])
         if row['event'] in ('sessionEnd', 'sessionInterrupted'):
             for account in accounts.values():
                 for (s, _), pos in account.open.items():
@@ -106,7 +114,11 @@ def run(directory, segment):
             temp.write_text(json.dumps(status))
             temp.replace(directory/'status.json')
             if kind in ('entry','exit','sessionEnd','finished','sessionInterrupted','resume','ready'):
-                print(json.dumps(status), flush=True)
+                for name, account in accounts.items():
+                    print(json.dumps(dict(at=row['at'], event=kind, account=name,
+                                          closed=account.closed, open=len(account.open),
+                                          netUsdc=sum(account.by_mint.values())/UNIT,
+                                          equityUsdc=account.snapshot()['equityUsdc'])), flush=True)
 
         def deadline(signum, frame):
             raise TimeoutErrorAtEnd()
