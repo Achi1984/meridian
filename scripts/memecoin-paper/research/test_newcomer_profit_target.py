@@ -35,6 +35,17 @@ class ProfitTargetTests(unittest.TestCase):
         self.assertEqual(item['target']['heldSeconds'], 60)
         self.assertEqual(item['missingWaveExitQuotes'], 0)
 
+    def test_terminal_target_hit_does_not_count_as_earlier_exit(self):
+        result = replay([sample(1, [19000000, 24000000])])
+        self.assertEqual(result['earlierTargetExits'], 0)
+        self.assertEqual(result['equalNet'], 1)
+        self.assertIsNone(result['deltaWithoutLargestLossUsdc'])
+
+    def test_earlier_exit_and_net_change_are_separate(self):
+        result = replay([sample(1, [19500000, 24000000, 24000000])])
+        self.assertEqual(result['earlierTargetExits'], 1)
+        self.assertEqual(result['equalNet'], 1)
+
     def test_missing_baseline_sale_keeps_delta_unknown(self):
         result = replay([sample(1, [19500000,22100000], False)])
         self.assertEqual(result['observations'][0]['target']['netUsdc'], 2)
