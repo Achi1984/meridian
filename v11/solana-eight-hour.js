@@ -22,7 +22,7 @@ export function accountRows(snapshot, campaign = original) {
     if (drawdown != null && (!Number.isFinite(drawdown) || drawdown < 0)) throw Error('drawdown');
     const missing = a.missingExitQuotes;
     if (missing !== undefined && (!Number.isSafeInteger(missing) || missing < 0)) throw Error('quotes');
-    return {missing, name:key + ' · ' + name, cash:a.cashUsdc, equity:a.equityUsdc, net:a.realizedUsdc,
+    return {key, missing, name:key + ' · ' + name, cash:a.cashUsdc, equity:a.equityUsdc, net:a.realizedUsdc,
       closed:a.closedTrades, open:a.openPositions.length, withoutBest, drawdown};
   });
 }
@@ -66,6 +66,14 @@ function mountCampaign(parent, add, read, amount, campaign) {
     result.replaceChildren();
     const at = new Date(snapshot.updatedAt * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
     add(result,'p',source + ' · ' + at + ' (Wien)');
+    const benchmark = rows[1];
+    for (const index of [0, 2]) {
+      const candidate = rows[index];
+      const label = candidate.key + ' gegenüber B';
+      const delta = candidate.equity === null || benchmark.equity === null
+        ? 'Bewertung offen' : amount(candidate.equity - benchmark.equity);
+      add(result,'p','Kontowert ' + label + ' · ' + delta);
+    }
     for (const {name,cash,equity,net,closed,open,withoutBest,drawdown,missing} of rows) {
       add(result,'h4',name);
       add(result,'p','Guthaben ' + amount(cash) + ' · Kontowert ' + amount(equity) +

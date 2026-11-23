@@ -47,7 +47,8 @@ class MemeAccount:
             if p is None or now < p['mark_at']:
                 return None
             if sell is None:
-                self.db.execute('UPDATE positions SET quote_missing=1 WHERE mint=?',(mint,))
+                self.db.execute('UPDATE positions SET marked=NULL,mark_at=?,quote_missing=1 WHERE mint=?',
+                                (now,mint))
                 return None
             if type(sell) is not int or sell <= 0:
                 raise ValueError('Invalid raw USDC exit quote')
