@@ -28,6 +28,7 @@ class VolumeMomentumTests(unittest.TestCase):
 
     def test_delayed_exit_and_missing_baseline(self):
         p = Position(ROW, 100, 20_000_000, 1000, True)
+        p.observe(1060, 19_990_000, False)
         p.observe(1120, 19_990_000, False)
         self.assertIsNone(p.pending)
         p.observe(1180, 19_900_000, True)

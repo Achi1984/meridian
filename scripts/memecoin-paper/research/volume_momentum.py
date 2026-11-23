@@ -61,6 +61,7 @@ class Position:
     def __init__(self, row, qty, initial, at, accepted):
         self.row, self.qty, self.at = row, qty, at
         self.accepted = accepted
+        self.last_quote_at = at
         self.high, self.high_at = initial, at
         self.pending = self.standard = self.strategy = self.delayed = None
         self.standard_at = self.strategy_at = self.strategy_delayed = None
@@ -75,6 +76,9 @@ class Position:
             self.strategy_delayed = net
         if self.pending is not None and at > self.pending and self.strategy is None:
             self.strategy, self.strategy_at = net, at
+        if at-self.last_quote_at > 90:
+            self.high_at = at
+        self.last_quote_at = at
         if bid > self.high:
             self.high, self.high_at = bid, at
         baseline_exit = at-self.at >= HOLD_SECONDS or net >= 2*SIZE or 10*net <= -3*SIZE
@@ -126,7 +130,7 @@ def run(fetch=None, quote=spot_quote, output=emit, clock=time.time, sleep=time.s
             as_of = fields['asOf']
         output(kind, **fields)
 
-    cohort = scan(journal, fetch=fetch, quote=quote, now=clock)[:2]
+    cohort = scan(journal, fetch=fetch, quote=quote, now=clock)
     positions = []
     for row in cohort:
         mint = row['mint']
@@ -152,8 +156,10 @@ def run(fetch=None, quote=spot_quote, output=emit, clock=time.time, sleep=time.s
                comparable=usable and baseline)
         if usable and baseline:
             positions.append(Position(row, qty, bid, at, accepted))
+    next_tick = clock()+60
     while any(clock()-p.at <= HOLD_SECONDS+EXIT_GRACE and p.delayed is None for p in positions):
-        sleep(60)
+        sleep(max(0, next_tick-clock()))
+        next_tick = clock()+60
         for p in positions:
             if clock()-p.at > HOLD_SECONDS+EXIT_GRACE or p.delayed is not None:
                 continue
@@ -178,7 +184,8 @@ def run(fetch=None, quote=spot_quote, output=emit, clock=time.time, sleep=time.s
             output('momentumMark', mint=mint, qty=p.qty, at=at, bidRaw=bid, netBuy1mUsd=flow,
                    fadeSignalAt=p.pending, standardNetRaw=p.standard, strategyNetRaw=p.strategy,
                    nextStandardQuoteNetRaw=p.delayed, nextStrategyQuoteNetRaw=p.strategy_delayed)
-    output('momentumSummary', **comparison(positions))
+    output('momentumSummary', shortlisted=len(cohort), comparable=len(positions),
+           excluded=len(cohort)-len(positions), **comparison(positions))
 
 
 if __name__ == '__main__':

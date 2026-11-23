@@ -10,6 +10,7 @@ def render(events):
     momentum = next((e for e in reversed(events) if e['event'] == 'momentumSummary'), None)
     if momentum:
         print('### 20 USDC volume momentum (paper)')
+        print(f"Shortlisted {momentum['shortlisted']}, comparable {momentum['comparable']}, excluded {momentum['excluded']}.")
         print('| Arm | Closed | Open | Realized USDC | Without best mint |')
         print('|---|---:|---:|---:|---:|')
         for label in ('standard', 'filterOnly', 'filterAndFade'):
