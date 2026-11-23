@@ -33,7 +33,7 @@ test('refresh loads the run checkpoint and keeps it across a failed or older ref
   const {mountEightHourComparison} = await import('../v11/solana-eight-hour.js');
   const nodes = [];
   const add = (parent, tag, textContent) => {
-    const node = {tag, textContent, children:[], setAttribute(){}, addEventListener(){},
+    const node = {tag, textContent, children:[], setAttribute(){}, addEventListener(event, callback){this[event]=callback;},
       replaceChildren(){this.children=[]; this.textContent='';}};
     parent.children.push(node);
     nodes.push(node);
@@ -43,11 +43,24 @@ test('refresh loads the run checkpoint and keeps it across a failed or older ref
     openPositions:[{}], missingExitQuotes:2};
   const snapshot = {runId:45185444796, startedAt:1795440944, endsAt:1795469744,
     updatedAt:1795447068, accounts:{A:account,B:account,C:account}};
-  let response = snapshot;
+  const newSnapshot = {runId:45210142704, startedAt:1795449172, endsAt:1795477972, updatedAt:1795449172,
+    accounts:Object.fromEntries(Object.entries({A:'trailing',B:'standard',C:'fixed'})
+      .map(([name,policy])=>[name,{...account,policy}]))};
+  let response = newSnapshot;
   const read = async url => url.endsWith('/jobs') ? {jobs:[]} : response;
   const refresh = mountEightHourComparison({children:[]},add,read,String);
   await refresh();
-  const report = nodes.find(node=>node.tag==='div');
+  const newReport = nodes.find(node=>node.tag==='div');
+  assert.ok(newReport.children.some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
+  response = snapshot;
+  await refresh();
+  assert.ok(newReport.children.some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
+  const select = nodes.find(node=>node.tag==='select');
+  select.value = String(snapshot.runId);
+  select.change();
+  await refresh();
+  const report = nodes.filter(node=>node.tag==='div').at(-1);
+  assert.ok(report.children.some(node=>node.textContent.includes('Soforteinstieg')));
   assert.equal(report.children.filter(node=>node.tag==='h4').length,3);
   assert.ok(report.children.some(node=>node.textContent.includes('Positionsgröße · 2')));
   const original = [...report.children];
