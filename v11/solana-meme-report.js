@@ -15,6 +15,8 @@ async function read(url, raw = false) {
   return response.json();
 }
 
+import {mountEightHourComparison} from './solana-eight-hour.js?v=B19-M11';
+
 export function mountSolanaReport(section) {
   const doc = section.ownerDocument;
   const add = (parent, tag, text) => {
@@ -25,6 +27,7 @@ export function mountSolanaReport(section) {
   };
   const badge = add(section.querySelector('summary'),'small','Status wird geladen');
   badge.className = 'pilot-status';
+  const refreshComparison = mountEightHourComparison(section, add, read, amount);
   const live = add(section,'p','Laufstatus wird beim Öffnen geladen.');
   live.setAttribute('role','status');
   const notice = add(section,'p','');
@@ -82,6 +85,7 @@ export function mountSolanaReport(section) {
     loading = true;
     refresh.disabled = true;
     live.textContent = 'Laufstatus wird geladen …';
+    void refreshComparison();
     const [, report] = await Promise.allSettled([
       refreshStatus(true),
       read(api + '/contents/solana-meme.json?ref=paper-dashboard-data',true)
