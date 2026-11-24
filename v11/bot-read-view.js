@@ -246,7 +246,8 @@ export function renderBotReadState(root, state, filters = {}) {
     const resultCount=element(document,'p',data.bots.length+' von '+data.count+' Bots im Snapshot');
     resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
     if (data.bots.length===data.count && Number.isSafeInteger(data.coverage?.unsupportedRows)) {
-      resultCount.textContent=data.count+' Bots dargestellt · '+data.coverage.unsupportedRows+' weitere Einträge nicht unterstützt';
+      resultCount.textContent=data.count+' Bots dargestellt · '+data.coverage.unsupportedRows+
+        (data.coverage.unsupportedRows===1?' weiterer Eintrag':' weitere Einträge')+' nicht unterstützt';
     }
     details.append(resultCount);
     if(data.counts?.tp?.unknown>0 && typeof filters.onUnknownTp==='function'){

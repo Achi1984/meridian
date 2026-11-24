@@ -775,7 +775,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           const empty=await evaluate(`document.getElementById('bot-read-root').innerText`);
-          assert.match(empty,/0 Bots im Snapshot/);assert.match(empty,/Keine darstellbaren Bots in diesem Snapshot\./);
+          assert.match(empty,/0 Bots dargestellt · 1 weiterer Eintrag nicht unterstützt/);assert.match(empty,/Keine darstellbaren Bots in diesem Snapshot\./);
           assert.match(empty,/Dies bestätigt kein leeres Wallet\./,'no displayable bots must not confirm an empty wallet');
           assert.equal(await evaluate(`(${backSelector}).hidden`),true,'new read drops prior return context');
           assert.doesNotMatch(empty,/Keine Bots entsprechen den Filtern/);
