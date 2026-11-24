@@ -24,7 +24,11 @@ def age_ok(age):
     return 110 * 60 <= age <= 120 * 60
 
 
-def monitor(ledger, fetch, quote, now, save):
+class RunBudgetSpent(Exception):
+    pass
+
+
+def monitor(ledger, fetch, quote, now, save, *, max_marks=None):
     pending = sorted(((p['entryAt'],mint,p) for mint,p in ledger.items()
                       if p.get('B',{}).get('state')=='pending'), reverse=True)
     def service_confirmations():
@@ -53,14 +57,21 @@ def monitor(ledger, fetch, quote, now, save):
         position.update(state='unpriced')
         save()
 
-    for mint, position in ledger.items():
+    marks = 0
+    by_mark_age = sorted(ledger.items(),key=lambda item:item[1].get('C',{}).get('lastMarkAt',0))
+    for mint, position in by_mark_age:
         service_confirmations()
+        c = position.get('C',{})
+        mark_due = c.get('state')=='open' and 'proceeds' not in c and now()<position['due']
+        if mark_due and max_marks is not None and marks>=max_marks:
+            continue
+        marks += int(mark_due)
         observe(mint, position, fetch, quote, now, check_confirmation=False)
     save()
 
 
 def tick(ledger, fetch, quote, now, save):
-    monitor(ledger, fetch, quote, now, save)
+    monitor(ledger, fetch, quote, now, save, max_marks=1)
     next_poll = now()+30
 
     def service_positions():
@@ -69,7 +80,7 @@ def tick(ledger, fetch, quote, now, save):
         due = any(p.get('B', {}).get('state')=='pending' and
                   300 <= at-p['entryAt'] <= 360 for p in ledger.values())
         if at >= next_poll or due:
-            monitor(ledger, fetch, quote, now, save)
+            monitor(ledger, fetch, quote, now, save, max_marks=1)
             next_poll = now()+30
 
     def discovery_read(url, max_age):
@@ -149,10 +160,25 @@ if __name__ == '__main__':
             temporary.write_text(json.dumps(ledger, allow_nan=False))
             os.replace(temporary, path)
         deadline = time.monotonic()+args.watch_seconds
-        fetch = market_reader(13)
+        def budget_sleep(seconds):
+            if args.watch_seconds and time.monotonic()+seconds >= deadline:
+                raise RunBudgetSpent
+            time.sleep(seconds)
+        reader = market_reader(13,sleep=budget_sleep)
+        def bounded(operation):
+            def call(*params):
+                if args.watch_seconds and time.monotonic() >= deadline:
+                    raise RunBudgetSpent
+                return operation(*params)
+            return call
+        fetch = bounded(reader)
+        quote = bounded(spot_quote)
         prior = len(ledger)
         try:
-            stats = tick(ledger, fetch, spot_quote, time.time, save)
+            stats = tick(ledger, fetch, quote, time.time, save)
+        except RunBudgetSpent:
+            stats = dict(budgetReached=True)
+            save()
         except ERRORS as exc:
             stats = dict(discoveryError=type(exc).__name__)
         stats['loadedObservations'] = prior
@@ -160,7 +186,11 @@ if __name__ == '__main__':
                 'B' in p and (p['B']['state']=='pending' or
                 (p['C']['state']=='open' and 'proceeds' not in p['C'])) for p in ledger.values()):
             time.sleep(min(30,max(0,deadline-time.monotonic())))
-            monitor(ledger, fetch, spot_quote, time.time, save)
+            try:
+                monitor(ledger, fetch, quote, time.time, save)
+            except RunBudgetSpent:
+                save()
+                break
         print(json.dumps(dict(**stats, accounts=summary(ledger))))
         if 'discoveryError' in stats:
             raise SystemExit(1)

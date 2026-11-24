@@ -124,3 +124,14 @@ class VariantTests(unittest.TestCase):
             monitor(ledger,lambda *_:{'data':{}},quote,lambda:stamp[0],lambda:None)
         self.assertEqual(ledger['m']['B']['state'],'open')
         self.assertLessEqual(ledger['m']['B']['decisionAt'],460)
+
+    def test_discovery_limits_background_marks_per_pass(self):
+        from pullback_buyflow import monitor
+        now = 800
+        ledger = {str(i):self.position() for i in range(20)}
+        for i,p in enumerate(ledger.values()):
+            p['B']['state']='skippedSignal'
+            p['C']['lastMarkAt']=110+i
+        for _ in range(3):
+            monitor(ledger,None,lambda *_:20_000_000,lambda:now,lambda:None,max_marks=1)
+        self.assertEqual([p['C']['marks'] for p in ledger.values()], [1]*3+[0]*17)
