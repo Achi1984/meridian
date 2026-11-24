@@ -230,12 +230,21 @@ class NextTickTarget:
                     pairedNextNetUsdc=self.delayed/UNIT if self.pairs else None)
 
 
-def run(directory, segment):
+def run(directory, segment, holder_test=False):
     directory.mkdir(exist_ok=True, parents=True)
     journal = directory/'events.jsonl'
     accounts = {name: Account(policy) for name, policy in
                 [('A', 'trailing'), ('B', 'standard'), ('C', 'fixed'), ('E', 'failedRecovery')]}
 
+    if holder_test:
+        from holder_signal import HolderSampler, LARGE_LOSS_BPS, HIGH_BPS
+        sampler = HolderSampler()
+        accounts['H'] = Account('fixed')
+    holder_states = Counter()
+    blocked = set()
+    avoided_losses = set()
+    missed_triples = set()
+    admitted_blocked = set()
     comparison = FilterComparison()
     next_tick = NextTickTarget()
     smaller_pools = set()
@@ -250,6 +259,8 @@ def run(directory, segment):
                     time.monotonic()-self.opened_at['wave'] <= collector.HOLD_SECONDS+collector.EXIT_GRACE)
 
         def tick(self, index, final):
+            if holder_test:
+                sampler.refresh(self.row['mint'])
             cache = {}
             def quote(src, dst, amount):
                 key = (src, dst, amount)
@@ -317,12 +328,29 @@ def run(directory, segment):
         if row['event'] == 'cohortSelection' and 0 < row['entryLiquidityUsd'] < 20_000:
             smaller_pools.add(key)
         if row.get('arm') == 'wave':
+            if holder_test and row['event'] == 'entry':
+                state = row['holderEvidence']['state']
+                holder_states[state] += 1
+                if state == 'high':
+                    blocked.add(key)
             prior = key in accounts['C'].open, key in accounts['F'].open
             for name, account in accounts.items():
+                if name == 'H' and key in blocked:
+                    continue
                 if name == 'F' and key not in smaller_pools:
                     continue
                 account.update(row, row['session'])
             current = key in accounts['C'].open, key in accounts['F'].open
+            if holder_test and key in blocked and key in accounts['C'].entries:
+                if prior[0] and not current[0]:
+                    net = row['usdcRaw'] - SIZE - 2*FEE
+                    if -net * 10000 >= LARGE_LOSS_BPS * SIZE:
+                        avoided_losses.add(key)
+                if (row['event'] == 'quotedTriple' and
+                        (key in admitted_blocked)):
+                    missed_triples.add(key)
+                if current[0]:
+                    admitted_blocked.add(key)
             next_tick.observe(key, row, prior[1] and not current[1] and row['event'] == 'resaleMark')
             comparison.update(key, row['event'], key in smaller_pools, prior, current, row.get('usdcRaw'))
         if row['event'] in ('sessionEnd', 'sessionInterrupted'):
@@ -385,12 +413,21 @@ def run(directory, segment):
                 row.update(provider='Jupiter', inputMint=collector.USDC if buying else row['mint'],
                            outputMint=row['mint'] if buying else collector.USDC,
                            inputRaw=SIZE if buying else row['qty'])
+            if holder_test and kind == 'entry' and row.get('arm') == 'wave':
+                row['holderEvidence'] = sampler.at_entry(row['mint'], time.time())
             changes = apply(row)
             row['fills'] = changes
             fills.extend(changes)
             print(json.dumps(row), file=out)
             status = dict(startedAt=started, endsAt=end, updatedAt=row['at'], lastEvent=kind,
                           session=session, accounts={n:a.snapshot() for n,a in accounts.items()})
+            if holder_test:
+                status['holderComparison'] = dict(
+                    reference='C', filtered='H', thresholdBps=HIGH_BPS, largeLossBps=LARGE_LOSS_BPS,
+                    entryStates=dict(holder_states), skippedReferenceEntries=len(admitted_blocked),
+                    avoidedLargeLosses=len(avoided_losses), skippedQuotedTriples=len(missed_triples),
+                    realizedDeltaUsdc=(sum(accounts['H'].by_mint.values()) -
+                                       sum(accounts['C'].by_mint.values())) / UNIT)
             status['fTargetNextTick'] = next_tick.snapshot()
             status['filterComparison'] = comparison.snapshot()
             if kind in ('sessionEnd','sessionInterrupted','handoff','finished','resume'):
@@ -428,6 +465,9 @@ def run(directory, segment):
         try:
             while time.time() < (handoff if segment == 1 else end):
                 session += 1
+                if holder_test:
+                    sampler.latest.clear()
+                    sampler.pending.clear()
                 emit('sessionStart')
                 try:
                     pending = {(origin, mint, pos['qty']) for account in accounts.values()
@@ -460,5 +500,7 @@ if __name__ == '__main__':
     cli = argparse.ArgumentParser(description=__doc__)
     cli.add_argument('directory', type=Path)
     cli.add_argument('segment', type=int, choices=(1,2))
+    cli.add_argument('--holder-test', action='store_true')
     args = cli.parse_args()
-    run(args.directory, args.segment)
+    run(args.directory, args.segment, args.holder_test)
+
