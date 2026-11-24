@@ -3,6 +3,7 @@ import json
 import time
 from collections import Counter
 from fractions import Fraction
+from urllib.request import Request, urlopen
 
 from new_pool_watch import ADDRESS, get
 from newcomer_research import ERRORS
@@ -41,6 +42,15 @@ def quote(mint, fetch):
                 trigger=uint(q['liquidation']['trigger_lamports']))
 
 
+def block_time(slot):
+    """Look up the reserve observation time independently of the quote service."""
+    payload = dict(jsonrpc='2.0', id=1, method='getBlockTime', params=[slot])
+    request = Request('https://api.mainnet-beta.solana.com', data=json.dumps(payload).encode(),
+                      headers={'Content-Type': 'application/json'})
+    with urlopen(request, timeout=5) as response:
+        return uint(json.loads(response.read(8192))['result'])
+
+
 def ceiling(n, d):
     return (n+d-1)//d
 
@@ -66,7 +76,7 @@ def signals(history):
     return []
 
 
-def run(mints, emit, fetch=get, clock=time.time, sleep=time.sleep):
+def run(mints, emit, fetch=get, clock=time.time, sleep=time.sleep, slot_time=block_time):
     history, positions = {}, {}
     for index in range(4):
         start = clock()
@@ -74,7 +84,11 @@ def run(mints, emit, fetch=get, clock=time.time, sleep=time.sleep):
             active = positions.pop(mint, None)
             try:
                 q = quote(mint, fetch)
-                at = int(clock())
+                observed = uint(slot_time(q['slot']))
+                received = int(clock())
+                if not 0 <= received-observed <= 20:
+                    raise ValueError('stale or future reserve slot')
+                at = observed
                 previous = history.get(mint, [])
                 if previous:
                     last_at, last = previous[-1]
@@ -82,13 +96,13 @@ def run(mints, emit, fetch=get, clock=time.time, sleep=time.sleep):
                             or q['venue'] != last['venue']):
                         raise ValueError('observation continuity lost')
                 history[mint] = previous + [(at, q)]
-                emit(dict(event='quote', mint=mint, at=at, **q))
+                emit(dict(event='quote', mint=mint, at=at, receivedAt=received, **q))
                 if active:
                     bot, when, entry = active
                     pnl = estimate(entry, q, at-when) if at < entry['expiry'] else None
                     emit(dict(event='paperMark' if pnl is not None else 'unresolved',
                               bot=bot, mint=mint, estimatedPnlLamports=pnl))
-                if index == 2 and len(previous) == 2 and at-born <= 86400 and q['expiry'] > at+90:
+                if index == 2 and len(previous) == 2 and 0 <= at-born <= 86400 and q['expiry'] > at+90:
                     for bot in signals([item for _, item in history[mint]]):
                         positions[mint] = bot, at, q
                         emit(dict(event='paperOpen', bot=bot, mint=mint, at=at))
