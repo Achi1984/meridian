@@ -6,7 +6,7 @@ on:
     types: [completed]
 permissions:
   actions: read
-  contents: read
+  contents: write
 jobs:
   score:
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.id >= 45470459543 && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.path == '.github/workflows/newcomer-eight-hour.yml'
@@ -28,3 +28,15 @@ jobs:
         with:
           name: paper-g-${{ github.event.workflow_run.id }}
           path: paper-g.json
+      - name: Publish run-specific G account summary
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+        run: |
+          jq '{runId,updatedAt,G:{realizedUsdc:.G.realizedUsdc,cashIfOpenWorthZeroUsdc:.G.cashIfOpenWorthZeroUsdc,closed:(.G.fills|length),open:(.G.openPositions|length)}}' paper-g.json > summary.json
+          path="repos/$GITHUB_REPOSITORY/contents/paper-g-$SOURCE_RUN.json"
+          if gh api "$path?ref=paper-dashboard-data" --jq .content > existing.b64; then
+            base64 -d existing.b64 | cmp - summary.json
+          else
+            gh api --method PUT "$path" -f branch=paper-dashboard-data -f message="Publish paper G for run $SOURCE_RUN" -f content="$(base64 -w0 summary.json)"
+          fi
