@@ -14,14 +14,71 @@ from newcomer_research import ERRORS
 from newcomer_scanner import market_reader, sample, timestamp
 
 
-def accepts(hour_change, buys, sells):
-    return (all(math.isfinite(n) for n in (hour_change, buys, sells))
+def buying_persists(buys, sells):
+    return (all(math.isfinite(n) for n in (buys, sells))
             and min(buys, sells) >= 0 and buys + sells >= 10
-            and hour_change < 0 and 5 * buys >= 3 * (buys + sells))
+            and 5 * buys >= 3 * (buys + sells))
+
+
+def accepts(hour_change, buys, sells):
+    return math.isfinite(hour_change) and hour_change < 0 and buying_persists(buys, sells)
 
 
 def age_ok(age):
     return 110 * 60 <= age <= 120 * 60
+
+
+def follow_second_look(mint, position, fetch, quote, now, save):
+    study = position.get('secondLook')
+    if not study:
+        return
+    if study['state'] == 'waiting':
+        target = position['entryAt'] + 1800
+        if now() < target:
+            return
+        if now() <= target + 120:
+            try:
+                row = snapshot(fetch(f"{GT}/pools/{position['pool']}", 30)['data'])
+                if row['pool'] != position['pool'] or row['mint'] != mint:
+                    return
+                passes = (row['liquidity'] >= position['liquidityUsd']
+                          and buying_persists(row['buys'], row['sells']))
+                if passes:
+                    qty = quote(USDC, mint, SIZE)
+                    bid = quote(mint, USDC, qty)
+                at = now()
+                if at <= target + 120:
+                    study.update(checkedAt=int(at), liquidityUsd=row['liquidity'],
+                                 buys5m=row['buys'], sells5m=row['sells'])
+                    if passes:
+                        study.update(state='tracking', quantity=qty, entryAt=int(at),
+                                     entryResaleUsdc=(bid-2*FEE)/UNIT, marks={})
+                    else:
+                        study.update(state='declined')
+                    save()
+                    return
+            except ERRORS:
+                return
+        study.update(state='missedWindow')
+        save()
+    if study['state'] != 'tracking':
+        return
+    for label, target in [(str(h)+'h', study['entryAt']+h*3600) for h in (2, 3, 6, 12)] + [('exit', position['due'])]:
+        if label in study['marks'] or now() < target:
+            continue
+        mark = None
+        if now() <= target+1800:
+            try:
+                bid = quote(mint, USDC, study['quantity'])
+            except ERRORS:
+                continue
+            at = now()
+            if at <= target+1800:
+                mark = dict(at=int(at), netUsdc=(bid-SIZE-2*FEE)/UNIT)
+        study['marks'][label] = mark
+        if label == 'exit':
+            study['state'] = 'closed' if mark else 'unpriced'
+        save()
 
 
 class RunBudgetSpent(Exception):
@@ -42,6 +99,8 @@ def monitor(ledger, fetch, quote, now, save, *, max_marks=None):
     # Resolve existing observations even when discovery is unavailable.
     for mint, position in ledger.items():
         service_confirmations()
+        follow_second_look(mint, position, fetch, quote, now, save)
+        service_confirmations()
         if position['state'] != 'open' or now() < position['due']:
             continue
         if now() <= position['due'] + 1800:
@@ -58,14 +117,20 @@ def monitor(ledger, fetch, quote, now, save, *, max_marks=None):
         save()
 
     marks = 0
-    by_mark_age = sorted(ledger.items(),key=lambda item:item[1].get('C',{}).get('lastMarkAt',0))
+    def last_attempt(item):
+        arm = item[1].get('C', {})
+        return arm.get('lastAttemptAt', arm.get('lastMarkAt', 0))
+
+    by_mark_age = sorted(ledger.items(), key=last_attempt)
     for mint, position in by_mark_age:
         service_confirmations()
         c = position.get('C',{})
         mark_due = c.get('state')=='open' and 'proceeds' not in c and now()<position['due']
         if mark_due and max_marks is not None and marks>=max_marks:
             continue
-        marks += int(mark_due)
+        if mark_due:
+            marks += 1
+            c['lastAttemptAt'] = now()
         observe(mint, position, fetch, quote, now, check_confirmation=False)
     save()
 
@@ -119,6 +184,8 @@ def tick(ledger, fetch, quote, now, save):
                             netResaleAtEntryUsdc=(bid-2*FEE)/UNIT)
         if ledger[mint]['selected']:
             ledger[mint].update(initial(bid))
+        else:
+            ledger[mint]['secondLook'] = dict(state='waiting')
         save()
         opened += 1
         if ledger[mint]['selected']:
@@ -143,6 +210,30 @@ def summary(ledger):
                                      for s in sorted({a['state'] for a in arms})},
                              realizedUsdc=round(sum(closed),6),
                              withoutBestUsdc=round(sum(closed)-max(closed),6) if closed else None)
+
+    rejected = [p for p in ledger.values() if not p['selected']]
+    outcomes = [p['netUsdc'] for p in rejected if p['state'] == 'closed']
+    avoided = -sum(x for x in outcomes if x < 0)
+    missed = sum(x for x in outcomes if x > 0)
+    result['rejectedComparable'] = dict(
+        total=len(rejected), closed=len(outcomes),
+        open=sum(p['state'] == 'open' for p in rejected),
+        unpriced=sum(p['state'] == 'unpriced' for p in rejected),
+        avoidedLossUsdc=round(avoided, 6),
+        missedProfitUsdc=round(missed, 6),
+        selectionBenefitUsdc=round(avoided - missed, 6) if outcomes else None,
+        missedNet10x=sum(x >= 9 * SIZE / UNIT for x in outcomes),
+    )
+    studies = [p['secondLook'] for p in rejected if 'secondLook' in p]
+    report = {state: sum(s['state'] == state for s in studies)
+              for state in ('waiting', 'missedWindow', 'declined', 'tracking', 'closed', 'unpriced')}
+    for label in ('2h', '3h', '6h', '12h', 'exit'):
+        marks = [s['marks'][label] for s in studies if label in s.get('marks', {})]
+        values = [m['netUsdc'] for m in marks if m is not None]
+        report[label] = dict(priced=len(values), unpriced=len(marks)-len(values),
+                             netVsSkipUsdc=round(sum(values), 6) if values else None,
+                             withoutBestUsdc=round(sum(values)-max(values), 6) if values else None)
+    result['secondLook30m'] = report
     return result
 
 
