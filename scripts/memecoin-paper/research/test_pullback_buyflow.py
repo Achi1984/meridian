@@ -42,3 +42,18 @@ class PullbackTests(unittest.TestCase):
             tick(ledger,None,fail,lambda:88201,lambda:None)
         self.assertEqual(summary(ledger)['pullbackBuyflow']['unpriced'],1)
         self.assertIsNone(summary(ledger)['pullbackBuyflow']['withoutBestUsdc'])
+
+    def test_rejection_cost_includes_rare_winner_and_separates_missing_exits(self):
+        ledger = {i: dict(selected=False, state='closed', netUsdc=pnl)
+                  for i, pnl in enumerate([-18, -12, 180, 0])}
+        ledger.update(holding=dict(selected=False, state='open'),
+                      missing=dict(selected=False, state='unpriced'),
+                      accepted=dict(selected=True, state='closed', netUsdc=20))
+        rows = summary(ledger)
+        audit = rows['rejectedComparable']
+        self.assertEqual(audit, dict(total=6, closed=4, open=1, unpriced=1,
+                                    avoidedLossUsdc=30, missedProfitUsdc=180,
+                                    selectionBenefitUsdc=-150, missedNet10x=1))
+        self.assertEqual(audit['selectionBenefitUsdc'],
+                         rows['pullbackBuyflow']['realizedUsdc'] - rows['allComparable']['realizedUsdc'])
+        self.assertIsNone(summary({})['rejectedComparable']['selectionBenefitUsdc'])
