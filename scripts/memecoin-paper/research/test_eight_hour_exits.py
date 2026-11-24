@@ -134,3 +134,81 @@ class TargetQuoteTest(unittest.TestCase):
         report.observe(7, first, True)
         self.assertEqual(report.snapshot(), dict(targetExits=7, paired=1, withoutNextQuote=6,
                          lowerNextQuote=1, pairedOriginalNetUsdc=2.9, pairedNextNetUsdc=-1.1))
+
+class IntegrityTests(unittest.TestCase):
+    def test_duplicate_before_and_after_exit(self):
+        from newcomer_eight_hour import START
+        account = Account('standard')
+        buy = dict(event='entry', mint='m', at=1, qty=7)
+        account.update(buy, 1)
+        account.update(buy, 1)
+        self.assertEqual(account.cash, START-SIZE-FEE)
+        account.update(dict(buy, event='exit', usdcRaw=SIZE), 1)
+        account.update(buy, 1)
+        self.assertEqual(account.cash, START-2*FEE)
+        self.assertFalse(account.open)
+        account.update(buy, 2)
+        self.assertEqual(account.open[2,'m']['positionId'], '2:wave:m')
+
+    def test_ledger_detects_quantity_and_cash_corruption(self):
+        from campaign_ledger import reconcile
+        from newcomer_eight_hour import START
+        account = Account('standard')
+        account.update(dict(event='entry', mint='m', at=1, qty=7), 1)
+        fill = dict(account='B',positionId='1:wave:m', qty=7,usdcRaw=SIZE,side='buy')
+        report = {'B':account.snapshot()}
+        reconcile([fill], report, START, FEE)
+        for patch in [dict(qty=8),dict(usdcRaw=SIZE-1)]:
+            with self.assertRaises(ValueError):
+                reconcile([dict(fill, **patch)], report, START, FEE)
+
+    def test_carry_quote_after_restart_targets_original_quantity(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from newcomer_eight_hour import run
+        rows = [dict(event='start', at=1, session=0),
+                dict(event='entry', at=2, session=1, arm='wave', mint='m', qty=7),
+                dict(event='sessionEnd', at=3, session=1),
+                dict(event='entry', at=28798, session=2, arm='wave', mint='m', qty=9),
+                dict(event='carryQuote', at=28800, session=2, originSession=1, mint='m',
+                     qty=7, usdcRaw=12345678)]
+        with TemporaryDirectory() as tmp, patch('newcomer_eight_hour.time.time', return_value=28801):
+            path = Path(tmp)
+            (path/'events.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            run(path, 2)
+            report = json.loads((path/'status.json').read_text())
+            positions = report['accounts']['B']['openPositions']
+            self.assertEqual([(p['qty'],p['bid']) for p in positions], [(7,12345678),(9,None)])
+            self.assertIsNone(report['accounts']['B']['equityUsdc'])
+
+    def test_identified_journal_survives_handoff_and_verifies_from_disk(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        import newcomer_eight_hour as campaign
+        clock = [1000]
+        def session(**kwargs):
+            if clock[0] == 1000:
+                campaign.collector.emit('entry', arm='wave', mint='mint', qty=20)
+            clock[0] += 14400
+        with TemporaryDirectory() as tmp, patch.object(campaign.time,'time',side_effect=lambda:clock[0]), \
+                patch.object(campaign.time,'sleep'), patch.object(campaign.collector,'run',side_effect=session), \
+                patch.object(campaign.collector,'spot_quote',return_value=21000000) as quote, \
+                patch.object(campaign.collector,'emit'):
+            path = Path(tmp)
+            campaign.run(path, 1)
+            campaign.run(path, 2)
+            quote.assert_called_once_with('mint',campaign.collector.USDC,20)
+            report = json.loads((path/'status.json').read_text())
+            self.assertTrue(report['ledgerVerified'])
+            self.assertIsNone(report['accounts']['B']['equityUsdc'])
+            rows = list(map(json.loads,(path/'events.jsonl').read_text().splitlines()))
+            self.assertEqual(len(rows),len({r['eventId'] for r in rows}))
+            buy = next(r for r in rows if r['event']=='entry')
+            buy['fills'][0]['usdcRaw'] -= 1
+            (path/'events.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            with self.assertRaises(ValueError):
+                campaign.verify_journal(path/'events.jsonl',report['accounts'],campaign.START,campaign.FEE)
