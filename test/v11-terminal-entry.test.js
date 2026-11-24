@@ -1559,8 +1559,8 @@ async function browserRun(call,start,width,height,server){
       window.fetch=async url=>{
         const reportAccount={cashUsdc:993.78,equityUsdc:993.78,realizedUsdc:-6.22,closedTrades:1,openPositions:[]};
         const data=String(url).includes('solana-abc-')
-          ? {runId:45210142704,startedAt:1795449172,endsAt:1795477972,updatedAt:1795452653,
-             accounts:Object.fromEntries(['trailing','standard','fixed'].map((policy,i)=>[['A','B','C'][i],{...reportAccount,policy}]))}
+          ? {runId:45433341029,startedAt:1795449172,endsAt:1795477972,updatedAt:1795452653,
+             accounts:Object.fromEntries(['trailing','standard','fixed','staged','failedRecovery','smallPoolFixed'].map((policy,i)=>[['A','B','C','D','E','F'][i],{...reportAccount,policy}]))}
           : String(url).endsWith('/jobs') ? {jobs:[{name:'first',status:'in_progress'}]}
           : String(url).includes('/actions/')
           ? {workflow_runs:[{id:23,run_number:5,status:'pending'},
@@ -1581,7 +1581,7 @@ async function browserRun(call,start,width,height,server){
         fits:section.scrollWidth<=section.clientWidth+1};
     } finally {window.fetch=fetchOriginal;section.open=false;}
   })()`,true);
-  assert.equal(paperSnapshot.compact.rows,3);
+  assert.equal(paperSnapshot.compact.rows,6);
   assert.ok(paperSnapshot.compact.fits);
   assert.match(paperSnapshot.compact.text,/Erste vier Stunden · läuft/);
   assert.match(paperSnapshot.compact.text,/10 % Nettoziel/);
