@@ -39,6 +39,21 @@ jobs:
           path: campaign
       - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_eight_hour_exits.py
       - run: python scripts/memecoin-paper/research/newcomer_eight_hour.py campaign 2
+      - name: Verify final journal against all six paper accounts
+        working-directory: scripts/memecoin-paper/research
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from campaign_ledger import verify_journal
+          from meme_paper_account import START, FEE
+          campaign = Path("../../../campaign")
+          status = json.loads((campaign / "status.json").read_text())
+          if (status["lastEvent"] != "finished" or status.get("ledgerVerified") is not True
+                  or set(status["accounts"]) != set("ABCDEF")):
+              raise ValueError("Incomplete campaign or missing journal verification")
+          verify_journal(campaign / "events.jsonl", status["accounts"], START, FEE)
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:

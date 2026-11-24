@@ -4,6 +4,9 @@ from collections import Counter
 import json
 from pathlib import Path
 import signal
+from uuid import uuid4
+from new_pool_watch import quote as raydium_quote
+from campaign_ledger import reconcile, verify_journal
 import time
 
 from meme_paper_account import FEE, SIZE, START, UNIT
@@ -16,15 +19,23 @@ class Account:
         self.cash = self.peak = START
         self.drawdown = self.closed = self.missing = 0
         self.open = {}
+        self.entries = {}
         self.by_mint = Counter()
 
     def update(self, row, session):
         mint = row.get('mint')
         key = (session, mint)
         kind = row['event']
+        if kind == 'entry':
+            signature = row['at'], row['qty']
+            if key in self.entries:
+                if self.entries[key] != signature:
+                    raise ValueError(f'Conflicting entry {key}')
+                return
+            self.entries[key] = signature
         if kind == 'entry' and self.cash >= SIZE + FEE:
             self.cash -= SIZE + FEE
-            self.open[key] = dict(mint=mint, qty=row['qty'], bid=None, markAt=None, marks=0, peakNet=0)
+            self.open[key] = dict(positionId=f'{session}:wave:{mint}', mint=mint, qty=row['qty'], bid=None, markAt=None, marks=0, peakNet=0)
         pos = self.open.get(key)
         if pos is None:
             return
@@ -98,7 +109,10 @@ class StagedAccount(Account):
             return
         key = (session, row['mint'])
         if kind == 'entry':
-            if key not in self.open and self.cash >= SIZE + FEE:
+            if key in self.entries:
+                super().update(row, session)
+                return
+            if self.cash >= SIZE + FEE:
                 super().update(row, session)
                 self.open[key].update(initialQty=row['qty'], basis=SIZE+FEE, stage=0)
             return
@@ -273,7 +287,30 @@ def run(directory, segment):
             else:
                 emit('stagedMark', mint=mint, bid=bid, lotBid=lot_bid, held=held)
 
+    seen = {}
+    fills = []
+
     def apply(row):
+        event_id = row.get('eventId')
+        if event_id is not None:
+            if event_id in seen:
+                if seen[event_id] != row:
+                    raise ValueError(f'Conflicting event {event_id}')
+                return []
+            seen[event_id] = row
+        key = row['session'], row.get('mint')
+        quantities = {name: account.open.get(key, {}).get('qty', 0)
+                      for name, account in accounts.items()}
+        if row['event'] == 'carryQuote':
+            origin = row['originSession'], row['mint']
+            for account in accounts.values():
+                pos = account.open.get(origin)
+                if pos and pos['qty'] == row['qty']:
+                    pos.update(bid=row['usdcRaw'], markAt=row['at'] if row['usdcRaw'] else None)
+        for account in accounts.values():
+            for pos in account.open.values():
+                if pos['markAt'] is not None and row['at']-pos['markAt'] > 90:
+                    pos.update(bid=None, markAt=None)
         if row['event'] in ('stagedMissing', 'stagedMark'):
             staged.update(row, row['session'])
         key = row['session'], row.get('mint')
@@ -294,33 +331,85 @@ def run(directory, segment):
                     if s == row['session']:
                         pos.update(bid=None, markAt=None)
 
+        changes = []
+        for name, account in accounts.items():
+            after = account.open.get(key, {}).get('qty', 0)
+            before = quantities[name]
+            if before == after:
+                continue
+            if before == 0:
+                raw = SIZE
+            elif row['event'] == 'stagedMark':
+                raw = row['lotBid'] if after else row['bid']
+            else:
+                raw = row['usdcRaw']
+            changes.append(dict(account=name, positionId=f'{key[0]}:wave:{key[1]}',
+                                side='buy' if after > before else 'sell',
+                                qty=abs(after-before), usdcRaw=raw))
+        return changes
+
     if segment == 1:
         started = int(time.time())
         with journal.open('x') as out:
-            print(json.dumps(dict(event='start', at=started, session=0)), file=out)
+            print(json.dumps(dict(event='start', eventId=uuid4().hex, fills=[], at=started, session=0)), file=out)
+        identified = True
         session = 0
     else:
         with journal.open() as src:
             first = json.loads(next(src))
             started, session = first['at'], 0
+            identified = 'eventId' in first
+            replayed = set()
             for line in src:
                 row = json.loads(line)
                 session = row['session']
-                apply(row)
+                computed = apply(row)
+                if 'fills' in row and row['fills'] != computed:
+                    if row.get('eventId') in replayed and not computed:
+                        continue
+                    raise ValueError('Journal fills differ on replay')
+                fills.extend(computed)
+                replayed.add(row.get('eventId'))
     end = started + 8*3600
     handoff = started + 4*3600
+    sampled_sessions = set()
     with journal.open('a', buffering=1) as out:
         def emit(kind, **fields):
-            row = dict(event=kind, session=session, at=int(time.time()), **fields)
+            row = dict(event=kind, eventId=uuid4().hex, session=session, at=int(time.time()), **fields)
+            if row.get('arm') == 'wave' or kind in ('stagedMark', 'stagedMissing', 'carryQuote'):
+                if row.get('mint'):
+                    origin = row.get('originSession', session)
+                    row['positionId'] = f"{origin}:wave:{row['mint']}"
+            if kind in ('entry','resaleMark','exit'):
+                buying = kind == 'entry'
+                row.update(provider='Jupiter', inputMint=collector.USDC if buying else row['mint'],
+                           outputMint=row['mint'] if buying else collector.USDC,
+                           inputRaw=SIZE if buying else row['qty'])
+            changes = apply(row)
+            row['fills'] = changes
+            fills.extend(changes)
             print(json.dumps(row), file=out)
-            apply(row)
             status = dict(startedAt=started, endsAt=end, updatedAt=row['at'], lastEvent=kind,
                           session=session, accounts={n:a.snapshot() for n,a in accounts.items()})
             status['fTargetNextTick'] = next_tick.snapshot()
             status['filterComparison'] = comparison.snapshot()
+            if kind in ('sessionEnd','sessionInterrupted','handoff','finished','resume'):
+                reconcile(fills, status['accounts'], START, FEE)
+                if identified:
+                    verify_journal(journal, status['accounts'], START, FEE)
+                status['ledgerVerified'] = identified
             temp = directory/'status.tmp'
             temp.write_text(json.dumps(status))
             temp.replace(directory/'status.json')
+            if kind == 'resaleMark' and row.get('arm') == 'wave' and session not in sampled_sessions:
+                sampled_sessions.add(session)
+                try:
+                    reference = raydium_quote(row['mint'], collector.USDC, row['qty'])
+                except collector.ERRORS:
+                    reference = None
+                emit('quoteComparison', sourceEventId=row['eventId'], provider='Raydium',
+                     inputMint=row['mint'], outputMint=collector.USDC, inputRaw=row['qty'],
+                     primaryAt=row['at'], primaryRaw=row['usdcRaw'], referenceRaw=reference)
             if kind in ('entry','exit','sessionEnd','finished','sessionInterrupted','resume','ready'):
                 for name, account in accounts.items():
                     print(json.dumps(dict(at=row['at'], event=kind, account=name,
@@ -341,6 +430,15 @@ def run(directory, segment):
                 session += 1
                 emit('sessionStart')
                 try:
+                    pending = {(origin, mint, pos['qty']) for account in accounts.values()
+                               for (origin, mint), pos in account.open.items() if origin < session}
+                    for origin, mint, qty in sorted(pending):
+                        try:
+                            raw = collector.spot_quote(mint, collector.USDC, qty)
+                        except collector.ERRORS:
+                            raw = None
+                        emit('carryQuote', originSession=origin, mint=mint, qty=qty, usdcRaw=raw,
+                             provider='Jupiter', inputMint=mint, outputMint=collector.USDC)
                     collector.run(pair_type=StagedPair)
                 except collector.ERRORS as exc:
                     emit('sessionInterrupted', reason=type(exc).__name__)
