@@ -20,6 +20,30 @@ class ScannerTests(unittest.TestCase):
         self.assertEqual(metrics(self.row, self.bars, [trade]*2, 3600)[5]['uniqueBuyers'], 1)
         self.assertIsNone(metrics(self.row, self.bars, [trade]*300, 3600)[5]['uniqueBuyers'])
 
+    def test_capped_trade_page_at_window_boundary_is_incomplete(self):
+        trade = dict(attributes=dict(block_timestamp='1970-01-01T00:55:00Z',
+                                     to_token_address='mint', tx_from_address='buyer'))
+        page = [trade] * 300
+        self.assertIsNone(metrics(self.row, self.bars, page, 3600)[5]['uniqueBuyers'])
+        older = dict(attributes=dict(trade['attributes'], block_timestamp='1970-01-01T00:54:59Z'))
+        self.assertEqual(metrics(self.row, self.bars, [older] + page[1:], 3600)[5]['uniqueBuyers'], 1)
+
+    def test_trade_feed_failure_preserves_volume_but_excludes_paper_entry(self):
+        def fetch(url, age):
+            if '/trades' in url:
+                raise ValueError('trade feed unavailable')
+            return {'data': {'attributes': {'ohlcv_list': self.bars}}}
+
+        events = []
+        with patch('newcomer_scanner.sample', return_value=[self.row]):
+            chosen = scan(lambda kind, **r: events.append(r), fetch, lambda *args: SIZE, lambda: 3600)
+        self.assertEqual(chosen, [])
+        self.assertEqual(events[0]['reasons'], ['tradeDataUnavailable'])
+        for window in WINDOWS:
+            self.assertEqual(events[0]['ranks'][window], 1)
+            self.assertEqual(events[0]['windows'][window]['volumeUsd'], window)
+            self.assertIsNone(events[0]['windows'][window]['uniqueBuyers'])
+
     def test_ranking_top_ten_and_quote_gate(self):
         rows = [dict(self.row, mint=str(i).zfill(2)) for i in range(12)]
         def fetch(url, age):
