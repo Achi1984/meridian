@@ -1,4 +1,4 @@
-import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint} from './helpers/pilot-log-fixture.mjs';
+import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, campaignEndpoint, scannerEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -223,10 +223,11 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details'), el=>[el.id,el.open])`),
           [['solana-scanner-live',false],['solana-meme-paper',false],['paper-advisor',false],['paper-reports-section',false],['paper-research-section',false]]);
         for(let i=0;i<100;i++){
-          if(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status')?.textContent==='Pilot 5 · Läuft'`))break;
+          if(await evaluate(`document.querySelector('#solana-meme-paper .campaign-status')?.textContent==='A–F · läuft' && document.querySelector('#solana-scanner-live summary')?.textContent.includes('veraltet')`))break;
           await new Promise(resolve=>setTimeout(resolve,20));
         }
-        assert.equal(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status').closest('details').open===false`),true);
+        assert.equal(await evaluate(`document.querySelector('#solana-meme-paper .campaign-status').textContent`),'A–F · läuft');
+        assert.match(await evaluate(`document.querySelector('#solana-scanner-live summary').textContent`),/90 Min. alt · veraltet/);
         if(size.mobile){
           // Read resting hit boxes once the view's entrance transform has finished.
           await evaluate(`Promise.all(document.querySelector('#view-strategies').getAnimations().map(a=>a.finished)).then(()=>true)`);
@@ -456,7 +457,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
-        const approvedExternal=new Set([pilotEndpoint,pilotStatusEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
+        const approvedExternal=new Set([pilotEndpoint,pilotStatusEndpoint,campaignEndpoint,scannerEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
           SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
           SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
         assert.ok(resources.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
