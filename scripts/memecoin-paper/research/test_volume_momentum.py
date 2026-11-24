@@ -1,3 +1,6 @@
+from contextlib import redirect_stdout
+from io import StringIO
+import json
 import unittest
 from unittest.mock import patch
 from volume_momentum import Position, comparison, entry_signal, run, signed_flow
@@ -43,15 +46,20 @@ class VolumeMomentumTests(unittest.TestCase):
 
     def test_paper_entry_gate_and_comparator_through_runner(self):
         now = [3600]
-        events = []
+        journal = StringIO()
         def scan(emit, **kwargs):
             emit('scannerSummary',asOf=3600)
             return [ROW]
         def quote(src, dst, quantity):
             return 123 if src != 'm' else 19_650_000
         with patch('volume_momentum.scan', scan), patch('volume_momentum.entry_signal',return_value=(True,{})):
-            run(fetch=lambda *a: {}, quote=quote, output=lambda kind, **e: events.append((kind,e)),
-                clock=lambda: now[0], sleep=lambda delay: now.__setitem__(0,now[0]+delay))
+            with redirect_stdout(journal):
+                run(fetch=lambda *a: {}, quote=quote, clock=lambda: now[0],
+                    sleep=lambda delay: now.__setitem__(0, now[0]+delay))
+        rows = list(map(json.loads, journal.getvalue().splitlines()))
+        events = [(row["event"], row) for row in rows]
+        self.assertEqual(dict(events)["momentumDecision"]["at"], 3600)
+        self.assertGreater(dict(events)["momentumMark"]["at"], 3600)
         decision=dict(events)['momentumDecision']
         self.assertFalse(decision['accepted'])
         self.assertTrue(decision['baseline'])
