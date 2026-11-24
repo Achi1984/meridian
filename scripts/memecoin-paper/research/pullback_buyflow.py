@@ -84,6 +84,19 @@ def summary(ledger):
                              unpriced=sum(p['state']=='unpriced' for p in positions),
                              realizedUsdc=round(sum(closed),6),
                              withoutBestUsdc=round(sum(closed)-max(closed),6) if closed else None)
+    rejected = [p for p in ledger.values() if not p['selected']]
+    outcomes = [p['netUsdc'] for p in rejected if p['state'] == 'closed']
+    avoided = -sum(x for x in outcomes if x < 0)
+    missed = sum(x for x in outcomes if x > 0)
+    result['rejectedComparable'] = dict(
+        total=len(rejected), closed=len(outcomes),
+        open=sum(p['state'] == 'open' for p in rejected),
+        unpriced=sum(p['state'] == 'unpriced' for p in rejected),
+        avoidedLossUsdc=round(avoided, 6),
+        missedProfitUsdc=round(missed, 6),
+        selectionBenefitUsdc=round(avoided - missed, 6) if outcomes else None,
+        missedNet10x=sum(x >= 9 * SIZE / UNIT for x in outcomes),
+    )
     return result
 
 
