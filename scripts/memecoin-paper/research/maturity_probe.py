@@ -33,45 +33,42 @@ def due_pools(journals, now):
 
 
 def probe(pools, fetch, quote=spot_quote, clock=time.time):
-    addresses = sorted(pools)
-    for start in range(0, len(addresses), 30):
-        batch = addresses[start:start+30]
+    for pool, (mint, counter, due) in sorted(pools.items()):
+        started = int(clock())
+        result = dict(pool=pool, mint=mint, earliest30mAt=due)
         try:
-            items = fetch(GT+'/pools/multi/'+','.join(batch), 120)['data']
-            current = {r['pool']: r for r in map(snapshot, items)}
+            items = fetch(GT+'/pools/multi/'+pool, 30)['data']
+            row = snapshot(items[0]) if items else None
         except ERRORS:
-            current = None
-        for pool in batch:
-            mint, counter, due = pools[pool]
-            at = int(clock())
-            result = dict(pool=pool, mint=mint, earliest30mAt=due, checkedAt=at,
-                          secondsAfterMaturity=at-due)
-            row = (current or {}).get(pool)
-            if current is None:
-                result['outcome'] = 'poolFeedUnavailable'
-            elif not row:
-                result['outcome'] = 'poolMissing'
-            elif (row['mint'], row['quote']) != (mint, counter):
-                result['outcome'] = 'identityMismatch'
-            elif row['liquidity'] < 5000:
-                result.update(outcome='lowLiquidity', liquidityUsd=row['liquidity'])
-            else:
-                end = at//60*60
-                try:
-                    passed, evidence = entry_signal(row, end, fetch)
-                    result.update(evidence=evidence, liquidityUsd=row['liquidity'])
-                    if not passed:
-                        result['outcome'] = evidence.get('reason', 'momentumRejected')
-                    else:
-                        quantity = quote(USDC, mint, SIZE)
-                        net = quote(mint, USDC, quantity)-2*FEE
-                        result['netResaleUsdc'] = net/UNIT
-                        result['outcome'] = 'quotePassed' if net >= 19_600_000 else 'roundTripCost'
-                    if clock()-end >= 120:
-                        result['outcome'] = 'staleSignal'
-                except ERRORS as exc:
-                    result.update(outcome='observationUnavailable', error=type(exc).__name__)
-            yield result
+            row = None
+            result['outcome'] = 'poolFeedUnavailable'
+        at = int(clock())
+        result.update(checkedAt=at, secondsAfterMaturity=at-due)
+        if not row:
+            result.setdefault('outcome', 'poolMissing')
+        elif row['pool'] != pool:
+            result['outcome'] = 'identityMismatch'
+        elif (row['mint'], row['quote']) != (mint, counter):
+            result['outcome'] = 'identityMismatch'
+        elif row['liquidity'] < 5000:
+            result.update(outcome='lowLiquidity', liquidityUsd=row['liquidity'])
+        else:
+            end = at//60*60
+            try:
+                passed, evidence = entry_signal(row, end, fetch)
+                result.update(evidence=evidence, liquidityUsd=row['liquidity'])
+                if not passed:
+                    result['outcome'] = evidence.get('reason', 'momentumRejected')
+                else:
+                    quantity = quote(USDC, mint, SIZE)
+                    net = quote(mint, USDC, quantity)-2*FEE
+                    result['netResaleUsdc'] = net/UNIT
+                    result['outcome'] = 'quotePassed' if net >= 19_600_000 else 'roundTripCost'
+                if clock()-end >= 120 or clock()-started >= 90:
+                    result['outcome'] = 'staleSignal'
+            except ERRORS as exc:
+                result.update(outcome='observationUnavailable', error=type(exc).__name__)
+        yield result
 
 
 def forward(fetch, clock=time.time, sleep=time.sleep):
