@@ -60,12 +60,15 @@ export function mountEightHourComparison(section, add, read, amount) {
   async function update() {
     const request = ++generation;
     let campaign = chosen;
+    let runState;
     if (chosen === validation) {
       try {
         const feed = await read('https://api.github.com/repos/Achi1984/meridian/actions/workflows/' +
           'newcomer-eight-hour.yml/runs?branch=paper%2Fovernight-staged-exits&per_page=1');
-        const id = feed.workflow_runs?.[0]?.id;
+        const latest = feed.workflow_runs?.[0];
+        const id = latest?.id;
         campaign = {...validation, id:Number.isSafeInteger(id) ? Math.max(id, activeId, validation.id) : activeId};
+        if (id === campaign.id) runState = latest.conclusion || latest.status;
       } catch { campaign = {...validation, id:activeId}; }
     }
     if (request !== generation) return;
@@ -74,7 +77,7 @@ export function mountEightHourComparison(section, add, read, amount) {
       body.replaceChildren();
       refresh = mountCampaign(body, add, read, amount, campaign);
     }
-    await refresh();
+    await refresh(runState);
   }
   select.addEventListener('change',() => {
     chosen = campaigns.find(item => String(item.id) === select.value) || validation;
@@ -113,7 +116,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
     const table = add(result,'table','');
     table.setAttribute('style','table-layout:fixed;overflow-wrap:anywhere');
     const header = add(add(table,'thead',''),'tr','');
-    for (const title of ['Strategie', 'Kontowert / PnL']) {
+    for (const title of ['Strategie', 'Kontowert / realisierter PnL']) {
       const cell = add(header,'th',title);
       cell.scope = 'col';
       cell.setAttribute('style','white-space:normal');
@@ -204,21 +207,21 @@ function mountCampaign(parent, add, read, amount, campaign) {
         'Abruf fehlgeschlagen. Der angezeigte Bericht behält seinen Zeitstand.';
     }
   }
-  async function refreshJobs() {
+  async function refreshJobs(runState) {
     try {
       const jobs = await read('https://api.github.com/repos/' + runPath + '/jobs');
       const phases = [['first','Erste vier Stunden'],['finish','Zweite vier Stunden']];
-      const states = {in_progress:'läuft',queued:'wartet',pending:'wartet',waiting:'wartet',
+      const states = {in_progress:'läuft',requested:'wartet',queued:'wartet',pending:'wartet',waiting:'wartet',
         success:'abgeschlossen',failure:'fehlgeschlagen',cancelled:'abgebrochen',skipped:'übersprungen',
         timed_out:'Zeitlimit erreicht'};
       const phase = jobs.jobs.find(item => item.name === 'finish') || jobs.jobs.find(item => item.name === 'first');
       const first = jobs.jobs.find(item => item.name === 'first');
       const current = first && first.status !== 'completed' ? first : phase;
       status.textContent = current ? phases.find(([id]) => id === current.name)[1] + ' · ' +
-        (states[current.conclusion || current.status] || 'unbekannt') : 'Laufstatus ausstehend';
+        (states[current.conclusion || current.status] || 'unbekannt') : states[runState] ? 'Achtstundenlauf · ' + states[runState] : 'Laufstatus ausstehend';
     } catch {
       status.textContent = 'Laufstatus derzeit nicht abrufbar.';
     }
   }
-  return () => Promise.all([refreshReport(), refreshJobs()]);
+  return runState => Promise.all([refreshReport(), refreshJobs(runState)]);
 }
