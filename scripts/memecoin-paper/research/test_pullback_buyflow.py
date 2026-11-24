@@ -17,6 +17,8 @@ class PullbackTests(unittest.TestCase):
         rows = [dict(mint=m, pool=m, quote=USDC, created='1970-01-01T00:00:00Z',
                      liquidity=10000, buys=6, sells=4) for m in ['yes','no']]
         def fetch(url, age):
+            if url.endswith('/trades'):
+                return {'data':[]}
             row = next(r for r in rows if url.endswith('/'+r['pool']))
             return {'data':dict(**row, attributes={'price_change_percentage':{'h1':-2 if row['mint']=='yes' else 1}})}
         def quote(src,dst,amount):
@@ -42,3 +44,47 @@ class PullbackTests(unittest.TestCase):
             tick(ledger,None,fail,lambda:88201,lambda:None)
         self.assertEqual(summary(ledger)['pullbackBuyflow']['unpriced'],1)
         self.assertIsNone(summary(ledger)['pullbackBuyflow']['withoutBestUsdc'])
+
+class VariantTests(unittest.TestCase):
+    def position(self):
+        from pullback_variants import initial
+        return dict(**initial(20_000_000),pool='pool',quantity=101,entryAt=100,due=86400,
+                    state='open',selected=True)
+
+    def test_confirmation_and_skipped_quote_window(self):
+        from pullback_variants import confirm
+        p=self.position()
+        row=dict(pool='pool',mint='m',buys=6,sells=4)
+        with patch('pullback_variants.snapshot',return_value=row):
+            confirm('m',p,lambda *_:{'data':{}},lambda src,dst,qty:102 if src==USDC else 20_000_000,lambda:401)
+        self.assertEqual(p['B']['state'],'open')
+        self.assertEqual(p['B']['quantity'],102)
+        late=self.position()
+        confirm('m',late,None,None,lambda:461)
+        self.assertEqual(late['B']['state'],'missedWindow')
+
+    def test_quarter_rounding_and_three_fees(self):
+        from pullback_variants import observe
+        p=self.position()
+        quotes={101:41_000_000,25:9_000_000,76:30_000_000}
+        def quote(src,dst,qty):
+            return quotes[qty]
+        observe('m',p,None,quote,lambda:200)
+        self.assertEqual(p['C']['soldQuantity'],25)
+        self.assertEqual(p['C']['saleAt'],200)
+        p.update(state='closed',netUsdc=20.9,exitAt=86400)
+        observe('m',p,None,quote,lambda:86401)
+        self.assertAlmostEqual(p['C']['netUsdc'],18.85)
+        self.assertEqual(p['follow48']['state'],'pending')
+        observe('m',p,None,quote,lambda:172801)
+        self.assertEqual(p['follow48']['state'],'closed')
+
+    def test_failed_partial_quote_stays_unpriced(self):
+        from pullback_variants import observe
+        p=self.position()
+        def quote(src,dst,qty):
+            if qty==101:return 41_000_000
+            raise ValueError('no partial quote')
+        observe('m',p,None,quote,lambda:200)
+        observe('m',p,None,quote,lambda:230)
+        self.assertEqual(p['C']['state'],'unpriced')

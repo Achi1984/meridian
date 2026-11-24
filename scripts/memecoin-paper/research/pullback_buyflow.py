@@ -7,6 +7,7 @@ import os
 from pathlib import Path
 import time
 
+from pullback_variants import initial, observe, sample_flow
 from meme_paper_account import FEE, SIZE, UNIT
 from new_pool_watch import GT, USDC, snapshot, spot_quote
 from newcomer_research import ERRORS
@@ -23,7 +24,7 @@ def age_ok(age):
     return 110 * 60 <= age <= 120 * 60
 
 
-def tick(ledger, fetch, quote, now, save):
+def monitor(ledger, fetch, quote, now, save):
     # Resolve existing observations even when discovery is unavailable.
     for mint, position in ledger.items():
         if position['state'] != 'open' or now() < position['due']:
@@ -41,6 +42,13 @@ def tick(ledger, fetch, quote, now, save):
         position.update(state='unpriced')
         save()
 
+    for mint, position in ledger.items():
+        observe(mint, position, fetch, quote, now)
+    save()
+
+
+def tick(ledger, fetch, quote, now, save):
+    monitor(ledger, fetch, quote, now, save)
     candidates = sample(now(), fetch)
     opened = 0
     for row in candidates:
@@ -70,8 +78,13 @@ def tick(ledger, fetch, quote, now, save):
                             entryAt=int(at), due=int(created)+86400, hourChangePct=change,
                             buys5m=fresh['buys'], sells5m=fresh['sells'], liquidityUsd=fresh['liquidity'],
                             netResaleAtEntryUsdc=(bid-2*FEE)/UNIT)
+        if ledger[mint]['selected']:
+            ledger[mint].update(initial(bid))
         save()
         opened += 1
+        if ledger[mint]['selected']:
+            ledger[mint]['netBuy5mUsd'] = sample_flow(fresh, int(at), fetch)
+            save()
     return dict(sampled=len(candidates), newObservations=opened)
 
 
@@ -84,13 +97,22 @@ def summary(ledger):
                              unpriced=sum(p['state']=='unpriced' for p in positions),
                              realizedUsdc=round(sum(closed),6),
                              withoutBestUsdc=round(sum(closed)-max(closed),6) if closed else None)
+    for label in ('B','C','follow48'):
+        arms = [p[label] for p in ledger.values() if label in p]
+        closed = [a['netUsdc'] for a in arms if a['state']=='closed']
+        result[label] = dict(states={s:sum(a['state']==s for a in arms)
+                                     for s in sorted({a['state'] for a in arms})},
+                             realizedUsdc=round(sum(closed),6),
+                             withoutBestUsdc=round(sum(closed)-max(closed),6) if closed else None)
     return result
 
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('ledger', type=Path)
-    path = parser.parse_args().ledger
+    parser.add_argument('--watch-seconds',type=int,default=0)
+    args = parser.parse_args()
+    path = args.ledger
     with Path(str(path)+'.lock').open('a') as lock:
         fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
         ledger = json.loads(path.read_text()) if path.exists() else {}
@@ -98,5 +120,19 @@ if __name__ == '__main__':
             temporary = Path(str(path)+'.tmp')
             temporary.write_text(json.dumps(ledger, allow_nan=False))
             os.replace(temporary, path)
-        stats = tick(ledger, market_reader(13), spot_quote, time.time, save)
+        deadline = time.monotonic()+args.watch_seconds
+        fetch = market_reader(13)
+        prior = len(ledger)
+        try:
+            stats = tick(ledger, fetch, spot_quote, time.time, save)
+        except ERRORS as exc:
+            stats = dict(discoveryError=type(exc).__name__)
+        stats['loadedObservations'] = prior
+        while time.monotonic()<deadline and any(
+                'B' in p and (p['B']['state']=='pending' or
+                (p['C']['state']=='open' and 'proceeds' not in p['C'])) for p in ledger.values()):
+            time.sleep(min(30,max(0,deadline-time.monotonic())))
+            monitor(ledger, fetch, spot_quote, time.time, save)
         print(json.dumps(dict(**stats, accounts=summary(ledger))))
+        if 'discoveryError' in stats:
+            raise SystemExit(1)
