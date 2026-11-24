@@ -310,7 +310,8 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                     event('botExitQuoteUnavailable',mint=mint,retry=retry,reason=type(exc).__name__)
                     continue
                 reason = account.observe(mint,sell,int(time.time()),final=final)
-                event('botSell' if reason else 'botMark',mint=mint,usdcRaw=sell,retry=retry,reason=reason)
+                event('botSell' if reason else 'botMark',mint=mint,usdcRaw=sell,retry=retry,reason=reason,
+                      positionId=f"{position['opened']}:{mint}",tokensRaw=int(position['qty']))
 
         for tick in range(ticks):
             clock = time.monotonic()
@@ -394,7 +395,8 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                                     or not launchpad_candidate(original,current,decision_at)):
                                 event('signalExpired',pool=pool,mint=mint)
                             elif account.buy(mint,pool,qty,sell,decision_at):
-                                event('botBuy',mint=mint,pool=pool,tokensRaw=qty,usdcRaw=SIZE)
+                                event('botBuy',mint=mint,pool=pool,tokensRaw=qty,usdcRaw=SIZE,
+                                      positionId=f'{decision_at}:{mint}')
                 except errors as exc:
                     status = exc.code if isinstance(exc, HTTPError) else None
                     event('quoteUnavailable', mint=mint, side=side, reason=type(exc).__name__,

@@ -85,3 +85,10 @@ test('refresh loads the run checkpoint and keeps it across a failed or older ref
   await refresh();
   assert.deepEqual(report.children,original);
 });
+
+test('requires cash and equity to agree when no position is open', () => {
+  for (const equityUsdc of [null, 1200]) {
+    assert.throws(() => comparison({openPositions:[], cashUsdc:1000, equityUsdc}));
+  }
+  assert.equal(comparison({openPositions:[], cashUsdc:1000, equityUsdc:1000}).equity,1000);
+});
