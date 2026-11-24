@@ -5,14 +5,14 @@ on:
       mode:
         description: Paper study
         type: choice
-        options: [momentum, paired]
+        options: [momentum, paired, maturity]
         default: momentum
 permissions:
   contents: read
 jobs:
   scan:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: ${{ inputs.mode == 'maturity' && 75 || 45 }}
     defaults:
       run:
         working-directory: scripts/memecoin-paper/research
@@ -20,15 +20,18 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - run: python3 -m unittest test_newcomer_scanner test_newcomer_wave_pair test_volume_momentum
+      - run: python3 -m unittest test_newcomer_scanner test_newcomer_wave_pair test_volume_momentum test_maturity_probe
       - run: python3 -u volume_momentum.py | tee scanner.jsonl
         shell: bash
         if: inputs.mode == 'momentum'
       - if: inputs.mode == 'paired'
         run: python3 -u newcomer_wave_pair.py --scanner | tee scanner.jsonl
         shell: bash
+      - if: inputs.mode == 'maturity'
+        run: python3 -u maturity_probe.py | tee scanner.jsonl
+        shell: bash
       - run: python3 scanner_summary.py scanner.jsonl >> "$GITHUB_STEP_SUMMARY"
-        if: always()
+        if: always() && inputs.mode != 'maturity'
       - uses: actions/upload-artifact@v4
         if: always()
         with:
