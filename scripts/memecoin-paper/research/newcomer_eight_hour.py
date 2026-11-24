@@ -188,6 +188,34 @@ class FilterComparison:
                 for group in ('both', 'excludedByFilter', 'cOnlyCapacity', 'fOnlyCapacity')}
 
 
+class NextTickTarget:
+    """Compare the target quote with the next scheduled full-position resale mark."""
+    def __init__(self):
+        self.pending = {}
+        self.targets = self.pairs = self.lower = 0
+        self.original = self.delayed = 0
+
+    def observe(self, key, row, target):
+        kind = row['event']
+        if target:
+            self.targets += 1
+            self.pending[key] = row
+        elif key in self.pending and kind in ('resaleMark', 'missingExitQuote', 'lateExitQuote'):
+            first = self.pending.pop(key)
+            if (kind == 'resaleMark' and row['tick'] == first['tick'] + 1
+                    and row['qty'] == first['qty'] and row['at'] > first['at']):
+                bid = row['usdcRaw']
+                self.pairs += 1
+                self.original += first['usdcRaw'] - SIZE - 2*FEE
+                self.delayed += bid - SIZE - 2*FEE
+                self.lower += bid < first['usdcRaw']
+
+    def snapshot(self):
+        return dict(targetExits=self.targets, paired=self.pairs, withoutNextQuote=self.targets-self.pairs,
+                    lowerNextQuote=self.lower, pairedOriginalNetUsdc=self.original/UNIT if self.pairs else None,
+                    pairedNextNetUsdc=self.delayed/UNIT if self.pairs else None)
+
+
 def run(directory, segment):
     directory.mkdir(exist_ok=True, parents=True)
     journal = directory/'events.jsonl'
@@ -195,6 +223,7 @@ def run(directory, segment):
                 [('A', 'trailing'), ('B', 'standard'), ('C', 'fixed'), ('E', 'failedRecovery')]}
 
     comparison = FilterComparison()
+    next_tick = NextTickTarget()
     smaller_pools = set()
     accounts['F'] = Account('smallPoolFixed')
 
@@ -257,6 +286,7 @@ def run(directory, segment):
                     continue
                 account.update(row, row['session'])
             current = key in accounts['C'].open, key in accounts['F'].open
+            next_tick.observe(key, row, prior[1] and not current[1] and row['event'] == 'resaleMark')
             comparison.update(key, row['event'], key in smaller_pools, prior, current, row.get('usdcRaw'))
         if row['event'] in ('sessionEnd', 'sessionInterrupted'):
             for account in accounts.values():
@@ -286,6 +316,7 @@ def run(directory, segment):
             apply(row)
             status = dict(startedAt=started, endsAt=end, updatedAt=row['at'], lastEvent=kind,
                           session=session, accounts={n:a.snapshot() for n,a in accounts.items()})
+            status['fTargetNextTick'] = next_tick.snapshot()
             status['filterComparison'] = comparison.snapshot()
             temp = directory/'status.tmp'
             temp.write_text(json.dumps(status))
