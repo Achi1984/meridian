@@ -30,7 +30,7 @@ jobs:
             const {startedAt, endsAt, updatedAt, lastEvent, accounts} = JSON.parse(fs.readFileSync('report/status.json','utf8'));
             if (lastEvent !== 'finished' || ![startedAt,endsAt,updatedAt].every(Number.isSafeInteger) ||
                 endsAt-startedAt !== 28800 || updatedAt < endsAt) throw Error('unfinished');
-            const report = {runId:run.id, attempt:run.run_attempt, startedAt, endsAt, updatedAt, accounts:{}};
+            const report = {runId:run.id, attempt:run.run_attempt, startedAt, endsAt, updatedAt, lastEvent, accounts:{}};
             const policies = {A:'trailing',B:'standard',C:'fixed',D:'staged',E:'failedRecovery',F:'smallPoolFixed'};
             for (const [key, policy] of Object.entries(policies)) {
               const a = accounts[key];
@@ -52,7 +52,9 @@ jobs:
             try {
               const {data} = await github.rest.repos.getContent({owner,repo,path,ref:branch});
               const previous = JSON.parse(Buffer.from(data.content,'base64'));
-              if (previous.attempt >= run.run_attempt) return;
+              if (previous.attempt > run.run_attempt ||
+                  (previous.attempt === run.run_attempt && previous.lastEvent === 'finished' &&
+                   previous.updatedAt >= updatedAt)) return;
               sha = data.sha;
             } catch (error) { if (error.status !== 404) throw error; }
             await github.rest.repos.createOrUpdateFileContents({owner,repo,path,branch,sha,
