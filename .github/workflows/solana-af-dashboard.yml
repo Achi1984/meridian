@@ -1,0 +1,61 @@
+name: Publish completed A-F paper comparison
+on:
+  workflow_run:
+    workflows: ['Meridian overnight staged exits']
+    types: [completed]
+    branches: [paper/overnight-staged-exits]
+permissions: {}
+jobs:
+  publish:
+    if: >-
+      github.event.workflow_run.conclusion == 'success' &&
+      github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    permissions:
+      actions: read
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: abc-final
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+          path: report
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const run = context.payload.workflow_run;
+            if (fs.statSync('report/status.json').size > 2000000) throw Error('report size');
+            const {startedAt, endsAt, updatedAt, lastEvent, accounts} = JSON.parse(fs.readFileSync('report/status.json','utf8'));
+            if (lastEvent !== 'finished' || ![startedAt,endsAt,updatedAt].every(Number.isSafeInteger) ||
+                endsAt-startedAt !== 28800 || updatedAt < endsAt) throw Error('unfinished');
+            const report = {runId:run.id, attempt:run.run_attempt, startedAt, endsAt, updatedAt, lastEvent, accounts:{}};
+            const policies = {A:'trailing',B:'standard',C:'fixed',D:'staged',E:'failedRecovery',F:'smallPoolFixed'};
+            for (const [key, policy] of Object.entries(policies)) {
+              const a = accounts[key];
+              if (a?.policy !== policy || !Array.isArray(a.openPositions)) throw Error('unexpected policy');
+              const row = {policy, openPositions:a.openPositions.map(()=>({}))};
+              for (const k of ['cashUsdc','realizedUsdc','equityUsdc','realizedWithoutBestMintUsdc','sampledMaxDrawdownUsdc']) {
+                if (!Number.isFinite(a[k]) && !(a[k] === null && ['equityUsdc','realizedWithoutBestMintUsdc'].includes(k))) throw Error(k);
+                row[k] = a[k];
+              }
+              for (const k of ['closedTrades','missingExitQuotes']) {
+                if (!Number.isSafeInteger(a[k]) || a[k] < 0) throw Error(k);
+                row[k] = a[k];
+              }
+              report.accounts[key] = row;
+            }
+            const branch = 'paper-dashboard-data', path = 'solana-abc-'+run.id+'.json';
+            const {owner,repo} = context.repo;
+            let sha;
+            try {
+              const {data} = await github.rest.repos.getContent({owner,repo,path,ref:branch});
+              const previous = JSON.parse(Buffer.from(data.content,'base64'));
+              if (previous.attempt > run.run_attempt ||
+                  (previous.attempt === run.run_attempt && previous.lastEvent === 'finished' &&
+                   previous.updatedAt >= updatedAt)) return;
+              sha = data.sha;
+            } catch (error) { if (error.status !== 404) throw error; }
+            await github.rest.repos.createOrUpdateFileContents({owner,repo,path,branch,sha,
+              message:'Publish A-F paper comparison '+run.id,content:Buffer.from(JSON.stringify(report)).toString('base64')});

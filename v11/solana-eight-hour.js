@@ -4,6 +4,10 @@ const recovery = {id:45210142704, start:1795449172, title:'Ausstiege · Käufer-
   names:{A:'Nachlaufender Gewinnausstieg', B:'Standardausstieg', C:'10 % Nettoziel'},
   policies:{A:'trailing', B:'standard', C:'fixed'}};
 
+const validation = {id:45433341029, title:'A–F · Aktueller Vergleich',
+  names:{...recovery.names, D:'Teilverkäufe', E:'Früher Verlustausstieg', F:'Nettoziel · Pool unter 20.000 USD'},
+  policies:{...recovery.policies, D:'staged', E:'failedRecovery', F:'smallPoolFixed'}};
+
 const reasons = new Map(Object.entries({early:'Soforteinstieg', wave:'Käufer-Erholung', time:'Zeitlimit',
   target:'Nettoziel', stop:'Verlustgrenze', trailing:'Nachlaufender Gewinnausstieg'}));
 const vienna = time => new Date(time * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
@@ -43,16 +47,40 @@ export function mountEightHourComparison(section, add, read, amount) {
   panel.className = 'solana-comparison';
   const label = add(panel,'label','Paperlauf ');
   const select = add(label,'select','');
-  for (const campaign of [recovery, original]) add(select,'option',campaign.title).value = String(campaign.id);
+  const campaigns = [validation, recovery, original];
+  for (const campaign of campaigns) add(select,'option',campaign.title).value = String(campaign.id);
   const body = add(panel,'section','');
-  let refresh = mountCampaign(body, add, read, amount, recovery);
+  let chosen = validation;
+  let activeId = chosen.id;
+  let refresh = mountCampaign(body, add, read, amount, chosen);
+  let generation = 0;
+  async function update() {
+    const request = ++generation;
+    let campaign = chosen;
+    if (chosen === validation) {
+      try {
+        const feed = await read('https://api.github.com/repos/Achi1984/meridian/actions/workflows/' +
+          'newcomer-eight-hour.yml/runs?branch=paper%2Fovernight-staged-exits&per_page=1');
+        const id = feed.workflow_runs?.[0]?.id;
+        campaign = {...validation, id:Number.isSafeInteger(id) ? Math.max(id, activeId, validation.id) : activeId};
+      } catch { campaign = {...validation, id:activeId}; }
+    }
+    if (request !== generation) return;
+    if (campaign.id !== activeId) {
+      activeId = campaign.id;
+      body.replaceChildren();
+      refresh = mountCampaign(body, add, read, amount, campaign);
+    }
+    await refresh();
+  }
   select.addEventListener('change',() => {
+    chosen = campaigns.find(item => String(item.id) === select.value) || validation;
+    activeId = chosen.id;
     body.replaceChildren();
-    const campaign = select.value === String(original.id) ? original : recovery;
-    refresh = mountCampaign(body, add, read, amount, campaign);
-    void refresh();
+    refresh = mountCampaign(body, add, read, amount, chosen);
+    void update();
   });
-  return () => refresh();
+  return update;
 }
 
 function mountCampaign(parent, add, read, amount, campaign) {
@@ -74,7 +102,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
   let displayedAt = -1;
   let revision = 0;
   function render(snapshot, source) {
-    if (snapshot.startedAt !== campaign.start ||
+    if ((campaign.start === undefined ? snapshot.runId !== runId : snapshot.startedAt !== campaign.start) ||
         (snapshot.runId !== undefined && snapshot.runId !== runId)) throw Error('run');
     const rows = accountRows(snapshot, campaign);
     result.replaceChildren();
@@ -92,7 +120,9 @@ function mountCampaign(parent, add, read, amount, campaign) {
       const line = add(body,'tr','');
       const strategy = add(line,'th',row.name);
       strategy.scope = 'row';
-      add(strategy,'small',row.open ? row.open + ' offen' : 'Keine Position').setAttribute('style','display:block');
+      add(strategy,'small',row.closed + ' geschlossen · ' + row.open + ' offen').setAttribute('style','display:block');
+      if (row.withoutBest != null) add(strategy,'small','Ohne besten Token · ' + amount(row.withoutBest))
+        .setAttribute('style','display:block');
       const last = row.trades.at(-1);
       if (last) add(strategy,'small',(last.action === 'exit' ? 'Verkauf' : 'Kauf') + ' · ' + vienna(last.at)).setAttribute('style','display:block');
       const balance = add(line,'td',row.equity === null ? 'Bewertung offen' : amount(row.equity));
@@ -104,6 +134,12 @@ function mountCampaign(parent, add, read, amount, campaign) {
     metrics.replaceChildren();
     if (Number.isSafeInteger(snapshot.lastQuoteAt) && snapshot.lastQuoteAt >= snapshot.startedAt &&
         snapshot.lastQuoteAt <= snapshot.updatedAt) add(metrics,'p','Letzte Rückverkaufsquote · ' + vienna(snapshot.lastQuoteAt));
+    const f = rows.find(row => row.key === 'F');
+    if (f) {
+      const c = rows.find(row => row.key === 'C');
+      add(metrics,'p','F gegenüber C · realisiert ' + amount(f.net-c.net) + ' · Kontowert ' +
+        (f.equity === null || c.equity === null ? 'Bewertung offen' : amount(f.equity-c.equity)));
+    }
     const benchmark = rows[1];
     for (const index of [0, 2]) {
       const candidate = rows[index];
@@ -147,7 +183,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
       const snapshot = JSON.parse(await file.text());
       if (current === revision) render(snapshot,'Lokaler Bericht');
     } catch {
-      if (current === revision) notice.textContent = 'Datei konnte nicht als A/B/C-Kontobericht gelesen werden.';
+      if (current === revision) notice.textContent = 'Datei konnte nicht als Kontobericht gelesen werden.';
     }
   });
   async function refreshReport() {
@@ -155,7 +191,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
     try {
       const snapshot = await read('https://api.github.com/repos/Achi1984/meridian/contents/solana-abc-' +
         runId + '.json?ref=paper-dashboard-data', true);
-      if (snapshot.runId !== runId || snapshot.startedAt !== campaign.start) throw Error('run');
+      if (snapshot.runId !== runId) throw Error('run');
       if (current !== revision) return;
       if (snapshot.updatedAt > displayedAt) render(snapshot,'Bestätigter Laufbericht');
       notice.textContent = '';

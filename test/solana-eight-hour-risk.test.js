@@ -47,12 +47,16 @@ test('refresh loads the run checkpoint and keeps it across a failed or older ref
   const newSnapshot = {runId:45210142704, startedAt:1795449172, endsAt:1795477972, updatedAt:1795449172,
     accounts:Object.fromEntries(Object.entries({A:'trailing',B:'standard',C:'fixed'})
       .map(([name,policy])=>[name,{...account,policy}]))};
-  let response = newSnapshot;
+  let response = { ...newSnapshot, runId:45433341029, accounts:{...newSnapshot.accounts,
+    D:{...account,policy:'staged'}, E:{...account,policy:'failedRecovery'},
+    F:{...account,policy:'smallPoolFixed',realizedWithoutBestMintUsdc:2}}};
   const read = async url => url.endsWith('/jobs') ? {jobs:[]} : response;
   const refresh = mountEightHourComparison({children:[]},add,read,String);
   await refresh();
   const newReport = nodes.find(node=>node.tag==='div');
   assert.ok(contents(newReport).some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
+  assert.equal(contents(newReport).filter(node=>node.scope==='row').length,6);
+  assert.ok(contents(newReport).some(node=>node.textContent.includes('Ohne besten Token · 2')));
   response = snapshot;
   await refresh();
   assert.ok(contents(newReport).some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
