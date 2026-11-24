@@ -5,7 +5,7 @@ from collections import Counter
 from meme_paper_account import FEE, UNIT
 from new_pool_watch import GT, SIZE, USDC, number, spot_quote
 from newcomer_research import ERRORS
-from newcomer_scanner import market_reader, metrics, scan, timestamp
+from newcomer_scanner import LONG_WINDOWS, market_reader, metrics, scan, timestamp
 from newcomer_wave_pair import EXIT_GRACE, HOLD_SECONDS, emit
 
 
@@ -34,7 +34,7 @@ def signed_flow(trades, row, start, end):
 
 def entry_signal(row, end, fetch):
     path = f"{GT}/pools/{row['pool']}"
-    candles = fetch(path+f'/ohlcv/minute?aggregate=1&currency=usd&token=base&limit=31'
+    candles = fetch(path+f'/ohlcv/minute?aggregate=1&currency=usd&token=base&limit={max(LONG_WINDOWS)+1}'
                     f'&include_empty_intervals=true&before_timestamp={end}', 120)
     if candles['meta']['base']['address'] != row['mint']:
         raise ValueError('pool mint mismatch')
@@ -53,13 +53,22 @@ def entry_signal(row, end, fetch):
         return False, dict(reason='incompleteTradeFlow')
     passed = (previous > 0 and current >= 2*previous and change is not None
               and 2-1e-9 <= change <= 10+1e-9 and net > 0)
-    return passed, dict(asOf=end, volume5mUsd=current, previousMean5mUsd=previous,
+    # Compare disjoint intervals using only closed candles before the decision.
+    context = {}
+    for minutes in LONG_WINDOWS:
+        window = windows.get(minutes)
+        if window and window['changePct'] is not None:
+            older_volume = window['volumeUsd'] - thirty['volumeUsd']
+            context[str(minutes)] = (window['changePct'] > 0 and older_volume > 0
+                                     and thirty['volumeUsd']/30 > older_volume/(minutes-30))
+    return passed, dict(longWindows=context, asOf=end, volume5mUsd=current, previousMean5mUsd=previous,
                         changePct=change, netBuys5mUsd=net)
 
 
 class Position:
-    def __init__(self, row, qty, initial, at, accepted):
+    def __init__(self, row, qty, initial, at, accepted, long_windows=None):
         self.row, self.qty, self.at = row, qty, at
+        self.long_windows = long_windows or {}
         self.accepted = accepted
         self.last_quote_at = at
         self.high, self.high_at = initial, at
@@ -118,6 +127,21 @@ def comparison(positions):
     rows['filterComparison'] = dict(skippedClosed=len(skipped),
         avoidedLossUsdc=-sum(min(0,p.standard) for p in skipped)/UNIT,
         missedProfitUsdc=sum(max(0,p.standard) for p in skipped)/UNIT)
+    rows['longWindowComparison'] = {}
+    for minutes in LONG_WINDOWS:
+        key = str(minutes)
+        baseline = [p for p in positions if p.accepted]
+        covered = [p for p in baseline if key in p.long_windows]
+        closed = [p for p in covered if p.standard is not None]
+        retained = [p for p in closed if p.long_windows[key]]
+        skipped = [p.standard for p in closed if not p.long_windows[key]]
+        rows['longWindowComparison'][key] = dict(
+            missingHistory=len(baseline)-len(covered), unresolved=len(covered)-len(closed),
+            comparableClosed=len(closed), retainedClosed=len(retained),
+            baselineNetUsdc=sum(p.standard for p in closed)/UNIT,
+            filteredNetUsdc=sum(p.standard for p in retained)/UNIT,
+            avoidedLossUsdc=-sum(min(0, value) for value in skipped)/UNIT,
+            missedProfitUsdc=sum(max(0, value) for value in skipped)/UNIT)
     return rows
 
 
@@ -155,7 +179,7 @@ def run(fetch=None, quote=spot_quote, output=emit, clock=time.time, sleep=time.s
                qty=qty, netResaleUsdc=(bid-2*FEE)/UNIT, baseline=baseline, accepted=accepted,
                comparable=usable and baseline)
         if usable and baseline:
-            positions.append(Position(row, qty, bid, at, accepted))
+            positions.append(Position(row, qty, bid, at, accepted, evidence.get('longWindows')))
     next_tick = clock()+60
     while any(clock()-p.at <= HOLD_SECONDS+EXIT_GRACE and p.delayed is None for p in positions):
         sleep(max(0, next_tick-clock()))

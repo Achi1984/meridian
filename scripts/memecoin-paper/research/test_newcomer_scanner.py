@@ -11,7 +11,7 @@ class ScannerTests(unittest.TestCase):
 
     def test_windows_and_incomplete_history(self):
         result = metrics(self.row, self.bars, [], 3600)
-        self.assertEqual([result[w]['volumeUsd'] for w in WINDOWS], list(WINDOWS))
+        self.assertEqual([result[w]['volumeUsd'] for w in result], [5, 10, 30, 60])
         self.assertAlmostEqual(result[5]['changePct'], 10)
         self.assertNotIn(60, metrics(self.row, self.bars[1:], [], 3600))
         self.assertIn(30, metrics(self.row, self.bars[1:], [], 3600))
@@ -19,6 +19,16 @@ class ScannerTests(unittest.TestCase):
                                      to_token_address='mint', tx_from_address='buyer'))
         self.assertEqual(metrics(self.row, self.bars, [trade]*2, 3600)[5]['uniqueBuyers'], 1)
         self.assertIsNone(metrics(self.row, self.bars, [trade]*300, 3600)[5]['uniqueBuyers'])
+
+    def test_multihour_windows_require_complete_pool_history(self):
+        bars = [[i*60, 10, 11, 9, 11, 1] for i in range(720)]
+        full = metrics(self.row, bars, None, 43200)
+        self.assertEqual([full[w]['volumeUsd'] for w in WINDOWS], list(WINDOWS))
+        young = dict(self.row, created='1970-01-01T00:00:01Z')
+        self.assertNotIn(720, metrics(young, bars, None, 43200))
+        gaps = metrics(self.row, bars[1:], None, 43200)
+        self.assertNotIn(720, gaps)
+        self.assertIn(360, gaps)
 
     def test_capped_trade_page_at_window_boundary_is_incomplete(self):
         trade = dict(attributes=dict(block_timestamp='1970-01-01T00:55:00Z',
@@ -39,7 +49,7 @@ class ScannerTests(unittest.TestCase):
             chosen = scan(lambda kind, **r: events.append(r), fetch, lambda *args: SIZE, lambda: 3600)
         self.assertEqual(chosen, [])
         self.assertEqual(events[0]['reasons'], ['tradeDataUnavailable'])
-        for window in WINDOWS:
+        for window in (5, 10, 30, 60):
             self.assertEqual(events[0]['ranks'][window], 1)
             self.assertEqual(events[0]['windows'][window]['volumeUsd'], window)
             self.assertIsNone(events[0]['windows'][window]['uniqueBuyers'])

@@ -19,6 +19,15 @@ def render(events):
             print(f"| {label} | {arm['closed']} | {arm['unresolved']} | {arm['netUsdc']} | {arm['withoutBestUsdc']} |")
         for label in ('filterComparison', 'exitComparison', 'oneQuoteLater'):
             print(f"\n{label}: `{json.dumps(momentum[label])}`")
+        if 'longWindowComparison' in momentum:
+            print('### Momentum with longer price and volume confirmation')
+            print('| Hours | Missing | Open | Closed baseline / retained | Baseline / filtered USDC | Avoided loss / missed gain USDC |')
+            print('|---:|---:|---:|---:|---:|---:|')
+            for minutes, row in momentum['longWindowComparison'].items():
+                print(f"| {int(minutes)//60} | {row['missingHistory']} | {row['unresolved']} | "
+                      f"{row['comparableClosed']} / {row['retainedClosed']} | "
+                      f"{row['baselineNetUsdc']} / {row['filteredNetUsdc']} | "
+                      f"{row['avoidedLossUsdc']} / {row['missedProfitUsdc']} |")
     summaries = [e for e in events if e['event'] == 'scannerSummary']
     if not summaries:
         print('Scanner incomplete. No verified leaderboard.')
