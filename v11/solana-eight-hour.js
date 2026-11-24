@@ -95,6 +95,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
   const root = add(parent,'section','');
   const status = add(root,'p','Laufstatus wird beim Öffnen geladen.');
   status.setAttribute('role','status');
+  status.className = 'af-muted';
   const result = add(root,'div','Noch kein Kontobericht geladen.');
   result.setAttribute('aria-live','polite');
   const details = add(root,'details','');
@@ -131,10 +132,11 @@ function mountCampaign(parent, add, read, amount, campaign) {
         .setAttribute('style','display:block');
       const last = row.trades.at(-1);
       if (last) add(strategy,'small',(last.action === 'exit' ? 'Verkauf' : 'Kauf') + ' · ' + vienna(last.at)).setAttribute('style','display:block');
-      const balance = add(line,'td',row.equity === null ? 'Bewertung offen' : amount(row.equity));
-      const pnl = add(balance,'span',(row.net > 0 ? '+' : '') + amount(row.net));
-      pnl.setAttribute('style','display:block');
-      pnl.className = row.net > 0 ? 'tone-safe' : row.net < 0 ? 'tone-danger' : '';
+      const balance = add(line,'td','');
+      const value = add(balance,'span',row.equity === null ? 'Bewertung offen' : amount(row.equity));
+      value.className = row.equity === null ? 'account-value af-waiting' : 'account-value';
+      const pnl = add(balance,'span','Realisiert · ' + (row.net > 0 ? '+' : '') + amount(row.net));
+      pnl.className = 'account-pnl ' + (row.net > 0 ? 'af-positive' : row.net < 0 ? 'af-negative' : 'af-muted');
     }
     add(result,'small',source + ' · ' + at + ' (Wien)');
     metrics.replaceChildren();
@@ -208,20 +210,33 @@ function mountCampaign(parent, add, read, amount, campaign) {
     }
   }
   async function refreshJobs(runState) {
+    const url = 'https://api.github.com/repos/' + runPath;
+    const states = {
+      requested:['wartet','waiting'], queued:['wartet','waiting'], pending:['wartet','waiting'],
+      waiting:['wartet','waiting'], in_progress:['läuft','running'], success:['abgeschlossen','positive'],
+      failure:['fehlgeschlagen','negative'], timed_out:['Zeitlimit erreicht','negative'],
+      cancelled:['abgebrochen','muted'], skipped:['übersprungen','muted']
+    };
+    let title = 'Achtstundenlauf';
     try {
-      const jobs = await read('https://api.github.com/repos/' + runPath + '/jobs');
-      const phases = [['first','Erste vier Stunden'],['finish','Zweite vier Stunden']];
-      const states = {in_progress:'läuft',requested:'wartet',queued:'wartet',pending:'wartet',waiting:'wartet',
-        success:'abgeschlossen',failure:'fehlgeschlagen',cancelled:'abgebrochen',skipped:'übersprungen',
-        timed_out:'Zeitlimit erreicht'};
-      const phase = jobs.jobs.find(item => item.name === 'finish') || jobs.jobs.find(item => item.name === 'first');
-      const first = jobs.jobs.find(item => item.name === 'first');
-      const current = first && first.status !== 'completed' ? first : phase;
-      status.textContent = current ? phases.find(([id]) => id === current.name)[1] + ' · ' +
-        (states[current.conclusion || current.status] || 'unbekannt') : states[runState] ? 'Achtstundenlauf · ' + states[runState] : 'Laufstatus ausstehend';
-    } catch {
-      status.textContent = 'Laufstatus derzeit nicht abrufbar.';
+      const {jobs} = await read(url + '/jobs');
+      const first = jobs.find(job => job.name === 'first');
+      const finish = jobs.find(job => job.name === 'finish');
+      const phase = first && first.status !== 'completed' ? first : finish || first;
+      if (phase) {
+        title = phase.name === 'first' ? 'Erste vier Stunden' : 'Zweite vier Stunden';
+        runState = phase.conclusion || phase.status;
+      }
+    } catch { /* The workflow status remains available when its jobs cannot be read. */ }
+    if (!runState) {
+      try {
+        const run = await read(url);
+        if (run.id === runId) runState = run.conclusion || run.status;
+      } catch { /* Both status sources may be unavailable. */ }
     }
+    const [label, tone] = states[runState] || ['Status unbekannt','muted'];
+    status.textContent = title + ' · ' + label;
+    status.className = 'af-' + tone;
   }
   return runState => Promise.all([refreshReport(), refreshJobs(runState)]);
 }
