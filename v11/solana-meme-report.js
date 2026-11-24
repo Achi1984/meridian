@@ -272,7 +272,7 @@ export function mountLiveScanner(section) {
   });
   const reasons = {shortHistory:'Historie zu kurz', missing30mData:'30-Minuten-Daten lückenhaft',
     quoteUnavailable:'Quote fehlt', roundTripCost:'Rückverkauf zu teuer',
-    marketDataUnavailable:'Marktdaten fehlen', outsidePairedTopTen:'Außerhalb der gemeinsamen Top 10'};
+    tradeDataUnavailable:'Handelsdaten fehlen', marketDataUnavailable:'Marktdaten fehlen', outsidePairedTopTen:'Außerhalb der gemeinsamen Top 10'};
   let latest, pending, timer, failed = false;
   function mint(parent, c) {
     const link = add(parent, 'a', c.symbol || c.mint.slice(0,8));
@@ -329,7 +329,7 @@ export function mountLiveScanner(section) {
       }
     }
     const gaps = latest.candidates.filter(c => c.reasons.includes('marketDataUnavailable') ||
-      c.reasons.includes('missing30mData')).length;
+      c.reasons.includes('missing30mData') || c.reasons.includes('tradeDataUnavailable')).length;
     if (gaps) add(result,'p','Fehlende Marktdaten bei ' + gaps + ' Kandidaten.');
   }
   async function refresh() {

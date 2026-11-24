@@ -86,7 +86,7 @@ def metrics(row, candles, trades, end):
             raise ValueError('invalid candle timestamp')
         bars[at] = number(op), number(close), number(volume)
     created = int(timestamp(row['created'])//60)*60
-    fills = [t['attributes'] for t in trades]
+    fills = [t['attributes'] for t in (trades or [])]
     times = [(timestamp(t['block_timestamp']), t) for t in fills]
     result = {}
     for minutes in WINDOWS:
@@ -95,7 +95,7 @@ def metrics(row, candles, trades, end):
         if not slots or any(at not in bars for at in slots):
             continue
         opening = bars[start][0]
-        covered = len(times) < 300 or min(at for at, _ in times) <= start
+        covered = trades is not None and (len(times) < 300 or min(at for at, _ in times) < start)
         buys = [t.get('tx_from_address') for at, t in times if start <= at < end
                 and t.get('to_token_address') == row['mint'] and not t.get('is_anomalous')]
         result[minutes] = dict(volumeUsd=sum(bars[at][2] for at in slots),
@@ -155,7 +155,15 @@ def scan(emit, fetch=None, quote=spot_quote, now=time.time, *, ranked_windows_on
         try:
             candles = fetch(path+f'/ohlcv/minute?aggregate=1&currency=usd&limit=60'
                             f'&include_empty_intervals=true&before_timestamp={end}', 120)
-            trades = fetch(path+'/trades', 120)['data']
+            try:
+                trades = fetch(path+'/trades', 120)['data']
+                if not isinstance(trades, list):
+                    raise ValueError('invalid trade page')
+            except ERRORS as exc:
+                if isinstance(exc, HTTPError) and exc.code == 429:
+                    raise
+                trades = None
+                result['reasons'].append('tradeDataUnavailable')
             result['windows'] = metrics(row, candles['data']['attributes']['ohlcv_list'], trades, end)
         except ERRORS as exc:
             if isinstance(exc, HTTPError) and exc.code == 429:
