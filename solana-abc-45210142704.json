@@ -1,21 +1,30 @@
 {
   "startedAt": 1795449172,
   "endsAt": 1795477972,
-  "updatedAt": 1795464239,
-  "lastEvent": "handoff",
-  "session": 22,
+  "updatedAt": 1795477972,
+  "lastEvent": "finished",
+  "session": 43,
   "accounts": {
     "A": {
       "policy": "trailing",
-      "cashUsdc": 944.017857,
-      "equityUsdc": 944.017857,
-      "realizedUsdc": -55.982143,
-      "closedTrades": 8,
-      "openPositions": [],
-      "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 60.681112,
-      "cashIfOpenWorthZeroUsdc": 944.017857,
-      "realizedWithoutBestMintUsdc": -60.52637,
+      "cashUsdc": 943.664678,
+      "equityUsdc": null,
+      "realizedUsdc": -36.285322,
+      "closedTrades": 15,
+      "openPositions": [
+        {
+          "mint": "NuKJU263z16LFrxUHu2XDumMzcDdCr6ziBfvFoVVLR2",
+          "qty": 27439787727816,
+          "bid": null,
+          "markAt": null,
+          "marks": 7,
+          "peakNet": 968945
+        }
+      ],
+      "missingExitQuotes": 7,
+      "sampledMaxDrawdownUsdc": 61.36017,
+      "cashIfOpenWorthZeroUsdc": 943.664678,
+      "realizedWithoutBestMintUsdc": -45.514615,
       "tradeEvents": [
         {
           "at": 1795450732,
@@ -128,20 +137,134 @@
           "action": "exit",
           "reason": "stop",
           "netUsdc": -20.047488
+        },
+        {
+          "at": 1795464910,
+          "mint": "mgvwT9M85os2og9HS5Agv57To92r1gQHRcWsRF7Q6ry",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795465210,
+          "mint": "mgvwT9M85os2og9HS5Agv57To92r1gQHRcWsRF7Q6ry",
+          "action": "exit",
+          "reason": "trailing",
+          "netUsdc": 0.067153
+        },
+        {
+          "at": 1795466110,
+          "mint": "NuKJU263z16LFrxUHu2XDumMzcDdCr6ziBfvFoVVLR2",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795469293,
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795469952,
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": 4.70334
+        },
+        {
+          "at": 1795470615,
+          "mint": "FiUUi49E3tPCwbRDnnwWYPp2aSzAHw7uEMGkxZ8qr4Kj",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795471093,
+          "mint": "FiUUi49E3tPCwbRDnnwWYPp2aSzAHw7uEMGkxZ8qr4Kj",
+          "action": "exit",
+          "reason": "trailing",
+          "netUsdc": 1.278362
+        },
+        {
+          "at": 1795471815,
+          "mint": "4pebwtdajKbgVj8ugW6D17xbtRekyQ8UqQPhmBof7qgP",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795472173,
+          "mint": "4pebwtdajKbgVj8ugW6D17xbtRekyQ8UqQPhmBof7qgP",
+          "action": "exit",
+          "reason": "trailing",
+          "netUsdc": -0.236873
+        },
+        {
+          "at": 1795474397,
+          "mint": "3ZgFwHT9PT7cmZmKN3EkHiFziW2CH9h9Smio71xAqJ9B",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795475056,
+          "mint": "3ZgFwHT9PT7cmZmKN3EkHiFziW2CH9h9Smio71xAqJ9B",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": 9.229293
+        },
+        {
+          "at": 1795475416,
+          "mint": "GMLSyjZCKGtFwztp2mtT8PDeNUA6WEk7oQoe3QkFpump",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795475596,
+          "mint": "GMLSyjZCKGtFwztp2mtT8PDeNUA6WEk7oQoe3QkFpump",
+          "action": "exit",
+          "reason": "trailing",
+          "netUsdc": 5.037006
+        },
+        {
+          "at": 1795476317,
+          "mint": "2kXxWxKJRNScZEL8vN2UKjbtpMArkXvEMbRgDnq4pump",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795476977,
+          "mint": "2kXxWxKJRNScZEL8vN2UKjbtpMArkXvEMbRgDnq4pump",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": -0.38146
         }
       ]
     },
     "B": {
       "policy": "standard",
-      "cashUsdc": 946.671376,
-      "equityUsdc": 946.671376,
-      "realizedUsdc": -53.328624,
-      "closedTrades": 8,
-      "openPositions": [],
-      "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 58.027593,
-      "cashIfOpenWorthZeroUsdc": 946.671376,
-      "realizedWithoutBestMintUsdc": -57.872851,
+      "cashUsdc": 940.943863,
+      "equityUsdc": null,
+      "realizedUsdc": -39.006137,
+      "closedTrades": 15,
+      "openPositions": [
+        {
+          "mint": "NuKJU263z16LFrxUHu2XDumMzcDdCr6ziBfvFoVVLR2",
+          "qty": 27439787727816,
+          "bid": null,
+          "markAt": null,
+          "marks": 7,
+          "peakNet": 0
+        }
+      ],
+      "missingExitQuotes": 7,
+      "sampledMaxDrawdownUsdc": 78.753274,
+      "cashIfOpenWorthZeroUsdc": 940.943863,
+      "realizedWithoutBestMintUsdc": -51.665776,
       "tradeEvents": [
         {
           "at": 1795450732,
@@ -254,20 +377,134 @@
           "action": "exit",
           "reason": "stop",
           "netUsdc": -20.047488
+        },
+        {
+          "at": 1795464910,
+          "mint": "mgvwT9M85os2og9HS5Agv57To92r1gQHRcWsRF7Q6ry",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795465450,
+          "mint": "mgvwT9M85os2og9HS5Agv57To92r1gQHRcWsRF7Q6ry",
+          "action": "exit",
+          "reason": "stop",
+          "netUsdc": -20.096011
+        },
+        {
+          "at": 1795466110,
+          "mint": "NuKJU263z16LFrxUHu2XDumMzcDdCr6ziBfvFoVVLR2",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795469293,
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795469952,
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": 4.70334
+        },
+        {
+          "at": 1795470615,
+          "mint": "FiUUi49E3tPCwbRDnnwWYPp2aSzAHw7uEMGkxZ8qr4Kj",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795471273,
+          "mint": "FiUUi49E3tPCwbRDnnwWYPp2aSzAHw7uEMGkxZ8qr4Kj",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": 0.452248
+        },
+        {
+          "at": 1795471815,
+          "mint": "4pebwtdajKbgVj8ugW6D17xbtRekyQ8UqQPhmBof7qgP",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795472473,
+          "mint": "4pebwtdajKbgVj8ugW6D17xbtRekyQ8UqQPhmBof7qgP",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": 7.755438
+        },
+        {
+          "at": 1795474397,
+          "mint": "3ZgFwHT9PT7cmZmKN3EkHiFziW2CH9h9Smio71xAqJ9B",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795475056,
+          "mint": "3ZgFwHT9PT7cmZmKN3EkHiFziW2CH9h9Smio71xAqJ9B",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": 9.229293
+        },
+        {
+          "at": 1795475416,
+          "mint": "GMLSyjZCKGtFwztp2mtT8PDeNUA6WEk7oQoe3QkFpump",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795476076,
+          "mint": "GMLSyjZCKGtFwztp2mtT8PDeNUA6WEk7oQoe3QkFpump",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": 12.659639
+        },
+        {
+          "at": 1795476317,
+          "mint": "2kXxWxKJRNScZEL8vN2UKjbtpMArkXvEMbRgDnq4pump",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795476977,
+          "mint": "2kXxWxKJRNScZEL8vN2UKjbtpMArkXvEMbRgDnq4pump",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": -0.38146
         }
       ]
     },
     "C": {
       "policy": "fixed",
-      "cashUsdc": 965.406381,
-      "equityUsdc": 965.406381,
-      "realizedUsdc": -34.593619,
-      "closedTrades": 8,
-      "openPositions": [],
-      "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 34.593619,
-      "cashIfOpenWorthZeroUsdc": 965.406381,
-      "realizedWithoutBestMintUsdc": -38.398013,
+      "cashUsdc": 970.201803,
+      "equityUsdc": null,
+      "realizedUsdc": -9.748197,
+      "closedTrades": 15,
+      "openPositions": [
+        {
+          "mint": "NuKJU263z16LFrxUHu2XDumMzcDdCr6ziBfvFoVVLR2",
+          "qty": 27439787727816,
+          "bid": null,
+          "markAt": null,
+          "marks": 7,
+          "peakNet": 0
+        }
+      ],
+      "missingExitQuotes": 7,
+      "sampledMaxDrawdownUsdc": 35.272677,
+      "cashIfOpenWorthZeroUsdc": 970.201803,
+      "realizedWithoutBestMintUsdc": -21.047957,
       "tradeEvents": [
         {
           "at": 1795450732,
@@ -380,10 +617,115 @@
           "action": "exit",
           "reason": "stop",
           "netUsdc": -20.047488
+        },
+        {
+          "at": 1795464910,
+          "mint": "mgvwT9M85os2og9HS5Agv57To92r1gQHRcWsRF7Q6ry",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795465090,
+          "mint": "mgvwT9M85os2og9HS5Agv57To92r1gQHRcWsRF7Q6ry",
+          "action": "exit",
+          "reason": "target",
+          "netUsdc": 2.285033
+        },
+        {
+          "at": 1795466110,
+          "mint": "NuKJU263z16LFrxUHu2XDumMzcDdCr6ziBfvFoVVLR2",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795469293,
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795469892,
+          "mint": "7uwVyMsvxWUyh3bzc5qKuxpnoYQ5QsnTLixTRWP5j11t",
+          "action": "exit",
+          "reason": "target",
+          "netUsdc": 3.488194
+        },
+        {
+          "at": 1795470615,
+          "mint": "FiUUi49E3tPCwbRDnnwWYPp2aSzAHw7uEMGkxZ8qr4Kj",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795470973,
+          "mint": "FiUUi49E3tPCwbRDnnwWYPp2aSzAHw7uEMGkxZ8qr4Kj",
+          "action": "exit",
+          "reason": "target",
+          "netUsdc": 2.227941
+        },
+        {
+          "at": 1795471815,
+          "mint": "4pebwtdajKbgVj8ugW6D17xbtRekyQ8UqQPhmBof7qgP",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795471933,
+          "mint": "4pebwtdajKbgVj8ugW6D17xbtRekyQ8UqQPhmBof7qgP",
+          "action": "exit",
+          "reason": "target",
+          "netUsdc": 3.427473
+        },
+        {
+          "at": 1795474397,
+          "mint": "3ZgFwHT9PT7cmZmKN3EkHiFziW2CH9h9Smio71xAqJ9B",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795474756,
+          "mint": "3ZgFwHT9PT7cmZmKN3EkHiFziW2CH9h9Smio71xAqJ9B",
+          "action": "exit",
+          "reason": "target",
+          "netUsdc": 2.498481
+        },
+        {
+          "at": 1795475416,
+          "mint": "GMLSyjZCKGtFwztp2mtT8PDeNUA6WEk7oQoe3QkFpump",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795475476,
+          "mint": "GMLSyjZCKGtFwztp2mtT8PDeNUA6WEk7oQoe3QkFpump",
+          "action": "exit",
+          "reason": "target",
+          "netUsdc": 11.29976
+        },
+        {
+          "at": 1795476317,
+          "mint": "2kXxWxKJRNScZEL8vN2UKjbtpMArkXvEMbRgDnq4pump",
+          "action": "entry",
+          "reason": "wave",
+          "netUsdc": null
+        },
+        {
+          "at": 1795476977,
+          "mint": "2kXxWxKJRNScZEL8vN2UKjbtpMArkXvEMbRgDnq4pump",
+          "action": "exit",
+          "reason": "time",
+          "netUsdc": -0.38146
         }
       ]
     }
   },
   "runId": 45210142704,
-  "lastQuoteAt": 1795464179
+  "lastQuoteAt": 1795477157
 }
