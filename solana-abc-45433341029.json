@@ -1,0 +1,83 @@
+{
+  "startedAt": 1795536425,
+  "endsAt": 1795565225,
+  "updatedAt": 1795550958,
+  "lastEvent": "handoff",
+  "session": 24,
+  "accounts": {
+    "A": {
+      "policy": "trailing",
+      "cashUsdc": 980.797803,
+      "equityUsdc": 980.797803,
+      "realizedUsdc": -19.202197,
+      "closedTrades": 8,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 37.946796,
+      "cashIfOpenWorthZeroUsdc": 980.797803,
+      "realizedWithoutBestMintUsdc": -38.381921
+    },
+    "B": {
+      "policy": "standard",
+      "cashUsdc": 960.845106,
+      "equityUsdc": 960.845106,
+      "realizedUsdc": -39.154894,
+      "closedTrades": 8,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 57.899493,
+      "cashIfOpenWorthZeroUsdc": 960.845106,
+      "realizedWithoutBestMintUsdc": -58.334618
+    },
+    "C": {
+      "policy": "fixed",
+      "cashUsdc": 959.076692,
+      "equityUsdc": 959.076692,
+      "realizedUsdc": -40.923308,
+      "closedTrades": 8,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 48.515999,
+      "cashIfOpenWorthZeroUsdc": 959.076692,
+      "realizedWithoutBestMintUsdc": -44.658072
+    },
+    "E": {
+      "policy": "failedRecovery",
+      "cashUsdc": 959.076692,
+      "equityUsdc": 959.076692,
+      "realizedUsdc": -40.923308,
+      "closedTrades": 8,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 48.515999,
+      "cashIfOpenWorthZeroUsdc": 959.076692,
+      "realizedWithoutBestMintUsdc": -44.658072
+    },
+    "F": {
+      "policy": "smallPoolFixed",
+      "cashUsdc": 976.738981,
+      "equityUsdc": 976.738981,
+      "realizedUsdc": -23.261019,
+      "closedTrades": 5,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 27.757721,
+      "cashIfOpenWorthZeroUsdc": 976.738981,
+      "realizedWithoutBestMintUsdc": -26.995783
+    },
+    "D": {
+      "policy": "staged",
+      "cashUsdc": 961.478772,
+      "equityUsdc": 961.478772,
+      "realizedUsdc": -38.521228,
+      "closedTrades": 8,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 48.301045,
+      "cashIfOpenWorthZeroUsdc": 961.478772,
+      "realizedWithoutBestMintUsdc": -46.417696
+    }
+  },
+  "runId": 45433341029,
+  "attempt": 1
+}
