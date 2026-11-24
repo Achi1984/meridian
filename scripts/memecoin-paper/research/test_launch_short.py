@@ -1,7 +1,7 @@
 import unittest
 from urllib.error import HTTPError
 
-from launch_short import MARGIN, run
+from launch_short import MARGIN, MARKET_PAGE, TOKENS, cohort, run
 
 MINT = 'a'*32
 
@@ -82,3 +82,36 @@ class ShortStudy(unittest.TestCase):
                        lambda q: q['reserves'].update(slot=1), lambda q: q['reserves'].pop('fees_bps')]:
             rows = self.replay([100, 97, 94, 90], lambda i, q: update(q))
             self.assertFalse(any(row['event'] == 'paperOpen' for row in rows))
+
+class MarketSelection(unittest.TestCase):
+    def token(self, mint, first='1970-01-02T00:00:00+00:00'):
+        return dict(id=mint, firstPool=dict(createdAt=first), launchpad='pump.fun')
+
+    def test_listed_sample_checks_identity_age_and_cap(self):
+        listed = [c*32 for c in 'abcdefghij']
+        tokens = [self.token(m) for m in listed[:7]]
+        tokens.extend([self.token(listed[7], '1970-01-01T00:00:00+00:00'),
+                       self.token(listed[8], 'invalid'), self.token('z'*32)])
+        responses = {MARKET_PAGE: {'items': [dict(mint=m) for m in listed]},
+                     TOKENS+'/search?query='+','.join(listed): tokens}
+        events = []
+        selected = cohort(lambda url, age: responses[url], 90000, events.append)
+        self.assertEqual(list(selected), listed[:6])
+        self.assertEqual(events[-1]['source'], 'listedWithLiquidity')
+
+    def test_empty_directory_skips_metadata(self):
+        events = []
+        self.assertEqual(cohort(lambda url, age: {MARKET_PAGE: {'items': []}}[url],
+                                90000, events.append), {})
+        self.assertEqual(events[-1]['listedSample'], 0)
+
+    def test_unavailable_directory_labels_fallback(self):
+        def fetch(url, age):
+            if url == MARKET_PAGE:
+                raise HTTPError(url, 503, 'unavailable', {}, None)
+            self.assertEqual(url, TOKENS+'/recent?limit=100')
+            return [self.token(MINT)]
+        events = []
+        self.assertEqual(list(cohort(fetch, 90000, events.append)), [MINT])
+        self.assertEqual(events[0]['status'], 503)
+        self.assertEqual(events[-1]['source'], 'recentLaunchFallback')
