@@ -818,7 +818,7 @@ function restoreDashboardClarity(source){
 function restoreB2(source){
   source=source.replace('      <details class="command-context-details">',"      <section class=\"card command-strategies\" aria-labelledby=\"command-strategies-heading\">\n        <div class=\"card-head\"><h2 id=\"command-strategies-heading\">Paper &amp; Forschung</h2><span class=\"limited\">Nur lesend</span></div>\n        <p>Live-Paperbot und Forschungsberichte findest du unter Strategien.</p>\n      </section>\n"+'      <details class="command-context-details">');
   const layout=source.match(/  <style id="dashboard-reading-order">[^]*?<\/style>\n/)?.[0];
-  assert.equal(gitBlob(layout),'795d4a2a03c2d007062a802dc0a847f2068787a3');
+  assert.equal(gitBlob(layout),'4b5d90d3e8cad585bd92dcf8c03df31e3cf9173d');
   source=source.replace(layout,'');
   const development=source.match(/    <details id="autonomy-status"[^]*?    <\/details>\n/)?.[0];
   source=source.replace(development,'').replace('    <section id="version-panel"',development+'    <section id="version-panel"');
@@ -1574,7 +1574,9 @@ async function browserRun(call,start,width,height,server){
       };
       section.open=true;
       for(let i=0;i<50&&!section.querySelector('dd');i++)await new Promise(resolve=>setTimeout(resolve,20));
-      const compact={rows:section.querySelectorAll('tbody tr').length,text:section.innerText,
+      const panel=section.querySelector('.solana-comparison');
+      const compact={pnlColor:getComputedStyle(panel.querySelector('.account-pnl')).color,
+        statusColor:getComputedStyle(panel.querySelector('[role=status]')).color,rows:section.querySelectorAll('tbody tr').length,text:section.innerText,
         fits:section.scrollWidth<=section.clientWidth+1};
       section.querySelectorAll('details').forEach(detail=>{detail.open=true;});
       return {compact,badge:section.querySelector('.pilot-status').textContent,text:section.innerText,values:[...section.querySelectorAll('dd')].map(x=>x.textContent),
@@ -1583,6 +1585,8 @@ async function browserRun(call,start,width,height,server){
   })()`,true);
   assert.equal(paperSnapshot.compact.rows,6);
   assert.ok(paperSnapshot.compact.fits);
+  assert.equal(paperSnapshot.compact.pnlColor,'rgb(255, 155, 164)');
+  assert.equal(paperSnapshot.compact.statusColor,'rgb(145, 216, 255)');
   assert.match(paperSnapshot.compact.text,/Erste vier Stunden · läuft/);
   assert.match(paperSnapshot.compact.text,/10 % Nettoziel/);
   assert.doesNotMatch(paperSnapshot.compact.text,/Signal- und Pooldetails|Lokalen Bericht laden|Letzter Pilot|Guthaben/);
