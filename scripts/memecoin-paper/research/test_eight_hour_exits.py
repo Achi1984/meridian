@@ -94,3 +94,26 @@ class StagedTests(unittest.TestCase):
         self.assertEqual(account.cash, START-SIZE+21_200_000-4*FEE)
         self.assertEqual(account.cash-START, account.by_mint['coin'])
         self.assertEqual(account.closed, 1)
+
+class FilterComparisonTest(unittest.TestCase):
+    def test_repeated_mint_open_and_closed_positions_and_capacity(self):
+        from newcomer_eight_hour import FilterComparison
+        report = FilterComparison()
+        empty = False, False
+        for session, eligible, holding, net in [
+                (1, False, (True, False), -2000000), (2, False, (True, False), 800000),
+                (3, False, (True, False), None), (4, True, (False, True), 200000),
+                (5, True, (True, True), -100000), (6, True, (True, False), 0)]:
+            key = session, 'mint'
+            report.update(key, 'entry', eligible, empty, holding, None)
+            if net is None:
+                report.update(key, 'missingExitQuote', eligible, holding, holding, None)
+            else:
+                report.update(key, 'resaleMark', eligible, holding, empty, SIZE+2*FEE+net)
+                report.update(key, 'exit', eligible, empty, empty, SIZE+2*FEE+net)
+        groups = report.snapshot()
+        self.assertEqual(groups['excludedByFilter'], dict(closed=2, open=1,
+                         grossPositiveNetUsdc=0.8, grossNegativeNetUsdc=2, netUsdc=-1.2))
+        self.assertEqual(groups['both']['netUsdc'], -0.1)
+        self.assertEqual(groups['fOnlyCapacity']['netUsdc'], 0.2)
+        self.assertEqual(groups['cOnlyCapacity']['closed'], 1)
