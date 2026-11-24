@@ -1,0 +1,26 @@
+name: Solana launch short paper study
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 11 * * *'
+permissions:
+  contents: read
+jobs:
+  study:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    defaults:
+      run:
+        working-directory: scripts/memecoin-paper/research
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest test_launch_short
+      - run: python3 -u launch_short.py | tee launch-short.jsonl
+        shell: bash
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: launch-short-journal
+          path: scripts/memecoin-paper/research/launch-short.jsonl
