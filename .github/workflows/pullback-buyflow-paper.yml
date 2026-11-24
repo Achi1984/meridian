@@ -1,6 +1,9 @@
 name: Solana pullback buy-flow paper
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [".github/workflows/pullback-buyflow-paper.yml", "scripts/memecoin-paper/research/pullback_variants.py"]
   schedule:
     - cron: '7,17,27,37,47,57 * * * *'
 permissions: {}
@@ -10,7 +13,7 @@ concurrency:
 
 jobs:
   observe:
-    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.PULLBACK_BUYFLOW_PAPER == 'enabled')
+    if: github.ref == 'refs/heads/main' && vars.PULLBACK_BUYFLOW_PAPER != 'disabled'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -29,7 +32,7 @@ jobs:
         run: python3 -m unittest test_pullback_buyflow
       - id: observe
         working-directory: scripts/memecoin-paper/research
-        run: python3 pullback_buyflow.py "$GITHUB_WORKSPACE/paper-state/pullback-buyflow.json" | tee -a "$GITHUB_STEP_SUMMARY"
+        run: python3 pullback_buyflow.py "$GITHUB_WORKSPACE/paper-state/pullback-buyflow.json" --watch-seconds 510 | tee -a "$GITHUB_STEP_SUMMARY"
         shell: bash
       - name: Save completed observations
         if: "!cancelled() && steps.observe.outcome != 'skipped'"

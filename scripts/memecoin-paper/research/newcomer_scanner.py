@@ -126,13 +126,14 @@ def rank_complete_windows(records, end):
             record['ranks'][minutes] = rank
 
 
-def market_reader(interval=3):
+def market_reader(interval=3, *, sleep=None):
+    sleep = sleep or time.sleep
     next_request = 0
     def fetch(url, max_age):
         nonlocal next_request
         for attempt in range(3):
             if url.startswith(GT):
-                time.sleep(max(0, next_request-time.monotonic()))
+                sleep(max(0, next_request-time.monotonic()))
                 next_request = time.monotonic()+interval
             try:
                 return get(url, max_age)
@@ -140,7 +141,7 @@ def market_reader(interval=3):
                 wait = (exc.headers or {}).get('Retry-After', '60')
                 if exc.code != 429 or attempt == 2 or not wait.isdigit() or int(wait) > 180:
                     raise
-                time.sleep(max(5, int(wait)))
+                sleep(max(5, int(wait)))
     return fetch
 
 
