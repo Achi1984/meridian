@@ -122,7 +122,7 @@ def comparison(positions):
 
 
 def run(fetch=None, quote=spot_quote, output=emit, clock=time.time, sleep=time.sleep):
-    fetch = fetch or market_reader()
+    fetch = fetch or market_reader(interval=13)
     as_of = None
     def journal(kind, **fields):
         nonlocal as_of
@@ -130,7 +130,7 @@ def run(fetch=None, quote=spot_quote, output=emit, clock=time.time, sleep=time.s
             as_of = fields['asOf']
         output(kind, **fields)
 
-    cohort = scan(journal, fetch=fetch, quote=quote, now=clock)
+    cohort = scan(journal, fetch=fetch, quote=quote, now=clock, ranked_windows_only=True)
     positions = []
     for row in cohort:
         mint = row['mint']
