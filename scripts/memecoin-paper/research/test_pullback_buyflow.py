@@ -88,3 +88,24 @@ class VariantTests(unittest.TestCase):
         observe('m',p,None,quote,lambda:200)
         observe('m',p,None,quote,lambda:230)
         self.assertEqual(p['C']['state'],'unpriced')
+
+    def test_monitoring_continues_inside_busy_discovery(self):
+        from pullback_variants import initial
+        p = dict(**initial(20_000_000), pool='p', quantity=10, entryAt=0,
+                 state='open', due=86400, selected=True)
+        stamp = [295]
+        ledger = {'m':p}
+        def discovery(at, read):
+            for i in range(15):
+                read('candidate', 30)
+            return []
+        def fetch(url, age):
+            if url=='candidate':
+                stamp[0]+=13
+            return {'data':{}}
+        with patch('pullback_buyflow.sample',side_effect=discovery), patch(
+                'pullback_variants.snapshot',return_value=dict(mint='m',pool='p',buys=7,sells=3)):
+            tick(ledger,fetch,lambda *_:20_000_000,lambda:stamp[0],lambda:None)
+        self.assertEqual(p['B']['state'],'open')
+        self.assertLessEqual(p['B']['decisionAt'],360)
+        self.assertGreater(p['C']['marks'],1)

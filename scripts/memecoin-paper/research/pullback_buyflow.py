@@ -49,9 +49,25 @@ def monitor(ledger, fetch, quote, now, save):
 
 def tick(ledger, fetch, quote, now, save):
     monitor(ledger, fetch, quote, now, save)
-    candidates = sample(now(), fetch)
+    next_poll = now()+30
+
+    def service_positions():
+        nonlocal next_poll
+        at = now()
+        due = any(p.get('B', {}).get('state')=='pending' and
+                  300 <= at-p['entryAt'] <= 360 for p in ledger.values())
+        if at >= next_poll or due:
+            monitor(ledger, fetch, quote, now, save)
+            next_poll = now()+30
+
+    def discovery_read(url, max_age):
+        service_positions()
+        return fetch(url, max_age)
+
+    candidates = sample(now(), discovery_read)
     opened = 0
     for row in candidates:
+        service_positions()
         mint = row['mint']
         created = timestamp(row['created'])
         if mint in ledger or not age_ok(now()-created):
@@ -83,7 +99,7 @@ def tick(ledger, fetch, quote, now, save):
         save()
         opened += 1
         if ledger[mint]['selected']:
-            ledger[mint]['netBuy5mUsd'] = sample_flow(fresh, int(at), fetch)
+            ledger[mint]['netBuy5mUsd'] = sample_flow(fresh, int(at), discovery_read)
             save()
     return dict(sampled=len(candidates), newObservations=opened)
 
