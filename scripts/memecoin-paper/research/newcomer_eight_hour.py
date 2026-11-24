@@ -155,12 +155,46 @@ class StagedAccount(Account):
         return dict(super().snapshot(), fills=self.fills)
 
 
+class FilterComparison:
+    """Attribute the actual C/F accounts at the granularity of one session and mint."""
+    def __init__(self):
+        self.groups = {}
+        self.closed = Counter()
+        self.gains = Counter()
+        self.losses = Counter()
+
+    def update(self, key, kind, eligible, prior, current, bid):
+        if kind == 'entry' and current != (False, False):
+            if current == (True, True):
+                group = 'both'
+            elif current == (False, True):
+                group = 'fOnlyCapacity'
+            else:
+                group = 'cOnlyCapacity' if eligible else 'excludedByFilter'
+            self.groups[key] = group
+        if prior != current and current == (False, False) and key in self.groups:
+            group = self.groups.pop(key)
+            net = bid - SIZE - 2*FEE
+            self.closed[group] += 1
+            self.gains[group] += max(0, net)
+            self.losses[group] += max(0, -net)
+
+    def snapshot(self):
+        unresolved = Counter(self.groups.values())
+        return {group: dict(closed=self.closed[group], open=unresolved[group],
+                            grossPositiveNetUsdc=self.gains[group]/UNIT,
+                            grossNegativeNetUsdc=self.losses[group]/UNIT,
+                            netUsdc=(self.gains[group]-self.losses[group])/UNIT)
+                for group in ('both', 'excludedByFilter', 'cOnlyCapacity', 'fOnlyCapacity')}
+
+
 def run(directory, segment):
     directory.mkdir(exist_ok=True, parents=True)
     journal = directory/'events.jsonl'
     accounts = {name: Account(policy) for name, policy in
                 [('A', 'trailing'), ('B', 'standard'), ('C', 'fixed'), ('E', 'failedRecovery')]}
 
+    comparison = FilterComparison()
     smaller_pools = set()
     accounts['F'] = Account('smallPoolFixed')
 
@@ -217,10 +251,13 @@ def run(directory, segment):
         if row['event'] == 'cohortSelection' and 0 < row['entryLiquidityUsd'] < 20_000:
             smaller_pools.add(key)
         if row.get('arm') == 'wave':
+            prior = key in accounts['C'].open, key in accounts['F'].open
             for name, account in accounts.items():
                 if name == 'F' and key not in smaller_pools:
                     continue
                 account.update(row, row['session'])
+            current = key in accounts['C'].open, key in accounts['F'].open
+            comparison.update(key, row['event'], key in smaller_pools, prior, current, row.get('usdcRaw'))
         if row['event'] in ('sessionEnd', 'sessionInterrupted'):
             for account in accounts.values():
                 for (s, _), pos in account.open.items():
@@ -249,6 +286,7 @@ def run(directory, segment):
             apply(row)
             status = dict(startedAt=started, endsAt=end, updatedAt=row['at'], lastEvent=kind,
                           session=session, accounts={n:a.snapshot() for n,a in accounts.items()})
+            status['filterComparison'] = comparison.snapshot()
             temp = directory/'status.tmp'
             temp.write_text(json.dumps(status))
             temp.replace(directory/'status.json')
