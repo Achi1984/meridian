@@ -72,13 +72,129 @@ class Account:
                     if len(self.by_mint)>1 else None)
 
 
+class StagedAccount(Account):
+    def __init__(self):
+        super().__init__('staged')
+        self.fills = []
+
+    def update(self, row, session):
+        kind = row['event']
+        if kind not in ('entry', 'stagedMark', 'stagedMissing'):
+            return
+        key = (session, row['mint'])
+        if kind == 'entry':
+            if key not in self.open and self.cash >= SIZE + FEE:
+                super().update(row, session)
+                self.open[key].update(initialQty=row['qty'], basis=SIZE+FEE, stage=0)
+            return
+        pos = self.open.get(key)
+        if pos is None:
+            return
+        if kind == 'stagedMissing':
+            self.missing += 1
+            pos.update(bid=None, markAt=None)
+            return
+        if kind != 'stagedMark':
+            return
+        qty, basis = pos['qty'], pos['basis']
+        bid = row['bid']
+        pos.update(bid=bid, markAt=row['at'])
+        reason = None
+        if row['held'] >= collector.HOLD_SECONDS:
+            reason = 'time'
+        elif pos['stage'] and bid-FEE <= basis:
+            reason = 'breakeven'
+        elif not pos['stage'] and 10*(bid-FEE-basis) <= -3*SIZE:
+            reason = 'stop'
+        amount, proceeds = qty, bid
+        if reason is None and row.get('lotBid') is not None and pos['stage'] < 2:
+            amount = self.next_lot(pos)
+            allocated = basis*amount//qty
+            target = (10,20)[pos['stage']]
+            proceeds = row['lotBid']
+            if 100*(proceeds-FEE-allocated)*pos['initialQty'] >= target*SIZE*amount:
+                reason = 'tp1' if pos['stage'] == 0 else 'tp2'
+        if reason:
+            allocated = basis*amount//qty
+            profit = proceeds-FEE-allocated
+            self.cash += proceeds-FEE
+            self.by_mint[row['mint']] += profit
+            self.fills.append(dict(at=row['at'], mint=row['mint'], session=session, reason=reason,
+                                   qty=amount, proceedsRaw=proceeds, netRaw=profit))
+            if amount == qty:
+                del self.open[key]
+                self.closed += 1
+            else:
+                pos.update(qty=qty-amount, basis=basis-allocated, stage=pos['stage']+1,
+                           bid=None, markAt=None)
+        equity = self.equity()
+        if equity is not None:
+            self.peak = max(self.peak, equity)
+            self.drawdown = max(self.drawdown, self.peak-equity)
+
+    @staticmethod
+    def next_lot(pos):
+        return pos['initialQty']//(2 if pos['stage'] == 0 else 4)
+
+    def snapshot(self):
+        return dict(super().snapshot(), fills=self.fills)
+
+
 def run(directory, segment):
     directory.mkdir(exist_ok=True, parents=True)
     journal = directory/'events.jsonl'
     accounts = {name: Account(policy) for name, policy in
                 [('A', 'trailing'), ('B', 'standard'), ('C', 'fixed')]}
 
+    staged = accounts['D'] = StagedAccount()
+
+    class StagedPair(collector.Pair):
+        @property
+        def staged_pending(self):
+            return ((session, self.row['mint']) in staged.open and
+                    time.monotonic()-self.opened_at['wave'] <= collector.HOLD_SECONDS+collector.EXIT_GRACE)
+
+        def tick(self, index, final):
+            cache = {}
+            def quote(src, dst, amount):
+                key = (src, dst, amount)
+                if key not in cache:
+                    cache[key] = collector.spot_quote(src, dst, amount)
+                return cache[key]
+
+            try:
+                super().tick(index, final, quote)
+            finally:
+                self.observe_staged(quote)
+
+        def observe_staged(self, quote):
+            mint = self.row['mint']
+            pos = staged.open.get((session, mint))
+            if pos is None:
+                return
+            def age():
+                return time.monotonic()-self.opened_at['wave']
+            try:
+                bid = quote(mint, collector.USDC, pos['qty'])
+            except collector.ERRORS:
+                emit('stagedMissing', mint=mint)
+                return
+            lot_bid = None
+            lot = staged.next_lot(pos)
+            if pos['stage'] < 2 and lot and age() < collector.HOLD_SECONDS:
+                try:
+                    lot_bid = quote(mint, collector.USDC, lot)
+                except collector.ERRORS:
+                    pass
+            held = age()
+            if held > collector.HOLD_SECONDS+collector.EXIT_GRACE:
+                emit('stagedMissing', mint=mint)
+            else:
+                emit('stagedMark', mint=mint, bid=bid, lotBid=lot_bid, held=held)
+
     def apply(row):
+        if row['event'] in ('stagedMissing', 'stagedMark'):
+            staged.update(row, row['session'])
         if row.get('arm') == 'wave':
             for account in accounts.values():
                 account.update(row, row['session'])
@@ -133,7 +249,7 @@ def run(directory, segment):
                 session += 1
                 emit('sessionStart')
                 try:
-                    collector.run()
+                    collector.run(pair_type=StagedPair)
                 except collector.ERRORS as exc:
                     emit('sessionInterrupted', reason=type(exc).__name__)
                 else:

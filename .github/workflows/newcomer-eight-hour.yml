@@ -1,13 +1,13 @@
-name: Meridian recovery exit comparison V2
+name: Meridian overnight staged exits
 on:
   workflow_dispatch:
   push:
-    branches: [paper/recovery-trailing-v2-20261123]
+    branches: [paper/overnight-staged-exits]
     paths: ['.github/workflows/newcomer-eight-hour.yml']
 permissions:
   contents: read
 concurrency:
-  group: newcomer-recovery-trailing-v2
+  group: newcomer-staged-exits
   cancel-in-progress: false
 jobs:
   first:

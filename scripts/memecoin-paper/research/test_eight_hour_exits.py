@@ -26,3 +26,51 @@ class RecoveryExitTests(unittest.TestCase):
             self.assertEqual(account.closed, expected)
         self.assertEqual(self.simulate('trailing', marks[:-1]).closed, 0)
         self.assertIsNone(self.simulate('trailing', [0, 2_000_000, None]).equity())
+
+
+class StagedTests(unittest.TestCase):
+    def test_resume_after_wave_summary(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from newcomer_eight_hour import run
+        rows = [dict(event='start', at=1, session=0),
+                dict(event='entry', at=2, session=1, arm='wave', mint='m', qty=100),
+                dict(event='stagedMark', at=3, session=1, mint='m', bid=23_000_000,
+                     lotBid=11_200_000, held=60),
+                dict(event='summary', at=4, session=1, arm='wave'),
+                dict(event='sessionEnd', at=5, session=1)]
+        with TemporaryDirectory() as tmp:
+            path = Path(tmp)
+            (path/'events.jsonl').write_text(''.join(json.dumps(r)+'\n' for r in rows))
+            run(path, 2)
+            state = json.loads((path/'status.json').read_text())
+            self.assertEqual(state['lastEvent'], 'finished')
+            staged = state['accounts']['D']
+            self.assertEqual([f['reason'] for f in staged['fills']], ['tp1'])
+            self.assertEqual(staged['openPositions'][0]['qty'], 50)
+            self.assertIsNone(staged['equityUsdc'])
+
+    def test_scale_out_and_gap_across_restart(self):
+        from newcomer_eight_hour import StagedAccount, START
+        rows = [dict(event='entry', qty=101),
+                dict(event='stagedMark', bid=SIZE, lotBid=10_000_000, held=20),
+                dict(event='stagedMark', bid=23_000_000, lotBid=11_100_000, held=60),
+                dict(event='stagedMissing'),
+                dict(event='stagedMark', bid=13_000_000, lotBid=6_100_000, held=120),
+                dict(event='stagedMark', bid=4_000_000, lotBid=None, held=180)]
+        account = StagedAccount()
+        for index, row in enumerate(rows):
+            account.update(dict(row, mint='coin', at=index), 1)
+            if index == 3:
+                self.assertIsNone(account.equity())
+                resumed = StagedAccount()
+                for i, prior in enumerate(rows[:index+1]):
+                    resumed.update(dict(prior, mint='coin', at=i), 1)
+                self.assertEqual(account.snapshot(), resumed.snapshot())
+                account = resumed
+        self.assertEqual([(f['qty'],f['reason']) for f in account.fills],
+                         [(50,'tp1'), (25,'tp2'), (26,'breakeven')])
+        self.assertEqual(account.cash, START-SIZE+21_200_000-4*FEE)
+        self.assertEqual(account.cash-START, account.by_mint['coin'])
+        self.assertEqual(account.closed, 1)

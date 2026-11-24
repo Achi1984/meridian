@@ -263,7 +263,7 @@ class HalfRunner(Pair):
                  cashRaw=cash)
 
 
-def run(persistence=False, half_runner=False):
+def run(persistence=False, half_runner=False, pair_type=Pair):
     arms = ('early','wave','persistent') if persistence else ('early','wave')
     studies, watch = {}, {}
     for attempt in range(3):
@@ -286,7 +286,7 @@ def run(persistence=False, half_runner=False):
             bands.add(band)
             emit('cohortSelection',mint=row['mint'],pool=row['pool'],band=band,
                  entryLiquidityUsd=row['liquidity'],buys=row['buys'],sells=row['sells'])
-            studies.setdefault(row['mint'],(HalfRunner if half_runner else Pair)(row,persistence))
+            studies.setdefault(row['mint'],(HalfRunner if half_runner else pair_type)(row,persistence))
             if len(studies)==2:
                 break
         emit('discovery', attempt=attempt+1, eligiblePools=len(candidates), watching=len(watch), selected=len(studies))
@@ -304,7 +304,7 @@ def run(persistence=False, half_runner=False):
                     emit('observationUnavailable',mint=study.row['mint'],reason=type(exc).__name__)
             if not any(s.reference_qty for s in studies.values()):
                 break
-            if i>=10 and not any(half_runner and "early" in s.positions and not s.finished for s in studies.values()) and not any(s.tripled_at or any(result is None and name not in s.expired
+            if i>=10 and not any(getattr(s, 'staged_pending', False) for s in studies.values()) and not any(half_runner and "early" in s.positions and not s.finished for s in studies.values()) and not any(s.tripled_at or any(result is None and name not in s.expired
                     for name,(_,result) in s.positions.items()) for s in studies.values()):
                 break
             if i<24:
