@@ -15,6 +15,8 @@ async function read(url, raw = false) {
   return response.json();
 }
 
+import {mountEightHourComparison} from './solana-eight-hour.js?v=B19-M11-FIX1';
+
 export function mountSolanaReport(section) {
   const doc = section.ownerDocument;
   const add = (parent, tag, text) => {
@@ -23,17 +25,20 @@ export function mountSolanaReport(section) {
     parent.append(child);
     return child;
   };
-  const badge = add(section.querySelector('summary'),'small','Status wird geladen');
-  badge.className = 'pilot-status';
-  const live = add(section,'p','Laufstatus wird beim Öffnen geladen.');
-  live.setAttribute('role','status');
-  const notice = add(section,'p','');
-  notice.hidden = true;
-  const body = add(section,'div','');
+  const refreshComparison = mountEightHourComparison(section, add, read, amount);
   const refresh = add(section,'button','Aktualisieren');
   refresh.type = 'button';
   refresh.className = 'strategy-entry-link';
-  const source = add(section,'a','Pilotläufe auf GitHub');
+  const archive = add(section,'details','');
+  add(archive,'summary','Pilotarchiv und Analysen');
+  const badge = add(archive,'small','Status wird geladen');
+  badge.className = 'pilot-status';
+  const live = add(archive,'p','Laufstatus wird beim Öffnen geladen.');
+  live.setAttribute('role','status');
+  const notice = add(archive,'p','');
+  notice.hidden = true;
+  const body = add(archive,'div','');
+  const source = add(archive,'a','Pilotläufe auf GitHub');
   source.href = 'https://github.com/' + repo + '/actions/workflows/' + workflow;
   source.style.cssText = 'display:inline-flex;align-items:center;min-height:44px;padding:0 10px';
   let loading = false;
@@ -82,6 +87,7 @@ export function mountSolanaReport(section) {
     loading = true;
     refresh.disabled = true;
     live.textContent = 'Laufstatus wird geladen …';
+    void refreshComparison();
     const [, report] = await Promise.allSettled([
       refreshStatus(true),
       read(api + '/contents/solana-meme.json?ref=paper-dashboard-data',true)
@@ -241,4 +247,113 @@ export function mountSolanaReport(section) {
   section.addEventListener('toggle',() => { if (section.open) update(); });
   refresh.addEventListener('click',update);
   return refreshStatus;
+}
+
+export function mountLiveScanner(section) {
+  const doc = section.ownerDocument;
+  function add(parent, tag, text) {
+    const element = doc.createElement(tag);
+    element.textContent = text;
+    parent.append(element);
+    return element;
+  }
+  const status = add(section, 'p', 'Warte auf Scanner-Daten.');
+  status.setAttribute('role', 'status');
+  const controls = add(section, 'label', 'Rangliste ');
+  const select = add(controls, 'select', '');
+  for (const minutes of [5, 10, 30, 60]) {
+    add(select, 'option', minutes + ' Minuten').value = String(minutes);
+  }
+  const result = add(section, 'div', '');
+  const fmt = (value, unit) => Number.isFinite(value)
+    ? value.toLocaleString('de-AT', {maximumFractionDigits:2}) + unit : '–';
+  const time = seconds => new Date(seconds*1000).toLocaleString('de-AT', {
+    timeZone:'Europe/Vienna', day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'
+  });
+  const reasons = {shortHistory:'Historie zu kurz', missing30mData:'30-Minuten-Daten lückenhaft',
+    quoteUnavailable:'Quote fehlt', roundTripCost:'Rückverkauf zu teuer',
+    marketDataUnavailable:'Marktdaten fehlen', outsidePairedTopTen:'Außerhalb der gemeinsamen Top 10'};
+  let latest, pending, timer, failed = false;
+  function mint(parent, c) {
+    const link = add(parent, 'a', c.symbol || c.mint.slice(0,8));
+    link.href = 'https://jup.ag/tokens/' + encodeURIComponent(c.mint);
+    link.title = c.mint;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+  }
+  function render() {
+    if (!latest) {
+      status.textContent = failed ? 'Noch kein Scanner-Stand abrufbar.' : 'Scanner-Daten werden geladen …';
+      return;
+    }
+    const age = Math.max(0, Math.floor((Date.now()/1000-latest.asOf)/60));
+    status.textContent = 'Stand ' + time(latest.asOf) + ' (Wien) · vor ' + age + ' Min. · ' +
+      latest.sampled + ' geprüft · ' + latest.qualified + ' in der Vorauswahl' +
+      (age >= 30 ? ' · Daten veraltet' : '') + (failed ? ' · Aktualisierung fehlgeschlagen' : '') +
+      (latest.warnings.length ? ' · Datenquelle eingeschränkt' : '');
+    result.replaceChildren();
+    const w = select.value || '5';
+    const ranked = latest.candidates.filter(c => Number.isInteger(c.ranks[w]))
+      .sort((a,b) => a.ranks[w]-b.ranks[w]);
+    if (!ranked.length) add(result, 'p', 'Kein Pool mit vollständigem Zeitfenster und positivem Volumen.');
+    else {
+      const wrap = add(result,'div','');
+      wrap.style.overflowX = 'auto';
+      const table = add(wrap,'table','');
+      const header = add(add(table,'thead',''),'tr','');
+      for (const label of ['Rang','Coin','Volumen','Kurs','Käufer','Netto aus 20 USDC','Scanner-Auswahl']) {
+        add(header,'th',label).scope = 'col';
+      }
+      const body = add(table,'tbody','');
+      for (const c of ranked) {
+        const row = add(body,'tr','');
+        const stats = c.windows[w];
+        add(row,'td',String(c.ranks[w]));
+        mint(add(row,'td',''),c);
+        add(row,'td',fmt(stats.volumeUsd,' USD'));
+        add(row,'td',fmt(stats.changePct,' %'));
+        add(row,'td',fmt(stats.uniqueBuyers,''));
+        add(row,'td',fmt(c.netResaleUsdc,' USDC'));
+        add(row,'td',c.reasons.map(r => reasons[r] || r).join(' · ') || 'Vorauswahl');
+      }
+    }
+    const young = latest.candidates.filter(c => c.earliest30mAt > latest.asOf)
+      .sort((a,b) => a.earliest30mAt-b.earliest30mAt);
+    if (young.length) {
+      const watch = add(result,'details','');
+      add(watch,'summary','Beobachtungsliste (' + young.length + ')');
+      for (const c of young) {
+        const line = add(watch,'p','');
+        mint(line,c);
+        add(line,'span',' · 30 volle Minuten frühestens ' + time(c.earliest30mAt) + ' (Wien)');
+      }
+    }
+    const gaps = latest.candidates.filter(c => c.reasons.includes('marketDataUnavailable') ||
+      c.reasons.includes('missing30mData')).length;
+    if (gaps) add(result,'p','Fehlende Marktdaten bei ' + gaps + ' Kandidaten.');
+  }
+  async function refresh() {
+    if (pending || !section.open || doc.hidden) return;
+    pending = true;
+    try {
+      const s = await read(api+'/contents/solana-scanner-live.json?ref=paper-dashboard-data',true);
+      if (s.schema !== 1 || !count(s.asOf) || !count(s.qualified) || !Array.isArray(s.warnings) ||
+          !Array.isArray(s.candidates) || s.sampled !== s.candidates.length ||
+          !s.candidates.every(c => typeof c.mint === 'string' && c.ranks && c.windows &&
+            Array.isArray(c.reasons) && Object.keys(c.ranks).every(k => c.windows[k]))) throw Error('format');
+      if (!latest || s.asOf >= latest.asOf) latest = s;
+      failed = false;
+    } catch { failed = true; }
+    finally { pending = false; render(); }
+  }
+  function activate() {
+    clearInterval(timer);
+    if (!section.open || doc.hidden) return;
+    void refresh();
+    timer = setInterval(refresh, 60000);
+  }
+  select.addEventListener('change',render);
+  section.addEventListener('toggle',activate);
+  doc.addEventListener('visibilitychange',activate);
+  return activate;
 }

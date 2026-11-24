@@ -21,6 +21,9 @@ class FunnelTest(unittest.TestCase):
         self.assertEqual(report['distinctPools']['signal'], 1)
         self.assertEqual(report['distinctPools']['launchpad'], 2)
         self.assertEqual(report['failedAtLeastOnceAmongNeverConfirmed'], {'priceMomentum':1,'volume':1})
+        self.assertEqual(report['entryDiagnostics']['neverPassed'], {
+            'tokenPair':0,'priceMomentum':1,'liquidity':0,'volume':1,'orderFlow':0})
+        self.assertEqual(report['entryDiagnostics']['onlyZeroLiquidity'], 0)
         self.assertEqual(report['quoteErrorsBySide'], {'sell':1})
         self.assertIsNone(report['account']['equityUsdc'])
         with self.assertRaises(ValueError):

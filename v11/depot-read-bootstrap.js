@@ -1,8 +1,8 @@
-import {appAccess} from './app-access.js?v=B19-M11';
-import {createDepotReadClient} from './depot-read-client.js?v=B19-M11';
-import {createDepotReadView} from './depot-read-view.js?v=B19-M11';
-import {mountLedgerReview} from './ledger-review-view.js?v=B19-M11';
-import {mountLedgerManual} from './ledger-manual-view.js?v=B19-M11';
+import {appAccess} from './app-access.js?v=B19-M11-FIX1';
+import {createDepotReadClient} from './depot-read-client.js?v=B19-M11-FIX1';
+import {createDepotReadView} from './depot-read-view.js?v=B19-M11-FIX1';
+import {mountLedgerReview} from './ledger-review-view.js?v=B19-M11-FIX1';
+import {mountLedgerManual} from './ledger-manual-view.js?v=B19-M11-FIX1';
 
 // Mounting controls never starts a request. Only the view's manual refresh can read.
 export function mountDepotReadAccess(document,window,{

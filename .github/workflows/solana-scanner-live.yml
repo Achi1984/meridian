@@ -1,0 +1,61 @@
+name: Solana scanner dashboard
+on:
+  schedule:
+    - cron: '3,13,23,33,43,53 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/solana-scanner-live.yml', 'scripts/memecoin-paper/research/scanner_snapshot.py']
+permissions: {}
+concurrency:
+  group: solana-scanner-live
+  cancel-in-progress: false
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 scanner_snapshot.py
+        working-directory: scripts/memecoin-paper/research
+      - uses: actions/upload-artifact@v4
+        with:
+          name: scanner-snapshot
+          retention-days: 1
+          path: scripts/memecoin-paper/research/scanner-live.json
+  publish:
+    needs: observe
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: scanner-snapshot
+      - uses: actions/github-script@v7
+        with:
+          script: |
+            const content = require('fs').readFileSync('scanner-live.json');
+            const data = JSON.parse(content);
+            if (data.schema !== 1 || !Number.isSafeInteger(data.asOf) ||
+                !Array.isArray(data.candidates) || data.sampled !== data.candidates.length) {
+              throw Error('Invalid scanner snapshot');
+            }
+            const branch = 'paper-dashboard-data', path = 'solana-scanner-live.json';
+            const args = {...context.repo, path};
+            let sha;
+            try {
+              const prior = (await github.rest.repos.getContent({...args, ref:branch})).data;
+              if (JSON.parse(Buffer.from(prior.content,'base64')).asOf >= data.asOf) return;
+              sha = prior.sha;
+            } catch (error) {
+              if (error.status !== 404) throw error;
+            }
+            await github.rest.repos.createOrUpdateFileContents({...args, sha, branch,
+              message:'Refresh Solana scanner snapshot', content:content.toString('base64')});

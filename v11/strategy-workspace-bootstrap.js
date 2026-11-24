@@ -1,13 +1,13 @@
-import {mountSolanaReport} from './solana-meme-report.js?v=B19-M11';
-import {createAdvisorSection} from './paper-advisor-view.js?v=B19-M11';
-import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B19-M11';
-import {createStrategyArenaView} from './strategy-arena.js?v=B19-M11';
-import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B19-M11';
-import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B19-M11';
-import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B19-M11';
-import {renderPaperReadiness} from './paper-readiness-view.js?v=B19-M11';
-import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B19-M11';
-import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B19-M11';
+import {mountSolanaReport, mountLiveScanner} from './solana-meme-report.js?v=B19-M11-FIX1';
+import {createAdvisorSection} from './paper-advisor-view.js?v=B19-M11-FIX1';
+import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B19-M11-FIX1';
+import {createStrategyArenaView} from './strategy-arena.js?v=B19-M11-FIX1';
+import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B19-M11-FIX1';
+import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B19-M11-FIX1';
+import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B19-M11-FIX1';
+import {renderPaperReadiness} from './paper-readiness-view.js?v=B19-M11-FIX1';
+import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B19-M11-FIX1';
+import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B19-M11-FIX1';
 
 let catalogRoot = document.getElementById('strategy-catalog');
 let catalogStatus = document.getElementById('strategy-load-status');
@@ -51,6 +51,8 @@ function mountWorkspace(){
   advisorController.setActive(Boolean(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')));
   const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot',advisor);
   refreshSolanaStatus = mountSolanaReport(solana);
+  const scanner = collapsedSection('solana-scanner-live','Solana-Memecoin-Scanner · Live',solana);
+  mountLiveScanner(scanner);
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';

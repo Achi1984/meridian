@@ -1,0 +1,36 @@
+name: Solana newcomer paired paper test
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/newcomer-wave-pair.yml']
+permissions:
+  contents: read
+jobs:
+  paired:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    defaults:
+      run:
+        working-directory: scripts/memecoin-paper/research
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python3 -m unittest test_newcomer_wave_pair test_newcomer_research test_newcomer_refresh
+      - run: python3 newcomer_wave_pair.py | tee wave-pair.jsonl
+        shell: bash
+      - name: Summarize buy-pressure bands and entry arms
+        run: |
+          python3 wave_band_report.py wave-pair.jsonl > wave-band-results.json
+          echo '### Newcomer paper comparison (USDC)' >> "$GITHUB_STEP_SUMMARY"
+          echo '~~~json' >> "$GITHUB_STEP_SUMMARY"
+          cat wave-band-results.json >> "$GITHUB_STEP_SUMMARY"
+          echo '~~~' >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: newcomer-wave-pair
+          path: |
+            scripts/memecoin-paper/research/wave-pair.jsonl
+            scripts/memecoin-paper/research/wave-band-results.json

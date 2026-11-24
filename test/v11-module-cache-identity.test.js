@@ -8,7 +8,7 @@ const indexUrl=new URL('index.html',v11Root);
 const bridgeRoot=new URL('../scripts/memecoin-paper-report-bridge/',v11Root);
 const spotBridgeRoot=new URL('../scripts/spot-paper-report-bridge/',v11Root);
 const pairedProgressRoot=new URL('../scripts/spot-paper-paired-progress/',v11Root);
-const CACHE_ID='?v=B19-M11';
+const CACHE_ID='?v=B19-M11-FIX1';
 const diskPath=url=>fileURLToPath(new URL(url.pathname,url));
 const readModule=url=>readFileSync(diskPath(url),'utf8');
 const exists=url=>existsSync(diskPath(url));
@@ -22,7 +22,7 @@ const expectedModules=[
   'depot-current-model.js','depot-history-model.js','depot-history-view.js','depot-portfolio-state.js','depot-read-bootstrap.js',
   'depot-read-client.js','depot-read-model.js','depot-read-view.js',
   'ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','paper-advisor-view.js','paper-bot-report-bootstrap.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-readiness-view.js','paper-readiness.js','paper-report-connector.js','pionex-history-model.js','release-update.js','research-evidence.js',
-  'solana-meme-report.js',
+  'solana-eight-hour.js','solana-meme-report.js',
   'spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js',
   'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js',
   'spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js',
@@ -109,11 +109,11 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
   assert.deepEqual([...graph.modules].sort(),expectedModules);
   assert.deepEqual([...graph.external].sort(),[
     '../ledger-manual-snapshot.js','../portfolio-data-contract.js','../public/js/m11-agent-status.js',
-    '../research/strategy-paper-arena.js','../scripts/memecoin-paper-report-bridge/contract.mjs?v=B19-M11',
-    '../scripts/memecoin-paper-report-bridge/index.mjs?v=B19-M11',
-    '../scripts/spot-paper-paired-progress/contract.mjs?v=B19-M11',
-    '../scripts/spot-paper-paired-report/contract.mjs?v=B19-M11',
-    '../scripts/spot-paper-report-bridge/contract.mjs?v=B19-M11','../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B19-M11',
+    '../research/strategy-paper-arena.js','../scripts/memecoin-paper-report-bridge/contract.mjs?v=B19-M11-FIX1',
+    '../scripts/memecoin-paper-report-bridge/index.mjs?v=B19-M11-FIX1',
+    '../scripts/spot-paper-paired-progress/contract.mjs?v=B19-M11-FIX1',
+    '../scripts/spot-paper-paired-report/contract.mjs?v=B19-M11-FIX1',
+    '../scripts/spot-paper-report-bridge/contract.mjs?v=B19-M11-FIX1','../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B19-M11-FIX1',
     '../v8-clean/live-price-core-r18.js'
   ]);
   assert.ok(graph.references.get('app-access.js')>=4,'status shares the existing central access module');
@@ -122,7 +122,7 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
   assert.ok(graph.references.get('bot-read-client.js')>=2,'shared bot client is reached by both read surfaces');
   for(const [module,identities] of graph.identities){
     assert.equal(identities.size,1,`${module} must resolve to one shared URL identity`);
-    assert.match([...identities][0],/\?v=B19-M11$/);
+    assert.match([...identities][0],/\?v=B19-M11-FIX1$/);
   }
 });
 
@@ -132,24 +132,24 @@ test('agent-status browser harness shares the served B18 bootstrap, client and a
   const statusModules=imports.filter(url=>url.pathname.startsWith('/v11/'))
     .map(url=>url.pathname.slice('/v11/'.length)+url.search).sort();
   assert.deepEqual(statusModules,[
-    'agent-status-bootstrap.js?v=B19-M11',
-    'agent-status-client.js?v=B19-M11',
-    'app-access.js?v=B19-M11'
+    'agent-status-bootstrap.js?v=B19-M11-FIX1',
+    'agent-status-client.js?v=B19-M11-FIX1',
+    'app-access.js?v=B19-M11-FIX1'
   ]);
 });
 
 test('nested stale FIX15 edges fail the same graph assertion',()=>{
   const fixtureRoot=new URL('file:///fixture/v11/');
   const fixture=new Map([
-    ['/fixture/v11/entry.js',"import './nested.js?v=B19-M11';"],
+    ['/fixture/v11/entry.js',"import './nested.js?v=B19-M11-FIX1';"],
     ['/fixture/v11/nested.js',"import './leaf.js?v=B16-M11-FIX15';"],
     ['/fixture/v11/leaf.js','export const ready=true;']
   ]);
-  assert.throws(()=>scanGraph([new URL('entry.js?v=B19-M11',fixtureRoot)],{
+  assert.throws(()=>scanGraph([new URL('entry.js?v=B19-M11-FIX1',fixtureRoot)],{
     root:fixtureRoot,
     read:url=>fixture.get(url.pathname),
     fileExists:url=>fixture.has(url.pathname)
-  }),/internal v11 import must use \?v=B19-M11/);
+  }),/internal v11 import must use \?v=B19-M11-FIX1/);
 });
 
 test('B18 cache preview remains isolated from terminal, root and PWA release identities',()=>{

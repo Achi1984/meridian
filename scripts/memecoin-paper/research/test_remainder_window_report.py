@@ -1,0 +1,53 @@
+import unittest
+from remainder_window_report import conditional_exit, shorter_window
+
+
+class RemainderWindowTests(unittest.TestCase):
+    def rows(self, held):
+        return [dict(event='entry', arm='early', qty=101),
+                dict(event='runnerPartialSale', qty=50, usdcRaw=10000000),
+                dict(event='runnerMark', qty=51, usdcRaw=11000000, heldSeconds=held)]
+
+    def test_sell_on_first_eligible_bid(self):
+        rows = self.rows(899)
+        rows.extend([dict(rows[-1], heldSeconds=901), dict(rows[-1], heldSeconds=950, usdcRaw=15000000)])
+        result = shorter_window(rows, {})
+        self.assertEqual((result['heldSeconds'], result['netUsdc']), (901, .85))
+
+    def test_deadline_and_partial_cash(self):
+        self.assertEqual(shorter_window(self.rows(1020), {})['state'], 'splitClosed')
+        result = shorter_window(self.rows(1021), {})
+        self.assertEqual((result['remainingQty'], result['zeroRecoveryUsdc']), (51, -10.1))
+
+    def test_guard_sells_at_observed_quote_after_a_gap(self):
+        rows = self.rows(750)
+        rows.insert(1, dict(event='exit', arm='early', usdcRaw=21000000))
+        rows.insert(-1, dict(event='runnerMissingQuote', qty=51))
+        rows.append(dict(rows[-1], heldSeconds=920, usdcRaw=14000000))
+        guarded = shorter_window(rows, {}, protect_full_exit=True)
+        self.assertEqual((guarded['heldSeconds'], guarded['netUsdc']), (750, .85))
+        self.assertEqual(shorter_window(rows, {})['netUsdc'], 3.85)
+
+    def test_guard_keeps_unquoted_remainder_unresolved(self):
+        rows = self.rows(1021)
+        rows.insert(1, dict(event='exit', arm='early', usdcRaw=21000000))
+        self.assertEqual(shorter_window(rows, {}, True)['zeroRecoveryUsdc'], -10.1)
+
+    def test_shared_early_barrier(self):
+        rows = self.rows(800)
+        rows[-1]['usdcRaw'] = 5000000
+        self.assertEqual(shorter_window(rows, {})['netUsdc'], -5.15)
+
+
+class ProfitGateTests(unittest.TestCase):
+    def test_gate_uses_only_baseline_exit_and_strict_positive_net(self):
+        split = dict(state='unresolved', remainingQty=50)
+        for reason, net, extend in [('time', 0, False), ('time', -1, False),
+                                    ('time', .000001, True), ('target', 40, False)]:
+            baseline = dict(state='closed', exitReason=reason, netUsdc=net)
+            self.assertIs(conditional_exit(baseline, split), split if extend else baseline)
+
+    def test_unpriced_and_skipped_entries_remain_separate(self):
+        for state in ('unresolved', 'noEntry', 'noEntryWithGap'):
+            baseline = dict(state=state)
+            self.assertIs(conditional_exit(baseline, {}), baseline)

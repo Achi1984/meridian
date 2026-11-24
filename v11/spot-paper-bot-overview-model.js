@@ -2,8 +2,8 @@ import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_NEXT_RUN_MODEL_PAIR,
   SPOT_PAPER_PAIRED_NEXT_RUN_MODELS
-} from '../scripts/spot-paper-paired-report/contract.mjs?v=B19-M11';
-import {validateProgress} from '../scripts/spot-paper-paired-progress/contract.mjs?v=B19-M11';
+} from '../scripts/spot-paper-paired-report/contract.mjs?v=B19-M11-FIX1';
+import {validateProgress} from '../scripts/spot-paper-paired-progress/contract.mjs?v=B19-M11-FIX1';
 
 export const SPOT_PAPER_BOT_DEFINITIONS = Object.freeze([
   Object.freeze({
