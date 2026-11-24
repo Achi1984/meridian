@@ -1,0 +1,49 @@
+name: Solana pullback buy-flow paper
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '7,17,27,37,47,57 * * * *'
+permissions: {}
+concurrency:
+  group: pullback-buyflow-paper
+  cancel-in-progress: false
+
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || vars.PULLBACK_BUYFLOW_PAPER == 'enabled')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: paper-dashboard-data
+          path: paper-state
+          sparse-checkout: pullback-buyflow.json
+          sparse-checkout-cone-mode: false
+      - working-directory: scripts/memecoin-paper/research
+        run: python3 -m unittest test_pullback_buyflow
+      - id: observe
+        working-directory: scripts/memecoin-paper/research
+        run: python3 pullback_buyflow.py "$GITHUB_WORKSPACE/paper-state/pullback-buyflow.json" | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
+      - name: Save completed observations
+        if: "!cancelled() && steps.observe.outcome != 'skipped'"
+        working-directory: paper-state
+        shell: bash
+        run: |
+          if [[ ! -f pullback-buyflow.json ]]; then exit 0; fi
+          git add --sparse -- pullback-buyflow.json
+          if git diff --cached --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git commit -m 'Update pullback paper observations'
+          for attempt in 1 2 3; do
+            git pull --rebase origin paper-dashboard-data
+            if git push origin HEAD:paper-dashboard-data; then exit 0; fi
+          done
+          exit 1
