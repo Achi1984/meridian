@@ -28,6 +28,8 @@ class Account:
         pos = self.open.get(key)
         if pos is None:
             return
+        if kind == 'entry' and self.policy == 'failedRecovery':
+            pos.update(entryAt=row['at'], lossAt=None, sellAfter=None)
         if kind in ('resaleMark', 'exit'):
             if pos['qty'] != row['qty']:
                 raise ValueError('Exit quantity differs from entry')
@@ -39,8 +41,19 @@ class Account:
                 if self.policy == 'trailing':
                     close_target = 10*pos['peakNet'] >= SIZE and 2*net <= pos['peakNet']
                     pos['peakNet'] = max(pos['peakNet'], net)
-                elif self.policy == 'fixed':
+                elif self.policy in ('fixed', 'failedRecovery', 'smallPoolFixed'):
                     close_target = 10*net >= SIZE
+            if self.policy == 'failedRecovery' and kind == 'resaleMark':
+                at = row['at']
+                if pos['sellAfter'] is not None:
+                    close_target |= at > pos['sellAfter']
+                elif net * 20 <= -SIZE and at > pos['entryAt']:
+                    previous = pos['lossAt']
+                    if previous is not None and 40 <= at-previous <= 90 and at-pos['entryAt'] >= 120:
+                        pos['sellAfter'] = at
+                    pos['lossAt'] = at
+                else:
+                    pos['lossAt'] = None
             if kind == 'exit' or close_target:
                 self.cash += bid-FEE
                 self.closed += 1
@@ -49,6 +62,8 @@ class Account:
             else:
                 pos['marks'] += 1
         elif kind in ('missingExitQuote', 'lateExitQuote'):
+            if self.policy == 'failedRecovery':
+                pos['lossAt'] = None
             self.missing += 1
             pos.update(bid=None, markAt=None)
         equity = self.equity()
@@ -144,7 +159,10 @@ def run(directory, segment):
     directory.mkdir(exist_ok=True, parents=True)
     journal = directory/'events.jsonl'
     accounts = {name: Account(policy) for name, policy in
-                [('A', 'trailing'), ('B', 'standard'), ('C', 'fixed')]}
+                [('A', 'trailing'), ('B', 'standard'), ('C', 'fixed'), ('E', 'failedRecovery')]}
+
+    smaller_pools = set()
+    accounts['F'] = Account('smallPoolFixed')
 
     staged = accounts['D'] = StagedAccount()
 
@@ -195,8 +213,13 @@ def run(directory, segment):
     def apply(row):
         if row['event'] in ('stagedMissing', 'stagedMark'):
             staged.update(row, row['session'])
+        key = row['session'], row.get('mint')
+        if row['event'] == 'cohortSelection' and 0 < row['entryLiquidityUsd'] < 20_000:
+            smaller_pools.add(key)
         if row.get('arm') == 'wave':
-            for account in accounts.values():
+            for name, account in accounts.items():
+                if name == 'F' and key not in smaller_pools:
+                    continue
                 account.update(row, row['session'])
         if row['event'] in ('sessionEnd', 'sessionInterrupted'):
             for account in accounts.values():

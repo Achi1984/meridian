@@ -1,4 +1,5 @@
 name: Meridian overnight staged exits
+run-name: Compare recovery exits A through F
 on:
   workflow_dispatch:
   push:

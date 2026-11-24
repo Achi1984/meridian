@@ -3,6 +3,26 @@ from newcomer_eight_hour import Account, SIZE, FEE
 
 
 class RecoveryExitTests(unittest.TestCase):
+    def test_failed_recovery_sells_at_next_available_bid(self):
+        account = Account('failedRecovery')
+        base = dict(mint='m', qty=10)
+        account.update(dict(base, event='entry', at=0), 1)
+        for at, net in [(0, -1000000), (60, -1000000), (120, -1000000)]:
+            account.update(dict(base, event='resaleMark', at=at, usdcRaw=SIZE+2*FEE+net), 1)
+        self.assertEqual(account.closed, 0)
+        account.update(dict(base, event='missingExitQuote', at=180), 1)
+        account.update(dict(base, event='resaleMark', at=240, usdcRaw=SIZE+2*FEE-3000000), 1)
+        self.assertEqual(account.by_mint['m'], -3000000)
+
+    def test_interrupted_confirmation_needs_two_new_loss_quotes(self):
+        account = Account('failedRecovery')
+        base = dict(mint='m', qty=10)
+        account.update(dict(base, event='entry', at=0), 1)
+        for at, kind in [(60, 'resaleMark'), (90, 'missingExitQuote'), (120, 'resaleMark'),
+                         (240, 'resaleMark'), (300, 'resaleMark')]:
+            account.update(dict(base, event=kind, at=at, usdcRaw=SIZE-2000000), 1)
+        self.assertEqual(account.open[1,'m']['sellAfter'], 300)
+
     def simulate(self, policy, marks):
         account = Account(policy)
         base = dict(mint='m', qty=10, at=1)
