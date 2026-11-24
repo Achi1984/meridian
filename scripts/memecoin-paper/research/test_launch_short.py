@@ -45,6 +45,26 @@ class ShortStudy(unittest.TestCase):
             rows = self.replay([100, 97, 94, 90], slot_delay=delay)
             self.assertEqual(rows[-1]['event'], 'quoteUnavailable')
 
+    def test_initial_outage_restarts_observations(self):
+        def first_round_unavailable(i, q):
+            if i == 0:
+                raise HTTPError('quote', 503, 'unavailable', {}, None)
+
+        rows = self.replay([1, 100, 97, 94, 90], first_round_unavailable)
+        self.assertEqual([r['event'] for r in rows], [
+            'quoteUnavailable', 'initialRoundRetry', 'quote', 'quote', 'quote',
+            'paperOpen', 'quote', 'paperMark'])
+        self.assertEqual(rows[5]['at'], 1180)
+
+    def test_outage_retry_is_bounded_and_status_specific(self):
+        for code, attempts in [(502, 2), (503, 2), (504, 2), (404, 1), (429, 1)]:
+            def unavailable(i, q):
+                raise HTTPError('quote', code, 'unavailable', {}, None)
+
+            rows = self.replay([100, 100], unavailable)
+            self.assertEqual(sum(r['event'] == 'quoteUnavailable' for r in rows), attempts)
+            self.assertFalse(any(r['event'] == 'paperOpen' for r in rows))
+
     def test_unavailable_exit(self):
         def unavailable(i, q):
             if i == 3:
