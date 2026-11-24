@@ -50,9 +50,19 @@ test('refresh loads the run checkpoint and keeps it across a failed or older ref
   let response = { ...newSnapshot, runId:45433341029, accounts:{...newSnapshot.accounts,
     D:{...account,policy:'staged'}, E:{...account,policy:'failedRecovery'},
     F:{...account,policy:'smallPoolFixed',realizedWithoutBestMintUsdc:2}}};
-  const read = async url => url.endsWith('/jobs') ? {jobs:[]} : response;
+  let jobs = [];
+  const read = async url => {
+    if (url.includes('/workflows/')) return {workflow_runs:[{id:45433341029, status:'queued'}]};
+    if (url.endsWith('/jobs')) return {jobs};
+    return response;
+  };
   const refresh = mountEightHourComparison({children:[]},add,read,String);
   await refresh();
+  const status = nodes.find(node=>node.textContent === 'Achtstundenlauf · wartet');
+  assert.ok(status);
+  jobs = [{name:'first', status:'in_progress'}];
+  await refresh();
+  assert.equal(status.textContent,'Erste vier Stunden · läuft');
   const newReport = nodes.find(node=>node.tag==='div');
   assert.ok(contents(newReport).some(node=>node.textContent.includes('Nachlaufender Gewinnausstieg')));
   assert.equal(contents(newReport).filter(node=>node.scope==='row').length,6);
