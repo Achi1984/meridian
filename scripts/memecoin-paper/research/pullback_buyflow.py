@@ -1,4 +1,5 @@
 """Paper-only pullback/buy-flow study. Run tick repeatedly against the same ledger."""
+from collections import Counter
 import argparse
 import fcntl
 import json
@@ -153,28 +154,44 @@ def tick(ledger, fetch, quote, now, save):
         return fetch(url, max_age)
 
     candidates = sample(now(), discovery_read)
+    outcomes = Counter()
     opened = 0
     for row in candidates:
         service_positions()
         mint = row['mint']
         created = timestamp(row['created'])
-        if mint in ledger or not age_ok(now()-created):
+        if mint in ledger:
+            outcomes["alreadyObserved"] += 1
             continue
+        age = now() - created
+        if not age_ok(age):
+            outcomes["tooYoung" if age < 110 * 60 else "tooOld"] += 1
+            continue
+        unavailable = "poolDataUnavailable"
         try:
             item = fetch(f"{GT}/pools/{row['pool']}", 60)['data']
             fresh = snapshot(item)
             change = float(item['attributes']['price_change_percentage']['h1'])
             if (fresh['mint'] != mint or fresh['pool'] != row['pool']
-                    or fresh['quote'] != row['quote'] or timestamp(fresh['created']) != created
-                    or fresh['liquidity'] < 5000 or not math.isfinite(change)
-                    or fresh['buys']+fresh['sells'] < 10):
+                    or fresh['quote'] != row['quote'] or timestamp(fresh['created']) != created):
+                outcomes['poolMismatch'] += 1
                 continue
+            if fresh['liquidity'] < 5000 or not math.isfinite(change) or fresh['buys']+fresh['sells'] < 10:
+                outcomes['poolQuality'] += 1
+                continue
+            unavailable = "buyQuoteUnavailable"
             qty = quote(USDC, mint, SIZE)
+            unavailable = "resaleQuoteUnavailable"
             bid = quote(mint, USDC, qty)
             at = now()
-            if not age_ok(at-created) or bid-2*FEE < .95*SIZE:
+            if not age_ok(at-created):
+                outcomes["agedOutDuringQuote"] += 1
+                continue
+            if bid-2*FEE < .95*SIZE:
+                outcomes["resaleBelowFloor"] += 1
                 continue
         except ERRORS:
+            outcomes[unavailable] += 1
             continue
         # Observe all comparable entries. The flag selects the strategy subset.
         ledger[mint] = dict(state='open', selected=accepts(change, fresh['buys'], fresh['sells']),
@@ -186,12 +203,13 @@ def tick(ledger, fetch, quote, now, save):
             ledger[mint].update(initial(bid))
         else:
             ledger[mint]['secondLook'] = dict(state='waiting')
+        outcomes["selected" if ledger[mint]["selected"] else "rejectedComparable"] += 1
         save()
         opened += 1
         if ledger[mint]['selected']:
             ledger[mint]['netBuy5mUsd'] = sample_flow(fresh, int(at), discovery_read)
             save()
-    return dict(sampled=len(candidates), newObservations=opened)
+    return dict(sampled=len(candidates), newObservations=opened, candidateOutcomes=dict(outcomes))
 
 
 def summary(ledger):

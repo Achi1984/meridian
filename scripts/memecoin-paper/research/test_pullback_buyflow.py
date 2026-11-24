@@ -26,8 +26,17 @@ class PullbackTests(unittest.TestCase):
         def scan():
             return tick(ledger, fetch, quote, lambda:stamp[0], lambda:None)
         with patch('pullback_buyflow.sample',return_value=rows), patch('pullback_buyflow.snapshot',side_effect=lambda x:x):
-            self.assertEqual(scan()['newObservations'],2)
-            self.assertEqual(scan()['newObservations'],0)
+            first = scan()
+            self.assertEqual(first['newObservations'], 2)
+            self.assertEqual(first['candidateOutcomes'], {'selected': 1, 'rejectedComparable': 1})
+            self.assertEqual(scan()['candidateOutcomes'], {'alreadyObserved': 2})
+            ledger.clear()
+            stamp[0] = 6599
+            self.assertEqual(scan()['candidateOutcomes'], {'tooYoung': 2})
+            stamp[0] = 7201
+            self.assertEqual(scan()['candidateOutcomes'], {'tooOld': 2})
+            stamp[0] = 7000
+            scan()
             self.assertEqual(summary(ledger)['pullbackBuyflow']['open'],1)
             stamp[0]=86400
             scan()
