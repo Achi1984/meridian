@@ -57,3 +57,34 @@ class PullbackTests(unittest.TestCase):
         self.assertEqual(audit['selectionBenefitUsdc'],
                          rows['pullbackBuyflow']['realizedUsdc'] - rows['allComparable']['realizedUsdc'])
         self.assertIsNone(summary({})['rejectedComparable']['selectionBenefitUsdc'])
+
+    def test_delayed_entry_reprices_and_checks_all_horizons(self):
+        from pullback_buyflow import follow_second_look
+        row = dict(pool='p', mint='m', liquidity=5000, buys=6, sells=4)
+        position = dict(selected=False, state='open', pool='p', entryAt=7200,
+                        due=86400, liquidityUsd=5000, secondLook={'state': 'waiting'})
+        def quote(src, dst, amount):
+            if src == USDC:
+                self.assertEqual(amount, 20_000_000)
+                return 77
+            self.assertEqual(amount, 77)
+            return 21_000_000
+        def run(at):
+            follow_second_look('m', position, lambda *args: {'data': row}, quote, lambda: at, lambda: None)
+        with patch('pullback_buyflow.snapshot', side_effect=lambda x:x):
+            run(8999)
+            self.assertEqual(position['secondLook']['state'], 'waiting')
+            run(9000)
+            for h in (2, 3, 6, 12):
+                run(9000+h*3600)
+            run(86400)
+        stats = summary({'m':position})['secondLook30m']
+        self.assertEqual(stats['closed'], 1)
+        for key in ('2h','3h','6h','12h','exit'):
+            self.assertEqual(stats[key]['netVsSkipUsdc'], .9)
+
+    def test_missed_confirmation_is_not_backfilled(self):
+        from pullback_buyflow import follow_second_look
+        p = dict(entryAt=0, secondLook={'state':'waiting'})
+        follow_second_look('m', p, None, None, lambda:1921, lambda:None)
+        self.assertEqual(p['secondLook']['state'], 'missedWindow')
