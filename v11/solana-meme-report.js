@@ -261,8 +261,8 @@ export function mountLiveScanner(section) {
   status.setAttribute('role', 'status');
   const controls = add(section, 'label', 'Rangliste ');
   const select = add(controls, 'select', '');
-  for (const minutes of [5, 10, 30, 60]) {
-    add(select, 'option', minutes + ' Minuten').value = String(minutes);
+  for (const minutes of [5, 10, 30, 60, 120, 180, 360, 720]) {
+    add(select, 'option', minutes < 120 ? minutes + ' Minuten' : minutes / 60 + ' Stunden').value = String(minutes);
   }
   const result = add(section, 'div', '');
   const fmt = (value, unit) => Number.isFinite(value)

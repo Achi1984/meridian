@@ -29,6 +29,29 @@ class VolumeMomentumTests(unittest.TestCase):
         bars.pop(0)
         self.assertFalse(entry_signal(ROW,3600,fetch)[0])
 
+    def test_long_signal_uses_prior_disjoint_volume_and_closed_bars(self):
+        bars = [[i*60, 100, 104, 99, 104, 2 if i >= 90 else 1] for i in range(120)]
+        def fetch(url, age):
+            if '/trades' in url:
+                return dict(data=[])
+            return dict(meta=dict(base=dict(address='m')), data=dict(attributes=dict(ohlcv_list=bars)))
+        self.assertEqual(entry_signal(ROW, 7200, fetch)[1]['longWindows'], {'120': True})
+        bars[-1][4] = 98
+        bars.append([7200, 98, 110, 98, 110, 1000])
+        self.assertEqual(entry_signal(ROW, 7200, fetch)[1]['longWindows'], {'120': False})
+
+    def test_long_arm_excludes_missing_data_and_values_skipped_trades(self):
+        positions = []
+        for state, net in [(True, 1000000), (False, -3000000), (False, 2000000),
+                           (False, None), (None, -7000000)]:
+            p = Position(ROW, 1, 1, 1, True, {} if state is None else {'120': state})
+            p.standard = net
+            positions.append(p)
+        row = comparison(positions)['longWindowComparison']['120']
+        self.assertEqual(row, dict(missingHistory=1, unresolved=1, comparableClosed=3,
+                                   retainedClosed=1, baselineNetUsdc=0, filteredNetUsdc=1,
+                                   avoidedLossUsdc=3, missedProfitUsdc=2))
+
     def test_delayed_exit_and_missing_baseline(self):
         p = Position(ROW, 100, 20_000_000, 1000, True)
         p.observe(1060, 19_990_000, False)

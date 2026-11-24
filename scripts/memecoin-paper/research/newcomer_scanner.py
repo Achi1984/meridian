@@ -9,7 +9,8 @@ from meme_paper_account import FEE, UNIT
 from new_pool_watch import ADDRESS, GT, SIZE, USDC, WSOL, get, number, snapshot, spot_quote
 from newcomer_research import ERRORS
 
-WINDOWS = (5, 10, 30, 60)
+LONG_WINDOWS = (120, 180, 360, 720)
+WINDOWS = (5, 10, 30, 60) + LONG_WINDOWS
 TOKENS = 'https://api.jup.ag/tokens/v2'
 
 
@@ -90,6 +91,8 @@ def metrics(row, candles, trades, end):
     times = [(timestamp(t['block_timestamp']), t) for t in fills]
     result = {}
     for minutes in WINDOWS:
+        if minutes in LONG_WINDOWS and timestamp(row['created']) > end-minutes*60:
+            continue
         start = max(end-minutes*60, created)
         slots = list(range(start, end, 60))
         if not slots or any(at not in bars for at in slots):
@@ -153,7 +156,7 @@ def scan(emit, fetch=None, quote=spot_quote, now=time.time, *, ranked_windows_on
         if ranked_windows_only and ceil(timestamp(row['created'])/60)*60 > end-300:
             continue
         try:
-            candles = fetch(path+f'/ohlcv/minute?aggregate=1&currency=usd&limit=60'
+            candles = fetch(path+f'/ohlcv/minute?aggregate=1&currency=usd&limit={max(WINDOWS)+1}'
                             f'&include_empty_intervals=true&before_timestamp={end}', 120)
             try:
                 trades = fetch(path+'/trades', 120)['data']
