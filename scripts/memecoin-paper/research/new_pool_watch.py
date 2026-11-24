@@ -110,6 +110,20 @@ def spot_quote(src, dst, amount):
     return minimum
 
 
+def additional_discovery_candidate(row, now):
+    if row['liquidity'] < 10000:
+        return False
+    if launchpad_candidate(row, row, now):
+        return True
+    if row.get('dex') != 'pumpswap' or row['quote'] not in (USDC, WSOL):
+        return False
+    try:
+        age = now - datetime.fromisoformat(row['created']).timestamp()
+    except (TypeError, ValueError, OverflowError):
+        return False
+    return 0 <= age <= 3600 and row['mint'] not in (USDC, WSOL)
+
+
 class PersistenceStudy:
     """Observe one fixed confirmation and one later outcome for each 5k signal."""
     def __init__(self):
@@ -338,8 +352,7 @@ def run(out, ticks, *, claude=False, account=None, probe_confirmations=False):
                             row = snapshot(item)
                         except errors:
                             continue
-                        if (row['pool'] not in first and row['liquidity'] >= 10000
-                                and launchpad_candidate(row, row, int(time.time()))):
+                        if (row['pool'] not in first and additional_discovery_candidate(row, int(time.time()))):
                             observe([item], candidates)
                             added += 1
                     event('liquidDiscoveryPage', addedPools=added)
