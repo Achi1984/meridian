@@ -25,7 +25,26 @@ export function mountSolanaReport(section) {
     parent.append(child);
     return child;
   };
+  const cardStatus = add(section.querySelector('summary'),'small','Laufstatus offen');
+  cardStatus.className = 'campaign-status';
   const refreshComparison = mountEightHourComparison(section, add, read, amount);
+  let checkingCard=false;
+  async function refreshCard(){
+    if(checkingCard || doc.hidden || !section.getClientRects().length)return;
+    checkingCard=true;
+    try{
+      const feed=await read(api+'/actions/workflows/newcomer-eight-hour.yml/runs?branch=paper%2Fovernight-staged-exits&per_page=1');
+      const run=feed.workflow_runs?.[0];
+      const states={pending:'wartet',queued:'wartet',requested:'wartet',waiting:'wartet',in_progress:'läuft',success:'abgeschlossen',
+        cancelled:'abgebrochen',failure:'fehlgeschlagen',timed_out:'Zeitlimit erreicht'};
+      const label=states[run?.conclusion || run?.status] || 'Status unbekannt';
+      cardStatus.textContent='A–F · '+label;
+      cardStatus.style.color=({wartet:'#ffd18a',läuft:'#91d8ff',abgeschlossen:'#70e5b4',fehlgeschlagen:'#ff9ba4','Zeitlimit erreicht':'#ff9ba4'})[label] || 'var(--muted)';
+    }catch{
+      cardStatus.textContent='A–F · Status unbekannt';
+      cardStatus.style.color='var(--muted)';
+    }finally{checkingCard=false;}
+  }
   const refresh = add(section,'button','Aktualisieren');
   refresh.type = 'button';
   refresh.className = 'strategy-entry-link';
@@ -246,10 +265,10 @@ export function mountSolanaReport(section) {
   }
   section.addEventListener('toggle',() => { if (section.open) update(); });
   refresh.addEventListener('click',update);
-  return refreshStatus;
+  return refreshCard;
 }
 
-export function mountLiveScanner(section) {
+export function mountLiveScanner(section, refreshPaperStatus) {
   const doc = section.ownerDocument;
   function add(parent, tag, text) {
     const element = doc.createElement(tag);
@@ -257,6 +276,8 @@ export function mountLiveScanner(section) {
     parent.append(element);
     return element;
   }
+  const badge = add(section.querySelector('summary'),'small','Datenstand offen');
+  badge.className = 'pilot-status';
   const status = add(section, 'p', 'Warte auf Scanner-Daten.');
   status.setAttribute('role', 'status');
   const controls = add(section, 'label', 'Rangliste ');
@@ -283,10 +304,13 @@ export function mountLiveScanner(section) {
   }
   function render() {
     if (!latest) {
+      badge.textContent = failed ? 'Datenstand unbekannt' : 'Wird geladen';
       status.textContent = failed ? 'Noch kein Scanner-Stand abrufbar.' : 'Scanner-Daten werden geladen …';
       return;
     }
     const age = Math.max(0, Math.floor((Date.now()/1000-latest.asOf)/60));
+    badge.textContent = 'Daten ' + age + ' Min. alt' + (failed ? ' · Abruf gestört' : age >= 30 ? ' · veraltet' : latest.warnings.length ? ' · eingeschränkt' : '');
+    badge.style.color = age >= 30 || failed || latest.warnings.length ? '#ffd18a' : '#91d8ff';
     status.textContent = 'Stand ' + time(latest.asOf) + ' (Wien) · vor ' + age + ' Min. · ' +
       latest.sampled + ' geprüft · ' + latest.qualified + ' in der Vorauswahl' +
       (age >= 30 ? ' · Daten veraltet' : '') + (failed ? ' · Aktualisierung fehlgeschlagen' : '') +
@@ -301,7 +325,7 @@ export function mountLiveScanner(section) {
       wrap.style.overflowX = 'auto';
       const table = add(wrap,'table','');
       const header = add(add(table,'thead',''),'tr','');
-      for (const label of ['Rang','Coin','Volumen','Kurs','Käufer','Netto aus 20 USDC','Scanner-Auswahl']) {
+      for (const label of ['Rang','Coin','Volumen','Kursänderung · '+w+' Min.','Käufer','Netto aus 20 USDC','Scanner-Auswahl']) {
         add(header,'th',label).scope = 'col';
       }
       const body = add(table,'tbody','');
@@ -333,8 +357,9 @@ export function mountLiveScanner(section) {
     if (gaps) add(result,'p','Fehlende Marktdaten bei ' + gaps + ' Kandidaten.');
   }
   async function refresh() {
-    if (pending || !section.open || doc.hidden) return;
+    if (pending || doc.hidden || !section.getClientRects().length) return;
     pending = true;
+    void refreshPaperStatus?.();
     try {
       const s = await read(api+'/contents/solana-scanner-live.json?ref=paper-dashboard-data',true);
       if (s.schema !== 1 || !count(s.asOf) || !count(s.qualified) || !Array.isArray(s.warnings) ||
@@ -348,7 +373,7 @@ export function mountLiveScanner(section) {
   }
   function activate() {
     clearInterval(timer);
-    if (!section.open || doc.hidden) return;
+    if (doc.hidden || !section.getClientRects().length) return;
     void refresh();
     timer = setInterval(refresh, 60000);
   }

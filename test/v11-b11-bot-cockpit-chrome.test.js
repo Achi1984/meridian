@@ -251,11 +251,13 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           assert.equal(await evaluate('window.__botReads'),1);
+          assert.equal(await evaluate("document.querySelector('.bot-overview-filters details').open"),false);
+          await evaluate("document.querySelector('.bot-overview-filters summary').click();document.querySelector('.bot-snapshot-details summary').click();true");
           const fresh=await evaluate(`(()=>{
             const root=document.getElementById('bot-read-root');
             const cards=[...root.querySelectorAll('.bot-card')];
             const command=document.getElementById('command-bot-overview');
-            return {cards:cards.length,ids:cards.map(c=>c.id),count:root.innerText.includes('7 Bots im Snapshot'),
+            return {cards:cards.length,ids:cards.map(c=>c.id),count:root.innerText.includes('7 Bots dargestellt'),
               duplicate:cards.filter(c=>c.innerText.includes('BTCUSDT')).length,
               cardHeights:cards.map(c=>c.getBoundingClientRect().height),
               cardGeometry:cards.map(c=>({open:c.open,summary:c.querySelector('summary').getBoundingClientRect().height,

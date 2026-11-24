@@ -79,6 +79,10 @@ function renderUsdRound(root, round) {
     const tr = row(body, [name, Number.isFinite(arm.equityUsd) ? usd.format(arm.equityUsd) : '—',
       Number.isFinite(arm.netUsd) ? usd.format(arm.netUsd) : '—', arm.closed, arm.activeDays,
       nonnegative(arm.maxDrawdownPct) ? PERCENT.format(arm.maxDrawdownPct) + ' %' : '—']);
+    if (key==='btcHold' && (!Number.isFinite(arm.equityUsd) || !Number.isFinite(arm.netUsd))) {
+      if (!Number.isFinite(arm.equityUsd)) tr.cells[1].textContent='Bewertung fehlt';
+      if (!Number.isFinite(arm.netUsd)) tr.cells[2].textContent='Netto offen';
+    }
     if (Number.isFinite(arm.netUsd) && Math.round(100 * Math.abs(arm.netUsd)) > 0) {
       tr.cells[2].className = arm.netUsd > 0 ? 'advisor-gain' : 'advisor-loss';
     }

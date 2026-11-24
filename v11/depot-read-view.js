@@ -38,6 +38,9 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
   }
   const el=(tag,text)=>{const node=document.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
   const controls=el('div'),refresh=el('button','Depot aktualisieren'),lock=el('button','Depot sperren');
+  const commandRefresh=el('button','Depot aktualisieren');
+  commandRefresh.type='button';
+  commandRoot?.querySelector('.portfolio-row')?.append(commandRefresh);
   refresh.type=lock.type='button';controls.append(refresh,lock);
   const section=el('div'),status=el('div'),details=el('div');
   status.setAttribute('role','status');status.setAttribute('aria-live','polite');status.setAttribute('aria-atomic','true');
@@ -58,6 +61,7 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
     publishDepotPortfolioState(kind==='fresh'?{status:kind,model:m}:{status:kind});
     section.dataset.state=kind;
     const current=kind==='fresh'&&['SERVER_PORTFOLIO_CURRENT','SERVER_PIONEX_CURRENT'].includes(m?.source);
+    commandRefresh.hidden=!['not_loaded','unavailable','stale'].includes(kind);
     if(commandRoot){
       const set=(selector,text)=>{const n=commandRoot.querySelector(selector);if(n)n.textContent=text;};
       set('.portfolio-value',kind==='fresh'?format(m.totalUsd):'—');
@@ -86,17 +90,20 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
     for(const [label,value] of [['Spot laut Depotquelle',m.spotUsd],['Pionex-Gesamteigenkapital',m.tradingUsd]])
       breakdown.append(el('dt',label),el('dd',money(value)));
     if(!pionexOnly)details.append(breakdown);
+    const provenance=el('details');provenance.append(el('summary','Bewertungsquelle'));
     for(const [label,value] of [['Bewertungsstand (lokale Zeit)',m.snapshotAt],['Verwendete Quelle (lokale Zeit)',m.sourceAt]]){
-      const line=el('p',label+': '),time=el('time',new Date(value).toLocaleString('de-AT'));time.dateTime=value;time.title='UTC: '+value;line.append(time);details.append(line);
+      const line=el('p',label+': '),time=el('time',new Date(value).toLocaleString('de-AT'));time.dateTime=value;time.title='UTC: '+value;line.append(time);(label.startsWith('Bewertungsstand') ? details : provenance).append(line);
     }
-    details.append(el('p',current&&pionexOnly?'Quelle: bestätigte Pionex-Bewertung aus serverseitigen Daten. Bot-Kapital und P/L werden nicht addiert.':current?'Quelle: serverseitige Depotdaten; soweit erforderlich mit öffentlichen Kursen bewertet. Zeitangabe zeigt die älteste verwendete Quelle; keine Bestätigung aller Konten.':'Quelle: gespeicherte Meridian-Depothistorie. Bestandsdetails und einzelne Börsenfristen sind hier nicht enthalten.'));
+    details.append(provenance);
+    provenance.append(el('p',current&&pionexOnly?'Quelle: bestätigte Pionex-Bewertung aus serverseitigen Daten. Bot-Kapital und P/L werden nicht addiert.':current?'Quelle: serverseitige Depotdaten; soweit erforderlich mit öffentlichen Kursen bewertet. Zeitangabe zeigt die älteste verwendete Quelle; keine Bestätigung aller Konten.':'Quelle: gespeicherte Meridian-Depothistorie. Bestandsdetails und einzelne Börsenfristen sind hier nicht enthalten.'));
     if(m.excludedIncompletePoints>0)details.append(el('p','Die Historie enthält Datenlücken. Unvollständige Bewertungen wurden ausgelassen.'));
   }
   const client=createClient({getToken,onChange:render});
   const update=()=>client.refresh(),clear=()=>client.lock();
+  commandRefresh.addEventListener('click',update);
   refresh.addEventListener('click',update);lock.addEventListener('click',clear);
   client.revalidate();if(!rendered)render({status:'locked'});
   return {revalidate:()=>client.revalidate(),dispose(){if(disposed)return;client.dispose();
-    render({status:'locked'});disposed=true;refresh.removeEventListener('click',update);lock.removeEventListener('click',clear);root.replaceChildren();}};
+    render({status:'locked'});disposed=true;commandRefresh.removeEventListener('click',update);commandRefresh.remove?.();refresh.removeEventListener('click',update);lock.removeEventListener('click',clear);root.replaceChildren();}};
 }
 
