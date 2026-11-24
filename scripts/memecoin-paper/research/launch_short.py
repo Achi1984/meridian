@@ -78,7 +78,10 @@ def signals(history):
 
 def run(mints, emit, fetch=get, clock=time.time, sleep=time.sleep, slot_time=block_time):
     history, positions = {}, {}
-    for index in range(4):
+    index = 0
+    retried = False
+    while index < 4:
+        transient_failures = 0
         start = clock()
         for mint, born in mints.items():
             active = positions.pop(mint, None)
@@ -107,15 +110,23 @@ def run(mints, emit, fetch=get, clock=time.time, sleep=time.sleep, slot_time=blo
                         positions[mint] = bot, at, q
                         emit(dict(event='paperOpen', bot=bot, mint=mint, at=at))
             except ERRORS as exc:
+                if getattr(exc, 'code', None) in (502, 503, 504):
+                    transient_failures += 1
                 history.pop(mint, None)
                 emit(dict(event='quoteUnavailable', mint=mint, status=getattr(exc, 'code', None),
                           reason=str(exc)[:160]))
                 if active:
                     emit(dict(event='unresolved', mint=mint, bot=active[0]))
+        if index == 0 and not retried and mints and transient_failures == len(mints):
+            retried = True
+            emit(dict(event='initialRoundRetry', delaySeconds=60, mintCount=len(mints)))
+            sleep(60)
+            continue
         if (index < 2 and history) or (index == 2 and positions):
             sleep(max(0, start+60-clock()))
         else:
             break
+        index += 1
 
 
 def cohort(fetch, now):
