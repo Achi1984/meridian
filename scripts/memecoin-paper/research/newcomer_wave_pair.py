@@ -16,8 +16,10 @@ HOLD_SECONDS = 600
 EXIT_GRACE = 120
 
 
-def emit(kind, **fields):
-    print(json.dumps(dict(at=int(time.time()),event=kind,**fields)),flush=True)
+def emit(kind, *, at=None, **fields):
+    if at is None:
+        at = int(time.time())
+    print(json.dumps(dict(at=at, event=kind, **fields)), flush=True)
 
 
 def provider_error_fields(exc):
