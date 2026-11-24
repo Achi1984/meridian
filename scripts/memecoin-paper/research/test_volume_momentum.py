@@ -48,6 +48,7 @@ class VolumeMomentumTests(unittest.TestCase):
         now = [3600]
         journal = StringIO()
         def scan(emit, **kwargs):
+            self.assertTrue(kwargs['ranked_windows_only'])
             emit('scannerSummary',asOf=3600)
             return [ROW]
         def quote(src, dst, quantity):
