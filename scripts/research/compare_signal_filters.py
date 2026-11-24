@@ -47,9 +47,15 @@ def compare(train, test, control):
 
 def launches(file):
     first, picks = {}, {}
+    start = end = None
     with ZipFile(file) as archive, archive.open('session/events.jsonl') as stream:
         for line in stream:
             r = json.loads(line)
+            at = r['at']
+            observed = r.get('observedAt', at)
+            lower, upper = min(at, observed), max(at, observed)
+            start = lower if start is None else min(start, lower)
+            end = upper if end is None else max(end, upper)
             if r['event'] not in ('firstSeen','seenAgain'):
                 continue
             pool, mint, at = r['pool'], r['mint'], r.get('observedAt',r['at'])
@@ -64,7 +70,23 @@ def launches(file):
             elif runner_signal(first[pool],r,at-first[pool]['at'],at,(USDC,WSOL)):
                 picks[mint] = [r,dict(flow=r['buys']/r['sells'], liquidity=r['liquidity'],
                                      advance=r['price']/first[pool]['price'], age=at-first[pool]['at']),None]
-    return {m:(x,y) for m,(r,x,y) in picks.items()}
+    if start is None:
+        raise ValueError(f'Empty pilot journal: {file}')
+    return start, end, {m:(x,y) for m,(r,x,y) in picks.items()}
+
+
+def split_pilots(files):
+    sessions = sorted((launches(file) for file in files), key=lambda item: item[0])
+    seen = set()
+    groups = [[], []]
+    last_end = None
+    for index, (start, end, sample) in enumerate(sessions):
+        if last_end is not None and start <= last_end:
+            raise ValueError('Overlapping pilot journals cannot form independent observations')
+        last_end = end
+        groups[int(index >= 4)].extend(row for mint, row in sample.items() if mint not in seen)
+        seen.update(sample)
+    return groups
 
 
 def doge(directory):
@@ -97,12 +119,7 @@ if __name__=='__main__':
     parser.add_argument('doge',type=Path)
     parser.add_argument('pilots',nargs=8)
     args = parser.parse_args()
-    samples = [launches(p) for p in args.pilots]
-    seen = set()
-    groups = [[],[]]
-    for i,sample in enumerate(samples):
-        groups[int(i>=4)].extend(v for m,v in sample.items() if m not in seen)
-        seen.update(sample)
+    groups = split_pilots(args.pilots)
     solana = compare(*groups,lambda x:x['flow']>=3)
     feature, cut, upper = solana['learnedSplit']
     for name, selected in [('baseline',groups[1]), ('simple',[r for r in groups[1] if r[0]['flow']>=3]),

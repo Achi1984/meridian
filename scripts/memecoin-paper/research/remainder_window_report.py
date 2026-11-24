@@ -1,0 +1,109 @@
+"""Replay the preregistered 15-minute remainder on validated 10/20 paper receipts."""
+import argparse
+import json
+from pathlib import Path
+
+from half_runner_report import compare
+from meme_paper_account import FEE, SIZE, UNIT
+from newcomer_wave_pair import EXIT_GRACE
+
+
+REMAINDER_SECONDS = 900
+
+
+def shorter_window(rows, runner, protect_full_exit=False):
+    sale = None
+    full_exit_net = None
+    initial = peak = drawdown = 0
+    for row in rows:
+        kind = row['event']
+        if row.get('arm') == 'early' and kind == 'entry':
+            initial = row['qty']
+        if row.get('arm') == 'early' and kind == 'resaleMark':
+            net = row['usdcRaw'] - SIZE - 2*FEE
+        elif kind == 'exit' and row.get('arm') == 'early':
+            full_exit_net = row['usdcRaw'] - SIZE - 2*FEE
+            continue
+        elif kind == 'runnerPartialSale':
+            sale = row
+            continue
+        elif sale and kind == 'runnerMark':
+            held = row['heldSeconds']
+            if held > REMAINDER_SECONDS + EXIT_GRACE:
+                break
+            net = sale['usdcRaw'] + row['usdcRaw'] - SIZE - 3*FEE
+            allocated = SIZE * row['qty'] / initial
+            proceeds = row['usdcRaw'] - FEE
+            exit_due = held >= REMAINDER_SECONDS or proceeds <= .7*allocated or proceeds >= 3*allocated
+            guard_hit = protect_full_exit and full_exit_net is not None and net <= full_exit_net
+            if exit_due or guard_hit:
+                return dict(state='splitClosed', heldSeconds=held, netUsdc=net/UNIT,
+                            sampledDrawdownUsdc=max(drawdown, peak-net)/UNIT)
+        else:
+            continue
+        peak = max(peak, net)
+        drawdown = max(drawdown, peak-net)
+    if sale:
+        return dict(state='unresolved', remainingQty=initial-sale['qty'],
+                    zeroRecoveryUsdc=(sale['usdcRaw']-SIZE-2*FEE)/UNIT,
+                    sampledDrawdownUsdc=drawdown/UNIT)
+    return dict(runner)
+
+
+def conditional_exit(baseline, split):
+    if (baseline['state'] == 'closed' and baseline['exitReason'] == 'time'
+            and baseline['netUsdc'] > 0):
+        return split
+    return baseline
+
+
+def replay(streams, legacy_times=(), profit_gate=False, protect_full_exit=False):
+    audited = compare(streams, legacy_times)
+    sessions = {}
+    for rows in streams:
+        cohort = next(r for r in rows if r['event'] == 'cohort')
+        for mint in cohort['mints']:
+            key = cohort['at'], mint
+            if key in sessions:
+                raise ValueError('Ambiguous mint and cohort timestamp')
+            sessions[key] = [r for r in rows if r.get('mint') == mint]
+    deltas = {'baseline': [], 'runner': []}
+    if protect_full_exit:
+        profit_gate = True
+        deltas['conditionalFifteenMinute'] = []
+    if profit_gate:
+        deltas['fifteenMinute'] = []
+    for item in audited['observations']:
+        rows = sessions[item['at'], item['mint']]
+        shorter = shorter_window(rows, item['runner'])
+        item['fifteenMinute'] = shorter
+        candidate = shorter
+        if profit_gate:
+            candidate = conditional_exit(item['baseline'], shorter)
+            item['conditionalFifteenMinute'] = candidate
+        if protect_full_exit:
+            candidate = conditional_exit(item['baseline'], shorter_window(rows, item['runner'], True))
+            item['guardedFifteenMinute'] = candidate
+        for name, values in deltas.items():
+            ref = item[name]
+            if (not item['repeated'] and candidate['state'] in ('closed','sharedExit','splitClosed')
+                    and ref['state'] in ('closed','sharedExit','splitClosed')):
+                values.append(round((candidate['netUsdc']-ref['netUsdc'])*UNIT))
+    return dict(observations=audited['observations'], paired={
+        name: dict(count=len(values), deltaUsdc=sum(values)/UNIT if values else None,
+                   withoutBestUsdc=(sum(values)-max(values))/UNIT if len(values)>1 else None)
+        for name, values in deltas.items()})
+
+
+if __name__ == '__main__':
+    cli = argparse.ArgumentParser(description=__doc__)
+    cli.add_argument('logs', nargs='+', type=Path)
+    cli.add_argument('--legacy-cohort-at', type=int, action='append', default=[])
+    cli.add_argument('--profit-gate', action='store_true',
+                     help='Extend only profitable normal time exits; compare with unconditional 15m')
+    cli.add_argument('--protect-full-exit', action='store_true',
+                     help='On profitable time exits, sell the remainder on the first sampled bid '
+                          'that brings combined net proceeds down to or below the full exit benchmark')
+    args = cli.parse_args()
+    streams = [[json.loads(line) for line in path.read_text().splitlines()] for path in args.logs]
+    print(json.dumps(replay(streams, args.legacy_cohort_at, args.profit_gate, args.protect_full_exit), indent=2))

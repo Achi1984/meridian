@@ -221,18 +221,23 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           await new Promise(resolve=>setTimeout(resolve,10));
         }
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details'), el=>[el.id,el.open])`),
-          [['solana-meme-paper',false],['paper-advisor',false],['paper-reports-section',false],['paper-research-section',false]]);
+          [['solana-scanner-live',false],['solana-meme-paper',false],['paper-advisor',false],['paper-reports-section',false],['paper-research-section',false]]);
         for(let i=0;i<100;i++){
           if(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status')?.textContent==='Pilot 5 · Läuft'`))break;
           await new Promise(resolve=>setTimeout(resolve,20));
         }
-        assert.equal(await evaluate(`document.querySelector('#solana-meme-paper > summary').innerText.includes('Pilot 5 · Läuft')`),true);
+        assert.equal(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status').closest('details').open===false`),true);
         if(size.mobile){
-          const fullWidthHeaders=await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details > summary')).every(summary=>{
-            const bounds=summary.getBoundingClientRect();
-            return bounds.height>=56 && Math.abs(bounds.width-summary.parentElement.clientWidth)<=1;
+          // Read resting hit boxes once the view's entrance transform has finished.
+          await evaluate(`Promise.all(document.querySelector('#view-strategies').getAnimations().map(a=>a.finished)).then(()=>true)`);
+          const headers=await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details > summary'),summary=>{
+            const {width,height}=summary.getBoundingClientRect();
+            return {id:summary.parentElement.id,width,height,cardWidth:summary.parentElement.clientWidth};
           })`);
-          assert.equal(fullWidthHeaders,true,'mobile disclosure targets span the card width and are at least 56px tall');
+          for(const header of headers){
+            assert.ok(header.height>=56 && Math.abs(header.width-header.cardWidth)<=1,
+              'mobile disclosure geometry at '+size.width+'px: '+JSON.stringify(header));
+          }
         }
         const overviewEvidence=evidence || process.env.V11_A2_EVIDENCE_DIR;
         if (overviewEvidence && size.width===390) {
@@ -463,8 +468,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.progressSettled(),3);
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B19-M11');
-          const view=await import('./paper-cockpit-view.js?v=B19-M11');
+          const model=await import('./paper-cockpit-model.js?v=B19-M11-FIX1');
+          const view=await import('./paper-cockpit-view.js?v=B19-M11-FIX1');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));
@@ -532,7 +537,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`);
         assert.equal(focus,true);
         await key('Tab','Tab',9);
-        for (const selector of ['#solana-meme-paper > summary','#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]','#paper-reports-section > summary']) {
+        for (const selector of ['#solana-scanner-live > summary','#solana-meme-paper > summary','#paper-advisor > summary', '[data-advisor-live]', '[data-advisor-file]','#paper-reports-section > summary']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
             true, 'live pilot control is reachable in document order: '+selector);
           await key('Tab','Tab',9);

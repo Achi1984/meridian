@@ -37,6 +37,20 @@ class MemeAccountTests(unittest.TestCase):
         self.assertEqual(a.status(191)['cashUsdc'],1000.9)
         a.close()
 
+    def test_missing_quote_survives_restart_and_blocks_an_older_stop(self):
+        with TemporaryDirectory() as directory:
+            path = Path(directory) / 'account.sqlite'
+            account = MemeAccount(path)
+            account.buy('m','pool',100,SIZE,100)
+            account.observe('m',None,180)
+            account.close()
+            account = MemeAccount(path)
+            self.addCleanup(account.close)
+            self.assertIsNone(account.observe('m',18*UNIT,150))
+            self.assertIsNone(account.status(180)['equityUsdc'])
+            self.assertEqual(account.status(180)['closedTrades'],0)
+            self.assertEqual(account.observe('m',18*UNIT,181),'stop')
+
     def test_full_bot_entry_and_time_exit(self):
         clock=[100000]
         mint='1'*32
