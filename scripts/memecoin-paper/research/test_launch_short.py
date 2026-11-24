@@ -7,7 +7,7 @@ MINT = 'a'*32
 
 
 class ShortStudy(unittest.TestCase):
-    def replay(self, prices, override=None):
+    def replay(self, prices, override=None, slot_delay=0):
         at = 1000
         rows = []
 
@@ -28,7 +28,7 @@ class ShortStudy(unittest.TestCase):
                 override(i, q)
             return q
 
-        run({MINT: 900}, rows.append, fetch, lambda: at, sleep)
+        run({MINT: 900}, rows.append, fetch, lambda: at, sleep, lambda slot: at-slot_delay)
         return rows
 
     def test_reversals_and_breakdowns(self):
@@ -39,6 +39,11 @@ class ShortStudy(unittest.TestCase):
             self.assertEqual(rows[-1]['bot'], bot)
             self.assertEqual(rows[-1]['event'], 'paperMark')
             self.assertLess(rows[-1]['estimatedPnlLamports'], 200000-90000-100000)
+
+    def test_stale_chain_observation(self):
+        for delay in (21, -1):
+            rows = self.replay([100, 97, 94, 90], slot_delay=delay)
+            self.assertEqual(rows[-1]['event'], 'quoteUnavailable')
 
     def test_unavailable_exit(self):
         def unavailable(i, q):
