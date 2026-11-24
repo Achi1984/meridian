@@ -80,11 +80,12 @@ def terminal(mint, arm, due, qty, quote, now, proceeds=0, fees=2):
     arm.update(state='unpriced')
 
 
-def observe(mint, p, fetch, quote, now):
+def observe(mint, p, fetch, quote, now, *, check_confirmation=True):
     if 'B' not in p:  # Historical A-only positions never receive retrospective signals.
         return
     try:
-        confirm(mint,p,fetch,quote,now)
+        if check_confirmation:
+            confirm(mint,p,fetch,quote,now)
     except ERRORS:
         pass
     try:

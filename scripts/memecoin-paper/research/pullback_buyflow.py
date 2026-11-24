@@ -7,7 +7,7 @@ import os
 from pathlib import Path
 import time
 
-from pullback_variants import initial, observe, sample_flow
+from pullback_variants import confirm, initial, observe, sample_flow
 from meme_paper_account import FEE, SIZE, UNIT
 from new_pool_watch import GT, USDC, snapshot, spot_quote
 from newcomer_research import ERRORS
@@ -25,8 +25,19 @@ def age_ok(age):
 
 
 def monitor(ledger, fetch, quote, now, save):
+    pending = sorted(((p['entryAt'],mint,p) for mint,p in ledger.items()
+                      if p.get('B',{}).get('state')=='pending'), reverse=True)
+    def service_confirmations():
+        while pending and pending[-1][0]+300 <= now():
+            _,mint,p = pending.pop()
+            try:
+                confirm(mint,p,fetch,quote,now)
+            except ERRORS:
+                pass
+    service_confirmations()
     # Resolve existing observations even when discovery is unavailable.
     for mint, position in ledger.items():
+        service_confirmations()
         if position['state'] != 'open' or now() < position['due']:
             continue
         if now() <= position['due'] + 1800:
@@ -43,7 +54,8 @@ def monitor(ledger, fetch, quote, now, save):
         save()
 
     for mint, position in ledger.items():
-        observe(mint, position, fetch, quote, now)
+        service_confirmations()
+        observe(mint, position, fetch, quote, now, check_confirmation=False)
     save()
 
 

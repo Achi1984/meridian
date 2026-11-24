@@ -109,3 +109,18 @@ class VariantTests(unittest.TestCase):
         self.assertEqual(p['B']['state'],'open')
         self.assertLessEqual(p['B']['decisionAt'],360)
         self.assertGreater(p['C']['marks'],1)
+
+    def test_due_confirmation_precedes_seven_slow_marks(self):
+        from pullback_buyflow import monitor
+        stamp = [400]
+        ledger = {str(i):self.position() for i in range(7)}
+        for p in ledger.values():
+            p['B']['state']='skippedSignal'
+        ledger['m']=self.position()
+        def quote(*_):
+            stamp[0]+=10
+            return 20_000_000
+        with patch('pullback_variants.snapshot',return_value=dict(pool='pool',mint='m',buys=7,sells=3)):
+            monitor(ledger,lambda *_:{'data':{}},quote,lambda:stamp[0],lambda:None)
+        self.assertEqual(ledger['m']['B']['state'],'open')
+        self.assertLessEqual(ledger['m']['B']['decisionAt'],460)
