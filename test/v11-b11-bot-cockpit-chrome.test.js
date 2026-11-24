@@ -251,11 +251,13 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           await evaluate(`window.__botReadMode='fresh';document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           assert.equal(await evaluate('window.__botReads'),1);
+          assert.equal(await evaluate("document.querySelector('.bot-overview-filters details').open"),false);
+          await evaluate("document.querySelector('.bot-overview-filters summary').click();document.querySelector('.bot-snapshot-details summary').click();true");
           const fresh=await evaluate(`(()=>{
             const root=document.getElementById('bot-read-root');
             const cards=[...root.querySelectorAll('.bot-card')];
             const command=document.getElementById('command-bot-overview');
-            return {cards:cards.length,ids:cards.map(c=>c.id),count:root.innerText.includes('7 Bots im Snapshot'),
+            return {cards:cards.length,ids:cards.map(c=>c.id),count:root.innerText.includes('7 Bots dargestellt'),
               duplicate:cards.filter(c=>c.innerText.includes('BTCUSDT')).length,
               cardHeights:cards.map(c=>c.getBoundingClientRect().height),
               cardGeometry:cards.map(c=>({open:c.open,summary:c.querySelector('summary').getBoundingClientRect().height,
@@ -773,7 +775,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             document.getElementById('bot-read-refresh').click()`);
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           const empty=await evaluate(`document.getElementById('bot-read-root').innerText`);
-          assert.match(empty,/0 Bots im Snapshot/);assert.match(empty,/Keine darstellbaren Bots in diesem Snapshot\./);
+          assert.match(empty,/0 Bots dargestellt · 1 weiterer Eintrag nicht unterstützt/);assert.match(empty,/Keine darstellbaren Bots in diesem Snapshot\./);
           assert.match(empty,/Dies bestätigt kein leeres Wallet\./,'no displayable bots must not confirm an empty wallet');
           assert.equal(await evaluate(`(${backSelector}).hidden`),true,'new read drops prior return context');
           assert.doesNotMatch(empty,/Keine Bots entsprechen den Filtern/);

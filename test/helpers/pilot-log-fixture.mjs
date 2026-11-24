@@ -4,11 +4,15 @@ export const pilotEndpoint = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/
 
 export const pilotStatusEndpoint = 'https://api.github.com/repos/Achi1984/meridian/actions/workflows/solana-meme-paper-bot.yml/runs?branch=main&per_page=5';
 
+export const campaignEndpoint='https://api.github.com/repos/Achi1984/meridian/actions/workflows/newcomer-eight-hour.yml/runs?branch=paper%2Fovernight-staged-exits&per_page=1';
+export const scannerEndpoint='https://api.github.com/repos/Achi1984/meridian/contents/solana-scanner-live.json?ref=paper-dashboard-data';
+
 export async function servePilotFixture(call, event, payload) {
   const {method, headers, url} = event.request;
-  const runStatus = url === pilotStatusEndpoint;
+  const runStatus = [pilotStatusEndpoint,campaignEndpoint,scannerEndpoint].includes(url);
   if (!runStatus && url !== pilotEndpoint) return false;
   if (runStatus) payload = {workflow_runs:[{id:55,run_number:5,status:'in_progress'}]};
+  if(url===scannerEndpoint)payload={schema:1,asOf:Math.floor(Date.now()/1000)-5400,sampled:0,qualified:0,warnings:[],candidates:[]};
   const preflight = method === 'OPTIONS';
   if (!preflight) {
     assert.equal(method, 'GET');

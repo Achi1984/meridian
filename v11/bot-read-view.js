@@ -239,15 +239,31 @@ export function renderBotReadState(root, state, filters = {}) {
     context.append(stamp,element(document,'span',' · bestätigt keinen laufenden Bot-Prozess.'));
     status.append(context);
   }else status.append(element(document,'p',LABELS[data.status][1]));
+  const evidenceOpen=Boolean(sameRead && details.querySelector?.('.bot-snapshot-details')?.open);
   details.replaceChildren();
   details.setAttribute('aria-busy',data.status==='loading'?'true':'false');
   if (data.status === 'fresh') {
     const resultCount=element(document,'p',data.bots.length+' von '+data.count+' Bots im Snapshot');
     resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
-    details.append(resultCount);appendDataSummary(details,data);
-    details.append(element(document,'p',coverageText(data.coverage)));appendExpiry(details,data);
+    if (data.bots.length===data.count && Number.isSafeInteger(data.coverage?.unsupportedRows)) {
+      resultCount.textContent=data.count+' Bots dargestellt · '+data.coverage.unsupportedRows+
+        (data.coverage.unsupportedRows===1?' weiterer Eintrag':' weitere Einträge')+' nicht unterstützt';
+    }
+    details.append(resultCount);
+    if(data.counts?.tp?.unknown>0 && typeof filters.onUnknownTp==='function'){
+      const quick=element(document,'button',data.counts.tp.unknown+' TP nicht prüfbar');
+      quick.type='button';quick.className='bot-tp-shortcut';
+      quick.setAttribute('aria-pressed',String(filters.tpStatus==='unknown'));
+      quick.addEventListener('click',filters.onUnknownTp);
+      details.append(quick);
+    }
+    const evidence=element(document,'details');
+    evidence.className='bot-snapshot-details';evidence.open=evidenceOpen;
+    evidence.append(element(document,'summary','Datenprüfung und Quelle'));
+    details.append(evidence);appendDataSummary(evidence,data);
+    evidence.append(element(document,'p',coverageText(data.coverage)));appendExpiry(evidence,data);
     const scope=scopeText(data);
-    if(scope)details.append(element(document,'p',scope));
+    if(scope)evidence.append(element(document,'p',scope));
     if (!data.count) details.append(element(document,'p',EMPTY_SNAPSHOT));
     else if (!data.bots.length) details.append(element(document,'p','Keine Bots entsprechen den Filtern.'));
     else {
@@ -513,6 +529,9 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const searchLabel=element(document,'label','Symbol suchen');searchLabel.setAttribute('for','bot-symbol-search');
   const searchField=element(document,'div');searchField.append(searchLabel,search);
   filterPanel.append(searchField);
+  const advanced=element(document,'details');
+  advanced.append(element(document,'summary','Weitere Filter und Sortierung'));
+  filterPanel.append(advanced);
   function select(label,id,key,options){
     const wrapper=element(document,'div'),selectNode=element(document,'select');
     selectNode.id=id;selectNode.setAttribute('aria-label',label);
@@ -521,7 +540,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       const option=element(document,'option',text);option.value=value;option.setAttribute('value',value);
       selectNode.append(option);
     }
-    wrapper.append(fieldLabel,selectNode);filterPanel.append(wrapper);return selectNode;
+    wrapper.append(fieldLabel,selectNode);advanced.append(wrapper);return selectNode;
   }
   const directionSelect=select('Richtung','bot-direction-filter','direction',[
     ['all','Alle Richtungen'],['long','Long'],['short','Short'],['neutral','Neutral'],['unknown','Unbekannt']]);
@@ -617,6 +636,12 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     const summary=card.querySelector?.('summary');
     summary?.focus();
     card.scrollIntoView?.({block:'nearest'});
+  };
+  filterState.onUnknownTp=()=>{
+    const selected=filterState.tpStatus==='unknown';
+    resetFilters();
+    if(!selected){tpSelect.value='unknown';updateFilters();}
+    content.querySelector?.('.bot-tp-shortcut')?.focus?.();
   };
   search.addEventListener('input',updateFilters);
   directionSelect.addEventListener('change',updateFilters);

@@ -816,9 +816,10 @@ function restoreDashboardClarity(source){
   return source;
 }
 function restoreB2(source){
+  source=source.replace('<span>FORECAST</span><small>Geplant</small>','<span>FORECAST</span>');
   source=source.replace('      <details class="command-context-details">',"      <section class=\"card command-strategies\" aria-labelledby=\"command-strategies-heading\">\n        <div class=\"card-head\"><h2 id=\"command-strategies-heading\">Paper &amp; Forschung</h2><span class=\"limited\">Nur lesend</span></div>\n        <p>Live-Paperbot und Forschungsberichte findest du unter Strategien.</p>\n      </section>\n"+'      <details class="command-context-details">');
   const layout=source.match(/  <style id="dashboard-reading-order">[^]*?<\/style>\n/)?.[0];
-  assert.equal(gitBlob(layout),'4b5d90d3e8cad585bd92dcf8c03df31e3cf9173d');
+  assert.equal(gitBlob(layout),'02b5e94a228d54e3da46abaeaf5e0ae151229496');
   source=source.replace(layout,'');
   const development=source.match(/    <details id="autonomy-status"[^]*?    <\/details>\n/)?.[0];
   source=source.replace(development,'').replace('    <section id="version-panel"',development+'    <section id="version-panel"');
@@ -1361,7 +1362,7 @@ async function browserRun(call,start,width,height,server){
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-positive')).color`),'rgb(110, 231, 183)');
       assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').textContent`),'+8,25 USD');
       assert.ok(card.body<=width+1&&card.root<=width+1,'collapsed card overflow');
-      await evaluate(`document.querySelector('#bot-read-root summary').focus();true`);
+      await evaluate(`document.querySelector('#bot-read-root .bot-card summary').focus();true`);
       await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
       await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
       card=await cardMetrics();assert.equal(card.open,true,'native keyboard expands card');assert.equal(card.textUnrotated,true,'open card text must not inherit icon rotation');
@@ -1396,7 +1397,7 @@ async function browserRun(call,start,width,height,server){
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(evidence,`v11-bot-compact-${width}-expanded.png`),Buffer.from(shot.data,'base64'));
       }
-      await evaluate(`document.querySelector('#bot-read-root summary').click();true`);
+      await evaluate(`document.querySelector('#bot-read-root .bot-card summary').click();true`);
       assert.equal((await cardMetrics()).open,false);
       if(evidence){
         await evaluate(`document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'center'});true`);

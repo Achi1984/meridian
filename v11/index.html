@@ -463,6 +463,11 @@
     #view-strategies>.card>summary{font-size:1rem;letter-spacing:0}
     #paper-reports-section>.card{margin:8px 0}
     #solana-meme-paper .strategy-summary{grid-template-columns:repeat(2,minmax(0,1fr))}
+    #solana-scanner-live>summary small,#solana-meme-paper>summary .campaign-status{display:block;font-size:.8rem;line-height:1.4;color:var(--muted)}
+    .bot-overview-filters details summary,.bot-snapshot-details summary{min-height:44px;cursor:pointer;align-content:center}
+    .bot-read-view .bot-tp-shortcut{color:#ffd18a;min-height:44px}
+    #nav button[data-v="market"] small{font-size:.64rem;color:var(--muted);line-height:1}
+    #command-portfolio button{min-height:44px;padding:6px 12px;color:var(--text);background:var(--brand-dim);border:1px solid var(--line);border-radius:8px}
     .solana-comparison table{width:100%;border-collapse:collapse;margin:8px 0}
     .solana-comparison th,.solana-comparison td{padding:8px 0;border-bottom:1px solid var(--line);text-align:left;font-size:.88rem}
     .solana-comparison thead th,.solana-comparison small{color:var(--muted);font-size:.75rem}
@@ -686,7 +691,7 @@
     <button type="button" data-v="command" class="active" aria-current="page" aria-controls="view-command"><span class="nav-icon" aria-hidden="true">⌂</span><span>COMMAND</span></button>
     <button type="button" data-v="depot" aria-controls="view-depot"><span class="nav-icon" aria-hidden="true">◉</span><span>DEPOT</span></button>
     <button type="button" data-v="bots" aria-controls="view-bots"><span class="nav-icon" aria-hidden="true">▦</span><span>BOTS</span></button>
-    <button type="button" data-v="market" aria-controls="view-market"><span class="nav-icon" aria-hidden="true">⌁</span><span>FORECAST</span></button>
+    <button type="button" data-v="market" aria-controls="view-market"><span class="nav-icon" aria-hidden="true">⌁</span><span>FORECAST</span><small>Geplant</small></button>
     <button type="button" data-v="strategies" aria-controls="view-strategies"><span class="nav-icon" aria-hidden="true">◇</span><span>STRATEGIEN</span></button>
   </nav>
 </div>

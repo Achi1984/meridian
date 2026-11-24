@@ -32,6 +32,8 @@ function root(){const document={createElement:tag=>new Node(document,tag)};const
   document.getElementById=id=>[target,...all(target,'details')].find(node=>node.id===id)||null;
   return target;}
 const all=(node,tag)=>[...(node.tagName===tag?[node]:[]),...node.children.flatMap(x=>all(x,tag))];
+const botCards=root=>root.querySelectorAll('.bot-card');
+const botSummaries=root=>botCards(root).map(card=>card.querySelector('summary'));
 const fresh=()=>({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
   source:'PIONEX_BOT_API',snapshotAt:'2026-10-12T20:00:00Z',
   bots:[{ref:'a'.repeat(20),symbol:'BTC',side:'SHORT',type:'futures_grid',category:'inverse',
@@ -41,7 +43,7 @@ test('confirmed zero P/L renders in summary and detail, while legacy zero stays 
     const state=fresh(),target=root();state.model.bots[0].metrics={pnlUsd:0,pnlEvidence:evidence};
     renderBotReadState(target,state);
     const known=evidence==='EXPLICIT_USD_VALUE'||evidence==='INVERSE_WALLET_USD_VALUE';
-    assert.match(all(target,'summary')[0].textContent,known?/P\/L laut Quelle0,00 USD/:/P\/L laut QuelleNicht verfügbar/);
+    assert.match(botSummaries(target)[0].textContent,known?/P\/L laut Quelle0,00 USD/:/P\/L laut QuelleNicht verfügbar/);
     all(target,'button').find(node=>node.text==='Originalwerte anzeigen').click();
     assert.match(target.textContent,known?/P\/L laut Quelle · Originalwert0 USD/:/P\/L laut Quelle · OriginalwertNicht verfügbar/);
   }
@@ -136,14 +138,14 @@ test('renderer fails closed on null and undefined and does not restore previous 
   for(const malformed of [null,undefined]){
     const target=root(),state=fresh();state.readIdentity=Symbol('read');
     assert.equal(renderBotReadState(target,state),'fresh');
-    all(target,'details')[0].setAttribute('open','');
+    botCards(target)[0].setAttribute('open','');
     assert.doesNotThrow(()=>assert.equal(renderBotReadState(target,malformed),'unavailable'));
-    assert.equal(all(target,'details').length,0);
+    assert.equal(botCards(target).length,0);
     assert.equal(all(target,'li').length,0);assert.equal(all(target,'time').length,0);
     assert.doesNotMatch(target.textContent,/BTC|2026-10-12|Snapshot-Zeit/);
     assert.equal(target.querySelector('.bot-read-state').getAttribute('data-state'),'unavailable');
     assert.equal(renderBotReadState(target,state),'fresh');
-    assert.equal(all(target,'details')[0].getAttribute('open'),null,'valid state cannot revive cleared disclosure');
+    assert.equal(botCards(target)[0].getAttribute('open'),null,'valid state cannot revive cleared disclosure');
   }
 });
 test('unknown enums stay unknown, including inherited object names',()=>{
@@ -321,36 +323,36 @@ test('real client revalidation preserves investigation state only within the sam
   const firstIdentity=lastState.readIdentity,firstModel=lastState.model;
   const search=all(target,'input')[0],direction=all(target,'select')[0],sort=all(target,'select')[2];
   change(search,'input','BTC');change(direction,'change','short');change(sort,'change','pnl');
-  all(target,'details')[0].setAttribute('open','');
+  botCards(target)[0].setAttribute('open','');
   jump('a'.repeat(20));
   assert.equal(returnButton({target}).hidden,false);
-  assert.equal(all(target,'details')[0].getAttribute('open'),'');
+  assert.equal(botCards(target)[0].getAttribute('open'),'');
   client.revalidate();
   assert.equal(lastState.readIdentity,firstIdentity);
   assert.notEqual(lastState.model,firstModel,'revalidation rebuilds the model');
   assert.equal(returnButton({target}).hidden,false,'same-read projection retains the Command return');
-  assert.equal(all(target,'details')[0].getAttribute('open'),'','same-read projection retains the expanded Bot');
+  assert.equal(botCards(target)[0].getAttribute('open'),'','same-read projection retains the expanded Bot');
   returnButton({target}).click();
   assert.equal(search.value,'BTC');assert.equal(direction.value,'short');assert.equal(sort.value,'pnl');
-  assert.equal(all(target,'details')[0].getAttribute('open'),'');
+  assert.equal(botCards(target)[0].getAttribute('open'),'');
   assert.equal(calls,1,'revalidation never reads again');
 
   await client.refresh();
   assert.notEqual(lastState.readIdentity,firstIdentity,'an explicit identical refresh invalidates the old read');
   assert.equal(search.value,'');assert.equal(returnButton({target}).hidden,true);
-  assert.equal(all(target,'details')[0].getAttribute('open'),null);
+  assert.equal(botCards(target)[0].getAttribute('open'),null);
 
   change(search,'input','BTC');jump('a'.repeat(20));
   credential='replacement-token';client.revalidate();
   assert.equal(lastState.status,'locked');assert.equal(search.value,'');
-  assert.equal(returnButton({target}).hidden,true);assert.equal(all(target,'details').length,0);
+  assert.equal(returnButton({target}).hidden,true);assert.equal(botCards(target).length,0);
   await client.refresh();
-  change(search,'input','BTC');all(target,'details')[0].setAttribute('open','');
+  change(search,'input','BTC');botCards(target)[0].setAttribute('open','');
   payload={...payload,schemaVersion:'MALFORMED'};
   await client.refresh();
   assert.equal(lastState.status,'unavailable');assert.equal(lastState.readIdentity,undefined);
   assert.equal(search.value,'');assert.equal(returnButton({target}).hidden,true);
-  assert.equal(all(target,'details').length,0);
+  assert.equal(botCards(target).length,0);
   payload=snapshot('2026-10-12T20:00:00Z');await client.refresh();
   change(search,'input','BTC');jump('a'.repeat(20));
   clock=Date.parse('2026-10-12T20:16:00Z');client.revalidate();
@@ -364,12 +366,12 @@ test('real client revalidation preserves investigation state only within the sam
 test('missing read identity fails closed instead of inheriting retained context',()=>{
   const h=mounted(),state=duplicateSnapshot();state.readIdentity=Symbol('read');
   h.publish(state);change(all(h.target,'input')[0],'input','BTC');
-  all(h.target,'details')[0].setAttribute('open','');h.jump('a'.repeat(20));
+  botCards(h.target)[0].setAttribute('open','');h.jump('a'.repeat(20));
   const replacement={...state};delete replacement.readIdentity;
   h.publish(replacement);
   assert.equal(all(h.target,'input')[0].value,'');
   assert.equal(returnButton(h).hidden,true);
-  assert.ok(all(h.target,'details').every(card=>card.getAttribute('open')===null));
+  assert.ok(botCards(h.target).every(card=>card.getAttribute('open')===null));
 });
 test('view update fails closed on null and undefined and clears all selection context',()=>{
   for(const malformed of [null,undefined]){
@@ -377,11 +379,11 @@ test('view update fails closed on null and undefined and clears all selection co
     h.publish(state);
     const search=all(h.target,'input')[0],direction=all(h.target,'select')[0],sort=all(h.target,'select')[2];
     change(search,'input','BTC');change(direction,'change','long');change(sort,'change','pnl');
-    all(h.target,'details')[0].setAttribute('open','');h.jump('a'.repeat(20));
+    botCards(h.target)[0].setAttribute('open','');h.jump('a'.repeat(20));
     assert.equal(returnButton(h).hidden,false);
     assert.doesNotThrow(()=>h.publish(malformed));
     assert.equal(h.target.querySelector('.bot-read-state').getAttribute('data-state'),'unavailable');
-    assert.equal(all(h.target,'details').length,0);assert.equal(all(h.target,'li').length,0);
+    assert.equal(botCards(h.target).length,0);assert.equal(all(h.target,'li').length,0);
     assert.equal(all(h.target,'time').length,0);
     assert.doesNotMatch(h.target.textContent,/BTC|2026-10-12|Snapshot-Zeit/);
     assert.equal(search.value,'');assert.equal(direction.value,'all');assert.equal(sort.value,'symbol');
@@ -389,7 +391,7 @@ test('view update fails closed on null and undefined and clears all selection co
     h.publish(state);
     assert.equal(search.value,'');assert.equal(direction.value,'all');assert.equal(sort.value,'symbol');
     assert.equal(returnButton(h).hidden,true);
-    assert.ok(all(h.target,'details').every(card=>card.getAttribute('open')===null));
+    assert.ok(botCards(h.target).every(card=>card.getAttribute('open')===null));
   }
 });
 
@@ -399,9 +401,9 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
     lower:0.00001234,upper:0.00002345,liquidationPrice:0,stopLoss:null,takeProfit:'SECRET',gridProfitUsd:999,riskBufferPct:100}});
   state.model.bots.push({...state.model.bots[0],ref:'b'.repeat(20)});
   renderBotReadState(target,state);
-  assert.equal(all(target,'details').length,2);assert.equal(all(target,'summary').length,2);
-  assert.ok(all(target,'details').every(node=>node.getAttribute('open')===null));
-   const [first,second]=all(target,'details'),[firstSummary,secondSummary]=all(target,'summary');
+  assert.equal(botCards(target).length,2);assert.equal(botSummaries(target).length,2);
+  assert.ok(botCards(target).every(node=>node.getAttribute('open')===null));
+   const [first,second]=botCards(target),[firstSummary,secondSummary]=botSummaries(target);
    assert.doesNotMatch(firstSummary.textContent,/Referenz|Bot 1/);
    assert.equal(firstSummary.getAttribute('aria-label'),
      'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aaaaaa · Aufklappen');
@@ -420,10 +422,10 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    assert.match(target.textContent,/0.00001234/);
    assert.match(target.textContent,/Grid-GewinnNicht verfügbar/);assert.match(target.textContent,/RisikopufferNicht verfügbar/);
    assert.match(target.textContent,/Liquidationspreis laut QuelleNicht verfügbar/);assert.doesNotMatch(target.textContent,/SECRET|999|100 %/);
-   assert.deepEqual(all(target,'details').map(node=>node.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
+   assert.deepEqual(botCards(target).map(node=>node.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
    assert.match(all(target,'div').find(node=>node.getAttribute('role')==='status').textContent,/bestätigt keinen laufenden Bot-Prozess/);
    assert.equal(all(target,'time').length,1,'freshness context appears once');
-   renderBotReadState(target,{status:'locked'});assert.equal(all(target,'details').length,0);
+   renderBotReadState(target,{status:'locked'});assert.equal(botCards(target).length,0);
    assert.doesNotMatch(target.textContent,/125.5|a{20}|b{20}/);
  });
 
@@ -468,17 +470,17 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
   input.bots[0].limits={takeProfit:90,upper:100,takeProfitEvidence:'PRICE_SET'};
   const target=root(),mismatch=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
   renderBotReadState(target,{status:'fresh',model:mismatch});
-  const summary=all(target,'summary')[0];
+  const summary=botSummaries(target)[0];
   assert.match(summary.textContent,/⚠ TP ≠ obere Range/);
   assert.match(summary.getAttribute('aria-label'),/BTC.*Warnung: TP weicht von oberer Range ab/);
-  assert.ok(all(target,'details')[0].getAttribute('open')===null,'warning is in the collapsed summary');
+  assert.ok(botCards(target)[0].getAttribute('open')===null,'warning is in the collapsed summary');
 
   input.bots[0].limits={takeProfit:null,upper:100,takeProfitEvidence:'UNKNOWN'};
   const unknown=buildBotReadModel(input,{now:Date.parse(input.sourceSnapshotAt)+60000});
   renderBotReadState(target,{status:'fresh',model:unknown});
-  assert.match(all(target,'summary')[0].textContent,/TP nicht prüfbar/);
-  assert.match(all(target,'summary')[0].getAttribute('aria-label'),/TP nicht prüfbar/);
-  assert.doesNotMatch(all(target,'summary')[0].textContent,/TP ≠ obere Range|Kein TP gesetzt/);
+  assert.match(botSummaries(target)[0].textContent,/TP nicht prüfbar/);
+  assert.match(botSummaries(target)[0].getAttribute('aria-label'),/TP nicht prüfbar/);
+  assert.doesNotMatch(botSummaries(target)[0].textContent,/TP ≠ obere Range|Kein TP gesetzt/);
 });
 
  test('producer-to-view pipeline preserves typed price evidence and keeps missing evidence neutral',()=>{
@@ -496,7 +498,7 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
    const model=buildBotReadModel(comparable,{now});
    assert.deepEqual(model.bots[0].takeProfitCheck,{set:true,matchesUpper:false,reason:null});
    const target=root();renderBotReadState(target,{status:'fresh',model});
-   assert.match(all(target,'summary')[0].textContent,/⚠ TP ≠ obere Range/);
+   assert.match(botSummaries(target)[0].textContent,/⚠ TP ≠ obere Range/);
    assert.match(target.textContent,/TP weicht von oberer Range ab/);
    assert.match(target.textContent,/TP-Wert: 90000 · obere Range: 100000/);
 
@@ -523,7 +525,7 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
    for(const [value,expected] of [[-0.0004,'-<0,01 USD'],[0.0004,'+<0,01 USD'],[0.01,'+0,01 USD'],[1234567890123.4568,'+1.234.567.890.123,46 USD']]){
      const state=fresh(),target=root();state.model.bots[0].metrics={pnlUsd:value};
      renderBotReadState(target,state);
-     const summary=all(target,'summary')[0];
+     const summary=botSummaries(target)[0];
      assert.ok(summary.textContent.includes(expected),expected);
      assert.ok(all(target,'strong').some(node=>node.textContent===expected));
    }
@@ -536,7 +538,7 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
      {...template,ref:'b'.repeat(14)+'abcdef',metrics:{leverage:2,investmentUsd:80,pnlUsd:1.25}}
    ];
    renderBotReadState(target,state);
-   const names=all(target,'summary').map(summary=>summary.getAttribute('aria-label'));
+   const names=botSummaries(target).map(summary=>summary.getAttribute('aria-label'));
    assert.deepEqual(names,[
      'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aabcdef · Aufklappen',
      'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · TP nicht prüfbar · ID-Ende babcdef · Aufklappen'
@@ -559,7 +561,7 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
      const state=fresh(),target=root();
      state.model.bots[0].metrics={...input,leverage:5.1234567890123,pnlUsd:0.0034567890123};
      renderBotReadState(target,state);
-     const summary=all(target,'summary')[0];
+     const summary=botSummaries(target)[0];
      assert.ok(summary.textContent.includes(input.collapsed),input.collapsed);
      all(target,'button').find(node=>node.text==='Originalwerte anzeigen').click();
      assert.match(target.textContent,new RegExp(input.detail.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')));
@@ -574,7 +576,7 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
    state.model.bots[0].metrics={pnlUsd:-0.001};
    state.model.bots[1].metrics={pnlUsd:0.002};
    renderBotReadState(target,state,{sort:'pnl'});
-   assert.deepEqual(all(target,'details').map(card=>card.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
+   assert.deepEqual(botCards(target).map(card=>card.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
  });
 
 
@@ -643,7 +645,7 @@ const returnButton=h=>all(h.target,'button').find(node=>node.text==='Zur vorheri
 function duplicateSnapshot(){const state=fresh();state.model.bots.push({...state.model.bots[0],ref:'b'.repeat(20),side:'LONG'});return state;}
 test('disclosure actions open and close visible bots and preserve filtered-out state',()=>{
   const h=mounted(),state=duplicateSnapshot();h.publish(state);
-  const cards=()=>all(h.target,'details');
+  const cards=()=>botCards(h.target);
   const button=text=>all(h.target,'button').find(node=>node.text===text);
   const nativeToggle=(card,open)=>{
     if(open)card.setAttribute('open','');else card.removeAttribute('open');
@@ -673,27 +675,27 @@ test('disclosure actions open and close visible bots and preserve filtered-out s
 
 test('disclosures retain exact reference through filtering sorting and reset within one snapshot',()=>{
   const h=mounted(),state=duplicateSnapshot();h.publish(state);
-  all(h.target,'details')[0].setAttribute('open','');
+  botCards(h.target)[0].setAttribute('open','');
   const direction=all(h.target,'select')[0],sort=all(h.target,'select')[2];
-  change(direction,'change','long');assert.equal(all(h.target,'details').length,1);
-  assert.equal(all(h.target,'details')[0].getAttribute('open'),null,'same symbol is not the same Bot');
+  change(direction,'change','long');assert.equal(botCards(h.target).length,1);
+  assert.equal(botCards(h.target)[0].getAttribute('open'),null,'same symbol is not the same Bot');
   change(sort,'change','pnl');change(direction,'change','all');
-  const [a,b]=all(h.target,'details');assert.equal(a.getAttribute('open'),'');assert.equal(b.getAttribute('open'),null);
+  const [a,b]=botCards(h.target);assert.equal(a.getAttribute('open'),'');assert.equal(b.getAttribute('open'),null);
   a.removeAttribute('open');change(sort,'change','leverage');
-  assert.equal(all(h.target,'details')[0].getAttribute('open'),null,'explicit close survives rerender');
-  all(h.target,'details')[1].setAttribute('open','');
+  assert.equal(botCards(h.target)[0].getAttribute('open'),null,'explicit close survives rerender');
+  botCards(h.target)[1].setAttribute('open','');
   all(h.target,'button').find(node=>node.text==='Filter zurücksetzen').click();
-  assert.equal(all(h.target,'details')[1].getAttribute('open'),'');assert.equal(h.calls.refresh,0);
+  assert.equal(botCards(h.target)[1].getAttribute('open'),'');assert.equal(h.calls.refresh,0);
 });
 test('Command jump and return retain original filters and reveal exact duplicate-symbol Bot',()=>{
   const h=mounted();h.publish(duplicateSnapshot());
   const search=all(h.target,'input')[0],direction=all(h.target,'select')[0],sort=all(h.target,'select')[2];
   change(search,'input','NO_MATCH');change(direction,'change','long');change(sort,'change','pnl');
   h.jump('a'.repeat(20));assert.equal(returnButton(h).hidden,false);assert.equal(search.value,'');
-  assert.equal(h.target.ownerDocument.activeElement,all(h.target,'details')[0].querySelector('summary'));
-  h.jump('b'.repeat(20));assert.equal(h.target.ownerDocument.activeElement,all(h.target,'details')[1].querySelector('summary'));
+  assert.equal(h.target.ownerDocument.activeElement,botCards(h.target)[0].querySelector('summary'));
+  h.jump('b'.repeat(20));assert.equal(h.target.ownerDocument.activeElement,botCards(h.target)[1].querySelector('summary'));
   returnButton(h).click();assert.equal(search.value,'NO_MATCH');assert.equal(direction.value,'long');assert.equal(sort.value,'pnl');
-  assert.equal(all(h.target,'details').length,0);assert.equal(returnButton(h).hidden,true);
+  assert.equal(botCards(h.target).length,0);assert.equal(returnButton(h).hidden,true);
   assert.equal(h.target.ownerDocument.activeElement,search);assert.equal(h.calls.refresh,0);
 });
 test('every invalidation and snapshot replacement drops disclosure and return memory',()=>{
@@ -707,7 +709,7 @@ test('every invalidation and snapshot replacement drops disclosure and return me
     else h.publish({status});
     assert.equal(previousReturn.hidden,true,status);previousReturn.click();
     if(status==='dispose'){assert.equal(h.target.textContent,'');continue;}
-    h.publish(state);assert.ok(all(h.target,'details').every(node=>node.getAttribute('open')===null),status);
+    h.publish(state);assert.ok(botCards(h.target).every(node=>node.getAttribute('open')===null),status);
     assert.equal(returnButton(h).hidden,true,status);
     assert.equal(h.calls.refresh,0,status);
   }
@@ -876,7 +878,7 @@ test('readable detail toggle retains exact source values, tiny nonzero prices an
   assert.match(metrics.textContent,/Grid-GewinnNicht verfügbar/);
   toggle.click();assert.match(metrics.textContent,/Liquidationspreis laut Quelle71\.165,19/);
   assert.deepEqual(bot,original,'formatting cannot mutate comparison or source data');
-  assert.equal(all(target,'details').length,1,'format toggle does not create nested bot disclosures');
+  assert.equal(botCards(target).length,1,'format toggle does not create nested bot disclosures');
   assert.ok(all(target,'button').some(node=>node.text==='Bot zuklappen'));
   renderBotReadState(target,{status:'locked'});assert.doesNotMatch(target.textContent,/71\.165|71165|Originalwerte/);
 });
@@ -933,17 +935,17 @@ test('new filters combine, preserve disclosure and Command return, reset and cle
   all(h.target,'button').find(n=>n.text==='Alle aufklappen').click();
   change(search,'input','BTC');change(direction,'change','long');change(category,'change','linear');
   change(tp,'change','mismatch');change(pnl,'change','available');change(sort,'change','tp');
-  assert.equal(all(h.target,'li').length,1);assert.equal(all(h.target,'details')[0].getAttribute('open'),'');
+  assert.equal(all(h.target,'li').length,1);assert.equal(botCards(h.target)[0].getAttribute('open'),'');
   h.jump('b'.repeat(20));assert.equal(tp.value,'all');assert.equal(pnl.value,'all');
   returnButton(h).click();
   assert.deepEqual([search.value,direction.value,category.value,sort.value,tp.value,pnl.value],['BTC','long','linear','tp','mismatch','available']);
-  assert.equal(all(h.target,'li').length,1);assert.equal(all(h.target,'details')[0].getAttribute('open'),'');
+  assert.equal(all(h.target,'li').length,1);assert.equal(botCards(h.target)[0].getAttribute('open'),'');
   all(h.target,'button').find(n=>n.text==='Filter zurücksetzen').click();
   assert.deepEqual([search.value,direction.value,category.value,sort.value,tp.value,pnl.value],['','all','all','symbol','all','all']);
   assert.equal(all(h.target,'li').length,3);assert.equal(returnButton(h).hidden,true);
   change(tp,'change','match');change(pnl,'change','available');assert.equal(all(h.target,'li').length,1,'confirmed zero P/L stays available');
   h.publish({...coverageSnapshot(),readIdentity:2});assert.equal(tp.value,'all');assert.equal(pnl.value,'all');
-  assert.ok(all(h.target,'details').every(n=>n.getAttribute('open')===null));assert.equal(h.calls.refresh,0);
+  assert.ok(botCards(h.target).every(n=>n.getAttribute('open')===null));assert.equal(h.calls.refresh,0);
   h.view.dispose();assert.equal(tp.listeners.get('change').size,0);assert.equal(pnl.listeners.get('change').size,0);
 });
 
@@ -967,4 +969,15 @@ test('Bot portfolio valuation and source clocks stay distinct in local time with
   }
   assert.match(h.target.textContent,/Stand \(lokale Zeit\)/);assert.match(h.target.textContent,/Quellzeit \(lokale Zeit\)/);
   assert.match(h.target.textContent,/Gültig bis \(lokale Zeit\)/);h.view.dispose();
+});
+
+test('unknown TP shortcut applies and clears its local filter',()=>{
+  const h=mounted();h.publish(fresh());
+  const quick=()=>h.target.querySelector('.bot-tp-shortcut');
+  assert.equal(quick().textContent,'1 TP nicht prüfbar');
+  quick().click();
+  assert.equal(quick().getAttribute('aria-pressed'),'true');
+  quick().click();
+  assert.equal(quick().getAttribute('aria-pressed'),'false');
+  assert.equal(h.calls.refresh,0);
 });
