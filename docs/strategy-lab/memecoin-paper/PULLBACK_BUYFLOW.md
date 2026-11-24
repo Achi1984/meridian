@@ -18,3 +18,5 @@ Exploratory replay of the June–July 2026 Pumpfun Memecoin Corpus using the las
 The signal mean of +10.4% becomes −17.5% excluding its largest winner. For June the mean was −10.5% (59 cases), and for July +28.0% (70 cases). Removing each period's best case makes both means negative. This archive informed the rule. Evaluate new observations separately.
 
 Dataset: https://huggingface.co/datasets/Slinky21/Pumpfun_Memecoin_Corpus
+
+The workflow summary also reports the rejected comparable entries. Avoided losses and forgone gains sum their negative and positive exact-size net exit results respectively. Their difference measures the signal's incremental result versus taking all comparable entries at the same fixed size. Open and unpriced exits have separate counts. A missed net 10× means at least 180 USDC of profit on 20 USDC at the scheduled exit. This metric does not capture intraday peaks.
