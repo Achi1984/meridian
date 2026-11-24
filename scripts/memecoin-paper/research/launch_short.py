@@ -129,16 +129,53 @@ def run(mints, emit, fetch=get, clock=time.time, sleep=time.sleep, slot_time=blo
         index += 1
 
 
-def cohort(fetch, now):
+MARKET_PAGE = ('https://api.shortr.fun/v1/markets?has_liquidity=true'
+               '&sort=created&order=desc&limit=30')
+
+
+def cohort(fetch, now, emit):
+    try:
+        page = fetch(MARKET_PAGE, 120)
+        rows = next((page[key] for key in ('items', 'markets', 'data')
+                     if isinstance(page.get(key), list)), None) if isinstance(page, dict) else None
+        if rows is None or any(not isinstance(row, dict) or not isinstance(row.get('mint'), str)
+                               or not ADDRESS.fullmatch(row['mint']) for row in rows):
+            raise ValueError('invalid short market page')
+        listed = sorted({row['mint'] for row in rows[:30]})
+    except ERRORS as exc:
+        emit(dict(event='marketDirectoryUnavailable', status=getattr(exc, 'code', None),
+                  reason=str(exc)[:160]))
+        listed = None
+
+    if listed is None:
+        source = 'recentLaunchFallback'
+        url = TOKENS+'/recent?limit=100'
+    else:
+        source = 'listedWithLiquidity'
+        url = TOKENS+'/search?query='+','.join(listed)
+    tokens = fetch(url, 120) if listed != [] else []
+    if not isinstance(tokens, list):
+        raise ValueError('invalid token metadata response')
     result = {}
-    for item in fetch(TOKENS+'/recent?limit=100', 120):
-        mint = item.get('id', '')
-        first = (item.get('firstPool') or {}).get('createdAt')
-        if first and ADDRESS.fullmatch(mint) and item.get('launchpad') == 'pump.fun':
-            born = timestamp(first)
-            if 0 <= now-born <= 86400:
-                result[mint] = born
-    return dict(sorted(result.items(), key=lambda pair: (-pair[1], pair[0]))[:6])
+    for item in tokens:
+        if not isinstance(item, dict):
+            continue
+        mint = item.get('id')
+        first = item.get('firstPool')
+        if (not isinstance(mint, str) or not ADDRESS.fullmatch(mint)
+                or (listed is not None and mint not in listed)
+                or item.get('launchpad') != 'pump.fun' or not isinstance(first, dict)):
+            continue
+        try:
+            born = timestamp(first['createdAt'])
+        except (TypeError, ValueError, KeyError):
+            continue
+        if 0 <= now-born <= 86400:
+            result[mint] = born
+    selected = dict(sorted(result.items(), key=lambda pair: (-pair[1], pair[0]))[:6])
+    emit(dict(event='cohort', source=source, listedSample=len(listed) if listed is not None else None,
+              mints=selected))
+    return selected
 
 
 if __name__ == '__main__':
@@ -149,8 +186,7 @@ if __name__ == '__main__':
         print(json.dumps(row), flush=True)
 
     try:
-        selected = cohort(get, time.time())
-        write(dict(event='cohort', mints=selected))
+        selected = cohort(get, time.time(), write)
         run(selected, write)
     except ERRORS as exc:
         write(dict(event='discoveryUnavailable', reason=str(exc)[:160]))
