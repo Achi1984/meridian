@@ -10,6 +10,7 @@ import sqlite3
 import time
 
 import feeds
+from btc_exit_study import ExitStudy
 from pair_report import breakout_reason
 from pilot import BudgetedFeeds, MODEL, UNIT, configure
 from worker import DAY, STEP, challenger_inputs, execute, forced, initial, iso, mark, range_covers_cost
@@ -137,6 +138,7 @@ def run(volume, start):
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         db.execute('CREATE TABLE IF NOT EXISTS slots (slot INTEGER PRIMARY KEY, record TEXT)')
         configure(db, start, time.time())
+        exit_study = ExitStudy()
         while time.time() < end:
             now = time.time()
             if now < start:
@@ -146,6 +148,12 @@ def run(volume, start):
             budget = BudgetedFeeds(db, slot, end)
             report = tick(db, slot, start, lambda ctx: budget.decide(ctx, MODEL, key))
             if report:
+                if exit_study is not None:
+                    try:
+                        report['chandelierStudy'] = exit_study.read(db)
+                    except (ValueError, KeyError, TypeError, ArithmeticError, IndexError, sqlite3.Error) as error:
+                        report['chandelierStudy'] = dict(status='unavailable', reason=type(error).__name__)
+                        exit_study = None
                 spent, reserved = db.execute(
                     'SELECT COALESCE(SUM(charge*settled),0), COALESCE(SUM(charge*(1-settled)),0) FROM calls'
                 ).fetchone()
