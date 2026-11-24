@@ -1,0 +1,32 @@
+name: Elder and Chandelier prospective paper comparison
+on:
+  workflow_run:
+    workflows: ['Compare recovery exits A through F', 'Meridian overnight staged exits']
+    branches: [paper/overnight-staged-exits]
+    types: [completed]
+permissions:
+  actions: read
+  contents: read
+jobs:
+  score:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.id >= 45470459543 && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.path == '.github/workflows/newcomer-eight-hour.yml'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: abc-final
+          path: journal
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - env:
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+        run: python scripts/memecoin-paper/research/elder_chandelier.py journal "$SOURCE_RUN"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: elder-chandelier-${{ github.event.workflow_run.id }}
+          path: |
+            technical-paper.json
+            technical-candles.json
