@@ -24,6 +24,9 @@ export function accountRows(snapshot, campaign = original) {
         !(a.equityUsdc === null || Number.isFinite(a.equityUsdc)) ||
         !Number.isSafeInteger(a.closedTrades) || a.closedTrades < 0 ||
         !Array.isArray(a.openPositions)) throw Error('account');
+    if (a.openPositions.length === 0 && a.equityUsdc !== a.cashUsdc) {
+      throw Error('Kontowert ohne offene Position weicht von der Kasse ab');
+    }
     const withoutBest = a.realizedWithoutBestMintUsdc;
     const drawdown = a.sampledMaxDrawdownUsdc;
     if (withoutBest != null && !Number.isFinite(withoutBest)) throw Error('concentration');
@@ -132,6 +135,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
     }
     add(result,'small',source + ' · ' + at + ' (Wien)');
     metrics.replaceChildren();
+    add(metrics,'p',snapshot.ledgerVerified === true ? 'Journalabgleich bestätigt' : 'Journalabgleich nicht bestätigt');
     if (Number.isSafeInteger(snapshot.lastQuoteAt) && snapshot.lastQuoteAt >= snapshot.startedAt &&
         snapshot.lastQuoteAt <= snapshot.updatedAt) add(metrics,'p','Letzte Rückverkaufsquote · ' + vienna(snapshot.lastQuoteAt));
     const f = rows.find(row => row.key === 'F');
@@ -168,7 +172,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
         add(metrics,'p',withoutBest === null ? 'Vergleich ab zwei abgeschlossenen Coins verfügbar.' :
           'Realisiert ohne besten Coin · ' + amount(withoutBest));
       }
-      if (drawdown != null) add(metrics,'p','Größter beobachteter Rückgang des Kontowerts · ' + amount(drawdown));
+      if (drawdown != null) add(metrics,'p','Beobachteter Drawdown (nur bewertbare Zeitpunkte) · ' + amount(drawdown));
     }
     displayedAt = snapshot.updatedAt;
   }

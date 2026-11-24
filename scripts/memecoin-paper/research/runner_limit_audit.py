@@ -48,16 +48,29 @@ def audit(archives):
         with ZipFile(file) as z, z.open('session/events.jsonl') as stream:
             rows = [json.loads(line) for line in stream]
         counts.update(r['event'] for r in rows)
-        for buy in (r for r in rows if r['event']=='botBuy'):
-            debit = buy['usdcRaw']+50_000
-            later = [r for r in rows if r['event'] in ('botMark','botSell')
-                     and r['mint']==buy['mint'] and r['at']>=buy['at']]
-            for stop, exits in account_stops.items():
-                for r in later:
-                    credit = r['usdcRaw']-50_000
-                    if credit<=debit*(1-stop) or r['event']=='botSell':
-                        exits.append((credit-debit)/1_000_000)
-                        break
+        buy_counts = Counter(row['mint'] for row in rows if row['event'] == 'botBuy')
+        for index, buy in enumerate(rows):
+            if buy['event'] != 'botBuy':
+                continue
+            position = buy.get('positionId')
+            if position is None and buy_counts[buy['mint']] != 1:
+                raise ValueError('Ambiguous legacy buy for ' + buy['mint'])
+            debit = buy['usdcRaw'] + 50_000
+            pending = set(account_stops)
+            for row in rows[index+1:]:
+                if row['event'] not in ('botMark','botSell') or row['mint'] != buy['mint']:
+                    continue
+                if row.get('positionId') != position:
+                    continue
+                if row['at'] < buy['at'] or row.get('tokensRaw', buy['tokensRaw']) != buy['tokensRaw']:
+                    raise ValueError('Inconsistent exit observation')
+                credit = row['usdcRaw'] - 50_000
+                for stop in tuple(pending):
+                    if credit <= debit*(1-stop) or row['event'] == 'botSell':
+                        account_stops[stop].append((credit-debit)/1_000_000)
+                        pending.remove(stop)
+                if not pending or row['event'] == 'botSell':
+                    break
         recoveries.extend(r['usdcRaw']/20_000_000 for r in rows
                           if r['event'] in ('roundTripQuote','confirmationRoundTrip'))
         for flow, cohort in paths_by_flow.items():

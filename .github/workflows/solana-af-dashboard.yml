@@ -27,10 +27,14 @@ jobs:
             const fs = require('node:fs');
             const run = context.payload.workflow_run;
             if (fs.statSync('report/status.json').size > 2000000) throw Error('report size');
-            const {startedAt, endsAt, updatedAt, lastEvent, accounts} = JSON.parse(fs.readFileSync('report/status.json','utf8'));
+            const {startedAt, endsAt, updatedAt, lastEvent, accounts, ledgerVerified} = JSON.parse(fs.readFileSync('report/status.json','utf8'));
             if (lastEvent !== 'finished' || ![startedAt,endsAt,updatedAt].every(Number.isSafeInteger) ||
                 endsAt-startedAt !== 28800 || updatedAt < endsAt) throw Error('unfinished');
             const report = {runId:run.id, attempt:run.run_attempt, startedAt, endsAt, updatedAt, lastEvent, accounts:{}};
+            if (ledgerVerified !== undefined) {
+              if (ledgerVerified !== true) throw Error('journal reconciliation incomplete');
+              report.ledgerVerified = true;
+            }
             const policies = {A:'trailing',B:'standard',C:'fixed',D:'staged',E:'failedRecovery',F:'smallPoolFixed'};
             for (const [key, policy] of Object.entries(policies)) {
               const a = accounts[key];
@@ -44,6 +48,7 @@ jobs:
                 if (!Number.isSafeInteger(a[k]) || a[k] < 0) throw Error(k);
                 row[k] = a[k];
               }
+              if (!row.openPositions.length && row.equityUsdc !== row.cashUsdc) throw Error('cash / equity');
               report.accounts[key] = row;
             }
             const branch = 'paper-dashboard-data', path = 'solana-abc-'+run.id+'.json';
