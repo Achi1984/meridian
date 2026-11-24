@@ -20,3 +20,18 @@ class MaturityTests(unittest.TestCase):
         with patch('maturity_probe.snapshot', return_value=row):
             result, = probe({'p': ('m', 'q', 1800)}, lambda *args: {'data': [{}]}, clock=lambda: 1860)
         self.assertEqual(result['outcome'], 'identityMismatch')
+
+    def test_malformed_pool_does_not_hide_later_pool(self):
+        rows = {'p': ('m', 'q', 1800), 'r': ('n', 'q', 1800)}
+        valid = dict(pool='r', mint='n', quote='q', liquidity=4000)
+        with patch('maturity_probe.snapshot', side_effect=[ValueError('invalid'), valid]):
+            results = list(probe(rows, lambda *args: {'data': [{}]}, clock=lambda: 1860))
+        self.assertEqual([r['outcome'] for r in results], ['poolFeedUnavailable', 'lowLiquidity'])
+
+    def test_expired_liquidity_observation_prevents_quote_pass(self):
+        row = dict(pool='p', mint='m', quote='q', liquidity=8000)
+        with patch('maturity_probe.snapshot', return_value=row), \
+             patch('maturity_probe.entry_signal', return_value=(True, {})):
+            result, = probe({'p': ('m', 'q', 1800)}, lambda *args: {'data': [{}]},
+                            quote=lambda *args: 20_000_000, clock=iter([1850, 1860, 1940, 1940]).__next__)
+        self.assertEqual(result['outcome'], 'staleSignal')
