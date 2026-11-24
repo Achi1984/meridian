@@ -117,3 +117,20 @@ class FilterComparisonTest(unittest.TestCase):
         self.assertEqual(groups['both']['netUsdc'], -0.1)
         self.assertEqual(groups['fOnlyCapacity']['netUsdc'], 0.2)
         self.assertEqual(groups['cOnlyCapacity']['closed'], 1)
+
+
+class TargetQuoteTest(unittest.TestCase):
+    def test_only_next_valid_tick_counts_and_missing_is_not_backfilled(self):
+        from newcomer_eight_hour import NextTickTarget
+        report = NextTickTarget()
+        first = dict(event='resaleMark', tick=4, qty=10, at=100, usdcRaw=23000000)
+        later = dict(first, tick=5, at=160, usdcRaw=19000000)
+        for key, change in enumerate([{}, {'tick': 6}, {'at': 100}, {'qty': 11},
+                                      {'event': 'missingExitQuote'}, {'event': 'lateExitQuote'}]):
+            report.observe(key, first, True)
+            report.observe(key, dict(first, event='exit'), False)
+            report.observe(key, dict(later, **change), False)
+            report.observe(key, later, False)
+        report.observe(7, first, True)
+        self.assertEqual(report.snapshot(), dict(targetExits=7, paired=1, withoutNextQuote=6,
+                         lowerNextQuote=1, pairedOriginalNetUsdc=2.9, pairedNextNetUsdc=-1.1))
