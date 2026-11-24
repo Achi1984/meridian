@@ -98,6 +98,29 @@ function mountCampaign(parent, add, read, amount, campaign) {
   status.className = 'af-muted';
   const result = add(root,'div','Noch kein Kontobericht geladen.');
   result.setAttribute('aria-live','polite');
+  let refreshG = async () => {};
+  if (runId >= 45470459543) {
+    const card = add(root,'section','');
+    add(card,'h4','G · Käufer-Erholung mit Verlustausstieg');
+    add(card,'small','20 USDC je Position · Verlustausstieg ab −2 USDC · nachlaufende Gewinnsicherung');
+    const score = add(card,'p','Auswertung nach Abschluss des Achtstundenfensters.');
+    score.setAttribute('role','status');
+    score.className = 'af-waiting';
+    refreshG = async () => {
+      try {
+        const report = await read('https://api.github.com/repos/Achi1984/meridian/contents/paper-g-' +
+          runId + '.json?ref=paper-dashboard-data', true);
+        const g = report.G;
+        if (report.runId !== runId || !Number.isSafeInteger(report.updatedAt) ||
+            !Number.isFinite(g.realizedUsdc) || !Number.isFinite(g.cashIfOpenWorthZeroUsdc) ||
+            !Number.isSafeInteger(g.closed) || g.closed < 0 || !Number.isSafeInteger(g.open) || g.open < 0) return;
+        score.textContent = 'Realisiert · ' + amount(g.realizedUsdc) + ' · ' + g.closed + ' geschlossen · ' +
+          g.open + ' offen · Kontowert bei Nullbewertung offener Positionen ' + amount(g.cashIfOpenWorthZeroUsdc) +
+          ' · ' + vienna(report.updatedAt) + ' (Wien)';
+        score.className = g.realizedUsdc > 0 ? 'af-positive' : g.realizedUsdc < 0 ? 'af-negative' : 'af-muted';
+      } catch { /* Keep the last available result for this run. */ }
+    };
+  }
   const details = add(root,'details','');
   add(details,'summary','Kontodetails und Quellen');
   const metrics = add(details,'section','');
@@ -238,5 +261,5 @@ function mountCampaign(parent, add, read, amount, campaign) {
     status.textContent = title + ' · ' + label;
     status.className = 'af-' + tone;
   }
-  return runState => Promise.all([refreshReport(), refreshJobs(runState)]);
+  return runState => Promise.all([refreshReport(), refreshJobs(runState), refreshG()]);
 }
