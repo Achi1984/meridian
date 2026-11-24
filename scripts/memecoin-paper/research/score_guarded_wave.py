@@ -3,7 +3,7 @@ import json
 import sys
 from pathlib import Path
 
-def score(rows):
+def score(rows, allow_entry=None, trail_exit=None):
     cash, realized = 1_000_000_000, 0
     pending, positions, fills, seen = {}, {}, [], {}
     for row in rows:
@@ -28,7 +28,8 @@ def score(rows):
         if key in pending:
             entry = pending.pop(key)
             if (event == 'resaleMark' and entry['qty'] == row['qty']
-                and 0 <= row['at'] - entry['at'] <= 1 and bid >= 19_300_000 and cash >= 20_050_000):
+                and 0 <= row['at'] - entry['at'] <= 1 and bid >= 19_300_000 and cash >= 20_050_000
+                and (allow_entry is None or allow_entry(key, row))):
                 cash -= 20_050_000
                 positions[key] = dict(qty=row['qty'], peak=0, at=entry['at'])
             continue
@@ -38,7 +39,10 @@ def score(rows):
         assert p['qty'] == row['qty']
         net = bid - 20_100_000
         p['peak'] = max(net, p['peak'])
-        if net <= -2_000_000 or (p['peak'] >= 2_000_000 and 2*net <= p['peak']) or event == 'exit':
+        trail = p['peak'] >= 2_000_000 and 2*net <= p['peak']
+        if trail_exit is not None:
+            trail = trail_exit(key, row, trail)
+        if net <= -2_000_000 or trail or event == 'exit':
             cash += bid - 50_000
             realized += net
             fills.append(dict(session=key[0], mint=key[1], entryAt=p['at'], exitAt=row['at'], qty=p['qty'], netRaw=net))
