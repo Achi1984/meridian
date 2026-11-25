@@ -1,0 +1,37 @@
+name: BTC hourly long short and cash paper comparison
+on:
+  push:
+    branches: [paper/btc-direction-20261125]
+    paths: ['.github/workflows/btc-direction-paper.yml']
+permissions:
+  contents: read
+jobs:
+  first:
+    runs-on: ubuntu-latest
+    timeout-minutes: 255
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - run: python scripts/spot-paper-advisor/btc_direction_paper.py direction 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: btc-direction-first
+          path: direction/
+          if-no-files-found: error
+  finish:
+    needs: first
+    runs-on: ubuntu-latest
+    timeout-minutes: 255
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@v4
+        with: {name: btc-direction-first, path: direction}
+      - run: python scripts/spot-paper-advisor/btc_direction_paper.py direction 2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: btc-direction-final
+          path: direction/
+          if-no-files-found: error
