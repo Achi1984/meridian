@@ -10,6 +10,8 @@ from urllib.request import Request, urlopen
 
 RPC = 'https://api.mainnet-beta.solana.com'
 TOKEN = 'TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA'
+TOKEN_2022 = 'TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb'
+PUBLIC_EXTENSIONS = {'mint': {'metadataPointer', 'tokenMetadata'}, 'account': {'immutableOwner'}}
 DIGITS = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 P = 2**255 - 19
 D = -121665 * pow(121666, -1, P) % P
@@ -73,10 +75,22 @@ def measure(mint, read=rpc):
     values = batch['value']
     if batch['context']['slot'] < slot or len(values) != 1 + len(keys):
         raise ValueError('invalid batch')
+    program = (values[0] or {}).get('owner')
+    if program not in (TOKEN, TOKEN_2022):
+        raise ValueError('unsupported mint program')
+
     def info(row, kind):
-        if not row or row['owner'] != TOKEN or row['data']['parsed']['type'] != kind:
+        if not row or row['owner'] != program or row['data']['parsed']['type'] != kind:
             raise ValueError('unsupported account')
-        return row['data']['parsed']['info']
+        details = row['data']['parsed']['info']
+        if program == TOKEN_2022:
+            extensions = details.get('extensions', [])
+            if not isinstance(extensions, list) or any(
+                not isinstance(ext, dict) or ext.get('extension') not in PUBLIC_EXTENSIONS[kind]
+                for ext in extensions
+            ):
+                raise ValueError('unsupported token extension')
+        return details
     supply = int(info(values[0], 'mint')['supply'])
     amounts = Counter()
     sampled = 0
@@ -92,7 +106,7 @@ def measure(mint, read=rpc):
         raise ValueError('fewer than ten observed signer addresses')
     if not amounts or not 0 < sampled <= supply:
         raise ValueError('insufficient sample')
-    return dict(slot=batch['context']['slot'], sampleAccounts=len(keys), observedOwners=len(amounts),
+    return dict(tokenProgram=program, slot=batch['context']['slot'], sampleAccounts=len(keys), observedOwners=len(amounts),
                 largestOwnerBps=max(amounts.values())*10000//supply,
                 sampledSupplyBps=sampled*10000//supply)
 
