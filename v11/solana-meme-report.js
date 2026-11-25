@@ -19,8 +19,8 @@ import {mountEightHourComparison} from './solana-eight-hour.js?v=B19-M11-FIX1';
 
 // The experiment stores raw USDC in millionths and charges 0.05 USDC per fill.
 const swingRun = 45624335706;
-const swingSource = 'https://raw.githubusercontent.com/' + repo +
-  '/paper/second-wave-48h-data/studies/swing48/' + swingRun + '/state.json';
+const swingSource = api + '/contents/studies/swing48/' + swingRun +
+  '/state.json?ref=paper%2Fsecond-wave-48h-data';
 
 export function swingAccounts(state) {
   const isMap = value => value && typeof value === 'object' && !Array.isArray(value);
@@ -62,7 +62,18 @@ export function mountSwingCard(section, add, load = read) {
       if (run?.id !== swingRun) throw Error('Unexpected run');
       const labels = {in_progress:'läuft', queued:'wartet', pending:'wartet', waiting:'wartet',
         success:'abgeschlossen', failure:'fehlgeschlagen', timed_out:'Zeitlimit erreicht', cancelled:'abgebrochen'};
-      worker.textContent = 'Datensammlung · ' + (labels[run.conclusion || run.status] || 'Status unbekannt');
+      let phase = run.conclusion || run.status;
+      if (!run.conclusion && ['queued','pending','waiting'].includes(phase) &&
+          Number.isSafeInteger(run.run_attempt) && run.run_attempt > 0) {
+        try {
+          const result = await load(api + '/actions/runs/' + swingRun + '/attempts/' + run.run_attempt + '/jobs');
+          if (result.jobs.some(job => /^observe \(\d+\)$/.test(job.name) && job.status === 'in_progress')) {
+            phase = 'in_progress';
+          }
+        } catch { phase = 'segmentUnknown'; }
+      }
+      worker.textContent = 'Datensammlung · ' + (phase === 'segmentUnknown' ? 'Segmentstatus unbekannt' :
+        labels[phase] || 'Status unbekannt');
     } catch { worker.textContent = 'Datensammlung · Status derzeit nicht abrufbar'; }
   }
   let last = 0, pending = false;
@@ -71,7 +82,7 @@ export function mountSwingCard(section, add, load = read) {
     pending = true;
     const workerUpdate = refreshWorker();
     try {
-      const state = await load(swingSource);
+      const state = await load(swingSource, true);
       const rows = swingAccounts(state);
       if (state.lastTick < last) throw Error('Older checkpoint');
       const entries = Object.keys(state.positions).length;
