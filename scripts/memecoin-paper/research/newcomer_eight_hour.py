@@ -230,7 +230,7 @@ class NextTickTarget:
                     pairedNextNetUsdc=self.delayed/UNIT if self.pairs else None)
 
 
-def run(directory, segment, holder_test=False):
+def run(directory, segment, holder_test=False, roundtrip_test=False):
     directory.mkdir(exist_ok=True, parents=True)
     journal = directory/'events.jsonl'
     accounts = {name: Account(policy) for name, policy in
@@ -240,6 +240,9 @@ def run(directory, segment, holder_test=False):
         from holder_signal import HolderSampler, LARGE_LOSS_BPS, HIGH_BPS
         sampler = HolderSampler()
         accounts['H'] = Account('fixed')
+    if roundtrip_test:
+        accounts['R'] = Account('fixed')
+    admissions = Counter()
     holder_states = Counter()
     blocked = set()
     avoided_losses = set()
@@ -335,6 +338,12 @@ def run(directory, segment, holder_test=False):
                     blocked.add(key)
             prior = key in accounts['C'].open, key in accounts['F'].open
             for name, account in accounts.items():
+                if name == 'R' and row['event'] == 'entry':
+                    proceeds = row['initialResaleRaw']
+                    passed = (SIZE + 2 * FEE - proceeds) * 100 <= 3 * SIZE
+                    admissions['passed' if passed else 'vetoed'] += 1
+                    if not passed or key not in accounts['C'].open:
+                        continue
                 if name == 'H' and key in blocked:
                     continue
                 if name == 'F' and key not in smaller_pools:
@@ -428,6 +437,9 @@ def run(directory, segment, holder_test=False):
                     avoidedLargeLosses=len(avoided_losses), skippedQuotedTriples=len(missed_triples),
                     realizedDeltaUsdc=(sum(accounts['H'].by_mint.values()) -
                                        sum(accounts['C'].by_mint.values())) / UNIT)
+            if roundtrip_test:
+                status['roundtripComparison'] = dict(reference='C', filtered='R', maxLossBps=300,
+                                                     decisions=dict(admissions))
             status['fTargetNextTick'] = next_tick.snapshot()
             status['filterComparison'] = comparison.snapshot()
             if kind in ('sessionEnd','sessionInterrupted','handoff','finished','resume'):
@@ -501,6 +513,7 @@ if __name__ == '__main__':
     cli.add_argument('directory', type=Path)
     cli.add_argument('segment', type=int, choices=(1,2))
     cli.add_argument('--holder-test', action='store_true')
+    cli.add_argument('--roundtrip-test', action='store_true')
     args = cli.parse_args()
-    run(args.directory, args.segment, args.holder_test)
+    run(args.directory, args.segment, args.holder_test, args.roundtrip_test)
 

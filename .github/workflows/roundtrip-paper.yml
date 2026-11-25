@@ -1,0 +1,63 @@
+name: Solana 3 percent round-trip paper comparison
+run-name: Compare 3 percent pre-entry cost with identical fixed exits
+on:
+  workflow_dispatch:
+  push:
+    branches: [paper/roundtrip-3pct-20261125]
+    paths: ['.github/workflows/roundtrip-paper.yml']
+permissions:
+  contents: read
+concurrency:
+  group: newcomer-roundtrip-3pct
+  cancel-in-progress: false
+jobs:
+  first:
+    runs-on: ubuntu-latest
+    timeout-minutes: 310
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_eight_hour_exits.py
+      - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_holder_signal.py
+      - run: python scripts/memecoin-paper/research/newcomer_eight_hour.py campaign 1 --roundtrip-test
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: abc-first
+          path: campaign/
+  finish:
+    needs: first
+    runs-on: ubuntu-latest
+    timeout-minutes: 270
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: abc-first
+          path: campaign
+      - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_eight_hour_exits.py
+      - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_holder_signal.py
+      - run: python scripts/memecoin-paper/research/newcomer_eight_hour.py campaign 2 --roundtrip-test
+      - name: Verify final journal against both study accounts and the comparison ledger
+        working-directory: scripts/memecoin-paper/research
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          from campaign_ledger import verify_journal
+          from meme_paper_account import START, FEE
+          campaign = Path("../../../campaign")
+          status = json.loads((campaign / "status.json").read_text())
+          if (status["lastEvent"] != "finished" or status.get("ledgerVerified") is not True
+                  or set(status["accounts"]) != set("ABCDEFR")):
+              raise ValueError("Incomplete campaign or missing journal verification")
+          verify_journal(campaign / "events.jsonl", status["accounts"], START, FEE)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: abc-final
+          path: campaign/
