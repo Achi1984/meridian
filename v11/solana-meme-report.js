@@ -55,10 +55,21 @@ export function mountSwingCard(section, add, load = read) {
   status.setAttribute('role','status');
   const body = add(card,'div','');
   add(card,'a','Paperlauf auf GitHub').href = runs + swingRun;
+  const worker = add(card,'p','');
+  async function refreshWorker() {
+    try {
+      const run = await load(api + '/actions/runs/' + swingRun);
+      if (run?.id !== swingRun) throw Error('Unexpected run');
+      const labels = {in_progress:'läuft', queued:'wartet', pending:'wartet', waiting:'wartet',
+        success:'abgeschlossen', failure:'fehlgeschlagen', timed_out:'Zeitlimit erreicht', cancelled:'abgebrochen'};
+      worker.textContent = 'Datensammlung · ' + (labels[run.conclusion || run.status] || 'Status unbekannt');
+    } catch { worker.textContent = 'Datensammlung · Status derzeit nicht abrufbar'; }
+  }
   let last = 0, pending = false;
   return async function refreshSwing() {
     if (pending) return;
     pending = true;
+    const workerUpdate = refreshWorker();
     try {
       const state = await load(swingSource);
       const rows = swingAccounts(state);
@@ -86,7 +97,7 @@ export function mountSwingCard(section, add, load = read) {
     } catch {
       if (!last) status.textContent = 'Laufstand derzeit nicht abrufbar.';
       else if (!status.textContent.includes('Abruf fehlgeschlagen')) status.textContent += ' · Abruf fehlgeschlagen';
-    } finally { pending = false; }
+    } finally { await workerUpdate; pending = false; }
   };
 }
 
