@@ -1558,7 +1558,9 @@ async function browserRun(call,start,width,height,server){
     try {
       window.fetch=async url=>{
         const reportAccount={cashUsdc:993.78,equityUsdc:993.78,realizedUsdc:-6.22,closedTrades:1,openPositions:[]};
-        const data=String(url).includes('solana-abc-')
+        const data=String(url).includes('/studies/swing48/')
+          ? {start:1000,lastTick:1600,positions:{},candidates:{pool:{}},cash:{fixed:1e9,runner:1e9}}
+          : String(url).includes('solana-abc-')
           ? {runId:45433341029,startedAt:1795449172,endsAt:1795477972,updatedAt:1795452653,
              accounts:Object.fromEntries(['trailing','standard','fixed','staged','failedRecovery','smallPoolFixed'].map((policy,i)=>[['A','B','C','D','E','F'][i],{...reportAccount,policy}]))}
           : String(url).endsWith('/jobs') ? {jobs:[{name:'first',status:'in_progress'}]}
@@ -1573,8 +1575,8 @@ async function browserRun(call,start,width,height,server){
         return new Response(JSON.stringify(data));
       };
       section.open=true;
-      for(let i=0;i<50&&!section.querySelector('dd');i++)await new Promise(resolve=>setTimeout(resolve,20));
-      const panel=section.querySelector('.solana-comparison');
+      for(let i=0;i<50&&!(section.querySelector('dd') && section.querySelector('tbody .account-pnl') && section.innerText.includes('1 Pools'));i++)await new Promise(resolve=>setTimeout(resolve,20));
+      const panel=section.querySelector('select').closest('.solana-comparison');
       const compact={pnlColor:getComputedStyle(panel.querySelector('.account-pnl')).color,
         statusColor:getComputedStyle(panel.querySelector('[role=status]')).color,rows:section.querySelectorAll('tbody tr').length,text:section.innerText,
         fits:section.scrollWidth<=section.clientWidth+1};
@@ -1583,6 +1585,8 @@ async function browserRun(call,start,width,height,server){
         fits:section.scrollWidth<=section.clientWidth+1};
     } finally {window.fetch=fetchOriginal;section.open=false;}
   })()`,true);
+  assert.match(paperSnapshot.compact.text,/Memecoins · 48 Stunden/);
+  assert.match(paperSnapshot.compact.text,/1 Pools · 0 Einstiege/);
   assert.equal(paperSnapshot.compact.rows,6);
   assert.ok(paperSnapshot.compact.fits);
   assert.equal(paperSnapshot.compact.pnlColor,'rgb(255, 155, 164)');
