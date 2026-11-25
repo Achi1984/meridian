@@ -1,0 +1,772 @@
+{
+  "archiveSHA256": {
+    "BTCUSDT-1h-2026-09-24.zip": "2b9da7fbf53895dd715886d1ea613a937a18520b13c7fa6219fec99fd9591a42",
+    "BTCUSDT-1h-2026-09-25.zip": "e912b776ab0412999c7f75f35482b8bfcd785e4b11d6b57860b39f3ea41c6043",
+    "BTCUSDT-1h-2026-09-26.zip": "571978500e18a9f83473d536cdbce97095a05af7754d1aa3928a6bf0f65d7f85",
+    "BTCUSDT-1h-2026-09-27.zip": "07c3d0bc54b948363bf2c6d7bbc8058e9cb45f544e7b1b1f0e25981ff78df2fd",
+    "BTCUSDT-1h-2026-09-28.zip": "a34fd63829fe6ef735072977db49abf98b09188d86e5bf26c2ecbf710003263d",
+    "BTCUSDT-1h-2026-09-29.zip": "7d309e40d3ea827d67e737d212b1b2c3e481a9f229a61d6276718b6230f213b6",
+    "BTCUSDT-1h-2026-09-30.zip": "ec8c3c00c044dd40fce24ce6772c760a6d43b532bb264c37ea6f34539d65d0e8",
+    "BTCUSDT-1h-2026-10-01.zip": "5634ccacd24313f214a8cf4b4a44da573d022241b0e051ca3b61c23e8c4eb635",
+    "BTCUSDT-1h-2026-10-02.zip": "eecba72424982fde9db2d92d91623cb65e6f16a5d9652b6c6992887515bfb897",
+    "BTCUSDT-1h-2026-10-03.zip": "ff58f33349f1d30921f6f1061f5d03b4e71d6fa329c6ceeafb1a6bbd8da71f39",
+    "BTCUSDT-1h-2026-10-04.zip": "db9bfd586812334c54ea96be65640ae93938ae4ea266ce90a0b223047354b430",
+    "BTCUSDT-1h-2026-10-05.zip": "16a276617d2652509f958a793d7b28363c41d6601db898ded81aa850ea8cb5fe",
+    "BTCUSDT-1h-2026-10-06.zip": "5de57e03a7eb397ec7cd4917b48e93e472415b026ca97bb76f1789c3f2f9e91f",
+    "BTCUSDT-1h-2026-10-07.zip": "dd8976e5c74a210fd7e068e20856e36e57fcd6ff00839558a095eeb83bc341d6",
+    "BTCUSDT-1h-2026-10-08.zip": "1a9a987b6b278e0dcfa92af363a41420133739e1c1e0aab9168cf548535b1c1a",
+    "BTCUSDT-1h-2026-10-09.zip": "03481e848d2bc9d3267e561f9626bf28ef2567d3a01d115ad8164183e01a3931",
+    "BTCUSDT-1h-2026-10-10.zip": "e8502dc0dc4e2692baf740cc648c88a4a3ede18e7e10b73dd44badba13ba2409",
+    "BTCUSDT-1h-2026-10-11.zip": "fe1f3b0c3546f3c22edde04eb33376ab78b9e596665eabacac222ac17c2ffc50",
+    "BTCUSDT-1h-2026-10-12.zip": "1359d5913bdd9c87b73b90f3a440a67b0dc8cb5fa459e79f2bce2ecdba1610e6",
+    "BTCUSDT-1h-2026-10-13.zip": "99596ec49cb8842336ca0eee14a6f61bf9c179b76f9e63d4540bba6744d50e56",
+    "BTCUSDT-1h-2026-10-14.zip": "17422b4668e08ffc67469b2690e0f159ff704e8c636bbc991fcb25c6dd560249",
+    "BTCUSDT-1h-2026-10-15.zip": "c4848989daee86b40ba7d79ea33bf4268c0722be9ec6895ea0410ae8b3ddb04a",
+    "BTCUSDT-1h-2026-10-16.zip": "add197e1c5d6dbab623f6f57aa4375415ea124432bf1c52967cac724a3c756f2",
+    "BTCUSDT-1h-2026-10-17.zip": "5a9b6de536301d42f09e380848ece4c660006d0052d850bfaa67d044fd61982e",
+    "BTCUSDT-1h-2026-10-18.zip": "d903baabbdd6ab0eba0a7306d01f2d4889e3a4fcff672528b8d473edfe5f8f29",
+    "BTCUSDT-1h-2026-10-19.zip": "847a5b00640c8b551091d0bb8c65fb84e48a83af529af09c235b0b49420fb851",
+    "BTCUSDT-1h-2026-10-20.zip": "a0736ddfd8207bb34d5f413710d467b8012e38701f682708d425aefc4f373071",
+    "BTCUSDT-1h-2026-10-21.zip": "6ad0b6f4268ceea67245f466532f6aca403d08becc1b630aab5369caa504f69d",
+    "BTCUSDT-1h-2026-10-22.zip": "9be07fc70d6fcdafd7fe2374075d42408a866f0f9095a90d7eb90590574e5471",
+    "BTCUSDT-1h-2026-10-23.zip": "5afb9e672381c8bb1355d241760aa554cf10208d5337e89b352a85bc5a73c2fd",
+    "BTCUSDT-1h-2026-10-24.zip": "63d31829054a15cae51fd780aa28f20fcbc9ef37af5977f7c5a1171d212cdd07",
+    "ETHUSDT-1h-2026-09-24.zip": "b35347bb85944f6187db56f300dcf342c270efa8d8310db63440068ea5c2d569",
+    "ETHUSDT-1h-2026-09-25.zip": "8975b56b14fc96a5e4e29ad867c75518c802ef1d7cbcd8e77bed0e12f41fcd15",
+    "ETHUSDT-1h-2026-09-26.zip": "d7aeb9dbedbcb90dd3cee4bf9d6ba70268c8339c8af44dfb5ec2c8932fac0f57",
+    "ETHUSDT-1h-2026-09-27.zip": "d81cfa8e3fb8e88b2810abf45391b8b9eb1cc427a3571a9e63e8c8a5c9a7b24e",
+    "ETHUSDT-1h-2026-09-28.zip": "d3308e368d5ca4b5bf02fd694acaa96fd2b8834f13a0a32028149806f98a3f4c",
+    "ETHUSDT-1h-2026-09-29.zip": "93b4fdd9517b3fc9a9e4a4175b64748f95c294fafa7564299054c77b7693ba9e",
+    "ETHUSDT-1h-2026-09-30.zip": "99020cdc7b38921f911b1179910903168ef0d3c1a384a61c4884aaaec3d7b990",
+    "ETHUSDT-1h-2026-10-01.zip": "27ecb052c5c050c4a756de0cb213f9e4f30dd4786fae428fd9f58862ce11f3db",
+    "ETHUSDT-1h-2026-10-02.zip": "c40bae7f1f32765dd3a72f3903b03847d969942fa27e4164576c826403b22342",
+    "ETHUSDT-1h-2026-10-03.zip": "d083db0ebc57949a0ed56ab3ce7763d8d39e67ca14f6f7c9e68226211d0a8196",
+    "ETHUSDT-1h-2026-10-04.zip": "bfd9e693e71ffb442bf51826f36adb17fab1241fa82f39dd1483e46835efb0fd",
+    "ETHUSDT-1h-2026-10-05.zip": "7d9f2694412673f321b02d965aa8221668627ff64c50633ab76030203df4d028",
+    "ETHUSDT-1h-2026-10-06.zip": "6c6b28f0abd41876449b1c193b4d6d0053b001660b255634f0f870d84bf3169e",
+    "ETHUSDT-1h-2026-10-07.zip": "7e3cdac7f9f386e2b20de79956e1272f97d9882cba4c0d251940c76d6367c7bf",
+    "ETHUSDT-1h-2026-10-08.zip": "cde3745145d64e517088453c289c054dfe7723ca3816d3d46a8eadc71b0a20d9",
+    "ETHUSDT-1h-2026-10-09.zip": "5798bfe85c45bfbc3fa5f21531a9b686ee4567d2733ffa540233f8e9ff42884f",
+    "ETHUSDT-1h-2026-10-10.zip": "aa0f031aaac54ba75b6331671c8d3390112a68864147b86c183c2192de2b9668",
+    "ETHUSDT-1h-2026-10-11.zip": "1f9c779ead0b951afbc35ad43615210484f09d0971716baf7a78cb7f59883a68",
+    "ETHUSDT-1h-2026-10-12.zip": "a1d588c72beff1bda883bc840cb1d4064a388f698f90869393bd10899649b64f",
+    "ETHUSDT-1h-2026-10-13.zip": "7351016cf9a0087a62dcb40611fe773b2c82230d96f4fa1d70298a3c7ceb9ac7",
+    "ETHUSDT-1h-2026-10-14.zip": "a760564cf846786821b8ea664d13f01a478e82a64267d34ed0d5212fd642ddae",
+    "ETHUSDT-1h-2026-10-15.zip": "4b9fbcf159a51d89d747653ab22e78628a35390b48af41e2646261687cc3a434",
+    "ETHUSDT-1h-2026-10-16.zip": "836ce1dfc4f8526e96af10736642733d7f7284001d7baa996e67a7945760994e",
+    "ETHUSDT-1h-2026-10-17.zip": "b4c6633ea0dbd94463904905309f8f1108e3f967ab1e33787c8079363c43b7c5",
+    "ETHUSDT-1h-2026-10-18.zip": "f3c6c7ae15deb833bfeb0531349a9d76500c5b3104deff8d4ed1698a7fd9dae0",
+    "ETHUSDT-1h-2026-10-19.zip": "f2153011afc3f783c0c0dc877bbdf157df529cf58caaf0b95b52873e916c6f0e",
+    "ETHUSDT-1h-2026-10-20.zip": "8032d917ae9388ca3c4f103ce537981da39b43b4799c4a24d586506e12b7fe48",
+    "ETHUSDT-1h-2026-10-21.zip": "2871a0008f7ed49756ff3c29c44684974d23d56485df010ac37fdfd3aacefe3d",
+    "ETHUSDT-1h-2026-10-22.zip": "59ec58778fb038a6928682bff3dfa1ccaf10e17d823c13a2e7cc1f9283095d40",
+    "ETHUSDT-1h-2026-10-23.zip": "b747a794000d12bc6ae18d9bcba43f91470e9f45c639543f479cf9069448315a",
+    "ETHUSDT-1h-2026-10-24.zip": "04c7585d838e27e3e5c115365800392a2cb8df9306ebaab1310c5719dc83e415"
+  },
+  "assumedRoundTripCostPct": 0.3,
+  "signals": [
+    {
+      "asset": "BTC",
+      "signalHour": 1790877600,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.6027317827079546
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1790913600,
+      "direction": 1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.9341804459642982
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1790917200,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.025011066217898517
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1790967600,
+      "direction": -1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.6108402418833034
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791100800,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.0434673526347959
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791108000,
+      "direction": 1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.32710354610593323
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791147600,
+      "direction": 1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": 0.6069954592270872
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791154800,
+      "direction": 1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.30670638077442386
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791338400,
+      "direction": -1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.8530358518970991
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791342000,
+      "direction": -1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.380836899667136
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791381600,
+      "direction": -1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.46974203903782885
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791475200,
+      "direction": -1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -1.3336380400551848
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791478800,
+      "direction": -1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -1.6023117520255756
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791482400,
+      "direction": -1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.5576724772894501
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791547200,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.49766802668894433
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791655200,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.2869853802438202
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791734400,
+      "direction": 1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.5803471964684224
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791810000,
+      "direction": -1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": 0.25364495946792237
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791849600,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -2.6293838717008517
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791853200,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -1.5318397382689473
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791982800,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": 0.09050169054646484
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791986400,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": 0.1565224914679717
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791990000,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -0.39362228798657223
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1791993600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.08030181967670885
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792072800,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.992247720372082
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792080000,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": 0.011233899279583792
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792166400,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.46889298326423495
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792173600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.9477000115880705
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792274400,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.6567817705338236
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792296000,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.45582240363792476
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792317600,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.9719792922159407
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792378800,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": 0.10326931867369354
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792508400,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.3898552023376853
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792591200,
+      "direction": 1,
+      "period": "later",
+      "passed": true,
+      "netPct": -0.19214142852152172
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792594800,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.4440200894415766
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792652400,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -0.05925159971777977
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792656000,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -0.17264167086306043
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792659600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": 0.009332213519786248
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792688400,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -0.37896480953590855
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792796400,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.06598862105807707
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792854000,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -1.2373706977618968
+    },
+    {
+      "asset": "BTC",
+      "signalHour": 1792857600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.6352666043030972
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1790917200,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": 0.9030682994704382
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1790931600,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.016303275076567647
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1790967600,
+      "direction": -1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.32362656525995986
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791075600,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.39244168563145027
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791079200,
+      "direction": 1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.2145422997038679
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791100800,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.3025935627771756
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791154800,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.15363008397010186
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791338400,
+      "direction": -1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.6182225489970714
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791342000,
+      "direction": -1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.570498084291182
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791370800,
+      "direction": -1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": 0.26454429053661715
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791475200,
+      "direction": -1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -2.278115697826066
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791478800,
+      "direction": -1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -2.634221457295582
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791644400,
+      "direction": 1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.2976102662959665
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791734400,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.8382439594669442
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791738000,
+      "direction": 1,
+      "period": "earlier",
+      "passed": false,
+      "netPct": -0.29369231921595434
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791781200,
+      "direction": 1,
+      "period": "earlier",
+      "passed": true,
+      "netPct": -0.7707517956444084
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791849600,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -3.8922009253139374
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791853200,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -2.477355181317697
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791986400,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -0.19278752318232714
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1791990000,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.3708107418248449
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792011600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.23061890442164554
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792033200,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -0.2385197245683754
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792152000,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": -1.5790640692522833
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792173600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.6982523456564247
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792274400,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.9450095603199875
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792353600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -2.816044366384129
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792508400,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.41146992770846297
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792598400,
+      "direction": 1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.9055387461082474
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792659600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.003776947780831097
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792688400,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -0.43705368216156976
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792796400,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -0.18896012201815554
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792854000,
+      "direction": -1,
+      "period": "later",
+      "passed": true,
+      "netPct": -1.6936617029400634
+    },
+    {
+      "asset": "ETH",
+      "signalHour": 1792857600,
+      "direction": -1,
+      "period": "later",
+      "passed": false,
+      "netPct": -1.223596155423101
+    }
+  ],
+  "fundingModel": "realized OKX rate on entry notional, settlement before boundary fills",
+  "summary": {
+    "earlier long all": {
+      "n": 20,
+      "meanGrossPct": 0.03287893597440639,
+      "meanNetPct": -0.26869733334457013
+    },
+    "earlier long pass": {
+      "n": 8,
+      "meanGrossPct": -0.05127364180224914,
+      "meanNetPct": -0.35303080896627914
+    },
+    "earlier long reject": {
+      "n": 12,
+      "meanGrossPct": 0.08898065449217674,
+      "meanNetPct": -0.21247501626343077
+    },
+    "earlier short all": {
+      "n": 14,
+      "meanGrossPct": -0.5371667083907493,
+      "meanNetPct": -0.8367551718229214
+    },
+    "earlier short pass": {
+      "n": 6,
+      "meanGrossPct": -0.7255242359226163,
+      "meanNetPct": -1.024856860621193
+    },
+    "earlier short reject": {
+      "n": 8,
+      "meanGrossPct": -0.39589856274184904,
+      "meanNetPct": -0.6956789052242178
+    },
+    "later long all": {
+      "n": 10,
+      "meanGrossPct": -0.22271689918855753,
+      "meanNetPct": -0.5235387941270365
+    },
+    "later long pass": {
+      "n": 1,
+      "meanGrossPct": 0.11130048884688826,
+      "meanNetPct": -0.19214142852152172
+    },
+    "later long reject": {
+      "n": 9,
+      "meanGrossPct": -0.25982994230360706,
+      "meanNetPct": -0.5603607236387604
+    },
+    "later short all": {
+      "n": 31,
+      "meanGrossPct": -0.5208413567209093,
+      "meanNetPct": -0.8194369578841928
+    },
+    "later short pass": {
+      "n": 13,
+      "meanGrossPct": -0.5534362145354512,
+      "meanNetPct": -0.8521872549013774
+    },
+    "later short reject": {
+      "n": 18,
+      "meanGrossPct": -0.4973006260770734,
+      "meanNetPct": -0.795783965594004
+    }
+  },
+  "begin": 1790812800,
+  "end": 1792886400,
+  "sensitivity": {
+    "long all": {
+      "n": 30,
+      "distinctUtcHours": 25,
+      "profitable": 4,
+      "meanNetPct": -0.3536444869387256,
+      "meanWithoutBestPct": -0.3969794106080071,
+      "nonOverlappingPerInstrument": 24,
+      "meanNonOverlappingPct": -0.3749274544459214
+    },
+    "long pass": {
+      "n": 9,
+      "distinctUtcHours": 9,
+      "profitable": 1,
+      "meanNetPct": -0.3351542111390839,
+      "meanWithoutBestPct": -0.4529229199348553,
+      "nonOverlappingPerInstrument": 8,
+      "meanNonOverlappingPct": -0.3387101899346664
+    },
+    "short all": {
+      "n": 45,
+      "distinctUtcHours": 29,
+      "profitable": 5,
+      "meanNetPct": -0.8248248466651306,
+      "meanWithoutBestPct": -0.8495832361469885,
+      "nonOverlappingPerInstrument": 30,
+      "meanNonOverlappingPct": -0.7928199914258106
+    },
+    "short pass": {
+      "n": 19,
+      "distinctUtcHours": 14,
+      "profitable": 3,
+      "meanNetPct": -0.9067144988128981,
+      "meanWithoutBestPct": -0.9711789131618326,
+      "nonOverlappingPerInstrument": 14,
+      "meanNonOverlappingPct": -1.0460731552676175
+    }
+  }
+}

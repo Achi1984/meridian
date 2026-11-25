@@ -16,6 +16,10 @@ def candles(asset,begin,end):
     if len(markets)!=1:
         raise ValueError('ambiguous market')
     spot={int(r[0]):list(map(float,r[1:5])) for r in markets[0][:-1]}
+    return spot, perp_candles(asset,start,end)
+
+
+def perp_candles(asset,start,end):
     perp={}
     cursor=end*1000
     while cursor>start*1000:
@@ -27,7 +31,7 @@ def candles(asset,begin,end):
             if row[-1]=='1':
                 perp[int(row[0])//1000]=list(map(float,row[1:5]))
         cursor=earliest
-    return spot,perp
+    return perp
 
 
 def side(bars,t):
