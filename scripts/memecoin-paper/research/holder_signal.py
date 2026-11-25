@@ -95,16 +95,28 @@ def capture(mint):
 
 class HolderSampler:
     def __init__(self):
-        self.pool = ThreadPoolExecutor(max_workers=2)
+        self.pool = ThreadPoolExecutor(max_workers=1)
+        self.next_request = 0
+        self.backoff = 30
         self.pending = {}
         self.latest = {}
 
     def refresh(self, mint):
-        previous = self.pending.get(mint)
-        if previous and not previous.done():
+        now = time.time()
+        for key, task in list(self.pending.items()):
+            if not task.done():
+                return
+            data = self.latest[key] = task.result()
+            del self.pending[key]
+            if data.get('error') == '429':
+                self.next_request = max(self.next_request, data['receivedAt'] + self.backoff)
+                self.backoff = min(300, self.backoff * 2)
+            elif 'error' not in data:
+                self.backoff = 30
+        last = self.latest.get(mint)
+        if now < self.next_request or (last and 'error' not in last and now-last['startedAt'] < MAX_AGE-20):
             return
-        if previous:
-            self.latest[mint] = previous.result()
+        self.next_request = now + 12
         self.pending[mint] = self.pool.submit(capture, mint)
 
     def at_entry(self, mint, cutoff):
