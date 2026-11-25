@@ -1,3 +1,4 @@
+import {swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import test from 'node:test';
 import {createServer} from 'node:http';
@@ -67,6 +68,7 @@ window.fetch=async(url,init)=>{
   return new Response(JSON.stringify({version:'7.64-CANONICAL-PORTFOLIO-HISTORY-V3',points:[]}),
     {headers:{'content-type':'application/json'}});
  }
+ if(String(url)===${JSON.stringify(swingCheckpointEndpoint)})return new Response('{}',{status:503});
  window.__botReads++;
  if(window.__botReadMode==='error')throw new Error('synthetic private failure');
  if(window.__botReadMode==='unauthorized')return new Response('',{status:401});
