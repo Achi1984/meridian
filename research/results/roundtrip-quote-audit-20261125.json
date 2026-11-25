@@ -1,0 +1,81 @@
+{
+  "scannerRun": 45669687305,
+  "selection": "All mints with a five-minute rank in the published 18:54 Vienna snapshot, measured later, independent of paper entries. Sequential public quotes. Not realized fills.",
+  "observations": [
+    {
+      "mint": "As3XtYSstuVdrVyb6sJZZ77Tu8JvjTBg6S6hgPv4pump",
+      "start": 1795631973.435477,
+      "finish": 1795631987.372267,
+      "inputRaw": 20000000,
+      "feesRaw": 100000,
+      "expectedBuyQty": 93112500779,
+      "minimumBuyQty": 92181375772,
+      "expectedResaleRaw": 19508514,
+      "expectedResaleOfMinimumQtyRaw": 19319519,
+      "minimumResaleOfMinimumQtyRaw": 19126324,
+      "expectedLossPct": 2.95743,
+      "conservativeLossPct": 4.86838,
+      "symbol": "BIAO"
+    },
+    {
+      "mint": "DVdWuNK8ncn79B6z8nCiwcNAiwyFcmBPfChgxJGTpump",
+      "start": 1795631987.3726947,
+      "finish": 1795631997.5827343,
+      "inputRaw": 20000000,
+      "feesRaw": 100000,
+      "expectedBuyQty": 57254276191,
+      "minimumBuyQty": 56681733430,
+      "expectedResaleRaw": 19573989,
+      "expectedResaleOfMinimumQtyRaw": 18924997,
+      "minimumResaleOfMinimumQtyRaw": 18735748,
+      "expectedLossPct": 2.630055,
+      "conservativeLossPct": 6.82126,
+      "symbol": "4CHAN"
+    },
+    {
+      "mint": "5EmvWDizkpjAXbcfCcVq69w1id8GaLzi4LLwtuSgpump",
+      "start": 1795631997.5830016,
+      "finish": 1795632009.385622,
+      "inputRaw": 20000000,
+      "feesRaw": 100000,
+      "expectedBuyQty": 38241971546,
+      "minimumBuyQty": 37859551831,
+      "expectedResaleRaw": 19714944,
+      "expectedResaleOfMinimumQtyRaw": 19740973,
+      "minimumResaleOfMinimumQtyRaw": 19543564,
+      "expectedLossPct": 1.92528,
+      "conservativeLossPct": 2.78218,
+      "symbol": "Pompom"
+    },
+    {
+      "mint": "4Di56UJzpnb7E4D7aLXFf7aLF5TrpJYv9Q3mR398pump",
+      "start": 1795632009.385814,
+      "finish": 1795632019.4777822,
+      "inputRaw": 20000000,
+      "feesRaw": 100000,
+      "expectedBuyQty": 167040149546,
+      "minimumBuyQty": 165369748051,
+      "expectedResaleRaw": 19099638,
+      "expectedResaleOfMinimumQtyRaw": 18911507,
+      "minimumResaleOfMinimumQtyRaw": 18722392,
+      "expectedLossPct": 5.00181,
+      "conservativeLossPct": 6.88804,
+      "symbol": "PERRO"
+    },
+    {
+      "mint": "2UyrvgCRXiEwiKRVk96gs6B4myrBHZAfcLyMVLE8vSCy",
+      "start": 1795632019.4780786,
+      "finish": 1795632032.5891306,
+      "inputRaw": 20000000,
+      "feesRaw": 100000,
+      "expectedBuyQty": 878430604726,
+      "minimumBuyQty": 869646298679,
+      "expectedResaleRaw": 19369260,
+      "expectedResaleOfMinimumQtyRaw": 19162179,
+      "minimumResaleOfMinimumQtyRaw": 18970558,
+      "expectedLossPct": 3.6537,
+      "conservativeLossPct": 5.64721,
+      "symbol": "JaoJiu"
+    }
+  ]
+}

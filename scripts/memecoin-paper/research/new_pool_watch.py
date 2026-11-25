@@ -98,7 +98,7 @@ def launchpad_candidate(first, current, now):
     return 0 <= now-created <= 3600
 
 
-def spot_quote(src, dst, amount):
+def spot_quote_amounts(src, dst, amount):
     params = dict(inputMint=src,outputMint=dst,amount=amount,slippageBps=100,swapMode='ExactIn')
     data = get('https://api.jup.ag/swap/v1/quote?'+urlencode(params),30)
     if (data.get('inputMint')!=src or data.get('outputMint')!=dst or data.get('inAmount')!=str(amount)
@@ -107,7 +107,11 @@ def spot_quote(src, dst, amount):
     minimum, expected = int(data['otherAmountThreshold']), int(data['outAmount'])
     if not 0 < minimum <= expected:
         raise ValueError('invalid spot quote amounts')
-    return minimum
+    return expected, minimum
+
+
+def spot_quote(src, dst, amount):
+    return spot_quote_amounts(src, dst, amount)[1]
 
 
 def additional_discovery_candidate(row, now):
