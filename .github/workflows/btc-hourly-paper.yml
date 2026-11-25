@@ -1,0 +1,25 @@
+name: BTC USD hourly Elder and Chandelier pilot
+on:
+  push:
+    branches: [paper/btc-hourly-elder-20261125]
+    paths: ['.github/workflows/btc-hourly-paper.yml']
+permissions:
+  contents: read
+jobs:
+  paper:
+    runs-on: ubuntu-latest
+    timeout-minutes: 255
+    defaults:
+      run:
+        working-directory: scripts/spot-paper-advisor
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python -m unittest test_btc_exit_study
+      - run: python btc_hourly_pilot.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: btc-hourly-paper
+          path: scripts/spot-paper-advisor/btc-paper.jsonl
