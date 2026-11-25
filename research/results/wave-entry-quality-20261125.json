@@ -1,0 +1,93 @@
+{
+  "abc-45185444796": {
+    "referenceClosed": 13,
+    "earlyPersistencePassed": 6,
+    "newRoundTripPassed": 0,
+    "referenceNet": 58.405018,
+    "selectedClosed": 0,
+    "selectedOpen": 0,
+    "uniqueSelectedClosed": 0,
+    "net": null,
+    "withoutBest": null,
+    "ifOpenWorthZero": null,
+    "missingChecks": 2
+  },
+  "abc-45210142704": {
+    "referenceClosed": 15,
+    "earlyPersistencePassed": 10,
+    "newRoundTripPassed": 0,
+    "referenceNet": -9.748197,
+    "selectedClosed": 0,
+    "selectedOpen": 0,
+    "uniqueSelectedClosed": 0,
+    "net": null,
+    "withoutBest": null,
+    "ifOpenWorthZero": null,
+    "missingChecks": 0
+  },
+  "abc-45433341029": {
+    "referenceClosed": 17,
+    "earlyPersistencePassed": 9,
+    "newRoundTripPassed": 0,
+    "referenceNet": -89.471131,
+    "selectedClosed": 0,
+    "selectedOpen": 0,
+    "uniqueSelectedClosed": 0,
+    "net": null,
+    "withoutBest": null,
+    "ifOpenWorthZero": null,
+    "missingChecks": 2
+  },
+  "abc-45470459543": {
+    "referenceClosed": 16,
+    "earlyPersistencePassed": 11,
+    "newRoundTripPassed": 0,
+    "referenceNet": -35.132711,
+    "selectedClosed": 0,
+    "selectedOpen": 0,
+    "uniqueSelectedClosed": 0,
+    "net": null,
+    "withoutBest": null,
+    "ifOpenWorthZero": null,
+    "missingChecks": 1
+  },
+  "journal-45580409598": {
+    "referenceClosed": 10,
+    "earlyPersistencePassed": 8,
+    "newRoundTripPassed": 0,
+    "referenceNet": -42.296878,
+    "selectedClosed": 0,
+    "selectedOpen": 0,
+    "uniqueSelectedClosed": 0,
+    "net": null,
+    "withoutBest": null,
+    "ifOpenWorthZero": null,
+    "missingChecks": 2
+  },
+  "journal-45622083781-first": {
+    "referenceClosed": 2,
+    "earlyPersistencePassed": 2,
+    "newRoundTripPassed": 0,
+    "referenceNet": -17.739439,
+    "selectedClosed": 0,
+    "selectedOpen": 0,
+    "uniqueSelectedClosed": 0,
+    "net": null,
+    "withoutBest": null,
+    "ifOpenWorthZero": null,
+    "missingChecks": 0
+  },
+  "combined": {
+    "referenceClosed": 73,
+    "earlyPersistencePassed": 46,
+    "newRoundTripPassed": 0,
+    "referenceNet": -135.983338,
+    "selectedClosed": 0,
+    "selectedOpen": 0,
+    "uniqueSelectedClosed": 0,
+    "net": null,
+    "withoutBest": null,
+    "ifOpenWorthZero": null,
+    "missingChecks": 7
+  }
+}
