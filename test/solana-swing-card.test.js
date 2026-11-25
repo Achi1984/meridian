@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {mountSwingCard, swingAccounts} from '../v11/solana-meme-report.js';
+import {mountSwingCard, swingAccounts, swingDecisionSummary} from '../v11/solana-meme-report.js';
 
 const state = {start:1000,lastTick:1600,candidates:{pool:{}},positions:{},cash:{fixed:1e9,runner:1e9}};
 
@@ -66,4 +66,13 @@ test('loads the branch checkpoint as raw JSON and resolves queued runs from the 
   jobs = [{name:'observe (1)',status:'queued'}];
   await refresh();
   assert.equal(card.children.at(-1).textContent,'Datensammlung · wartet');
+});
+
+test('counts each watched pool once using only its latest recorded decision',()=>{
+  const pool = outcome => ({diagnostics:{latest:{outcome},counts:{rise:42}}});
+  assert.deepEqual(swingDecisionSummary({a:pool('rise'),b:pool('rise'),c:pool('noTrades30m'),
+    d:{},e:pool('newOutcome')}),[
+    ['Erster Kursanstieg fehlt',2],['Entscheidung fehlt',1],['Keine Trades in 30 Minuten',1],
+    ['Weitere Entscheidung',1]]);
+  assert.deepEqual(swingDecisionSummary({}),[]);
 });
