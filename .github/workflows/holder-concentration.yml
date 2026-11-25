@@ -3,7 +3,7 @@ run-name: Compare holder concentration with identical fixed exits
 on:
   workflow_dispatch:
   push:
-    branches: [paper/holder-concentration-v1]
+    branches: [paper/holder-token2022-forward]
     paths: ['.github/workflows/holder-concentration.yml']
 permissions:
   contents: read
@@ -21,6 +21,9 @@ jobs:
       - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_eight_hour_exits.py
       - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_holder_signal.py
       - run: python scripts/memecoin-paper/research/newcomer_eight_hour.py campaign 1 --holder-test
+        env:
+          HOLDER_RPC_PROVIDER: helius
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -41,6 +44,9 @@ jobs:
       - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_eight_hour_exits.py
       - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_holder_signal.py
       - run: python scripts/memecoin-paper/research/newcomer_eight_hour.py campaign 2 --holder-test
+        env:
+          HOLDER_RPC_PROVIDER: helius
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
       - name: Verify final journal against both study accounts and the comparison ledger
         working-directory: scripts/memecoin-paper/research
         run: |
