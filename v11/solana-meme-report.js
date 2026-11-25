@@ -47,6 +47,31 @@ export function swingAccounts(state) {
   });
 }
 
+const swingOutcomes = new Map(Object.entries({
+  rise:'Erster Kursanstieg fehlt', pullback:'Rücksetzer fehlt', recovery:'Kurserholung fehlt',
+  liquidity:'Liquidität unter der Einstiegsschwelle', noTrades30m:'Keine Trades in 30 Minuten',
+  warmingUp:'Beobachtungszeit zu kurz', incompleteFlow:'Handelsdaten unvollständig',
+  buyImbalanceMissing:'Kaufüberhang fehlt in mindestens einem Zeitfenster', tradeRateLimitCooldown:'Wartet auf Datenanbieter',
+  tradesError:'Handelsdaten nicht abrufbar', poolAbsentFromSnapshot:'Pooldaten fehlen',
+  snapshotBatchAborted:'Poolabfrage unterbrochen', snapshotError:'Pooldaten fehlerhaft',
+  poolIdentityMismatch:'Pool und Token passen nicht zusammen', invalidMarketData:'Marktdaten ungültig',
+  entryError:'Einstiegsprüfung fehlgeschlagen', staleSignal:'Signal zu alt',
+  missingResaleQuote:'Rückverkaufskurs fehlt', resaleBelowMinimum:'Rückverkaufswert zu niedrig',
+  invalidBuyQuantity:'Kaufmenge zu gering', insufficientCash:'Paperguthaben zu gering',
+  admissionsClosed:'Einstiegsphase beendet', cohortFull:'Positionslimit erreicht',
+  alreadyEntered:'Position bereits erfasst', entered:'Einstieg erfolgt'
+}));
+
+export function swingDecisionSummary(candidates) {
+  const totals = new Map();
+  for (const pool of Object.values(candidates)) {
+    const outcome = pool?.diagnostics?.latest?.outcome;
+    const label = outcome ? swingOutcomes.get(outcome) || 'Weitere Entscheidung' : 'Entscheidung fehlt';
+    totals.set(label, (totals.get(label) || 0) + 1);
+  }
+  return [...totals].sort(([a,n],[b,m]) => m-n || a.localeCompare(b,'de'));
+}
+
 export function mountSwingCard(section, add, load = read) {
   const card = add(section,'section','');
   card.className = 'solana-comparison';
@@ -54,6 +79,10 @@ export function mountSwingCard(section, add, load = read) {
   const status = add(card,'p','Laufstand wird geladen.');
   status.setAttribute('role','status');
   const body = add(card,'div','');
+  const decisions = add(card,'details','');
+  add(decisions,'summary','Letzte Entscheidung je beobachtetem Pool');
+  const reasons = add(decisions,'ul','');
+  decisions.hidden = true;
   const source = add(card,'a','Paperlauf auf GitHub');
   let collector = swingRun;
   source.href = runs + collector;
@@ -110,6 +139,11 @@ export function mountSwingCard(section, add, load = read) {
         add(line,'span','Realisiert ' + amount(row.realized)).className = 'account-pnl af-' +
           (row.realized > 0 ? 'positive' : row.realized < 0 ? 'negative' : 'muted');
       }
+      reasons.replaceChildren();
+      for (const [label,total] of swingDecisionSummary(state.candidates)) {
+        add(reasons,'li',total + (total === 1 ? ' Pool · ' : ' Pools · ') + label);
+      }
+      decisions.hidden = pools === 0;
       last = state.lastTick;
     } catch {
       if (!last) status.textContent = 'Laufstand derzeit nicht abrufbar.';
