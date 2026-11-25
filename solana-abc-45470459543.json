@@ -1,0 +1,248 @@
+{
+  "startedAt": 1795565236,
+  "endsAt": 1795594036,
+  "updatedAt": 1795579944,
+  "lastEvent": "handoff",
+  "session": 26,
+  "accounts": {
+    "A": {
+      "policy": "trailing",
+      "cashUsdc": 1027.060575,
+      "equityUsdc": null,
+      "realizedUsdc": 47.110575,
+      "closedTrades": 5,
+      "openPositions": [
+        {
+          "positionId": "4:wave:EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "mint": "EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "qty": 328221076484,
+          "bid": null,
+          "markAt": null,
+          "marks": 5,
+          "peakNet": 287368
+        }
+      ],
+      "missingExitQuotes": 9,
+      "sampledMaxDrawdownUsdc": 0.629867,
+      "cashIfOpenWorthZeroUsdc": 1027.060575,
+      "realizedWithoutBestMintUsdc": 13.670325
+    },
+    "B": {
+      "policy": "standard",
+      "cashUsdc": 1027.060575,
+      "equityUsdc": null,
+      "realizedUsdc": 47.110575,
+      "closedTrades": 5,
+      "openPositions": [
+        {
+          "positionId": "4:wave:EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "mint": "EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "qty": 328221076484,
+          "bid": null,
+          "markAt": null,
+          "marks": 5,
+          "peakNet": 0
+        }
+      ],
+      "missingExitQuotes": 9,
+      "sampledMaxDrawdownUsdc": 0.629867,
+      "cashIfOpenWorthZeroUsdc": 1027.060575,
+      "realizedWithoutBestMintUsdc": 13.670325
+    },
+    "C": {
+      "policy": "fixed",
+      "cashUsdc": 985.204707,
+      "equityUsdc": null,
+      "realizedUsdc": 5.254707,
+      "closedTrades": 5,
+      "openPositions": [
+        {
+          "positionId": "4:wave:EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "mint": "EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "qty": 328221076484,
+          "bid": null,
+          "markAt": null,
+          "marks": 5,
+          "peakNet": 0
+        }
+      ],
+      "missingExitQuotes": 9,
+      "sampledMaxDrawdownUsdc": 0.629867,
+      "cashIfOpenWorthZeroUsdc": 985.204707,
+      "realizedWithoutBestMintUsdc": 0.051945
+    },
+    "E": {
+      "policy": "failedRecovery",
+      "cashUsdc": 984.495535,
+      "equityUsdc": null,
+      "realizedUsdc": 4.545535,
+      "closedTrades": 5,
+      "openPositions": [
+        {
+          "positionId": "4:wave:EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "mint": "EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "qty": 328221076484,
+          "bid": null,
+          "markAt": null,
+          "marks": 5,
+          "peakNet": 0,
+          "entryAt": 1795567037,
+          "lossAt": null,
+          "sellAfter": null
+        }
+      ],
+      "missingExitQuotes": 9,
+      "sampledMaxDrawdownUsdc": 0.629867,
+      "cashIfOpenWorthZeroUsdc": 984.495535,
+      "realizedWithoutBestMintUsdc": 1.991351
+    },
+    "F": {
+      "policy": "smallPoolFixed",
+      "cashUsdc": 1000.366962,
+      "equityUsdc": 1000.366962,
+      "realizedUsdc": 0.366962,
+      "closedTrades": 3,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 8.472084,
+      "cashIfOpenWorthZeroUsdc": 1000.366962,
+      "realizedWithoutBestMintUsdc": -4.8358
+    },
+    "D": {
+      "policy": "staged",
+      "cashUsdc": 997.234564,
+      "equityUsdc": null,
+      "realizedUsdc": 17.284564,
+      "closedTrades": 5,
+      "openPositions": [
+        {
+          "positionId": "4:wave:EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "mint": "EchrsdCbj5V8g6WXWpQGRfrwc8ovDpKQ3tAKwrVLiSCg",
+          "qty": 328221076484,
+          "bid": null,
+          "markAt": null,
+          "marks": 0,
+          "peakNet": 0,
+          "initialQty": 328221076484,
+          "basis": 20050000,
+          "stage": 0
+        }
+      ],
+      "missingExitQuotes": 9,
+      "sampledMaxDrawdownUsdc": 0.629867,
+      "cashIfOpenWorthZeroUsdc": 997.234564,
+      "realizedWithoutBestMintUsdc": 4.527937,
+      "fills": [
+        {
+          "at": 1795569498,
+          "mint": "2Zro1WMK1KLgEPKjBGYaFARN92M63zFBh216pWgRAiJj",
+          "session": 8,
+          "reason": "tp1",
+          "qty": 89529887249,
+          "proceedsRaw": 12666119,
+          "netRaw": 2591119
+        },
+        {
+          "at": 1795569558,
+          "mint": "2Zro1WMK1KLgEPKjBGYaFARN92M63zFBh216pWgRAiJj",
+          "session": 8,
+          "reason": "tp2",
+          "qty": 44764943624,
+          "proceedsRaw": 6871885,
+          "netRaw": 1809386
+        },
+        {
+          "at": 1795569918,
+          "mint": "2Zro1WMK1KLgEPKjBGYaFARN92M63zFBh216pWgRAiJj",
+          "session": 8,
+          "reason": "time",
+          "qty": 44764943625,
+          "proceedsRaw": 13418623,
+          "netRaw": 8356122
+        },
+        {
+          "at": 1795570818,
+          "mint": "4Di56UJzpnb7E4D7aLXFf7aLF5TrpJYv9Q3mR398pump",
+          "session": 9,
+          "reason": "stop",
+          "qty": 357238246246,
+          "proceedsRaw": 12710016,
+          "netRaw": -7389984
+        },
+        {
+          "at": 1795575021,
+          "mint": "2K8pP87oS9L6KsUpyr9LW88rAd5a248zLeKEomc7bedg",
+          "session": 18,
+          "reason": "tp1",
+          "qty": 590039076794,
+          "proceedsRaw": 11377367,
+          "netRaw": 1302368
+        },
+        {
+          "at": 1795575081,
+          "mint": "2K8pP87oS9L6KsUpyr9LW88rAd5a248zLeKEomc7bedg",
+          "session": 18,
+          "reason": "time",
+          "qty": 590039076795,
+          "proceedsRaw": 11127600,
+          "netRaw": 1052599
+        },
+        {
+          "at": 1795576222,
+          "mint": "mS7VrfVx1NiWEmrdohwVRx4AnYdqszHawb8jh1Zpump",
+          "session": 20,
+          "reason": "tp1",
+          "qty": 301183813340,
+          "proceedsRaw": 11346016,
+          "netRaw": 1271016
+        },
+        {
+          "at": 1795576342,
+          "mint": "mS7VrfVx1NiWEmrdohwVRx4AnYdqszHawb8jh1Zpump",
+          "session": 20,
+          "reason": "tp2",
+          "qty": 150591906670,
+          "proceedsRaw": 6216352,
+          "netRaw": 1153852
+        },
+        {
+          "at": 1795576642,
+          "mint": "mS7VrfVx1NiWEmrdohwVRx4AnYdqszHawb8jh1Zpump",
+          "session": 20,
+          "reason": "time",
+          "qty": 150591906670,
+          "proceedsRaw": 7858515,
+          "netRaw": 2796015
+        },
+        {
+          "at": 1795577842,
+          "mint": "BNNYZCSwmqLxD1diCec4Z9ZHaJ2y2FXnJjN1o9Z7jxKt",
+          "session": 22,
+          "reason": "tp1",
+          "qty": 499316029408,
+          "proceedsRaw": 11310988,
+          "netRaw": 1235989
+        },
+        {
+          "at": 1795577962,
+          "mint": "BNNYZCSwmqLxD1diCec4Z9ZHaJ2y2FXnJjN1o9Z7jxKt",
+          "session": 22,
+          "reason": "tp2",
+          "qty": 249658014704,
+          "proceedsRaw": 6278877,
+          "netRaw": 1216377
+        },
+        {
+          "at": 1795578262,
+          "mint": "BNNYZCSwmqLxD1diCec4Z9ZHaJ2y2FXnJjN1o9Z7jxKt",
+          "session": 22,
+          "reason": "time",
+          "qty": 249658014705,
+          "proceedsRaw": 6952206,
+          "netRaw": 1889705
+        }
+      ]
+    }
+  },
+  "runId": 45470459543
+}
