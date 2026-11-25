@@ -1,81 +1,362 @@
 {
   "startedAt": 1795536425,
   "endsAt": 1795565225,
-  "updatedAt": 1795550958,
-  "lastEvent": "handoff",
-  "session": 24,
+  "updatedAt": 1795565225,
+  "lastEvent": "finished",
+  "session": 42,
   "accounts": {
     "A": {
       "policy": "trailing",
-      "cashUsdc": 980.797803,
-      "equityUsdc": 980.797803,
-      "realizedUsdc": -19.202197,
-      "closedTrades": 8,
+      "cashUsdc": 934.730993,
+      "equityUsdc": 934.730993,
+      "realizedUsdc": -65.269007,
+      "closedTrades": 17,
       "openPositions": [],
       "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 37.946796,
-      "cashIfOpenWorthZeroUsdc": 980.797803,
-      "realizedWithoutBestMintUsdc": -38.381921
+      "sampledMaxDrawdownUsdc": 78.896305,
+      "cashIfOpenWorthZeroUsdc": 934.730993,
+      "realizedWithoutBestMintUsdc": -84.448731
     },
     "B": {
       "policy": "standard",
-      "cashUsdc": 960.845106,
-      "equityUsdc": 960.845106,
-      "realizedUsdc": -39.154894,
-      "closedTrades": 8,
+      "cashUsdc": 914.778296,
+      "equityUsdc": 914.778296,
+      "realizedUsdc": -85.221704,
+      "closedTrades": 17,
       "openPositions": [],
       "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 57.899493,
-      "cashIfOpenWorthZeroUsdc": 960.845106,
-      "realizedWithoutBestMintUsdc": -58.334618
+      "sampledMaxDrawdownUsdc": 98.849002,
+      "cashIfOpenWorthZeroUsdc": 914.778296,
+      "realizedWithoutBestMintUsdc": -104.401428
     },
     "C": {
       "policy": "fixed",
-      "cashUsdc": 959.076692,
-      "equityUsdc": 959.076692,
-      "realizedUsdc": -40.923308,
-      "closedTrades": 8,
+      "cashUsdc": 910.528869,
+      "equityUsdc": 910.528869,
+      "realizedUsdc": -89.471131,
+      "closedTrades": 17,
       "openPositions": [],
       "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 48.515999,
-      "cashIfOpenWorthZeroUsdc": 959.076692,
-      "realizedWithoutBestMintUsdc": -44.658072
+      "sampledMaxDrawdownUsdc": 102.233915,
+      "cashIfOpenWorthZeroUsdc": 910.528869,
+      "realizedWithoutBestMintUsdc": -93.205895
     },
     "E": {
       "policy": "failedRecovery",
-      "cashUsdc": 959.076692,
-      "equityUsdc": 959.076692,
-      "realizedUsdc": -40.923308,
-      "closedTrades": 8,
+      "cashUsdc": 927.429616,
+      "equityUsdc": 927.429616,
+      "realizedUsdc": -72.570384,
+      "closedTrades": 17,
       "openPositions": [],
       "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 48.515999,
-      "cashIfOpenWorthZeroUsdc": 959.076692,
-      "realizedWithoutBestMintUsdc": -44.658072
+      "sampledMaxDrawdownUsdc": 82.654772,
+      "cashIfOpenWorthZeroUsdc": 927.429616,
+      "realizedWithoutBestMintUsdc": -76.305148
     },
     "F": {
       "policy": "smallPoolFixed",
-      "cashUsdc": 976.738981,
-      "equityUsdc": 976.738981,
-      "realizedUsdc": -23.261019,
-      "closedTrades": 5,
+      "cashUsdc": 959.968759,
+      "equityUsdc": 959.968759,
+      "realizedUsdc": -40.031241,
+      "closedTrades": 7,
       "openPositions": [],
       "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 27.757721,
-      "cashIfOpenWorthZeroUsdc": 976.738981,
-      "realizedWithoutBestMintUsdc": -26.995783
+      "sampledMaxDrawdownUsdc": 47.99434,
+      "cashIfOpenWorthZeroUsdc": 959.968759,
+      "realizedWithoutBestMintUsdc": -43.766005
     },
     "D": {
       "policy": "staged",
-      "cashUsdc": 961.478772,
-      "equityUsdc": 961.478772,
-      "realizedUsdc": -38.521228,
-      "closedTrades": 8,
+      "cashUsdc": 914.436628,
+      "equityUsdc": 914.436628,
+      "realizedUsdc": -85.563372,
+      "closedTrades": 17,
       "openPositions": [],
       "missingExitQuotes": 0,
-      "sampledMaxDrawdownUsdc": 48.301045,
-      "cashIfOpenWorthZeroUsdc": 961.478772,
-      "realizedWithoutBestMintUsdc": -46.417696
+      "sampledMaxDrawdownUsdc": 97.663867,
+      "cashIfOpenWorthZeroUsdc": 914.436628,
+      "realizedWithoutBestMintUsdc": -93.45984,
+      "fills": [
+        {
+          "at": 1795536846,
+          "mint": "6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK",
+          "session": 1,
+          "reason": "tp1",
+          "qty": 1278467393097,
+          "proceedsRaw": 11130516,
+          "netRaw": 1055517
+        },
+        {
+          "at": 1795536966,
+          "mint": "6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK",
+          "session": 1,
+          "reason": "tp2",
+          "qty": 639233696548,
+          "proceedsRaw": 6857044,
+          "netRaw": 1794544
+        },
+        {
+          "at": 1795537206,
+          "mint": "6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK",
+          "session": 1,
+          "reason": "breakeven",
+          "qty": 639233696550,
+          "proceedsRaw": 344,
+          "netRaw": -5062157
+        },
+        {
+          "at": 1795539490,
+          "mint": "DJUZ7gAuhj8GCMR1wNXvXf9LmmPArVEcuNGvLpzJCZ3n",
+          "session": 6,
+          "reason": "tp1",
+          "qty": 1145967776498,
+          "proceedsRaw": 11253304,
+          "netRaw": 1178305
+        },
+        {
+          "at": 1795539670,
+          "mint": "DJUZ7gAuhj8GCMR1wNXvXf9LmmPArVEcuNGvLpzJCZ3n",
+          "session": 6,
+          "reason": "tp2",
+          "qty": 572983888249,
+          "proceedsRaw": 6316978,
+          "netRaw": 1254478
+        },
+        {
+          "at": 1795539790,
+          "mint": "DJUZ7gAuhj8GCMR1wNXvXf9LmmPArVEcuNGvLpzJCZ3n",
+          "session": 6,
+          "reason": "breakeven",
+          "qty": 572983888250,
+          "proceedsRaw": 4912262,
+          "netRaw": -150239
+        },
+        {
+          "at": 1795541892,
+          "mint": "VJieKLQyU6QSWbGXjKdNPQtz99m2mJHW8F2RTXm8xQ3",
+          "session": 10,
+          "reason": "stop",
+          "qty": 1120832789267,
+          "proceedsRaw": 3704,
+          "netRaw": -20096296
+        },
+        {
+          "at": 1795543212,
+          "mint": "6UMPEvR5XrEyWYwLB1gYnAPMBTyssN7sVa1HzZpvpump",
+          "session": 12,
+          "reason": "stop",
+          "qty": 433355187191,
+          "proceedsRaw": 8703937,
+          "netRaw": -11396063
+        },
+        {
+          "at": 1795544053,
+          "mint": "CoahWQn3SM9YuKT9uGrnWN6xGJ2pjZ8PPkAZN5fDiSRF",
+          "session": 13,
+          "reason": "tp1",
+          "qty": 1548198716755,
+          "proceedsRaw": 11942979,
+          "netRaw": 1867979
+        },
+        {
+          "at": 1795544113,
+          "mint": "CoahWQn3SM9YuKT9uGrnWN6xGJ2pjZ8PPkAZN5fDiSRF",
+          "session": 13,
+          "reason": "tp2",
+          "qty": 774099358377,
+          "proceedsRaw": 6291067,
+          "netRaw": 1228568
+        },
+        {
+          "at": 1795544593,
+          "mint": "CoahWQn3SM9YuKT9uGrnWN6xGJ2pjZ8PPkAZN5fDiSRF",
+          "session": 13,
+          "reason": "time",
+          "qty": 774099358378,
+          "proceedsRaw": 9862422,
+          "netRaw": 4799921
+        },
+        {
+          "at": 1795545194,
+          "mint": "3HaP2DqkjVMjdabGrY8oTtLcPXyuK5ogAHJrBPDgriTz",
+          "session": 14,
+          "reason": "stop",
+          "qty": 2440982391212,
+          "proceedsRaw": 3578,
+          "netRaw": -20096422
+        },
+        {
+          "at": 1795546154,
+          "mint": "E9QvCyhE1Zk8rRMVc4opoFxcTvs24Q68VfDmCRxR3JyP",
+          "session": 16,
+          "reason": "tp1",
+          "qty": 505789941901,
+          "proceedsRaw": 11094079,
+          "netRaw": 1019080
+        },
+        {
+          "at": 1795546334,
+          "mint": "E9QvCyhE1Zk8rRMVc4opoFxcTvs24Q68VfDmCRxR3JyP",
+          "session": 16,
+          "reason": "tp2",
+          "qty": 252894970950,
+          "proceedsRaw": 6197570,
+          "netRaw": 1135070
+        },
+        {
+          "at": 1795546634,
+          "mint": "E9QvCyhE1Zk8rRMVc4opoFxcTvs24Q68VfDmCRxR3JyP",
+          "session": 16,
+          "reason": "time",
+          "qty": 252894970952,
+          "proceedsRaw": 7650359,
+          "netRaw": 2587858
+        },
+        {
+          "at": 1795550178,
+          "mint": "FrHdGgGEzdNZheCR1FMFqHUDHpdDx7EFxaEjFs1tPvvK",
+          "session": 23,
+          "reason": "time",
+          "qty": 7356650850484,
+          "proceedsRaw": 20458629,
+          "netRaw": 358629
+        },
+        {
+          "at": 1795553736,
+          "mint": "7c7C22p7N4DmjBjFe9wcwrEwhrVK8jbHDmTpVzdcTiFH",
+          "session": 27,
+          "reason": "time",
+          "qty": 229689709946,
+          "proceedsRaw": 20439321,
+          "netRaw": 339321
+        },
+        {
+          "at": 1795554336,
+          "mint": "3Ln739FL5NDJcbquBsobeCWYh6EtY5JAaXuMTBvz24wQ",
+          "session": 28,
+          "reason": "tp1",
+          "qty": 407655222218,
+          "proceedsRaw": 11509690,
+          "netRaw": 1434690
+        },
+        {
+          "at": 1795554396,
+          "mint": "3Ln739FL5NDJcbquBsobeCWYh6EtY5JAaXuMTBvz24wQ",
+          "session": 28,
+          "reason": "tp2",
+          "qty": 203827611109,
+          "proceedsRaw": 6092560,
+          "netRaw": 1030060
+        },
+        {
+          "at": 1795554696,
+          "mint": "3Ln739FL5NDJcbquBsobeCWYh6EtY5JAaXuMTBvz24wQ",
+          "session": 28,
+          "reason": "time",
+          "qty": 203827611109,
+          "proceedsRaw": 6627873,
+          "netRaw": 1565373
+        },
+        {
+          "at": 1795557998,
+          "mint": "AY4jL8U2tsmu8dYNtmXMjzH3qgtwnBgMFVkEpbFuzzoo",
+          "session": 33,
+          "reason": "time",
+          "qty": 7412315151147,
+          "proceedsRaw": 20457410,
+          "netRaw": 357410
+        },
+        {
+          "at": 1795558839,
+          "mint": "2X1ewPRjZNnM2Jxo8pKKVB4yJ8C7S1FhJ4YaS7rUdLVj",
+          "session": 34,
+          "reason": "stop",
+          "qty": 878961748857,
+          "proceedsRaw": 348,
+          "netRaw": -20099652
+        },
+        {
+          "at": 1795559679,
+          "mint": "Dhy5Ayni79ru86m34m7XoJf2SiR4ugto5BcyeqMeUg8",
+          "session": 35,
+          "reason": "tp1",
+          "qty": 480844004191,
+          "proceedsRaw": 11819935,
+          "netRaw": 1744936
+        },
+        {
+          "at": 1795559739,
+          "mint": "Dhy5Ayni79ru86m34m7XoJf2SiR4ugto5BcyeqMeUg8",
+          "session": 35,
+          "reason": "tp2",
+          "qty": 240422002095,
+          "proceedsRaw": 6235930,
+          "netRaw": 1173430
+        },
+        {
+          "at": 1795559799,
+          "mint": "Dhy5Ayni79ru86m34m7XoJf2SiR4ugto5BcyeqMeUg8",
+          "session": 35,
+          "reason": "time",
+          "qty": 240422002097,
+          "proceedsRaw": 6103091,
+          "netRaw": 1040590
+        },
+        {
+          "at": 1795560220,
+          "mint": "54b8dnn3Jrs6r5eJNgACXJq1iD2ReWbhguSxGxo7pump",
+          "session": 36,
+          "reason": "stop",
+          "qty": 399914736522,
+          "proceedsRaw": 590478,
+          "netRaw": -19509522
+        },
+        {
+          "at": 1795562262,
+          "mint": "Gch2XjodPRTfxeWnB6obD9a5Ux7VmhoNQK6rQNvQpump",
+          "session": 38,
+          "reason": "stop",
+          "qty": 266681582527,
+          "proceedsRaw": 381658,
+          "netRaw": -19718342
+        },
+        {
+          "at": 1795563343,
+          "mint": "GisWWjhwrSud4aFGSHvTMt85Ky14sY7LeBFCpfoFpump",
+          "session": 39,
+          "reason": "time",
+          "qty": 121849625041,
+          "proceedsRaw": 21143047,
+          "netRaw": 1043047
+        },
+        {
+          "at": 1795563943,
+          "mint": "4JGEJiNRKX4guX1QxN8jQxu79tj4DSDgUDkrSwKbCD1o",
+          "session": 40,
+          "reason": "tp1",
+          "qty": 1103060304397,
+          "proceedsRaw": 11436183,
+          "netRaw": 1361184
+        },
+        {
+          "at": 1795564063,
+          "mint": "4JGEJiNRKX4guX1QxN8jQxu79tj4DSDgUDkrSwKbCD1o",
+          "session": 40,
+          "reason": "tp2",
+          "qty": 551530152198,
+          "proceedsRaw": 6073627,
+          "netRaw": 1011127
+        },
+        {
+          "at": 1795564243,
+          "mint": "4JGEJiNRKX4guX1QxN8jQxu79tj4DSDgUDkrSwKbCD1o",
+          "session": 40,
+          "reason": "time",
+          "qty": 551530152200,
+          "proceedsRaw": 5246705,
+          "netRaw": 184204
+        }
+      ]
     }
   },
   "runId": 45433341029,
