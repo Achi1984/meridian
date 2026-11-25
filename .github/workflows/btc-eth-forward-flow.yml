@@ -22,13 +22,21 @@ jobs:
         run: |
           python - <<'PY'
           import time
+          from urllib.error import HTTPError
           from prospective_taker_flow import ASSETS,HOUR,flow,bars_for
           slot=int(time.time())//HOUR*HOUR
           for asset in ASSETS:
-              data=flow(asset,slot,-1)
               _,bar=bars_for((asset+'-USDT-SWAP',slot-HOUR))
-              assert 'side' in bar and len(data['previousSameHour'])==7
-              print(asset,data['observedAt'],data['buyShare'])
+              assert 'side' in bar, bar
+              try:
+                  data=flow(asset,slot,-1)
+              except HTTPError as exc:
+                  if exc.code != 451:
+                      raise
+                  print(asset,'Binance live feed unavailable here; retaining OKX baseline and timestamps')
+              else:
+                  assert len(data['previousSameHour'])==7
+                  print(asset,data['observedAt'],data['buyShare'])
           PY
       - run: python -u scripts/research/prospective_taker_flow.py forward.json
       - if: always()
