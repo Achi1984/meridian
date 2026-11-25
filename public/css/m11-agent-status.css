@@ -140,3 +140,12 @@
     grid-template-columns: 1fr;
   }
 }
+
+.scanner-compact {display:none}
+    @media (max-width:640px) {
+      .scanner-wide {display:none}
+      .scanner-compact {display:block;list-style:decimal;padding-inline-start:1.6rem}
+      .scanner-compact li {padding:.55rem 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+      .scanner-compact li div {display:flex;align-items:baseline;flex-wrap:wrap;gap:.25rem .6rem}
+      .scanner-compact small {color:var(--muted)}
+    }

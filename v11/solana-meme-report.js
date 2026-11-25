@@ -523,6 +523,9 @@ export function mountLiveScanner(section) {
     if (!ranked.length) add(result, 'p', 'Kein Pool mit vollständigem Zeitfenster und positivem Volumen.');
     else {
       const wrap = add(result,'div','');
+      wrap.className = 'scanner-wide';
+      const compact = add(result,'ol','');
+      compact.className = 'scanner-compact';
       wrap.style.overflowX = 'auto';
       const table = add(wrap,'table','');
       const header = add(add(table,'thead',''),'tr','');
@@ -533,13 +536,21 @@ export function mountLiveScanner(section) {
       for (const c of ranked) {
         const row = add(body,'tr','');
         const stats = c.windows[w];
+        const decision = c.reasons.map(r => reasons[r] || r).join(' · ') || 'Vorauswahl';
+        const entry = add(compact,'li','');
+        const summary = add(entry,'div','');
+        mint(summary,c);
+        add(summary,'strong',decision);
+        add(summary,'small',age + ' Min. alt');
+        add(entry,'small','Volumen ' + fmt(stats.volumeUsd,' USD') + ' · Kurs ' + fmt(stats.changePct,' %') +
+          ' · Käufer ' + fmt(stats.uniqueBuyers,'') + ' · Netto aus 20 USDC ' + fmt(c.netResaleUsdc,' USDC'));
         add(row,'td',String(c.ranks[w]));
         mint(add(row,'td',''),c);
         add(row,'td',fmt(stats.volumeUsd,' USD'));
         add(row,'td',fmt(stats.changePct,' %'));
         add(row,'td',fmt(stats.uniqueBuyers,''));
         add(row,'td',fmt(c.netResaleUsdc,' USDC'));
-        add(row,'td',c.reasons.map(r => reasons[r] || r).join(' · ') || 'Vorauswahl');
+        add(row,'td',decision);
       }
     }
     const young = latest.candidates.filter(c => c.earliest30mAt > latest.asOf)

@@ -119,7 +119,8 @@ function renderUsdRound(root, round) {
   if (activity && Number.isInteger(activity.observed) && Number.isInteger(activity.expected)) {
     const coverage = doc.createElement('small');
     coverage.textContent = 'Aktivität der letzten 24 Stunden · ' + activity.observed + ' von ' +
-      activity.expected + ' erwarteten Intervallen erfasst.';
+      activity.expected + ' erwarteten Intervallen erfasst.' + (activity.observed < activity.expected ?
+        ' Für ' + (activity.expected - activity.observed) + ' Intervalle fehlt ein Entscheidungsnachweis im Bericht.' : '');
     root.replaceChildren(title, scroll, costs, slot, decisions, coverage);
   } else {
     root.replaceChildren(title, scroll, costs, slot, decisions);
