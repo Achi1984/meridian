@@ -17,21 +17,14 @@ jobs:
         run: |
           python -m unittest test_holder_signal
           python -u - <<'PY'
-          import json, time
-          from holder_signal import HolderSampler
+          import json
+          import time
+          import holder_signal as holder
+          holder.RPC = 'https://solana-rpc.publicnode.com'
           mint = '6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK'
-          sampler = HolderSampler()
-          try:
-              for index in range(6):
-                  sampler.refresh(mint)
-                  time.sleep(10)
-                  result = sampler.at_entry(mint, time.time())
-                  print(json.dumps(result))
-                  if result['state'] != 'unknown':
-                      break
-                  time.sleep(20)
-              else:
-                  raise SystemExit('No usable holder sample')
-          finally:
-              sampler.pool.shutdown()
+          started = time.time()
+          result = holder.measure(mint)
+          if time.time() - started > holder.MAX_AGE:
+              raise ValueError('stale sample')
+          print(json.dumps(dict(result, provider=holder.RPC, startedAt=started, receivedAt=time.time())))
           PY
