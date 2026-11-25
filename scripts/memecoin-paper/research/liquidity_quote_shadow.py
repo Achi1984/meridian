@@ -5,7 +5,7 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 from buyer_persistence_pilot import pool_state, wait_until
-from new_pool_watch import GT, USDC, WSOL, FEE, SIZE, get, qualifies, snapshot, spot_quote_amounts
+from new_pool_watch import GT, USDC, WSOL, FEE, SIZE, get, failed_checks, snapshot, spot_quote_amounts
 
 ERRORS=(ValueError,KeyError,OSError,TypeError,IndexError)
 
@@ -16,7 +16,8 @@ def sample(first,born):
     try:
         current=pool_state(pool)
         row.update(signalAt=time.time(),signalLiquidityUsd=current['liquidity'])
-        row['eligible']=qualifies(first,current,row['signalAt']-born)
+        row['failedChecks']=failed_checks(first,current,row['signalAt']-born)
+        row['eligible']=not row['failedChecks']
         if not row['eligible']:
             return row
         _,qty=spot_quote_amounts(USDC,first['mint'],SIZE)
