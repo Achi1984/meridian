@@ -1,0 +1,36 @@
+name: BTC and ETH paired forward flow study
+on:
+  push:
+    branches: [research/literature-paper-20261125]
+    paths: ['.github/workflows/btc-eth-forward-flow.yml']
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: btc-eth-forward-flow
+  cancel-in-progress: false
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 310
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - run: python -m unittest discover -s scripts/research -p test_prospective_taker_flow.py
+      - name: Verify market data and timestamp alignment
+        working-directory: scripts/research
+        run: |
+          python - <<'PY'
+          import time
+          from prospective_taker_flow import ASSETS,HOUR,flow,bars_for
+          slot=int(time.time())//HOUR*HOUR
+          for asset in ASSETS:
+              data=flow(asset,slot,-1)
+              _,bar=bars_for((asset+'-USDT-SWAP',slot-HOUR))
+              assert 'side' in bar and len(data['previousSameHour'])==7
+              print(asset,data['observedAt'],data['buyShare'])
+          PY
+      - run: python -u scripts/research/prospective_taker_flow.py forward.json
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with: {name: btc-eth-forward-flow, path: forward.json, if-no-files-found: warn}
