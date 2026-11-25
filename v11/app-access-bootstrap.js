@@ -115,5 +115,56 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
 
 if(typeof document!=='undefined'&&typeof window!=='undefined'){
   mountAppAccess(document,window);
+  const strategies = document.getElementById('view-strategies');
+  const catalogStatus = document.getElementById('strategy-load-status');
+  let commandMounted = false;
+  let checking = false;
+  async function checkWorkspace(retry = false) {
+    if (checking || !strategies || strategies.hidden || !appAccess.isUnlocked() ||
+        document.getElementById('paper-research-section')) return;
+    checking = true;
+    catalogStatus.textContent = 'Strategien werden geladen …';
+    try {
+      const path = './strategy-workspace-bootstrap.js?v=B19-M11-FIX1';
+      await import(retry ? path + '&retry=' + Date.now() : path);
+      window.ensureStrategyWorkspace?.();
+      if (!document.getElementById('paper-research-section')) throw Error('Workspace unavailable');
+    } catch {
+      catalogStatus.textContent = 'Weitere Strategien konnten nicht geladen werden. ';
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = 'Erneut laden';
+      button.onclick = () => checkWorkspace(true);
+      catalogStatus.append(button);
+    } finally { checking = false; }
+  }
+  if (strategies && catalogStatus) {
+    new MutationObserver(()=>checkWorkspace()).observe(strategies,{attributes:true,attributeFilter:['hidden']});
+    async function loadPaperEntry() {
+      if (commandMounted || !appAccess.isUnlocked()) return;
+      commandMounted = true;
+      const fallback = document.getElementById('paper-entry-retry');
+      try {
+        const paper = fallback ? await import('./solana-meme-report.js?v=B19-M11-FIX1&retry=' + Date.now()) :
+          await import('./solana-meme-report.js?v=B19-M11-FIX1');
+        paper.mountCommandPaper(document,appAccess);
+        fallback?.remove();
+      } catch {
+        commandMounted = false;
+        if (fallback) return;
+        const retry = document.createElement('button');
+        retry.id = 'paper-entry-retry';
+        retry.className = 'strategy-entry-link';
+        retry.textContent = 'Paperbot-Kachel erneut laden';
+        retry.onclick = loadPaperEntry;
+        document.getElementById('command-portfolio')?.before(retry);
+      }
+    }
+    appAccess.subscribe(state=>{
+      if (state.status !== 'unlocked') return;
+      void checkWorkspace();
+      void loadPaperEntry();
+    });
+  }
   mountReleaseUpdate(document,window,{access:appAccess});
 }

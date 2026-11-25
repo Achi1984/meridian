@@ -44,6 +44,8 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,deviceScaleFactor:1,
         mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
       await unlockAppThroughGate(call);
+      for(let i=0;i<100 && !await evaluate("!!document.getElementById('command-paper-live')");i++)
+        await new Promise(resolve=>setTimeout(resolve,10));
       const initial=await evaluate(`({
         width:innerWidth,height:innerHeight,scrollY,viewport:document.documentElement.clientWidth,
         body:document.body.scrollWidth,root:document.documentElement.scrollWidth,
@@ -71,7 +73,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       assert.ok(initial.viewport<=size.width&&initial.viewport>=size.width-20,'unexpected usable viewport '+size.width);
       assert.ok(initial.body<=initial.viewport+1&&initial.root<=initial.viewport+1,'initial page overflow '+size.width);
       assert.equal(initial.statusOpen,false);assert.equal(initial.statusText,'');
-      assert.equal(initial.commandHeading,'Command');assert.equal(initial.primaryImmediatelyAfterHeading,'command-portfolio');
+      assert.equal(initial.commandHeading,'Command');assert.equal(initial.primaryImmediatelyAfterHeading,'command-paper-live');
       assert.ok(initial.portfolioBeforeRisk,'portfolio must precede explanatory risk content');
       assert.ok(initial.header<Math.min(360,size.height*0.65),'bounded readable header: '+initial.header+'px');
       assert.ok(initial.headerPadding>=8,'header includes breathing room before safe-area padding');

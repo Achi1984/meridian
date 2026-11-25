@@ -873,8 +873,9 @@ test('M11 strategy bootstrap mounts both reviewed panels under existing navigati
   assert.match(source, /Run-, Quellen-, Profil-, Fingerabdruck- und Host-Identität bleiben unbekannt/);
   assert.match(source, /paperBotReportWorkspace\?\.setActive\(button\.dataset\.v==='strategies'\)/);
   assert.match(source,/reports\.append\(host8hRoot,botReports,pairedReports,history\)/);
-  assert.equal((source.match(/addEventListener\(['"]click['"]/g) || []).length, 1,
-    'only the bottom nav listener loads reports');
+  assert.equal((source.match(/addEventListener\(['"]click['"]/g) || []).length, 2,
+    'only the bottom nav and the explicit retry load reports');
+  assert.ok(source.includes("retry.addEventListener('click',loadWorkspace,{once:true})"));
   const access = readFileSync(new URL('../v11/app-access-bootstrap.js', import.meta.url), 'utf8');
   assert.ok(access.includes("strategyLink?.addEventListener('click',openStrategies)"));
   assert.ok(access.includes("strategyLink?.removeEventListener('click',openStrategies)"));

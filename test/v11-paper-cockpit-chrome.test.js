@@ -1,4 +1,4 @@
-import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint} from './helpers/pilot-log-fixture.mjs';
+import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -456,7 +456,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
-        const approvedExternal=new Set([pilotEndpoint,pilotStatusEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
+        const approvedExternal=new Set([pilotEndpoint,pilotStatusEndpoint,swingCheckpointEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
           SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
           SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
         assert.ok(resources.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
@@ -741,6 +741,62 @@ test('early Strategies navigation remains active when its module bootstrap initi
       await call('Fetch.enable',{patterns:[{
         urlPattern:'*strategy-workspace-bootstrap.js*',requestStage:'Request'
       }]});
+    });
+  }finally{await hosted.close();}
+});
+
+test('Command reaches live decisions even if the research bootstrap fails',async()=>{
+  const name='Command reaches live decisions even if the research bootstrap fails';
+  if(typeof WebSocket!=='function'){
+    const child=runFlaggedBrowserTest(name,60000);
+    assert.equal(child.status,0,child.stdout+child.stderr);
+    assertNamedTestPassed(child.stdout,name);
+    return;
+  }
+  const hosted=await startV11StaticServer();
+  try {
+    await withMobileChrome(chrome,375,hosted.url,async call=>{
+      const evaluate=async expression=>{
+        const result=await call('Runtime.evaluate',{expression,awaitPromise:true,returnByValue:true});
+        assert.ok(!result.exceptionDetails,JSON.stringify(result.exceptionDetails));
+        return result.result.value;
+      };
+      await evaluate(`(()=>{
+        const original=window.fetch;
+        window.fetch=(url,options)=>{
+          if(String(url)===${JSON.stringify(swingCheckpointEndpoint)})return Promise.resolve(new Response(JSON.stringify({
+            start:100,lastTick:200,cash:{fixed:1e9,runner:1e9},positions:{},
+            candidates:{one:{diagnostics:{latest:{outcome:'rise'}}}}})));
+          if(String(url).startsWith('https://') && String(url)!==${JSON.stringify(VERIFY_ENDPOINT)})
+            return Promise.resolve(new Response('{}',{status:503}));
+          return original(url,options);
+        };
+        return true;
+      })()`);
+      await unlockAppThroughGate(call);
+      await call('Fetch.enable',{patterns:[{urlPattern:'*strategy-workspace-bootstrap.js*'}]});
+      const wait=async predicate=>{
+        for(let i=0;i<100;i++){
+          if(await evaluate(predicate))return;
+          await new Promise(resolve=>setTimeout(resolve,25));
+        }
+        assert.fail(predicate);
+      };
+      await wait("document.querySelector('#command-paper-live')?.innerText.includes('Letzter Scan')");
+      await evaluate("document.querySelector('#command-paper-live button').click();true");
+      await wait("document.querySelector('#solana-meme-paper details')?.open && document.querySelector('#solana-meme-paper li')?.innerText.includes('Erster Kursanstieg fehlt')");
+      await wait("document.querySelector('#strategy-load-status button')?.textContent==='Erneut laden'");
+      await evaluate("document.querySelector('#strategy-load-status button').click();true");
+      await wait("!!document.getElementById('paper-research-section')");
+      assert.equal(await evaluate("document.querySelectorAll('#solana-meme-paper').length"),1);
+    },667,async call=>{
+      call.onEvent('Fetch.requestPaused',event=>{
+        if(event.request.url.includes('strategy-workspace-bootstrap.js') && !event.request.url.includes('&retry='))
+          void call('Fetch.failRequest',{requestId:event.requestId,errorReason:'Failed'});
+        else if(event.request.url.includes('strategy-workspace-bootstrap.js'))
+          void call('Fetch.continueRequest',{requestId:event.requestId});
+      });
+      await call('Fetch.enable',{patterns:[{urlPattern:'*strategy-workspace-bootstrap.js*'}]});
     });
   }finally{await hosted.close();}
 });

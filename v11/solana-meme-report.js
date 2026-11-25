@@ -72,6 +72,94 @@ export function swingDecisionSummary(candidates) {
   return [...totals].sort(([a,n],[b,m]) => m-n || a.localeCompare(b,'de'));
 }
 
+function swingStatus(state) {
+  const entries = Object.keys(state.positions).length;
+  const pools = Object.keys(state.candidates).length;
+  const elapsed = state.lastTick-state.start;
+  const phase = elapsed >= 72*3600 ? 'Ende des Beobachtungsfensters' :
+    elapsed >= 24*3600 || entries >= 30 ? 'Nachbeobachtung' :
+    entries ? 'Einstiegsphase' : 'Wartet auf Einstieg';
+  const time = new Date(state.lastTick*1000).toLocaleString('de-AT',{
+    timeZone:'Europe/Vienna', day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+  const stale = Date.now()/1000-state.lastTick > 1200 && elapsed < 72*3600;
+  return phase + ' · ' + pools + ' Pools · ' + entries + ' Einstiege · ' +
+    'Letzter Scan ' + time + ' (Wien)' + (stale ? ' · Datenstand veraltet' : '');
+}
+
+const reportRefresh = new WeakMap();
+
+export function ensureSolanaSection(doc, before) {
+  let section = doc.getElementById('solana-meme-paper');
+  if (!section) {
+    section = doc.createElement('details');
+    section.id = 'solana-meme-paper';
+    section.className = 'card';
+    const title = doc.createElement('summary');
+    title.textContent = 'Solana-Memecoin · Paperbot';
+    section.append(title);
+    before.before(section);
+    reportRefresh.set(section, mountSolanaReport(section));
+  } else if (before.id === 'paper-advisor') {
+    before.before(section);
+  }
+  return {section, refresh:reportRefresh.get(section)};
+}
+
+export function mountCommandPaper(doc, access) {
+  const portfolio = doc.getElementById('command-portfolio');
+  const strategies = doc.getElementById('view-strategies');
+  const command = doc.getElementById('view-command');
+  if (!portfolio || !strategies || !command) return;
+  const card = doc.createElement('section');
+  card.className = 'card';
+  card.id = 'command-paper-live';
+  const title = doc.createElement('h2');
+  title.textContent = 'Memecoin-Paperbot · 48 Stunden';
+  const status = doc.createElement('p');
+  status.setAttribute('role','status');
+  status.textContent = 'Letzter Scan wird geladen …';
+  const open = doc.createElement('button');
+  open.type = 'button';
+  open.className = 'strategy-entry-link';
+  open.textContent = 'Einstiegsgründe ansehen';
+  card.append(title,status,open);
+  portfolio.before(card);
+  const anchor = doc.getElementById('strategy-load-status');
+  const section = doc.getElementById('solana-meme-paper') || ensureSolanaSection(doc,anchor).section;
+  open.addEventListener('click',()=>{
+    if (!access.isUnlocked()) return;
+    doc.querySelector('#nav button[data-v="strategies"]').click();
+    section.open = true;
+    const reasons = section.querySelector('.solana-comparison details');
+    if (reasons) reasons.open = true;
+    section.querySelector('summary').focus();
+    section.scrollIntoView({block:'start'});
+  });
+  let timer, busy = false, snapshot;
+  const visible = () => access.isUnlocked() && !doc.hidden && !command.hidden;
+  async function refresh() {
+    if (!visible() || busy) return;
+    busy = true;
+    try {
+      const state = await read(swingSource,true);
+      swingAccounts(state);
+      if (snapshot && state.lastTick < snapshot.lastTick) throw Error('Older checkpoint');
+      snapshot = state;
+      status.textContent = swingStatus(state);
+    } catch {
+      status.textContent = snapshot ? swingStatus(snapshot) + ' · Abruf fehlgeschlagen' :
+        'Letzter Scan derzeit nicht abrufbar.';
+    } finally { busy = false; }
+  }
+  function sync() {
+    clearInterval(timer);
+    if (visible()) { void refresh(); timer = setInterval(refresh,300000); }
+  }
+  new MutationObserver(sync).observe(command,{attributes:true,attributeFilter:['hidden']});
+  doc.addEventListener('visibilitychange',sync);
+  access.subscribe(sync);
+}
+
 export function mountSwingCard(section, add, load = read) {
   const card = add(section,'section','');
   card.className = 'solana-comparison';
@@ -120,17 +208,7 @@ export function mountSwingCard(section, add, load = read) {
       }
       collector = state.collectorRunId ?? swingRun;
       source.href = runs + collector;
-      const entries = Object.keys(state.positions).length;
-      const pools = Object.keys(state.candidates).length;
-      const elapsed = state.lastTick-state.start;
-      const phase = elapsed >= 72*3600 ? 'Ende des Beobachtungsfensters' :
-        elapsed >= 24*3600 || entries >= 30 ? 'Nachbeobachtung' :
-        entries ? 'Einstiegsphase' : 'Wartet auf Einstieg';
-      const time = new Date(state.lastTick*1000).toLocaleString('de-AT',{
-        timeZone:'Europe/Vienna', day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
-      const stale = Date.now()/1000-state.lastTick > 1200 && elapsed < 72*3600;
-      status.textContent = phase + ' · ' + pools + ' Pools · ' + entries + ' Einstiege · ' +
-        time + ' (Wien)' + (stale ? ' · Datenstand veraltet' : '');
+      status.textContent = swingStatus(state);
       body.replaceChildren();
       for (const row of rows) {
         const line = add(body,'p','');
@@ -143,7 +221,7 @@ export function mountSwingCard(section, add, load = read) {
       for (const [label,total] of swingDecisionSummary(state.candidates)) {
         add(reasons,'li',total + (total === 1 ? ' Pool · ' : ' Pools · ') + label);
       }
-      decisions.hidden = pools === 0;
+      decisions.hidden = Object.keys(state.candidates).length === 0;
       last = state.lastTick;
     } catch {
       if (!last) status.textContent = 'Laufstand derzeit nicht abrufbar.';
