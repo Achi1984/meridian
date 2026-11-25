@@ -2,16 +2,16 @@
   "runId": 45580409598,
   "startedAt": 1795596872,
   "endsAt": 1795625672,
-  "updatedAt": 1795611764,
-  "lastEvent": "handoff",
-  "session": 19,
+  "updatedAt": 1795625672,
+  "lastEvent": "finished",
+  "session": 80,
   "accounts": {
     "A": {
       "policy": "trailing",
-      "cashUsdc": 911.589789,
+      "cashUsdc": 912.401826,
       "equityUsdc": null,
-      "realizedUsdc": -68.360211,
-      "closedTrades": 8,
+      "realizedUsdc": -67.548174,
+      "closedTrades": 9,
       "openPositions": [
         {
           "positionId": "6:wave:H3mREMBTP2sioMN6XeUztN9sStXscpAPW8HhAwTvicXs",
@@ -25,15 +25,15 @@
       ],
       "missingExitQuotes": 5,
       "sampledMaxDrawdownUsdc": 21.498546,
-      "cashIfOpenWorthZeroUsdc": 911.589789,
-      "realizedWithoutBestMintUsdc": -70.76638
+      "cashIfOpenWorthZeroUsdc": 912.401826,
+      "realizedWithoutBestMintUsdc": -69.954343
     },
     "B": {
       "policy": "standard",
-      "cashUsdc": 911.589789,
+      "cashUsdc": 912.401826,
       "equityUsdc": null,
-      "realizedUsdc": -68.360211,
-      "closedTrades": 8,
+      "realizedUsdc": -67.548174,
+      "closedTrades": 9,
       "openPositions": [
         {
           "positionId": "6:wave:H3mREMBTP2sioMN6XeUztN9sStXscpAPW8HhAwTvicXs",
@@ -47,32 +47,32 @@
       ],
       "missingExitQuotes": 5,
       "sampledMaxDrawdownUsdc": 21.498546,
-      "cashIfOpenWorthZeroUsdc": 911.589789,
-      "realizedWithoutBestMintUsdc": -70.76638
+      "cashIfOpenWorthZeroUsdc": 912.401826,
+      "realizedWithoutBestMintUsdc": -69.954343
     },
     "C": {
       "policy": "fixed",
-      "cashUsdc": 956.891085,
-      "equityUsdc": 956.891085,
-      "realizedUsdc": -43.108915,
-      "closedTrades": 9,
+      "cashUsdc": 957.703122,
+      "equityUsdc": 957.703122,
+      "realizedUsdc": -42.296878,
+      "closedTrades": 10,
       "openPositions": [],
       "missingExitQuotes": 0,
       "sampledMaxDrawdownUsdc": 46.461722,
-      "cashIfOpenWorthZeroUsdc": 956.891085,
-      "realizedWithoutBestMintUsdc": -46.042489
+      "cashIfOpenWorthZeroUsdc": 957.703122,
+      "realizedWithoutBestMintUsdc": -45.230452
     },
     "E": {
       "policy": "failedRecovery",
-      "cashUsdc": 969.489639,
-      "equityUsdc": 969.489639,
-      "realizedUsdc": -30.510361,
-      "closedTrades": 9,
+      "cashUsdc": 970.301676,
+      "equityUsdc": 970.301676,
+      "realizedUsdc": -29.698324,
+      "closedTrades": 10,
       "openPositions": [],
       "missingExitQuotes": 0,
       "sampledMaxDrawdownUsdc": 33.863168,
-      "cashIfOpenWorthZeroUsdc": 969.489639,
-      "realizedWithoutBestMintUsdc": -33.443935
+      "cashIfOpenWorthZeroUsdc": 970.301676,
+      "realizedWithoutBestMintUsdc": -32.631898
     },
     "F": {
       "policy": "smallPoolFixed",
@@ -88,10 +88,10 @@
     },
     "D": {
       "policy": "staged",
-      "cashUsdc": 941.571372,
+      "cashUsdc": 942.383409,
       "equityUsdc": null,
-      "realizedUsdc": -48.403628,
-      "closedTrades": 8,
+      "realizedUsdc": -47.591591,
+      "closedTrades": 9,
       "openPositions": [
         {
           "positionId": "6:wave:H3mREMBTP2sioMN6XeUztN9sStXscpAPW8HhAwTvicXs",
@@ -108,8 +108,8 @@
       ],
       "missingExitQuotes": 5,
       "sampledMaxDrawdownUsdc": 21.498546,
-      "cashIfOpenWorthZeroUsdc": 941.571372,
-      "realizedWithoutBestMintUsdc": -50.883083,
+      "cashIfOpenWorthZeroUsdc": 942.383409,
+      "realizedWithoutBestMintUsdc": -50.071046,
       "fills": [
         {
           "at": 1795598733,
@@ -218,6 +218,15 @@
           "qty": 566775442510,
           "proceedsRaw": 11261483,
           "netRaw": 1186482
+        },
+        {
+          "at": 1795613756,
+          "mint": "BYePRHSa6RCMq2HSMV4qHEZHwafsMfaxxcDrTcfr6XB5",
+          "session": 22,
+          "reason": "time",
+          "qty": 1022042814087,
+          "proceedsRaw": 20912037,
+          "netRaw": 812037
         }
       ]
     }
