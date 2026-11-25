@@ -48,6 +48,9 @@ jobs:
               'HCp2dih9ytKmYxK3vXYKmae6Layk6F8AMaJyzf3gB2cz',
               'J8wrkmb6Jp9MYn31A9BndbWwSRgGzCFDRT8Kjx4Drdsd',
           )
+          mint_info = holder.rpc('getMultipleAccounts', [list(mints), {'encoding':'jsonParsed','commitment':'finalized'}])
+          from collections import Counter
+          print('Mint programs:', dict(Counter(v['owner'] if v else 'missing' for v in mint_info['value'])))
           passed = 0
           for mint in mints:
               time.sleep(1)
