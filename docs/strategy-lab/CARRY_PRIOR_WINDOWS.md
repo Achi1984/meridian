@@ -1,0 +1,7 @@
+# Fixed 84-day carry replication on earlier OKX data
+
+Use the four adjacent 84-day periods immediately before September 1, 2026. Freeze the previously observed BTC and ETH universe, initial 1,000 USDT per asset, 500 USDT spot purchase, equal-quantity linear perpetual short, and original fee/slippage settings. Run carry_prior_windows.py and specify the output JSON path.
+
+Record eight asset-period results. For a portfolio view give each asset its original 1,000 USDT each period; do not compound or describe these resets as one continuous trade. Compare holding the original quantity with closing and reopening that same quantity every 28 days. The higher-cost sensitivity doubles all modeled costs. The cash reference is idle USDT earning zero. Funding changes sign with the realized rate. Report basis PnL, funding and modeled costs separately.
+
+Funding source: official OKX monthly ZIPs, with calendar boundaries in UTC+8, exact eight-hour coverage, and per-archive SHA256. Settlement valuation uses the contemporaneous four-hour mark candle open. Entry and exit use UTC daily spot/perpetual opens; these historical prices are indicative. Results omit margin calls, liquidation paths, incidental interest and venue outages. October/November breakout studies used different rules and objectives. These periods are historical replications and cannot replace the separately recorded forward observation.
