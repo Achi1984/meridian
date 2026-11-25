@@ -26,13 +26,24 @@ def count(s, name):
     s['errors'][name] = s['errors'].get(name, 0) + 1
 
 
-def wave(c, row):
+def record(c, at, outcome, **evidence):
+    diag = c.setdefault('diagnostics', {'counts': {}})
+    counts = diag['counts']
+    counts[outcome] = counts.get(outcome, 0) + 1
+    diag['latest'] = dict(at=at, outcome=outcome, **evidence)
+
+
+def wave(c, row, gates=None):
     price, liquidity = row['price'], row['liquidity']
     if price <= 0 or liquidity <= 0:
         return False
     # Check recovery against the prior high before recording a possible breakout.
-    ready = (c['rose'] and c['low'] <= 0.8*c['high'] and
-             price >= (c['low']+c['high'])/2 and liquidity >= 0.8*c['highLiquidity'])
+    conditions = dict(rise=c['rose'], pullback=c['low'] <= 0.8*c['high'],
+                      recovery=price >= (c['low']+c['high'])/2,
+                      liquidity=liquidity >= 0.8*c['highLiquidity'])
+    if gates is not None:
+        gates.update(conditions)
+    ready = all(conditions.values())
     if price >= c['high']:
         c.update(rose=c['rose'] or price > c['high'], high=price, low=price, highLiquidity=liquidity)
     else:
@@ -75,32 +86,41 @@ def trade_windows(c, rows, now):
     return values
 
 
-def bid(s, mint, qty):
+def bid(s, mint, qty, evidence=None):
     try:
         return spot_quote(mint, USDC, qty)
-    except ERRORS:
+    except ERRORS as exc:
+        if evidence is not None:
+            evidence.update(error=type(exc).__name__, httpStatus=getattr(exc, 'code', None))
         count(s, 'missingResaleQuote')
         return None
 
 
-def enter(s, c, signal):
+def enter(s, c, signal, evidence=None):
     mint = c['mint']
     if min(s['cash'].values()) < SIZE+FEE:
-        return
+        return 'insufficientCash'
     holder = capture(mint)
     qty = spot_quote(USDC, mint, SIZE)
-    resale = bid(s, mint, qty)
+    resale = bid(s, mint, qty, evidence)
     now = int(time.time())
     if qty < 2 or resale is None or resale < 19*UNIT or now-signal['at'] > 120:
         count(s, 'entryQuoteGate')
-        return
+        if qty < 2:
+            return 'invalidBuyQuantity'
+        if resale is None:
+            return 'missingResaleQuote'
+        if resale < 19*UNIT:
+            return 'resaleBelowMinimum'
+        return 'staleSignal'
     if now >= s['start']+24*HOUR:
-        return
+        return 'admissionsClosed'
     arms = {k:dict(left=qty, fills=[], pending=None, peak=None) for k in ARMS}
     s['positions'][mint] = dict(at=now, qty=qty, pool=c['pool'], signal=signal, holder=holder,
         entryBid=resale, arms=arms, marks=[], maxBid=resale, maxAt=now, expired=False)
     for k in ARMS:
         s['cash'][k] -= SIZE+FEE
+    return 'entered'
 
 
 def monitor(s, mint, p, now, quote):
@@ -181,6 +201,8 @@ def scan(s, now):
     for pool,c in list(watch.items()):
         if now-c['first'] > 6*HOUR or c['mint'] in s['positions']:
             s['retired'][pool] = dict(mint=c['mint'], first=c['first'], last=c.get('last'), samples=c['samples'])
+            if 'diagnostics' in c:
+                s['retired'][pool]['diagnostics'] = c['diagnostics']
             del watch[pool]
     try:
         items = get(GT+'/new_pools?page=1', 120)['data']
@@ -211,33 +233,72 @@ def scan(s, now):
     for offset in range(0, len(pools), 12):
         if offset:
             time.sleep(2.2)
-        items.extend(get(GT+'/pools/multi/'+','.join(pools[offset:offset+12]), 60)['data'])
+        try:
+            items.extend(get(GT+'/pools/multi/'+','.join(pools[offset:offset+12]), 60)['data'])
+        except ERRORS as exc:
+            for pool in pools:
+                record(watch[pool], now, 'snapshotBatchAborted', error=type(exc).__name__,
+                       httpStatus=getattr(exc, 'code', None), failedGroup=pool in pools[offset:offset+12])
+            raise
     batch_at = int(time.time())
+    observed = set()
     for item in items:
+        pool = str(item.get('id', '')).removeprefix('solana_') if isinstance(item, dict) else ''
+        c = watch.get(pool)
+        stage = 'snapshot'
+        evidence = {}
+        if c is not None:
+            observed.add(pool)
         try:
             r = snapshot(item)
             c = watch.get(r['pool'])
-            if not c or (c['mint'],c['quote']) != (r['mint'],r['quote']):
+            if not c:
+                continue
+            if (c['mint'],c['quote']) != (r['mint'],r['quote']):
+                record(c, batch_at, 'poolIdentityMismatch')
                 continue
             c['samples'] += 1
             s['observations'] += 1
             at = batch_at
             c['last'] = at
             before = (c['high'], min(c['low'],r['price']), c['highLiquidity'])
-            ready = wave(c, r)
+            gates = {}
+            ready = wave(c, r, gates)
+            evidence.update(ageSeconds=at-c['first'], market=gates)
+            market_reason = next((k for k,v in gates.items() if not v), 'invalidMarketData')
             if not c['rose'] or at-c['first'] < 25*60 or c['mint'] in s['positions']:
+                outcome = 'alreadyEntered' if c['mint'] in s['positions'] else (market_reason if not ready else 'warmingUp')
+                record(c, at, outcome, **evidence)
                 continue
+            stage = 'trades'
             time.sleep(2.2)
             trades = get(GT+'/pools/'+r['pool']+'/trades', 60)['data']
             windows = trade_windows(c, trades, at)
             if not windows:
                 count(s, 'flowWindowIncomplete')
-            if (ready and at-c['first'] >= HOUR and windows and all(b > sell for b,sell in windows)
-                    and len(s['positions']) < 30):
-                enter(s,c,dict(at=at, windows=windows, price=r['price'], liquidity=r['liquidity'],
-                               high=before[0], low=before[1], priorLiquidity=before[2], discovered=c['first']))
+            evidence['flowWindows'] = windows
+            if not ready:
+                outcome = market_reason
+            elif at-c['first'] < HOUR:
+                outcome = 'warmingUp'
+            elif windows is None:
+                outcome = 'incompleteFlow'
+            elif not all(b > sell for b,sell in windows):
+                outcome = 'buyImbalanceMissing'
+            elif len(s['positions']) >= 30:
+                outcome = 'cohortFull'
+            else:
+                stage = 'entry'
+                outcome = enter(s,c,dict(at=at, windows=windows, price=r['price'], liquidity=r['liquidity'],
+                                high=before[0], low=before[1], priorLiquidity=before[2], discovered=c['first']), evidence)
+            record(c, at, outcome, **evidence)
         except ERRORS as exc:
             count(s, 'poolOrEntry'+type(exc).__name__)
+            if c is not None:
+                record(c, batch_at, stage+'Error', error=type(exc).__name__,
+                       httpStatus=getattr(exc, 'code', None), **evidence)
+    for pool in watch.keys()-observed:
+        record(watch[pool], batch_at, 'poolAbsentFromSnapshot')
 
 
 def tick(folder):
@@ -258,3 +319,4 @@ def tick(folder):
 
 if __name__ == '__main__':
     tick(Path(sys.argv[1]))
+
