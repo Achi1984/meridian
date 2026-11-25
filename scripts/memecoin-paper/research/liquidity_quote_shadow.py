@@ -44,8 +44,7 @@ def sample(first,born):
 
 
 def shortlist(rows):
-    candidates=[]
-    seen=set()
+    deepest={}
     counts=dict(scanned=len(rows),supportedQuote=0,sufficientLiquidity=0,uniqueMints=0)
     for item in rows:
         p=snapshot(item)
@@ -55,12 +54,11 @@ def shortlist(rows):
         if p['liquidity']<10000:
             continue
         counts['sufficientLiquidity']+=1
-        if p['mint'] in seen:
-            continue
-        candidates.append(p)
-        seen.add(p['mint'])
-    counts['uniqueMints']=len(seen)
-    return sorted(candidates,key=lambda p:-p['liquidity'])[:6],counts
+        previous=deepest.get(p['mint'])
+        if previous is None or p['liquidity']>previous['liquidity']:
+            deepest[p['mint']]=p
+    counts['uniqueMints']=len(deepest)
+    return sorted(deepest.values(),key=lambda p:(-p['liquidity'],p['mint']))[:6],counts
 
 
 def run(path):
