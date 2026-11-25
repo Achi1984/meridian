@@ -13,18 +13,32 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - working-directory: scripts/memecoin-paper/research
+      - env:
+          DRPC_API_KEY: ${{ secrets.DRPC_API_KEY }}
+        working-directory: scripts/memecoin-paper/research
         run: |
           python -m unittest test_holder_signal
           python -u - <<'PY'
           import json
           import time
           import holder_signal as holder
-          holder.RPC = 'https://solana-rpc.publicnode.com'
+          import os
           mint = '6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK'
-          started = time.time()
-          result = holder.measure(mint)
-          if time.time() - started > holder.MAX_AGE:
-              raise ValueError('stale sample')
-          print(json.dumps(dict(result, provider=holder.RPC, startedAt=started, receivedAt=time.time())))
+          for provider in ('onfinality', 'drpc'):
+              if provider == 'drpc' and not os.getenv('DRPC_API_KEY'):
+                  print('drpc: missing DRPC_API_KEY')
+                  continue
+              os.environ['HOLDER_RPC_PROVIDER'] = provider
+              started = time.time()
+              try:
+                  result = holder.measure(mint)
+                  if time.time()-started > holder.MAX_AGE:
+                      raise ValueError('stale sample')
+              except (OSError, ValueError, KeyError) as exc:
+                  print(provider, type(exc).__name__, getattr(exc, 'code', None), str(exc) if isinstance(exc, ValueError) else '')
+                  continue
+              print(json.dumps(dict(result, provider=provider, startedAt=started, receivedAt=time.time())))
+              break
+          else:
+              raise SystemExit('No qualified source')
           PY
