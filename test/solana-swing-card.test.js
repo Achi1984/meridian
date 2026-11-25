@@ -39,3 +39,29 @@ test('keeps the last verified accounts on failure and recovers on refresh',async
   await refresh();
   assert.doesNotMatch(status.textContent,/Abruf fehlgeschlagen/);
 });
+
+test('loads the branch checkpoint as raw JSON and resolves queued runs from the current attempt',async()=>{
+  const root = {children:[]};
+  function add(parent,tag,textContent) {
+    const child = {textContent,children:[],setAttribute(){},replaceChildren(){this.children=[];}};
+    parent.children.push(child);
+    return child;
+  }
+  let jobs = [{name:'observe (1)',status:'in_progress'}];
+  const refresh = mountSwingCard(root, add, async (url,raw) => {
+    if (url.includes('/contents/studies/swing48/')) {
+      assert.equal(raw,true);
+      assert.equal(new URL(url).searchParams.get('ref'),'paper/second-wave-48h-data');
+      return state;
+    }
+    if (url.endsWith('/attempts/2/jobs')) return {jobs};
+    return {id:45624335706,status:'queued',run_attempt:2};
+  });
+  const card = root.children[0];
+  await refresh();
+  assert.match(card.children[1].textContent,/Wartet auf Einstieg/);
+  assert.equal(card.children.at(-1).textContent,'Datensammlung · läuft');
+  jobs = [{name:'observe (1)',status:'queued'}];
+  await refresh();
+  assert.equal(card.children.at(-1).textContent,'Datensammlung · wartet');
+});
