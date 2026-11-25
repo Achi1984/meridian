@@ -1,0 +1,12 @@
+# Public-source qualification, 25 November 2026
+
+| Source | Verified evidence | Use and boundary |
+|---|---|---|
+| https://github.com/coinmetrics/data | Read btc.csv from master, SHA256 06495ff8e643432e6948b7b4686ce44fc106217287dabdc1b38351d9ddec46c3, 6351 daily rows. Last usable price and active addresses 2026-05-23. | Historical regime studies; author's CC BY-NC 4.0 terms. The current dump can include revisions. Do not use its last row as a live observation. |
+| https://github.com/hyperliquid-dex/historical_data | liquidations.csv blob bd919d3cf5aab7aaaa4100ff42dc52cfd720dea4, 62 rows from 2023-02-28 to 2023-05-01. Account, notional position, account value and leverage type, no coin column. | Parser fixture for account-level events; no attribution to BTC/ETH from this file alone. |
+| https://github.com/binance/binance-public-data | Official external archive data/futures/um/daily/klines/BTCUSDT/1h/BTCUSDT-1h-2026-11-20.zip downloaded, official SHA256 f0533c3abb2aa2ad26dbe8d91b4e756bd796d2ba86aa8eee9b5729101cd75846 matched, header plus 24 hourly rows. | Next research candidate: signed taker volume share, with a historical baseline at the same UTC hour. Evaluate on executable OKX observations with separate venue timestamps. |
+| https://github.com/duneanalytics/spellbook | Dune model definitions, not a raw transaction dump. dex_solana.trades exposes mint, tx_id, trader_id and inner/outer instruction indices. | Candidate: incoming buyers persisting over two windows, excluding repeated route hops. Define buyer identity and deduplicate before testing. No query result ingested here. |
+
+For the spot confirmation diagnostic, use Kraken spot USD and OKX USDT linear swaps. Fixed periods Nov 1–12 and Nov 13–24, 2026 (UTC). Each venue uses its own 24-hour high/low. Skip one hour after confirmation; evaluate the next three hours at perpetual candle opens. Omit each period's final four hours. Positive signed returns favor breakout direction; these returns exclude fees, spread and funding. Outcomes may overlap; 67 confirmed events and 3 unconfirmed events cannot establish incremental net profitability.
+
+For Coin Metrics, use btc_network_regime.py with the source CSV; only aggregates are stored. Compare the 7-day vs 30-day mean of active addresses through t-2 to the t-to-t+1 close return. Test fixed annual windows starting 1 May 2024 and 2025. Address counts are not unique users. This is an exploratory association using a downloaded vintage, not evidence of historical data publication times.
