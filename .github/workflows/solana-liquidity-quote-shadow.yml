@@ -12,6 +12,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
+      - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_liquidity_quote_shadow.py
       - run: python -u scripts/memecoin-paper/research/liquidity_quote_shadow.py pool-quotes.json
       - if: always()
         uses: actions/upload-artifact@v4

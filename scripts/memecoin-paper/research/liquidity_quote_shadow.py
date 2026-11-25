@@ -43,21 +43,35 @@ def sample(first,born):
     return row
 
 
-def run(path):
-    rows=get(GT+'/new_pools?page=1',120)['data']
+def shortlist(rows):
     candidates=[]
     seen=set()
+    counts=dict(scanned=len(rows),supportedQuote=0,sufficientLiquidity=0,uniqueMints=0)
     for item in rows:
         p=snapshot(item)
-        if p['quote'] in (WSOL,USDC) and p['liquidity']>=10000 and p['mint'] not in seen:
-            candidates.append(p)
-            seen.add(p['mint'])
-    candidates=sorted(candidates,key=lambda p:-p['liquidity'])[:6]
+        if p['quote'] not in (WSOL,USDC):
+            continue
+        counts['supportedQuote']+=1
+        if p['liquidity']<10000:
+            continue
+        counts['sufficientLiquidity']+=1
+        if p['mint'] in seen:
+            continue
+        candidates.append(p)
+        seen.add(p['mint'])
+    counts['uniqueMints']=len(seen)
+    return sorted(candidates,key=lambda p:-p['liquidity'])[:6],counts
+
+
+def run(path):
+    rows=get(GT+'/new_pools?page=1',120)['data']
+    candidates,counts=shortlist(rows)
     born=time.time()
-    wait_until(born+75)
+    if candidates:
+        wait_until(born+75)
     with ThreadPoolExecutor(6) as workers:
         measured=list(workers.map(lambda p:sample(p,born),candidates))
-    result=dict(scanned=len(rows),candidates=len(candidates),eligible=sum(r.get('eligible') is True for r in measured),
+    result=dict(**counts,candidates=len(candidates),eligible=sum(r.get('eligible') is True for r in measured),
                 errors=sum('error' in r for r in measured),observations=measured)
     path.write_text(json.dumps(result,indent=2)+'\n')
     print({k:v for k,v in result.items() if k!='observations'})
