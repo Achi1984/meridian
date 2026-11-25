@@ -80,3 +80,32 @@ test('USD activity counts distinct observed slots, signals and fills independent
   }});
   assert.equal(usdActivity([buy], buy).expected, 3);
 });
+
+test('mixed 200-line log limit preserves the full day of available USD decisions', async t => {
+  const {latestPilotReport} = await import('../paper-advisor-gateway.js?mixed-log-test');
+  const run = '00000000-0000-4000-8000-000000000001';
+  const time = n => new Date(n * 600000).toISOString();
+  const arm = {action:'HOLD', execution:'HOLD'};
+  const usd = Array.from({length:144}, (_, i) => ({log:JSON.stringify({pilotAudit:{usdRound:{
+    schema:'MERIDIAN_USD_ROUND_V1', pair:'BTC/USD', start:time(0), at:time(i),
+    arms:{v3:arm, v4:arm, cash:{}, btcHold:{}}
+  }}})}));
+  const mixed = usd.slice(-100).flatMap(line => [line, {log:'{"pilotAudit":{}}'}]);
+  t.mock.method(globalThis, 'fetch', async url => {
+    if (url.pathname.endsWith('/runs')) return Response.json({data:{runs:[{
+      id:run, active:1, concluded:false, status:'RUNNING', startedAt:time(0)
+    }]}, pagination:{hasNextPage:false}});
+    const query = url.searchParams.get('textIncludes');
+    assert.ok(['"pilotAudit"', '"usdRound"'].includes(query));
+    return Response.json({data:query === '"usdRound"' ? usd : mixed});
+  });
+  const previous = process.env.MERIDIAN_PILOT_LOG_READ_TOKEN;
+  process.env.MERIDIAN_PILOT_LOG_READ_TOKEN = 'fixture';
+  t.after(() => {
+    if (previous === undefined) delete process.env.MERIDIAN_PILOT_LOG_READ_TOKEN;
+    else process.env.MERIDIAN_PILOT_LOG_READ_TOKEN = previous;
+  });
+  const {usdRound} = await latestPilotReport();
+  assert.equal(usdRound.activity.observed, 144);
+  assert.equal(usdRound.activity.expected, 144);
+});

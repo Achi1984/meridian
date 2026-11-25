@@ -402,6 +402,14 @@
     #paper-advisor .advisor-skipped > summary {color:var(--attention)}
     #paper-advisor > label {display:block;margin-top:10px;color:var(--muted);font-size:12px}
     #paper-advisor input[type=file] {max-width:100%;display:block;margin-top:4px}
+    .scanner-compact {display:none}
+    @media (max-width:640px) {
+      .scanner-wide {display:none}
+      .scanner-compact {display:block;list-style:decimal;padding-inline-start:1.6rem}
+      .scanner-compact li {padding:.55rem 0;border-bottom:1px solid var(--line);overflow-wrap:anywhere}
+      .scanner-compact li div {display:flex;align-items:baseline;flex-wrap:wrap;gap:.25rem .6rem}
+      .scanner-compact small {color:var(--muted)}
+    }
   </style>
   <style id="m11-compact-nav">
     @media(max-width:430px){#nav{grid-template-columns:repeat(4,minmax(44px,1fr)) minmax(44px,1.3fr)}}

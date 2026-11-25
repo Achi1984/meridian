@@ -72,8 +72,13 @@ async function readReport() {
   const token = process.env.MERIDIAN_PILOT_LOG_READ_TOKEN;
   if (!token) throw new Error('Missing pilot log access');
   const runId = await resolvePilotRun(token, process.env.MERIDIAN_PILOT_RUN_ID);
-  const items = await readRun(runId, token);
-  const usdRows = items.filter(item => item.usdRound).map(item => item.usdRound);
+  const {rows: items, truncated} = await readRun(runId, token);
+  let usdRows = items.filter(item => item.usdRound).map(item => item.usdRound);
+  // USD and futures write separate audit lines for the same ten-minute slot.
+  if (usdRows.length && truncated) {
+    const {rows: decisions} = await readRun(runId, token, '"usdRound"').catch(() => ({rows: []}));
+    usdRows = usdRows.concat(decisions.filter(item => item.usdRound).map(item => item.usdRound));
+  }
   const usd = usdRows
     .sort((a, b) => Date.parse(b.at) - Date.parse(a.at))[0];
   if (usd) {
@@ -87,7 +92,7 @@ async function readReport() {
   // This pilot moved to a new job instance with its original account ledger.
   if (runId === '17c5dbdf-641b-465b-80cc-12b7691af7b7' && rows.length &&
       Date.now() < Date.parse('2026-11-19T15:11:42Z')) {
-    const earlier = await readRun('f68a62a4-5446-481a-9aef-df1241b1e959', token).catch(() => []);
+    const {rows: earlier} = await readRun('f68a62a4-5446-481a-9aef-df1241b1e959', token).catch(() => ({rows: []}));
     rows.push(...earlier.filter(item => item.pilotAudit.startUtc === rows[0].pilotAudit.startUtc));
   }
   const summary = summarize(rows);
@@ -121,11 +126,11 @@ export function decisionUsdClose(bars, decisionAt) {
   return Number.isFinite(close) && close > 0 ? {close, at: new Date(end * 1000).toISOString()} : null;
 }
 
-async function readRun(runId, token) {
+async function readRun(runId, token, textIncludes = '"pilotAudit"') {
   const endpoint = new URL(jobUrl + '/logs');
   endpoint.search = new URLSearchParams({
     runId: runId, type: 'runtime', queryType: 'range',
-    duration: '86400', lineLimit: '200', direction: 'backward', textIncludes: '"pilotAudit"'
+    duration: '86400', lineLimit: '200', direction: 'backward', textIncludes
   });
   const response = await fetch(endpoint, {
     headers: {authorization: 'Bearer ' + token}, redirect: 'error', signal: AbortSignal.timeout(8000)
@@ -163,7 +168,7 @@ async function readRun(runId, token) {
         Number.isFinite(Date.parse(report.asOf)) && Number.isInteger(pilotAudit?.completedSlots) &&
         typeof report.last.reason === 'string' && typeof report.last.execution === 'string') rows.push(item);
   }
-  return rows;
+  return {rows, truncated: data.length >= 200};
 }
 
 export function validComparison(row) {
