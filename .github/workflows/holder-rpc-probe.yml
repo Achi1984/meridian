@@ -52,6 +52,7 @@ jobs:
           from collections import Counter
           print('Mint programs:', dict(Counter(v['owner'] if v else 'missing' for v in mint_info['value'])))
           passed = 0
+          passed_token_2022 = 0
           for mint in mints:
               time.sleep(1)
               started = time.time()
@@ -67,6 +68,8 @@ jobs:
                   continue
               print(json.dumps(dict(result, mint=mint, provider='helius')))
               passed += 1
-          if not passed:
+              passed_token_2022 += result['tokenProgram'] == holder.TOKEN_2022
+          print('Valid total:', passed, 'Token-2022:', passed_token_2022)
+          if not passed_token_2022:
               raise SystemExit('No qualified sample')
           PY
