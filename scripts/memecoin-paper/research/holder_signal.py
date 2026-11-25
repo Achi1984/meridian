@@ -4,6 +4,8 @@ from concurrent.futures import ThreadPoolExecutor
 from http.client import HTTPException
 import json
 import time
+import os
+from urllib.parse import quote
 from urllib.request import Request, urlopen
 
 RPC = 'https://api.mainnet-beta.solana.com'
@@ -40,11 +42,20 @@ def signer_address(address):
 
 def rpc(method, params):
     payload = json.dumps(dict(jsonrpc='2.0', id=1, method=method, params=params)).encode()
-    request = Request(RPC, data=payload, headers={'Content-Type': 'application/json'})
+    provider = os.environ.get('HOLDER_RPC_PROVIDER', 'solana')
+    if provider == 'onfinality':
+        endpoint = 'https://solana.api.onfinality.io/public'
+    elif provider == 'drpc':
+        endpoint = 'https://lb.drpc.live/solana/' + quote(os.environ['DRPC_API_KEY'], safe='')
+    elif provider == 'solana':
+        endpoint = RPC
+    else:
+        raise ValueError('unknown holder provider')
+    request = Request(endpoint, data=payload, headers={'Content-Type': 'application/json'})
     with urlopen(request, timeout=5) as response:
         body = json.load(response)
     if 'error' in body:
-        raise ValueError('rpcError')
+        raise ValueError('RPC %s error %s' % (method, body['error'].get('code')))
     return body['result']
 
 
