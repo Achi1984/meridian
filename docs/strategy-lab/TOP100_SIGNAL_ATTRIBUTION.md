@@ -1,0 +1,9 @@
+# Top 100 breakout signal attribution
+
+Run breakout_signal_audit.py on the pilot state.json at handoff and again after completion. It uses every recorded signal, including candidates skipped due to portfolio limits. The measure is the direction-adjusted three-hour close-to-close move. Missing intermediate or terminal candles leave an outcome unresolved. Each hourly signal counts once per instrument, so consecutive breakouts can overlap. Count hours as well as signals and compare the signal-weighted and equal-hour means. Neither is realized execution PnL.
+
+For the exploratory historical check, run breakout_history_audit.py with the frozen top100_start.json and an output path. Universe membership reflects the pilot start. This retrospective selection and the single three-day period restrict generalization. All candles used to form a signal are confirmed. The signal bar is excluded from the prior 24-hour range. The last three observations have no complete follow-up in this sample. The volume cut of one times the previous 24-hour mean and the sign of relative strength are diagnostics, not fitted trading gates.
+
+For the forward comparison, reconcile each account's entry, exit, modeled fees, funding and unresolved exposures. Compare direct and retest against cash; also report missed signals, execution coverage and largest contributing hour. A failed breakout only establishes a potential reversal setup once re-entry into the former range was observable. Its subsequent book and outcome would be needed to test a reversal.
+
+Highest priority for the next collector revision is synchronized quote and funding timestamps with size and spread on skipped signals as well as fills. Record lagged open interest on the same contracts and at the same clock boundaries before using its change as a feature. Keep historical candles separate from prospective executable quotes.

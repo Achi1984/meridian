@@ -1,0 +1,76 @@
+{
+  "universeAt": 1795632363,
+  "firstSlot": 1795363200,
+  "lastSlot": 1795629600,
+  "covered": 48,
+  "errors": {},
+  "method": "Exploratory current-universe replay. 72 hourly signal windows with complete subsequent three-hour paths. Final three hours are follow-up only. Price change before execution and costs.",
+  "result": {
+    "unresolved": 8,
+    "groups": {
+      "all": {
+        "n": 333,
+        "hours": 53,
+        "meanPct": -0.43364351390347894,
+        "medianPct": -0.3463753265309011,
+        "positive": 131,
+        "backInsideOrBeyond": 197,
+        "equalHourMeanPct": -0.06580643448906412
+      },
+      "short": {
+        "n": 205,
+        "hours": 33,
+        "meanPct": -0.3627996091951804,
+        "medianPct": -0.20737476508327912,
+        "positive": 85,
+        "backInsideOrBeyond": 146,
+        "equalHourMeanPct": -0.2862470425030864
+      },
+      "volume>=1": {
+        "n": 267,
+        "hours": 45,
+        "meanPct": -0.5551601459600723,
+        "medianPct": -0.5588673621460538,
+        "positive": 99,
+        "backInsideOrBeyond": 156,
+        "equalHourMeanPct": 0.04297544195378418
+      },
+      "relative aligned": {
+        "n": 270,
+        "hours": 52,
+        "meanPct": -0.474925782902284,
+        "medianPct": -0.4098245122981403,
+        "positive": 102,
+        "backInsideOrBeyond": 160,
+        "equalHourMeanPct": -0.07988111101752932
+      },
+      "long": {
+        "n": 128,
+        "hours": 25,
+        "meanPct": -0.5471044550378633,
+        "medianPct": -0.572283719751332,
+        "positive": 46,
+        "backInsideOrBeyond": 51,
+        "equalHourMeanPct": 0.03415732875055776
+      },
+      "relative other": {
+        "n": 59,
+        "hours": 17,
+        "meanPct": -0.19528500666323667,
+        "medianPct": -0.09562260943476453,
+        "positive": 29,
+        "backInsideOrBeyond": 34,
+        "equalHourMeanPct": -0.20435025040381297
+      },
+      "volume<1": {
+        "n": 66,
+        "hours": 27,
+        "meanPct": 0.0579464975981946,
+        "medianPct": -0.019665764736720437,
+        "positive": 32,
+        "backInsideOrBeyond": 41,
+        "equalHourMeanPct": 0.01166690290783787
+      }
+    }
+  }
+}

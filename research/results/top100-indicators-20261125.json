@@ -1,0 +1,118 @@
+{
+  "end": 1795629600,
+  "instruments": 48,
+  "results": {
+    "earlier": {
+      "baseline": {
+        "n": 330,
+        "hours": 48,
+        "meanPct": -0.06809845092061931,
+        "hourMeanPct": 0.2960139449909927
+      },
+      "MACD aligned yes": {
+        "n": 324,
+        "hours": 48,
+        "meanPct": -0.06781443390779522,
+        "hourMeanPct": 0.293241478252983
+      },
+      "RSI not extended no": {
+        "n": 204,
+        "hours": 34,
+        "meanPct": -0.37106075060202115,
+        "hourMeanPct": 0.42121650016014417
+      },
+      "BB prior compression no": {
+        "n": 235,
+        "hours": 42,
+        "meanPct": -0.32624955425031255,
+        "hourMeanPct": 0.19834587272981524
+      },
+      "before Fib 1.272 yes": {
+        "n": 280,
+        "hours": 47,
+        "meanPct": 0.021341023891516618,
+        "hourMeanPct": 0.35533317839415346
+      },
+      "BB prior compression yes": {
+        "n": 95,
+        "hours": 24,
+        "meanPct": 0.5704858573159902,
+        "hourMeanPct": 0.5687243171137354
+      },
+      "before Fib 1.272 no": {
+        "n": 50,
+        "hours": 6,
+        "meanPct": -0.5689595098685805,
+        "hourMeanPct": -0.7426604578994201
+      },
+      "RSI not extended yes": {
+        "n": 126,
+        "hours": 34,
+        "meanPct": 0.42241193903974555,
+        "hourMeanPct": 0.35609639987047237
+      },
+      "MACD aligned no": {
+        "n": 6,
+        "hours": 4,
+        "meanPct": -0.08343536961311997,
+        "hourMeanPct": 0.7791977400692633
+      }
+    },
+    "recent": {
+      "baseline": {
+        "n": 333,
+        "hours": 53,
+        "meanPct": -0.43364351390347894,
+        "hourMeanPct": -0.06580643448906412
+      },
+      "MACD aligned yes": {
+        "n": 321,
+        "hours": 52,
+        "meanPct": -0.4228505890946313,
+        "hourMeanPct": -0.03832724036849855
+      },
+      "RSI not extended no": {
+        "n": 135,
+        "hours": 34,
+        "meanPct": -0.7918837532942602,
+        "hourMeanPct": 0.14073572368929915
+      },
+      "BB prior compression yes": {
+        "n": 212,
+        "hours": 42,
+        "meanPct": -0.3422742644251276,
+        "hourMeanPct": -0.07295921708283462
+      },
+      "before Fib 1.272 no": {
+        "n": 49,
+        "hours": 8,
+        "meanPct": -0.6251557730943429,
+        "hourMeanPct": -0.4608690736727783
+      },
+      "RSI not extended yes": {
+        "n": 198,
+        "hours": 46,
+        "meanPct": -0.18938880522794627,
+        "hourMeanPct": -0.16686148066763007
+      },
+      "BB prior compression no": {
+        "n": 121,
+        "hours": 31,
+        "meanPct": -0.5937284799316647,
+        "hourMeanPct": -0.02666330183353022
+      },
+      "before Fib 1.272 yes": {
+        "n": 284,
+        "hours": 53,
+        "meanPct": -0.40060090580364677,
+        "hourMeanPct": -0.04351069215329284
+      },
+      "MACD aligned no": {
+        "n": 12,
+        "hours": 7,
+        "meanPct": -0.7223542525401536,
+        "hourMeanPct": -0.5397302336747282
+      }
+    }
+  }
+}
