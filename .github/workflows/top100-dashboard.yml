@@ -1,0 +1,48 @@
+name: Publish Top 100 pilot report
+on:
+  workflow_run:
+    workflows: ["Top 100 hourly breakout and retest paper pilot"]
+    types: [completed]
+    branches: [paper/top100-breakout-20261125]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency: top100-dashboard-45678525838
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch' || github.event.workflow_run.id == 45678525838)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Publish available checkpoint
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          run=45678525838
+          branch=paper-dashboard-data
+          path=top100-$run.json
+          artifacts=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run/artifacts")
+          stage=$(jq -er '[.artifacts[] | select(.expired == false) | .name] |
+            if index("top100-breakout-final") then "final"
+            elif index("top100-breakout-first") then "first" else error("no checkpoint") end' <<< "$artifacts")
+          gh run download "$run" --name "top100-breakout-$stage" --dir "$RUNNER_TEMP/checkpoint"
+          if [ "$stage" = final ]; then
+            conclusion=$(gh api "repos/$GITHUB_REPOSITORY/actions/runs/$run" --jq '.conclusion')
+            if [ "$conclusion" != success ]; then stage=first; fi
+          fi
+          python scripts/research/top100_dashboard.py "$RUNNER_TEMP/checkpoint/state.json" "$stage" > "$RUNNER_TEMP/report.json"
+          api="repos/$GITHUB_REPOSITORY/contents/$path"
+          # Read branch contents first so network errors cannot be mistaken for a missing file.
+          sha=$(gh api "repos/$GITHUB_REPOSITORY/contents?ref=$branch" | jq -r --arg name "$path" '.[] | select(.name==$name) | .sha')
+          args=()
+          if [ -n "$sha" ]; then
+            gh api -H 'Accept: application/vnd.github.raw+json' "$api?ref=$branch" > "$RUNNER_TEMP/old.json"
+            if jq -e --slurpfile new "$RUNNER_TEMP/report.json" '.asOf > $new[0].asOf or (.stage == "final" and $new[0].stage != "final") or . == $new[0]' "$RUNNER_TEMP/old.json" >/dev/null; then exit 0; fi
+            args+=(-f "sha=$sha")
+          fi
+          gh api -X PUT "$api" -f branch="$branch" -f message="Publish Top 100 pilot report" \
+            -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" "${args[@]}" >/dev/null

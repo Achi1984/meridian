@@ -27,7 +27,7 @@ const expectedModules=[
   'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js',
   'spot-paper-host8h-controller.js','spot-paper-host8h-model.js','spot-paper-host8h-view.js',
   'spot-paper-paired-controller.js','spot-paper-paired-model.js','spot-paper-paired-progress-config.js','spot-paper-paired-progress-connector.js','spot-paper-paired-report-connector.js','spot-paper-paired-view.js','spot-paper-report-connector.js','spot-paper-three-way-controller.js','spot-paper-three-way-model.js','spot-paper-three-way-reader.js','spot-paper-three-way-view.js',
-  'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js'
+  'strategy-arena.js','strategy-catalog.js','strategy-workspace-bootstrap.js','top100-report.js'
 ];
 
 function scanGraph(entries,{root=v11Root,read=readModule,fileExists=exists,importMap=new Map()}={}){
