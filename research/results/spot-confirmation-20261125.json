@@ -1,0 +1,590 @@
+{
+  "begin": 1793491200,
+  "end": 1795564800,
+  "missing": {
+    "BTC earlier": 0,
+    "BTC later": 0,
+    "ETH earlier": 0,
+    "ETH later": 0
+  },
+  "summary": {
+    "earlier confirmed=True": {
+      "n": 31,
+      "meanGrossPct": -0.006157181911205279
+    },
+    "earlier confirmed=False": {
+      "n": 1,
+      "meanGrossPct": -0.598813897092354
+    },
+    "later confirmed=True": {
+      "n": 36,
+      "meanGrossPct": -0.19587974181022194
+    },
+    "later confirmed=False": {
+      "n": 2,
+      "meanGrossPct": -0.4375369409116536
+    }
+  },
+  "signals": [
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793516400,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": 0.10512669114060014
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793523600,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.2720847920741787
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793577600,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": 0.6237275113643692
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793635200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.5244664976532643
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793642400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.2144356355399557
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793761200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -1.981423176686481
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793782800,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.12595679949769512
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793790000,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": 1.0984135725978117
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793804400,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": 0.05717951752446382
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793808000,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.6703838432027265
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1793894400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.036542239685655176
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1794175200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.9351997022837732
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1794319200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 1.4986414486553579
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1794326400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.8105696636925286
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1794420000,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.11966622390612303
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1794484800,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 1.640948097246664
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1794492000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.3632032262388618
+    },
+    {
+      "asset": "BTC",
+      "period": "earlier",
+      "at": 1794495600,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.0715653846744102
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794538800,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.15102934989192907
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794542400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.011233938750221384
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794549600,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.05330930551590285
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794628800,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.10990321955293147
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794668400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.2752825488516186
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794672000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.5782745158080083
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794690000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 1.5947943330006376
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794693600,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 1.4432531928394776
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794697200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -1.1566525847294562
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1794708000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.5976900213361724
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795021200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.7415099724133456
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795042800,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.7592607281668884
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795125600,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.9456873534434029
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795190400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 1.6676468117281407
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795201200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -1.0387457815370205
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795233600,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -3.0013843794372663
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795237200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -3.572536273066751
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795341600,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.23911257189811463
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795442400,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -1.9427698865895793
+    },
+    {
+      "asset": "BTC",
+      "period": "later",
+      "at": 1795489200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.22884054125762443
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793498400,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": 0.22308117062397326
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793523600,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.37104606788116445
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793584800,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.12989164073192727
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793592000,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.35949879585354116
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793782800,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.38550501156515704
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793804400,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -0.14139723553975303
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793808000,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -1.1897425784876847
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793894400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.16605206792235094
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1793916000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.4885051026129794
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1794175200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.6562648376496671
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1794319200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 2.612529960756804
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1794420000,
+      "side": 1,
+      "confirmed": false,
+      "grossPct": -0.598813897092354
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1794484800,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.6756121808029092
+    },
+    {
+      "asset": "ETH",
+      "period": "earlier",
+      "at": 1794492000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.5957251481828907
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1794542400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.4797047970479751
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1794549600,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.15015015015016342
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1794668400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.550456721494974
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1794672000,
+      "side": -1,
+      "confirmed": false,
+      "grossPct": -0.5157153426684546
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1794690000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 1.8370363683551383
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1794697200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -2.602962049797286
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1794841200,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": 0.05496589366298377
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795021200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.8033628088279454
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795125600,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 1.4133010552875303
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795140000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 0.47971365840271396
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795190400,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 2.278048394845511
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795194000,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": 1.7863386804895298
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795201200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.9141655205889387
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795204800,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -1.3079080342029759
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795233600,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -4.459027319392717
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795341600,
+      "side": 1,
+      "confirmed": false,
+      "grossPct": -0.3593585391548526
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795442400,
+      "side": 1,
+      "confirmed": true,
+      "grossPct": -2.0440410720109714
+    },
+    {
+      "asset": "ETH",
+      "period": "later",
+      "at": 1795489200,
+      "side": -1,
+      "confirmed": true,
+      "grossPct": -0.2382679570881674
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+{
+  "BTC": {
+    "basisUsdt": -0.03499520247587876,
+    "fundingUsdt": 6.126280443328435,
+    "costUsdt": 1.8684156844679838,
+    "netUsdt": 4.222869556384572,
+    "stressNetUsdt": 2.3544538719165886,
+    "resetEvery28dUsdt": -0.13488855614751769,
+    "reopenSameQuantityEvery28dUsdt": -0.1497309816507586
+  },
+  "ETH": {
+    "basisUsdt": -0.09928514694201747,
+    "fundingUsdt": 3.942778055687619,
+    "costUsdt": 1.7775388630432316,
+    "netUsdt": 2.0659540457023704,
+    "stressNetUsdt": 0.2884151826591386,
+    "resetEvery28dUsdt": -2.2239165915302705,
+    "reopenSameQuantityEvery28dUsdt": -2.200158515287077
+  }
+}

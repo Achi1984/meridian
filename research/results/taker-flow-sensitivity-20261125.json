@@ -1,0 +1,56 @@
+{
+  "long earlier": {
+    "n": 2,
+    "distinctUtcHours": 2,
+    "profitable": 0,
+    "meanNetPct": -0.3363560616037317,
+    "meanWithoutBestPct": -0.42989164073192726,
+    "nonOverlappingPerInstrument": 2,
+    "meanNonOverlappingPct": -0.3363560616037317
+  },
+  "long later": {
+    "n": 1,
+    "distinctUtcHours": 1,
+    "profitable": 0,
+    "meanNetPct": -2.3460724011779313,
+    "meanWithoutBestPct": null,
+    "nonOverlappingPerInstrument": 1,
+    "meanNonOverlappingPct": -2.3460724011779313
+  },
+  "long combined": {
+    "n": 3,
+    "distinctUtcHours": 3,
+    "profitable": 0,
+    "meanNetPct": -1.006261508128465,
+    "meanWithoutBestPct": -1.3879820209549292,
+    "nonOverlappingPerInstrument": 3,
+    "meanNonOverlappingPct": -1.006261508128465
+  },
+  "short earlier": {
+    "n": 3,
+    "distinctUtcHours": 3,
+    "profitable": 1,
+    "meanNetPct": 0.18078512070832128,
+    "meanWithoutBestPct": -0.8832018407138602,
+    "nonOverlappingPerInstrument": 3,
+    "meanNonOverlappingPct": 0.18078512070832128
+  },
+  "short later": {
+    "n": 9,
+    "distinctUtcHours": 8,
+    "profitable": 4,
+    "meanNetPct": 0.11633771309038218,
+    "meanWithoutBestPct": -0.11637612212900891,
+    "nonOverlappingPerInstrument": 6,
+    "meanNonOverlappingPct": 0.344339043590754
+  },
+  "short combined": {
+    "n": 12,
+    "distinctUtcHours": 11,
+    "profitable": 5,
+    "meanNetPct": 0.13244956499486696,
+    "meanWithoutBestPct": -0.06539675123766191,
+    "nonOverlappingPerInstrument": 9,
+    "meanNonOverlappingPct": 0.2898210692966098
+  }
+}

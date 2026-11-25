@@ -1,0 +1,36 @@
+{
+  "status": "indicative paper entry observations",
+  "holdDays": 84,
+  "records": [
+    {
+      "asset": "BTC",
+      "spotInst": "BTC-USDT",
+      "swapInst": "BTC-USDT-SWAP",
+      "capitalUsdt": 1000,
+      "spotAsk": "59970",
+      "perpBid": "59945.9",
+      "qty": "0.0083",
+      "contracts": "0.83",
+      "spotTs": 1795637536254,
+      "perpTs": 1795637536254,
+      "exitDueMs": 1802895136254,
+      "spotAvailable": "0.00848907",
+      "swapAvailableContracts": "448.9"
+    },
+    {
+      "asset": "ETH",
+      "spotInst": "ETH-USDT",
+      "swapInst": "ETH-USDT-SWAP",
+      "capitalUsdt": 1000,
+      "spotAsk": "1682.92",
+      "perpBid": "1682.32",
+      "qty": "0.297",
+      "contracts": "2.97",
+      "spotTs": 1795637536258,
+      "perpTs": 1795637536258,
+      "exitDueMs": 1802895136258,
+      "spotAvailable": "5.257417",
+      "swapAvailableContracts": "1246.19"
+    }
+  ]
+}

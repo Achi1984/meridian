@@ -1,0 +1,42 @@
+[
+  {
+    "start": "2025-09-30",
+    "end": "2025-12-23",
+    "netUsdt": -0.22637339164897208,
+    "stressNetUsdt": -3.8894811936094564,
+    "halfFundingNetUsdt": -1.989669643997264,
+    "fundingUsdt": 3.5265925046965836,
+    "breakEvenFundingUsdt": 3.7529658963455557,
+    "reopenNetUsdt": -7.467655191464676
+  },
+  {
+    "start": "2025-12-23",
+    "end": "2026-03-17",
+    "netUsdt": 1.2301063613209289,
+    "stressNetUsdt": -2.577071065628042,
+    "halfFundingNetUsdt": -1.3928279601462439,
+    "fundingUsdt": 5.245868642934345,
+    "breakEvenFundingUsdt": 4.015762281613416,
+    "reopenNetUsdt": -6.2153974239364675
+  },
+  {
+    "start": "2026-03-17",
+    "end": "2026-06-09",
+    "netUsdt": 0.8330196666467575,
+    "stressNetUsdt": -2.9052819385316937,
+    "halfFundingNetUsdt": -1.4698425929359855,
+    "fundingUsdt": 4.605724519165486,
+    "breakEvenFundingUsdt": 3.7727048525187286,
+    "reopenNetUsdt": -7.748212268617064
+  },
+  {
+    "start": "2026-06-09",
+    "end": "2026-09-01",
+    "netUsdt": 4.935839533798415,
+    "stressNetUsdt": -0.003996139846282887,
+    "halfFundingNetUsdt": 0.018155891008010627,
+    "fundingUsdt": 9.835367285580809,
+    "breakEvenFundingUsdt": 4.899527751782394,
+    "reopenNetUsdt": -3.8568374040841604
+  }
+]
