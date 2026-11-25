@@ -1,0 +1,56 @@
+name: Second-wave 48-hour Solana paper study
+on:
+  push:
+    branches: [paper/second-wave-48h-v1]
+    paths: ['.github/workflows/swing48.yml']
+permissions:
+  contents: write
+concurrency:
+  group: second-wave-48h-v1
+  cancel-in-progress: false
+jobs:
+  observe:
+    strategy:
+      max-parallel: 1
+      fail-fast: true
+      matrix:
+        segment: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19]
+    runs-on: ubuntu-latest
+    timeout-minutes: 265
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: source
+          persist-credentials: false
+      - uses: actions/checkout@v4
+        with:
+          ref: paper/second-wave-48h-data
+          path: data
+      - name: Verify strategy rules and handoff
+        working-directory: source/scripts/memecoin-paper/research
+        run: python -m unittest -v test_swing48
+      - name: Observe and checkpoint paper accounts
+        env:
+          HOLDER_RPC_PROVIDER: helius
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+        run: |
+          set -euo pipefail
+          folder="studies/swing48/$GITHUB_RUN_ID"
+          git -C data config user.name 'github-actions[bot]'
+          git -C data config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          segment_end=$(( $(date +%s) + 14400 ))
+          while (( $(date +%s) < segment_end )); do
+            start_tick=$(date +%s)
+            file="data/$folder/state.json"
+            if [[ -f "$file" ]] && (( start_tick >= $(jq -r .start "$file") + 260100 )); then
+              break
+            fi
+            python source/scripts/memecoin-paper/research/swing48.py "data/$folder"
+            git -C data add "$folder/state.json"
+            if ! git -C data diff --cached --quiet; then
+              git -C data commit -qm "Checkpoint paper observation for $GITHUB_RUN_ID"
+              git -C data push origin HEAD:paper/second-wave-48h-data
+            fi
+            wait_seconds=$((start_tick + 300 - $(date +%s)))
+            if (( wait_seconds > 0 )); then sleep "$wait_seconds"; fi
+          done
