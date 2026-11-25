@@ -9,18 +9,50 @@ from top100_paper import ok
 from matched_spot_carry import SPOT_FEE, SWAP_FEE, SLIP, DAY, series
 
 
+def exit_price(levels, size, bids):
+    """Walk the observed book up to the frozen position size."""
+    remaining=size
+    value=D(0)
+    previous=None
+    if size<=0:
+        raise ValueError('nonpositive size')
+    for level in levels:
+        price,amount=map(D,level[:2])
+        if (not price.is_finite() or not amount.is_finite() or price<=0 or amount<=0
+                or (previous is not None and (price>=previous if bids else price<=previous))):
+            raise ValueError('invalid exit book')
+        used=min(remaining,amount)
+        value+=used*price
+        remaining-=used
+        if remaining==0:
+            return value/size
+        previous=price
+    raise ValueError('insufficient exit-side depth')
+
+
+def threshold(basis, funding, fees, slip, notional, at, due):
+    net=basis+funding-fees-slip
+    shortfall=max(D(0),-net)
+    remaining=max(0,due//(DAY//3)-at//(DAY//3))
+    required=10000*shortfall/(remaining*notional) if remaining else None
+    return dict(basisUsdt=str(basis),feeUsdt=str(fees),slippageUsdt=str(slip),
+                fundingUsdt=str(funding),costUsdt=str(fees+slip),netUsdt=str(net),
+                fundingStillNeededUsdt=str(shortfall),remainingScheduledSettlements=remaining,
+                requiredMeanFundingBps=None if required is None else str(required),
+                netAtDoubleSlippageUsdt=str(net-slip),netAtDoubleCostsUsdt=str(net-fees-slip))
+
+
 def mark(r):
     legs=(r['spotInst'],r['swapInst'])
     with ThreadPoolExecutor(2) as workers:
-        a,b=workers.map(lambda inst:ok('market/books',instId=inst,sz=1)[0],legs)
+        a,b=workers.map(lambda inst:ok('market/books',instId=inst,sz=20)[0],legs)
     times=[int(q['ts']) for q in (a,b)]
-    if max(times)-min(times)>2000 or not 0<=time.time()*1000-max(times)<10000:
+    now=time.time()*1000
+    if max(times)-min(times)>2000 or any(not 0<=now-t<10000 for t in times):
         raise ValueError('stale or unpaired exit quote')
-    s,avail=map(D,a['bids'][0][:2])
-    p,depth=map(D,b['asks'][0][:2])
     qty=D(r['qty'])
-    if avail<qty or depth<D(r['contracts']):
-        raise ValueError('insufficient exit-side depth')
+    s=exit_price(a['bids'],qty,True)
+    p=exit_price(b['asks'],D(r['contracts']),False)
     start=r['perpTs']
     stop=times[1]
     cursor=stop+1
@@ -43,10 +75,13 @@ def mark(r):
         weighted=sum(marks[t]*rate for t,rate in funding.items())
     s0,p0=D(r['spotAsk']),D(r['perpBid'])
     basis=qty*(s-s0+p0-p)
-    fees=qty*((s+s0)*(SPOT_FEE+SLIP)+(p+p0)*(SWAP_FEE+SLIP))
+    fees=qty*((s+s0)*SPOT_FEE+(p+p0)*SWAP_FEE)
+    slip=qty*(s+s0+p+p0)*SLIP
     return dict(asset=r['asset'],spotTs=times[0],swapTs=stop,spotBid=str(s),swapAsk=str(p),
-                settlements=len(funding),fundingUsdt=str(qty*weighted),costUsdt=str(fees),
-                netUsdt=str(basis+qty*weighted-fees),secondsFromDue=(max(times)-r['exitDueMs'])/1000)
+                spotBestBid=a['bids'][0][0],swapBestAsk=b['asks'][0][0],
+                settlements=len(funding),secondsFromDue=(max(times)-r['exitDueMs'])/1000,
+                **threshold(basis,qty*weighted,fees,slip,qty*p,stop,r['exitDueMs']))
+
 
 
 if __name__=='__main__':
