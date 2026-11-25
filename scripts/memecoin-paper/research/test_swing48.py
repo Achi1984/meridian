@@ -61,3 +61,26 @@ class SwingStudy(unittest.TestCase):
         self.assertEqual(p['arms']['runner']['fills'][0]['reason'],'loss')
         self.assertEqual(p['arms']['runner']['fills'][0]['gross'],1)
         bot.reconcile(s)
+
+
+    def test_old_checkpoint_pool_outcomes_and_http_failure(self):
+        from urllib.error import HTTPError
+        s = bot.fresh(1)
+        sample = dict(pool='p', mint='m', quote='u', first=1, samples=0,
+                      high=100, low=70, highLiquidity=100, rose=True)
+        s['candidates'] = {'p':sample, 'missing':dict(sample,pool='missing')}
+        row = dict(id='solana_p', pool='p', mint='m', quote='u', price=90, liquidity=90)
+        def scan(trades):
+            with patch.object(bot,'get',side_effect=[{'data':[]},{'data':[row]},trades]), \
+                 patch.object(bot,'snapshot',side_effect=lambda item:item), \
+                 patch.object(bot.time,'time',return_value=4000), patch.object(bot.time,'sleep'):
+                bot.scan(s,4000)
+        scan(HTTPError('provider',429,'limited',{},None))
+        diag = sample['diagnostics']
+        self.assertEqual(diag['latest']['outcome'],'tradesError')
+        self.assertEqual(diag['latest']['httpStatus'],429)
+        self.assertTrue(all(diag['latest']['market'].values()))
+        scan({'data':[]})
+        self.assertEqual(diag['counts'],{'tradesError':1,'incompleteFlow':1})
+        self.assertEqual(s['candidates']['missing']['diagnostics']['counts'],{'poolAbsentFromSnapshot':2})
+        self.assertEqual(s['positions'],{})
