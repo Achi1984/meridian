@@ -13,7 +13,10 @@ jobs:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - working-directory: scripts/memecoin-paper/research
+      - env:
+          HOLDER_RPC_PROVIDER: helius
+          HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
+        working-directory: scripts/memecoin-paper/research
         run: |
           python -m unittest test_holder_signal
           python -u - <<'PY'
@@ -21,22 +24,12 @@ jobs:
           import time
           import holder_signal as holder
           mint = '6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK'
-          for provider, endpoint in (
-              ('nodeflare', 'https://rpc.nodeflare.app/solana/public'),
-              ('solana', 'https://api.mainnet.solana.com'),
-              ('extrnode', 'https://solana-mainnet.rpc.extrnode.com'),
-          ):
-              holder.RPC = endpoint
-              started = time.time()
-              try:
-                  result = holder.measure(mint)
-                  if time.time()-started > holder.MAX_AGE:
-                      raise ValueError('stale sample')
-              except (OSError, ValueError, KeyError) as exc:
-                  print(provider, type(exc).__name__, getattr(exc, 'code', None), str(exc) if isinstance(exc, ValueError) else '')
-                  continue
-              print(json.dumps(dict(result, provider=provider, startedAt=started, receivedAt=time.time())))
-              break
-          else:
-              raise SystemExit('No qualified source')
+          started = time.time()
+          try:
+              result = holder.measure(mint)
+          except Exception as exc:
+              raise SystemExit('Holder sample failed: %s %s' % (type(exc).__name__, getattr(exc, 'code', ''))) from None
+          if time.time()-started > holder.MAX_AGE:
+              raise SystemExit('Stale sample')
+          print(json.dumps(dict(result, provider='helius', startedAt=started, receivedAt=time.time())))
           PY
