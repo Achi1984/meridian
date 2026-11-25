@@ -7,11 +7,11 @@ from meme_paper_account import FEE
 from new_pool_watch import ADDRESS, SIZE, USDC, spot_quote_amounts
 
 
-def observe(mint, quote=spot_quote_amounts, clock=time.time):
+def observe(mint, quote=spot_quote_amounts, clock=time.time, size=SIZE):
     if mint == USDC or not ADDRESS.fullmatch(mint):
         raise ValueError('invalid target mint')
     start = clock()
-    buy, buy_floor = quote(USDC, mint, SIZE)
+    buy, buy_floor = quote(USDC, mint, size)
     expected, sell_floor = quote(mint, USDC, buy)
     if buy == buy_floor:
         conservative_expected, minimum = expected, sell_floor
@@ -20,12 +20,12 @@ def observe(mint, quote=spot_quote_amounts, clock=time.time):
     finish = clock()
     if not 0 <= finish-start <= 30:
         raise ValueError('quote window exceeds 30 seconds')
-    return dict(mint=mint, start=start, finish=finish, inputRaw=SIZE, feesRaw=2*FEE,
+    return dict(mint=mint, start=start, finish=finish, inputRaw=size, feesRaw=2*FEE,
                 expectedBuyQty=buy, minimumBuyQty=buy_floor,
                 expectedResaleRaw=expected, expectedResaleOfMinimumQtyRaw=conservative_expected,
                 minimumResaleOfMinimumQtyRaw=minimum,
-                expectedLossPct=100*(SIZE+2*FEE-expected)/SIZE,
-                conservativeLossPct=100*(SIZE+2*FEE-minimum)/SIZE)
+                expectedLossPct=100*(size+2*FEE-expected)/size,
+                conservativeLossPct=100*(size+2*FEE-minimum)/size)
 
 
 if __name__ == '__main__':
