@@ -81,6 +81,32 @@ class SwingStudy(unittest.TestCase):
         self.assertEqual(diag['latest']['httpStatus'],429)
         self.assertTrue(all(diag['latest']['market'].values()))
         scan({'data':[]})
-        self.assertEqual(diag['counts'],{'tradesError':1,'incompleteFlow':1})
+        self.assertEqual(diag['counts'],{'tradesError':1,'tradeRateLimitCooldown':1})
         self.assertEqual(s['candidates']['missing']['diagnostics']['counts'],{'poolAbsentFromSnapshot':2})
         self.assertEqual(s['positions'],{})
+
+
+    def test_idle_pool_no_trade_call(self):
+        c = dict(pool='p', mint='m', quote='u', first=1, samples=0, high=100,
+                 low=70, highLiquidity=100, rose=True)
+        s = bot.fresh(1)
+        s['candidates']['p'] = c
+        row = dict(id='solana_p',pool='p',mint='m',quote='u',price=90,liquidity=90,
+                   buys=0,sells=0,attributes={'transactions':{'m30':{'buys':0,'sells':0}}})
+        with patch.object(bot,'get',side_effect=[{'data':[]},{'data':[row]}]), patch.object(bot,'snapshot',side_effect=lambda item:item), patch.object(bot.time,'time',return_value=4000), patch.object(bot.time,'sleep'):
+            bot.scan(s,4000)
+        self.assertEqual(c['diagnostics']['latest']['outcome'],'noTrades30m')
+        self.assertEqual(s['errors'],{})
+        self.assertEqual(s['positions'],{})
+        for val in (None,False,'0',1):
+            row['attributes']['transactions']['m30']['buys'] = val
+            self.assertFalse(bot.quiet_half_hour(row))
+
+    def test_trade_request_recovery(self):
+        from urllib.error import HTTPError
+        s = bot.fresh(1)
+        with patch.object(bot,'get',side_effect=HTTPError('u',429,'limited',{'Retry-After':'400'},None)), patch.object(bot.time,'time',return_value=100):
+            with self.assertRaises(HTTPError): bot.fetch_trades(s,'p')
+        self.assertGreaterEqual(s['tradeRetryAt'],500)
+        with patch.object(bot,'get',side_effect=[HTTPError('u',502,'gateway',{},None),{'data':[1]}]), patch.object(bot.time,'sleep'):
+            self.assertEqual(bot.fetch_trades(s,'p'),[1])

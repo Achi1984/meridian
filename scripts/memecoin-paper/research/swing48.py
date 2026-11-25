@@ -5,6 +5,8 @@ import sys
 import time
 from datetime import datetime
 from pathlib import Path
+from urllib.error import HTTPError
+from email.utils import parsedate_to_datetime
 
 from holder_signal import capture
 from newcomer_research import ERRORS
@@ -84,6 +86,29 @@ def trade_windows(c, rows, now):
         if start <= t < now and direction:
             values[int(t >= now-900)][int(direction < 0)] += 1
     return values
+
+
+def quiet_half_hour(item):
+    counts = item.get('attributes', {}).get('transactions', {}).get('m30') or {}
+    return all(type(counts.get(k)) is int and counts[k] == 0 for k in ('buys', 'sells'))
+
+
+def fetch_trades(s, pool):
+    url = GT+'/pools/'+pool+'/trades'
+    for attempt in range(2):
+        try:
+            return get(url, 60)['data']
+        except HTTPError as exc:
+            if exc.code == 429:
+                retry = (exc.headers or {}).get('Retry-After', '')
+                try:
+                    delay = int(retry) if retry.isdigit() else parsedate_to_datetime(retry).timestamp()-time.time()
+                except (TypeError, ValueError, OverflowError):
+                    delay = 60
+                s['tradeRetryAt'] = int(time.time()+max(60, delay))+1
+            if attempt or exc.code not in (502, 503, 504) or (exc.headers or {}).get('Retry-After'):
+                raise
+            time.sleep(3)
 
 
 def bid(s, mint, qty, evidence=None):
@@ -271,8 +296,14 @@ def scan(s, now):
                 record(c, at, outcome, **evidence)
                 continue
             stage = 'trades'
+            if quiet_half_hour(item) and r.get('buys') == 0 and r.get('sells') == 0:
+                record(c, at, 'noTrades30m', flowWindows=[[0, 0], [0, 0]], **evidence)
+                continue
+            if time.time() < s.get('tradeRetryAt', 0):
+                record(c, at, 'tradeRateLimitCooldown', retryAt=s['tradeRetryAt'], **evidence)
+                continue
             time.sleep(2.2)
-            trades = get(GT+'/pools/'+r['pool']+'/trades', 60)['data']
+            trades = fetch_trades(s, r['pool'])
             windows = trade_windows(c, trades, at)
             if not windows:
                 count(s, 'flowWindowIncomplete')
@@ -310,6 +341,8 @@ def tick(folder):
     except ERRORS as exc:
         count(s,'cycle'+type(exc).__name__)
     reconcile(s)
+    if os.environ.get('GITHUB_ACTIONS') == 'true' and os.environ.get('GITHUB_RUN_ID', '').isdigit():
+        s['collectorRunId'] = int(os.environ['GITHUB_RUN_ID'])
     tmp = path.with_suffix('.tmp')
     tmp.write_text(json.dumps(s, separators=(',',':'), allow_nan=False))
     os.replace(tmp,path)

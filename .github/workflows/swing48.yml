@@ -7,7 +7,7 @@ permissions:
   contents: write
 concurrency:
   group: second-wave-48h-v1
-  cancel-in-progress: false
+  cancel-in-progress: true
 jobs:
   observe:
     strategy:
@@ -35,7 +35,8 @@ jobs:
           HELIUS_API_KEY: ${{ secrets.HELIUS_API_KEY }}
         run: |
           set -euo pipefail
-          folder="studies/swing48/$GITHUB_RUN_ID"
+          folder="studies/swing48/45624335706"
+          test -s "data/$folder/state.json"
           git -C data config user.name 'github-actions[bot]'
           git -C data config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           segment_end=$(( $(date +%s) + 14400 ))
