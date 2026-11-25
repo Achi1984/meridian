@@ -1,3 +1,4 @@
+import {mountTop100} from './top100-report.js?v=B19-M11-FIX1';
 import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B19-M11-FIX1';
 import {createAdvisorSection} from './paper-advisor-view.js?v=B19-M11-FIX1';
 import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B19-M11-FIX1';
@@ -53,6 +54,7 @@ function mountWorkspace(){
   refreshSolanaStatus = refresh;
   const scanner = collapsedSection('solana-scanner-live','Solana-Memecoin-Scanner · Live',solana);
   mountLiveScanner(scanner);
+  mountTop100(collapsedSection('top100-paper','Top 100 · Ausbruch und Rücktest',botReports));
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';
