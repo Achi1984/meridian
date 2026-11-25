@@ -1,4 +1,4 @@
-import {mountSolanaReport, mountLiveScanner} from './solana-meme-report.js?v=B19-M11-FIX1';
+import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B19-M11-FIX1';
 import {createAdvisorSection} from './paper-advisor-view.js?v=B19-M11-FIX1';
 import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B19-M11-FIX1';
 import {createStrategyArenaView} from './strategy-arena.js?v=B19-M11-FIX1';
@@ -49,8 +49,8 @@ function mountWorkspace(){
 
   advisorController = createAdvisorSection(advisor);
   advisorController.setActive(Boolean(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')));
-  const solana = collapsedSection('solana-meme-paper','Solana-Memecoin · Paperbot',advisor);
-  refreshSolanaStatus = mountSolanaReport(solana);
+  const {section:solana, refresh} = ensureSolanaSection(document,advisor);
+  refreshSolanaStatus = refresh;
   const scanner = collapsedSection('solana-scanner-live','Solana-Memecoin-Scanner · Live',solana);
   mountLiveScanner(scanner);
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
@@ -157,6 +157,11 @@ async function loadWorkspace() {
     renderStrategyCatalog(catalogRoot,null);
     catalogStatus.textContent = String(error?.message || 'Das Strategieregister ist unbekannt.').slice(0,220);
     catalogStatus.setAttribute('role','alert');
+    const retry = document.createElement('button');
+    retry.type = 'button';
+    retry.textContent = 'Erneut laden';
+    retry.addEventListener('click',loadWorkspace,{once:true});
+    catalogStatus.append(' ',retry);
   } finally {
     loading = false;
     catalogRoot.removeAttribute('aria-busy');
