@@ -25,13 +25,32 @@ jobs:
           import holder_signal as holder
           import re
           mints = (
-              '6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK',
-              'D4xDAWoc6rCgt72ia7CmSjyDgbQ5EmJRk9SHE4vkMme5',
+              '2PzvrzRV4vH8pqUKm6zL38RgpFidnYDJvi9DkZLqHB91',
+              '2Zro1WMK1KLgEPKjBGYaFARN92M63zFBh216pWgRAiJj',
+              '3hPCbZW6TtnoE82hASGPTiCN75B5td22wTQrSqJpiy5i',
+              '45tToMjZVo9bsXUAx1zxPxjFWmRycjnU9i2ADsGMpump',
+              '4Di56UJzpnb7E4D7aLXFf7aLF5TrpJYv9Q3mR398pump',
+              '4Zjp4gXc4urnk1aSYecjzq2BwoPZtbnr8TA9UzRNYFEo',
+              '5Zrfo2A8Umh5PeQzYmJ953SYt7yS8ssm8TdpUXDxb58U',
+              '5jkaHXU4nW5LEdEdYxBfpT5jwEtYahL2YzxS2s9HGqS4',
+              '6zD5fGV11kU4bBshABjBNN4t3CbsDrd9gr1GwpNKjSiS',
+              '7TgRLg4xKHZdXyR62QyQp9JCRPcjN5dJxRVApoofRp3E',
+              '8daxqp51Reo8rJAuW5PaaF2QajqVGLh6YqWdDwyrhAUB',
               '8kP8xVjVhDMdUaXEbJSsS8WcXP3X7rRPkBwzqeH1pump',
-              'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+              'BNNYZCSwmqLxD1diCec4Z9ZHaJ2y2FXnJjN1o9Z7jxKt',
+              'C8whvS2MpckxTSAWKZuq2YJac99BKqeFDbW3BxNqGecg',
+              'D4xDAWoc6rCgt72ia7CmSjyDgbQ5EmJRk9SHE4vkMme5',
+              'DgYWQwAsgRtJXcb29ye44Theya9dtDSYdVBzE8Zo5BC5',
+              'Dhy5Ayni79ru86m34m7XoJf2SiR4ugto5BcyeqMeUg8',
+              'FpkTauQZicvTUbz2HFu8ghUX4q4KgW8qWyxfbpk5L5ri',
+              'FsL44UW3khYf37pZpio3ve9XwA83bAMgh4zxpue5sFs',
+              'H4yofqyieb2Xo6pyWddwrcpmXG4jpQSabCB7oPySPLhX',
+              'HCp2dih9ytKmYxK3vXYKmae6Layk6F8AMaJyzf3gB2cz',
+              'J8wrkmb6Jp9MYn31A9BndbWwSRgGzCFDRT8Kjx4Drdsd',
           )
           passed = 0
           for mint in mints:
+              time.sleep(1)
               started = time.time()
               try:
                   result = holder.measure(mint)
