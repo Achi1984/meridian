@@ -7,6 +7,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from decimal import Decimal as D
 from pathlib import Path
+from breakout_indicators import indicator_values
 from urllib.parse import urlencode
 from urllib.request import Request, urlopen
 
@@ -80,7 +81,15 @@ def features(rows, slot):
 def bars_for(inst_slot):
     inst,slot=inst_slot
     try:
-        return inst,features(ok('market/candles',instId=inst,bar='1H',limit=30),slot)
+        rows=ok('market/candles',instId=inst,bar='1H',limit=125)
+        signal=features(rows,slot)
+        if signal['side']:
+            closes={int(r[0])//1000:float(r[4]) for r in rows if r[-1]=='1'}
+            try:
+                signal['indicators']=indicator_values(closes,slot,signal)
+            except (KeyError,ValueError):
+                signal['indicatorStatus']='incomplete hourly history'
+        return inst,signal
     except (OSError,ValueError,KeyError,IndexError) as e:
         return inst,dict(error=str(e)[:120])
 
