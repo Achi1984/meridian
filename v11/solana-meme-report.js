@@ -17,6 +17,79 @@ async function read(url, raw = false) {
 
 import {mountEightHourComparison} from './solana-eight-hour.js?v=B19-M11-FIX1';
 
+// The experiment stores raw USDC in millionths and charges 0.05 USDC per fill.
+const swingRun = 45624335706;
+const swingSource = 'https://raw.githubusercontent.com/' + repo +
+  '/paper/second-wave-48h-data/studies/swing48/' + swingRun + '/state.json';
+
+export function swingAccounts(state) {
+  const isMap = value => value && typeof value === 'object' && !Array.isArray(value);
+  if (!isMap(state?.candidates) || !isMap(state.positions) || !count(state.start) ||
+      !count(state.lastTick) || state.lastTick < state.start) throw Error('Invalid checkpoint');
+  return ['fixed','runner'].map(key => {
+    let cash = 1000000000, realized = 0, open = 0;
+    for (const p of Object.values(state.positions)) {
+      const arm = p.arms?.[key];
+      if (!count(p.qty) || !p.qty || !count(arm?.left) || !Array.isArray(arm.fills)) throw Error('Position');
+      let sold = 0, proceeds = 0;
+      for (const f of arm.fills) {
+        if (!count(f.qty) || !f.qty || !count(f.gross) || f.fee !== 50000) throw Error('Fill');
+        sold += f.qty;
+        proceeds += f.gross - f.fee;
+      }
+      if (sold + arm.left !== p.qty) throw Error('Quantity mismatch');
+      cash += proceeds - 20050000;
+      realized += proceeds - 20050000 * (sold / p.qty);
+      if (arm.left > 0) open++;
+    }
+    if (!count(cash) || cash !== state.cash?.[key]) throw Error('Cash mismatch');
+    return {key, cash:cash/1e6, realized:realized/1e6, open};
+  });
+}
+
+export function mountSwingCard(section, add, load = read) {
+  const card = add(section,'section','');
+  card.className = 'solana-comparison';
+  add(card,'h3','Memecoins · 48 Stunden');
+  const status = add(card,'p','Laufstand wird geladen.');
+  status.setAttribute('role','status');
+  const body = add(card,'div','');
+  add(card,'a','Paperlauf auf GitHub').href = runs + swingRun;
+  let last = 0, pending = false;
+  return async function refreshSwing() {
+    if (pending) return;
+    pending = true;
+    try {
+      const state = await load(swingSource);
+      const rows = swingAccounts(state);
+      if (state.lastTick < last) throw Error('Older checkpoint');
+      const entries = Object.keys(state.positions).length;
+      const pools = Object.keys(state.candidates).length;
+      const elapsed = state.lastTick-state.start;
+      const phase = elapsed >= 72*3600 ? 'Ende des Beobachtungsfensters' :
+        elapsed >= 24*3600 || entries >= 30 ? 'Nachbeobachtung' :
+        entries ? 'Einstiegsphase' : 'Wartet auf Einstieg';
+      const time = new Date(state.lastTick*1000).toLocaleString('de-AT',{
+        timeZone:'Europe/Vienna', day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
+      const stale = Date.now()/1000-state.lastTick > 1200 && elapsed < 72*3600;
+      status.textContent = phase + ' · ' + pools + ' Pools · ' + entries + ' Einstiege · ' +
+        time + ' (Wien)' + (stale ? ' · Datenstand veraltet' : '');
+      body.replaceChildren();
+      for (const row of rows) {
+        const line = add(body,'p','');
+        add(line,'strong',row.key === 'fixed' ? 'Festes Gewinnziel' : 'Teilverkauf');
+        add(line,'span','Kasse ' + amount(row.cash) + ' · ' + row.open + ' offen').className = 'account-value';
+        add(line,'span','Realisiert ' + amount(row.realized)).className = 'account-pnl af-' +
+          (row.realized > 0 ? 'positive' : row.realized < 0 ? 'negative' : 'muted');
+      }
+      last = state.lastTick;
+    } catch {
+      if (!last) status.textContent = 'Laufstand derzeit nicht abrufbar.';
+      else if (!status.textContent.includes('Abruf fehlgeschlagen')) status.textContent += ' · Abruf fehlgeschlagen';
+    } finally { pending = false; }
+  };
+}
+
 export function mountSolanaReport(section) {
   const doc = section.ownerDocument;
   const add = (parent, tag, text) => {
@@ -25,6 +98,7 @@ export function mountSolanaReport(section) {
     parent.append(child);
     return child;
   };
+  const refreshSwing = mountSwingCard(section, add);
   const refreshComparison = mountEightHourComparison(section, add, read, amount);
   const refresh = add(section,'button','Aktualisieren');
   refresh.type = 'button';
@@ -87,6 +161,7 @@ export function mountSolanaReport(section) {
     loading = true;
     refresh.disabled = true;
     live.textContent = 'Laufstatus wird geladen …';
+    void refreshSwing();
     void refreshComparison();
     const [, report] = await Promise.allSettled([
       refreshStatus(true),
@@ -245,6 +320,16 @@ export function mountSolanaReport(section) {
     }
   }
   section.addEventListener('toggle',() => { if (section.open) update(); });
+  let swingTimer;
+  function syncSwingTimer() {
+    clearInterval(swingTimer);
+    if (section.open && !doc.hidden) {
+      void refreshSwing();
+      swingTimer = setInterval(refreshSwing, 300000);
+    }
+  }
+  section.addEventListener('toggle',syncSwingTimer);
+  doc.addEventListener('visibilitychange',syncSwingTimer);
   refresh.addEventListener('click',update);
   return refreshStatus;
 }
