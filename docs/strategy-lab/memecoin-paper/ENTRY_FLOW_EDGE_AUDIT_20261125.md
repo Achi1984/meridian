@@ -1,0 +1,18 @@
+# Paper edge audit, 25 November 2026
+
+## Replay of observed fills
+
+Run `python scripts/memecoin-paper/research/entry_flow_audit.py abc-final.zip` separately for each archive. The audit uses account C, actual recorded full fills, the two recorded 0.05 USDC charges, and selection records available by entry. It reconciles realized net, closed count and open IDs. Open risk is excluded from realized returns. This is descriptive, conditional on entry and closure, and uses trade counts rather than distinct buyers. It does not simulate freeing capacity or earning a short return.
+
+| Run | Final ZIP SHA-256 | Closed / open | Winning trades | C net | Worst two combined | Buys at least twice sells, closed / net |
+|---|---|---:|---:|---:|---:|---:|
+| 45470459543 | 4f1758aac487433da2b13b3735b1f58673b6eb913fcbf24f41d7064eeb314b54 | 16 / 1 | 11 | -35.132711 | -40.197952 | 12 / -32.338639 |
+| 45580409598 | 2e406462a50eb6758bba13c7b35c91f80d174e000b9e867506092c0bf28a6752 | 10 / 0 | 5 | -42.296878 | -39.492413 | 9 / -22.904416 |
+
+The older 45433341029 format lacks the required account C fill rows and fails reconciliation. Keep the runs separate; repeat mints can recur. The two-thirds cut is an exploratory diagnostic. Pool size below 20k produced -24.954414 across three closes in the latest run, while the other seven produced -17.342464. In run 45622083781 first segment the 20% holder rule accepted both reference entries and changed net by zero. No discrimination was observed. BTC hourly run 45552642310 closed all four arms below the initial 1,000 USD.
+
+## Frozen forward comparisons proposed for the next independent sample
+
+1. BTC directional test: on each new fully closed hourly bar, use the existing Elder impulse classification. Short only on two successive red completed hourly bars, flat otherwise. Compare against flat and the long mirror on two green bars, on the same BTC perpetual instrument with separate simulated accounts, 1x and common fixed USD notional. Enter on the first subsequent executable bid, cover on the corresponding ask after the first non-red completed bar or six bars, whichever comes first. Mirror long fills at ask then bid. Apply venue-specific fees, actual funding at settlement, quote age, available size and one-update delay sensitivity. Keep missing exits open and marked separately. The spot pilot archive cannot price this comparison.
+2. Solana entry quality: compare the standard C cohort and E exits on identical entries, then shadow a pre-entry liquidity veto using a contemporaneous buy quote and a reverse quote for exactly its output size. Start with a 3% maximum quoted round-trip loss including explicit fees; this is a research parameter. Quote both before admitting a simulated position. Record skipped mints and their reference result. Capture distinct buyer and seller owners, concentration of buy volume, liquidity change and holder measurement slot at decision time. Classify pool vaults separately where ownership is verified. Missing classification or stale quotes are separate outcomes. Compare each feature individually before combinations. Social sentiment stays observational until source time, capture time, missing coverage and bot/spam controls are recorded.
+3. Report net per eligible opportunity and per trade, coverage, worst two losses, unpriced exposure, fees and funding. Split results by day, mint and BTC regime. Freeze thresholds before collecting fresh data. Describe uncertainty by independent day blocks once enough days exist. Keep cash as the benchmark and show results excluding the largest gain. No conversion of spot losses into hypothetical short fills. No strategy promotion on these two samples.

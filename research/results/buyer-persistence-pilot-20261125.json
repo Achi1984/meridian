@@ -1,0 +1,135 @@
+{
+  "arms": {
+    "baseline": {
+      "eligible": 1,
+      "unknown": 0,
+      "exits": 1,
+      "meanConservativeNetPct": -6.18437
+    },
+    "buyers": {
+      "eligible": 1,
+      "unknown": 0,
+      "exits": 1,
+      "meanConservativeNetPct": -6.18437
+    },
+    "cost": {
+      "eligible": 0,
+      "unknown": 0,
+      "exits": 0,
+      "meanConservativeNetPct": null
+    },
+    "both": {
+      "eligible": 0,
+      "unknown": 0,
+      "exits": 0,
+      "meanConservativeNetPct": null
+    }
+  },
+  "observations": [
+    {
+      "pool": "BnR3kT93PUxNYCCDnNgDtnk56U1V1Lho3MV9C7sUcqpt",
+      "mint": "As3XtYSstuVdrVyb6sJZZ77Tu8JvjTBg6S6hgPv4pump",
+      "decision": 1795634062,
+      "baseline": false,
+      "buyers": {
+        "complete": true,
+        "earlier": 12,
+        "later": 8,
+        "newInLater": 7,
+        "passes": true
+      },
+      "roundtrip": {
+        "mint": "As3XtYSstuVdrVyb6sJZZ77Tu8JvjTBg6S6hgPv4pump",
+        "start": 1795634066.944059,
+        "finish": 1795634081.3107646,
+        "inputRaw": 20000000,
+        "feesRaw": 100000,
+        "expectedBuyQty": 103120621566,
+        "minimumBuyQty": 102089415351,
+        "expectedResaleRaw": 19541220,
+        "expectedResaleOfMinimumQtyRaw": 19354468,
+        "minimumResaleOfMinimumQtyRaw": 19160924,
+        "expectedLossPct": 2.7939,
+        "conservativeLossPct": 4.69538
+      },
+      "costPass": false,
+      "entryAt": 1795634085.0844843,
+      "entryQty": 102250811182,
+      "minimumEntryQty": 101228303071,
+      "exitAt": 1795634269.818971,
+      "exitExpectedRaw": 20974326,
+      "exitMinimumRaw": 20764583,
+      "conservativeNetPct": 3.322915
+    },
+    {
+      "pool": "Ak4wr2ueEAJMqZSEcGPMX9EhCrwWRngP8CskvdEh1e6H",
+      "mint": "DVdWuNK8ncn79B6z8nCiwcNAiwyFcmBPfChgxJGTpump",
+      "decision": 1795634062,
+      "baseline": false,
+      "buyers": {
+        "complete": true,
+        "earlier": 33,
+        "later": 21,
+        "newInLater": 17,
+        "passes": true
+      },
+      "roundtrip": {
+        "mint": "DVdWuNK8ncn79B6z8nCiwcNAiwyFcmBPfChgxJGTpump",
+        "start": 1795634066.9502213,
+        "finish": 1795634081.3249938,
+        "inputRaw": 20000000,
+        "feesRaw": 100000,
+        "expectedBuyQty": 57039087052,
+        "minimumBuyQty": 56468696182,
+        "expectedResaleRaw": 19503845,
+        "expectedResaleOfMinimumQtyRaw": 19293445,
+        "minimumResaleOfMinimumQtyRaw": 19100511,
+        "expectedLossPct": 2.980775,
+        "conservativeLossPct": 4.997445
+      },
+      "costPass": false,
+      "entryAt": 1795634085.1206677,
+      "entryQty": 58341743070,
+      "minimumEntryQty": 57758325640,
+      "exitAt": 1795634269.8079126,
+      "exitExpectedRaw": 20631217,
+      "exitMinimumRaw": 20424905,
+      "conservativeNetPct": 1.624525
+    },
+    {
+      "pool": "5UTPFtaKKMSeCKJ1ZpTpTWYz4FPvbpj5rXnFsbR1kMiJ",
+      "mint": "5EmvWDizkpjAXbcfCcVq69w1id8GaLzi4LLwtuSgpump",
+      "decision": 1795634062,
+      "baseline": true,
+      "buyers": {
+        "complete": true,
+        "earlier": 22,
+        "later": 30,
+        "newInLater": 28,
+        "passes": true
+      },
+      "roundtrip": {
+        "mint": "5EmvWDizkpjAXbcfCcVq69w1id8GaLzi4LLwtuSgpump",
+        "start": 1795634067.5292335,
+        "finish": 1795634081.2600079,
+        "inputRaw": 20000000,
+        "feesRaw": 100000,
+        "expectedBuyQty": 39469004422,
+        "minimumBuyQty": 39074314378,
+        "expectedResaleRaw": 19403954,
+        "expectedResaleOfMinimumQtyRaw": 19110321,
+        "minimumResaleOfMinimumQtyRaw": 18919218,
+        "expectedLossPct": 3.48023,
+        "conservativeLossPct": 5.90391
+      },
+      "costPass": false,
+      "entryAt": 1795634085.0857847,
+      "entryQty": 40172436022,
+      "minimumEntryQty": 39770711662,
+      "exitAt": 1795634269.8051903,
+      "exitExpectedRaw": 19053662,
+      "exitMinimumRaw": 18863126,
+      "conservativeNetPct": -6.18437
+    }
+  ]
+}

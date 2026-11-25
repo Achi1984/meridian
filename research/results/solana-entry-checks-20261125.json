@@ -1,0 +1,23 @@
+{
+  "scanned": 20,
+  "supportedQuote": 19,
+  "sufficientLiquidity": 1,
+  "uniqueMints": 1,
+  "candidates": 1,
+  "eligible": 0,
+  "errors": 0,
+  "observations": [
+    {
+      "pool": "4HMrQjdri7qGGLeejUyR6pUvRGwYkZrEs9nUPkRKpeu8",
+      "mint": "7AqMJKj3hMcz2yWtGr918U8aq6L2A6fWZb8mURwoWWNt",
+      "firstLiquidityUsd": 14387.2817,
+      "firstAt": 1795637169.5669143,
+      "signalAt": 1795637248.5085585,
+      "signalLiquidityUsd": 15415.3769,
+      "failedChecks": [
+        "orderFlow"
+      ],
+      "eligible": false
+    }
+  ]
+}

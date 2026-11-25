@@ -1,0 +1,108 @@
+{
+  "closed": [
+    {
+      "positionId": "3:wave:G6F1daq9DouNW4LHvhm3pLie88CDkuVsFsitZU3xbonk",
+      "qty": 250362024,
+      "basisRaw": 20100000,
+      "entryAt": 1795598553,
+      "missing": 0,
+      "warningAt": 1795598733,
+      "signalNetRaw": -20099951,
+      "baselineRaw": -20099951,
+      "deltaUsdc": 0.0
+    },
+    {
+      "positionId": "6:wave:H3mREMBTP2sioMN6XeUztN9sStXscpAPW8HhAwTvicXs",
+      "qty": 1275132183098,
+      "basisRaw": 20100000,
+      "entryAt": 1795600775,
+      "missing": 0,
+      "baselineRaw": 2037124,
+      "deltaUsdc": 0.0
+    },
+    {
+      "positionId": "8:wave:J5HpUDc6AqpXyHrGFWWUAdrK3Go6342GknYDPSVasB7R",
+      "qty": 160994514837,
+      "basisRaw": 20100000,
+      "entryAt": 1795602939,
+      "missing": 0,
+      "baselineRaw": 2933574,
+      "deltaUsdc": 0.0
+    },
+    {
+      "positionId": "10:wave:BmwrXAHqa415X2isEHherVJXUrk7CtMLfNmC4e8nitfR",
+      "qty": 339113146306,
+      "basisRaw": 20100000,
+      "entryAt": 1795604379,
+      "missing": 0,
+      "baselineRaw": 2117643,
+      "deltaUsdc": 0.0
+    },
+    {
+      "positionId": "11:wave:AMaDQtUvN2LLfJy3gDgyftmD8brKj2cMJXVn2jqNqeo6",
+      "qty": 1101913336656,
+      "basisRaw": 20100000,
+      "entryAt": 1795605701,
+      "missing": 0,
+      "warningAt": 1795606359,
+      "signalNetRaw": -4551912,
+      "baselineRaw": -4551912,
+      "deltaUsdc": 0.0
+    },
+    {
+      "positionId": "14:wave:86p1Wz65gGy72rfLbx8tyEz2SqnPqqVTJqv3XaMBpump",
+      "qty": 554824856549,
+      "basisRaw": 20100000,
+      "entryAt": 1795607142,
+      "missing": 0,
+      "warningAt": 1795607203,
+      "signalNetRaw": -3652350,
+      "nextNetRaw": -2833611,
+      "nextAt": 1795607262,
+      "baselineRaw": -19392462,
+      "deltaUsdc": 16.558851
+    },
+    {
+      "positionId": "15:wave:5B7tkaL5Y2rHk3oobsbgm1AxbzM6X3AsEWaxvUzFEBQ9",
+      "qty": 69945693106,
+      "basisRaw": 20100000,
+      "entryAt": 1795607922,
+      "missing": 0,
+      "warningAt": 1795607982,
+      "signalNetRaw": -4789749,
+      "nextNetRaw": -8495526,
+      "nextAt": 1795608042,
+      "baselineRaw": -8495526,
+      "deltaUsdc": 0.0
+    },
+    {
+      "positionId": "15:wave:4hFxoopE642K7PyAe5dC6SHemtvPgoa2iwQAJeYdn83C",
+      "qty": 1163169597585,
+      "basisRaw": 20100000,
+      "entryAt": 1795607984,
+      "missing": 0,
+      "baselineRaw": -277070,
+      "deltaUsdc": 0.0
+    },
+    {
+      "positionId": "17:wave:AhneMtVCFUcmjF6FMM1icKhCgmDV45FebadQapn8ECRV",
+      "qty": 1133550885019,
+      "basisRaw": 20100000,
+      "entryAt": 1795609664,
+      "missing": 0,
+      "baselineRaw": 2619665,
+      "deltaUsdc": 0.0
+    },
+    {
+      "positionId": "22:wave:BYePRHSa6RCMq2HSMV4qHEZHwafsMfaxxcDrTcfr6XB5",
+      "qty": 1022042814087,
+      "basisRaw": 20100000,
+      "entryAt": 1795613097,
+      "missing": 0,
+      "baselineRaw": 812037,
+      "deltaUsdc": 0.0
+    }
+  ],
+  "open": [],
+  "netChangeUsdc": 16.558851
+}
