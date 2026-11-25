@@ -45,6 +45,8 @@ def rpc(method, params):
     provider = os.environ.get('HOLDER_RPC_PROVIDER', 'solana')
     if provider == 'onfinality':
         endpoint = 'https://solana.api.onfinality.io/public'
+    elif provider == 'helius':
+        endpoint = 'https://mainnet.helius-rpc.com/?api-key=' + quote(os.environ['HELIUS_API_KEY'], safe='')
     elif provider == 'drpc':
         endpoint = 'https://lb.drpc.live/solana/' + quote(os.environ['DRPC_API_KEY'], safe='')
     elif provider == 'solana':
