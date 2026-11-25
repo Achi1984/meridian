@@ -1,0 +1,7 @@
+# BTC/ETH taker-flow comparison
+
+Use the OKX breakout event ledger from the existing BTC/ETH spot-confirmation study, including signals rejected by that study. At UTC hour t the preceding closed hour has broken the prior 24-hour range. During hour t observe Binance USD-M taker-buy quote volume divided by total quote volume. For longs require both above 50% and above the median for the same hour on the previous seven days. For shorts require both below. There is no parameter search. Verify the SHA256 for each archive and require all 24 hourly observations.
+
+The historical replay uses the original OKX entry open at t+1h and exit open at t+4h. It assumes the just-closed Binance bar could be acted on at that opening price. Deduct Meridian's 5 bp fee and 10 bp slippage allowance per side. Apply realized OKX funding on the entry notional, assuming boundary fills just after settlement. This is an event study with potentially overlapping positions, not an account equity curve. The November windows have already been used in related research.
+
+For prospective comparison, freeze the rule above for BTC and ETH. Record the first available timestamp for each closed Binance bar, then the subsequent executable OKX bid and ask. Use identical entry/exit conventions for filtered and unfiltered signals. Report both directions, missing observations, non-overlapping positions per instrument, distinct UTC signal hours, and sensitivity to the best trade. A larger universe is a separate experiment. Do not infer prospective fills from the historical archive.
