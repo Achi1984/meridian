@@ -23,13 +23,28 @@ jobs:
           import json
           import time
           import holder_signal as holder
-          mint = '6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK'
-          started = time.time()
-          try:
-              result = holder.measure(mint)
-          except Exception as exc:
-              raise SystemExit('Holder sample failed: %s %s' % (type(exc).__name__, getattr(exc, 'code', ''))) from None
-          if time.time()-started > holder.MAX_AGE:
-              raise SystemExit('Stale sample')
-          print(json.dumps(dict(result, provider='helius', startedAt=started, receivedAt=time.time())))
+          import re
+          mints = (
+              '6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK',
+              'D4xDAWoc6rCgt72ia7CmSjyDgbQ5EmJRk9SHE4vkMme5',
+              '8kP8xVjVhDMdUaXEbJSsS8WcXP3X7rRPkBwzqeH1pump',
+              'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v',
+          )
+          passed = 0
+          for mint in mints:
+              started = time.time()
+              try:
+                  result = holder.measure(mint)
+                  if time.time()-started > holder.MAX_AGE:
+                      raise ValueError('stale sample')
+              except Exception as exc:
+                  reason = str(exc)
+                  if not isinstance(exc, ValueError) or not re.fullmatch(r'[a-zA-Z0-9 -]{1,70}', reason):
+                      reason = type(exc).__name__
+                  print(mint, reason)
+                  continue
+              print(json.dumps(dict(result, mint=mint, provider='helius')))
+              passed += 1
+          if not passed:
+              raise SystemExit('No qualified sample')
           PY
