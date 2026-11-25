@@ -1,3 +1,4 @@
+import {swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync} from 'node:fs';
@@ -70,7 +71,7 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
         assert.equal(state.open,true);
         assert.equal(state.overflow,false);
         assert.equal(state.panelOverflow,false);
-        assert.equal(state.requests.length,1,'only central access verification');
+        assert.equal(state.requests.filter(url=>url!==swingCheckpointEndpoint).length,1,'only central access verification and the public paper checkpoint');
         assert.equal(state.depot,'not_loaded');
         const originalBots=state.bots;
 
@@ -183,8 +184,9 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
         await unlockAppThroughGate(call);
         state=await read();
         assert.equal(state.depot,'not_loaded');assert.equal(state.bots,originalBots);
-        assert.equal(state.requests.length,3,'no status, Bot or Depot reads; only three gate verifications');
-        assert.ok(state.requests.every(url=>url.includes('/api/private/portfolio-history?range=1w')));
+        const privateRequests=state.requests.filter(url=>url!==swingCheckpointEndpoint);
+        assert.equal(privateRequests.length,3,'three gate verifications, no private status, Bot or Depot reads');
+        assert.ok(privateRequests.every(url=>url.includes('/api/private/portfolio-history?range=1w')));
         console.log('V11_AGENT_STATUS_SIZE '+JSON.stringify({width:size.width,overflow:state.overflow,statusRequests:0}));
       },size.height);
     }
