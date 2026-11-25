@@ -1,0 +1,26 @@
+[
+  {
+    "asset": "BTC",
+    "spotTs": 1795637562854,
+    "swapTs": 1795637562904,
+    "spotBid": "60017.5",
+    "swapAsk": "59990",
+    "settlements": 0,
+    "fundingUsdt": "0.0000",
+    "costUsdt": "2.091039501",
+    "netUsdt": "-2.062819501",
+    "secondsFromDue": -7257573.35
+  },
+  {
+    "asset": "ETH",
+    "spotTs": 1795637562908,
+    "swapTs": 1795637562858,
+    "spotBid": "1684.81",
+    "swapAsk": "1684",
+    "settlements": 0,
+    "fundingUsdt": "0.000",
+    "costUsdt": "2.100118185",
+    "netUsdt": "-2.037748185",
+    "secondsFromDue": -7257573.35
+  }
+]
