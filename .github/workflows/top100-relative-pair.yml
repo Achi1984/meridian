@@ -1,0 +1,19 @@
+name: Top 100 relative breakout pair observation
+on:
+  push:
+    branches: [research/literature-paper-20261125]
+    paths: ['.github/workflows/top100-relative-pair.yml']
+permissions:
+  contents: read
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 310
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - run: python -m unittest discover -s scripts/research -p test_relative_pair_forward.py
+      - run: python -u scripts/research/relative_pair_forward.py pair.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with: {name: top100-relative-pair, path: pair.json, if-no-files-found: error}
