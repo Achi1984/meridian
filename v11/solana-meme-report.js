@@ -54,19 +54,21 @@ export function mountSwingCard(section, add, load = read) {
   const status = add(card,'p','Laufstand wird geladen.');
   status.setAttribute('role','status');
   const body = add(card,'div','');
-  add(card,'a','Paperlauf auf GitHub').href = runs + swingRun;
+  const source = add(card,'a','Paperlauf auf GitHub');
+  let collector = swingRun;
+  source.href = runs + collector;
   const worker = add(card,'p','');
   async function refreshWorker() {
     try {
-      const run = await load(api + '/actions/runs/' + swingRun);
-      if (run?.id !== swingRun) throw Error('Unexpected run');
+      const run = await load(api + '/actions/runs/' + collector);
+      if (run?.id !== collector) throw Error('Unexpected run');
       const labels = {in_progress:'läuft', queued:'wartet', pending:'wartet', waiting:'wartet',
         success:'abgeschlossen', failure:'fehlgeschlagen', timed_out:'Zeitlimit erreicht', cancelled:'abgebrochen'};
       let phase = run.conclusion || run.status;
       if (!run.conclusion && ['queued','pending','waiting'].includes(phase) &&
           Number.isSafeInteger(run.run_attempt) && run.run_attempt > 0) {
         try {
-          const result = await load(api + '/actions/runs/' + swingRun + '/attempts/' + run.run_attempt + '/jobs');
+          const result = await load(api + '/actions/runs/' + collector + '/attempts/' + run.run_attempt + '/jobs');
           if (result.jobs.some(job => /^observe \(\d+\)$/.test(job.name) && job.status === 'in_progress')) {
             phase = 'in_progress';
           }
@@ -80,11 +82,15 @@ export function mountSwingCard(section, add, load = read) {
   return async function refreshSwing() {
     if (pending) return;
     pending = true;
-    const workerUpdate = refreshWorker();
     try {
       const state = await load(swingSource, true);
       const rows = swingAccounts(state);
       if (state.lastTick < last) throw Error('Older checkpoint');
+      if (state.collectorRunId !== undefined && (!count(state.collectorRunId) || !state.collectorRunId)) {
+        throw Error('Invalid collector');
+      }
+      collector = state.collectorRunId ?? swingRun;
+      source.href = runs + collector;
       const entries = Object.keys(state.positions).length;
       const pools = Object.keys(state.candidates).length;
       const elapsed = state.lastTick-state.start;
@@ -108,7 +114,7 @@ export function mountSwingCard(section, add, load = read) {
     } catch {
       if (!last) status.textContent = 'Laufstand derzeit nicht abrufbar.';
       else if (!status.textContent.includes('Abruf fehlgeschlagen')) status.textContent += ' · Abruf fehlgeschlagen';
-    } finally { await workerUpdate; pending = false; }
+    } finally { await refreshWorker(); pending = false; }
   };
 }
 

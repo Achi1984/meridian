@@ -48,14 +48,16 @@ test('loads the branch checkpoint as raw JSON and resolves queued runs from the 
     return child;
   }
   let jobs = [{name:'observe (1)',status:'in_progress'}];
+  const collector = 45699000001;
   const refresh = mountSwingCard(root, add, async (url,raw) => {
     if (url.includes('/contents/studies/swing48/')) {
       assert.equal(raw,true);
       assert.equal(new URL(url).searchParams.get('ref'),'paper/second-wave-48h-data');
-      return state;
+      return {...state,collectorRunId:collector};
     }
+    assert.ok(url.includes('/runs/' + collector));
     if (url.endsWith('/attempts/2/jobs')) return {jobs};
-    return {id:45624335706,status:'queued',run_attempt:2};
+    return {id:collector,status:'queued',run_attempt:2};
   });
   const card = root.children[0];
   await refresh();
