@@ -1,0 +1,895 @@
+{
+  "at": 1795632363,
+  "listing": [
+    {
+      "id": "bitcoin",
+      "rank": 1,
+      "symbol": "btc",
+      "instrument": "BTC-USDT-SWAP"
+    },
+    {
+      "id": "ethereum",
+      "rank": 2,
+      "symbol": "eth",
+      "instrument": "ETH-USDT-SWAP"
+    },
+    {
+      "id": "tether",
+      "rank": 3,
+      "symbol": "usdt",
+      "instrument": null
+    },
+    {
+      "id": "binancecoin",
+      "rank": 4,
+      "symbol": "bnb",
+      "instrument": "BNB-USDT-SWAP"
+    },
+    {
+      "id": "usd-coin",
+      "rank": 5,
+      "symbol": "usdc",
+      "instrument": null
+    },
+    {
+      "id": "ripple",
+      "rank": 6,
+      "symbol": "xrp",
+      "instrument": "XRP-USDT-SWAP"
+    },
+    {
+      "id": "solana",
+      "rank": 7,
+      "symbol": "sol",
+      "instrument": "SOL-USDT-SWAP"
+    },
+    {
+      "id": "tron",
+      "rank": 8,
+      "symbol": "trx",
+      "instrument": "TRX-USDT-SWAP"
+    },
+    {
+      "id": "figure-heloc",
+      "rank": 9,
+      "symbol": "figr_heloc",
+      "instrument": null
+    },
+    {
+      "id": "hyperliquid",
+      "rank": 10,
+      "symbol": "hype",
+      "instrument": "HYPE-USDT-SWAP"
+    },
+    {
+      "id": "zcash",
+      "rank": 11,
+      "symbol": "zec",
+      "instrument": "ZEC-USDT-SWAP"
+    },
+    {
+      "id": "monero",
+      "rank": 12,
+      "symbol": "xmr",
+      "instrument": null
+    },
+    {
+      "id": "dogecoin",
+      "rank": 13,
+      "symbol": "doge",
+      "instrument": "DOGE-USDT-SWAP"
+    },
+    {
+      "id": "leo-token",
+      "rank": 14,
+      "symbol": "leo",
+      "instrument": null
+    },
+    {
+      "id": "chainlink",
+      "rank": 15,
+      "symbol": "link",
+      "instrument": "LINK-USDT-SWAP"
+    },
+    {
+      "id": "whitebit",
+      "rank": 16,
+      "symbol": "wbt",
+      "instrument": null
+    },
+    {
+      "id": "usds",
+      "rank": 17,
+      "symbol": "usds",
+      "instrument": null
+    },
+    {
+      "id": "cardano",
+      "rank": 18,
+      "symbol": "ada",
+      "instrument": "ADA-USDT-SWAP"
+    },
+    {
+      "id": "ethena-usde",
+      "rank": 19,
+      "symbol": "usde",
+      "instrument": null
+    },
+    {
+      "id": "stellar",
+      "rank": 20,
+      "symbol": "xlm",
+      "instrument": "XLM-USDT-SWAP"
+    },
+    {
+      "id": "dai",
+      "rank": 21,
+      "symbol": "dai",
+      "instrument": null
+    },
+    {
+      "id": "bitcoin-cash",
+      "rank": 22,
+      "symbol": "bch",
+      "instrument": "BCH-USDT-SWAP"
+    },
+    {
+      "id": "near",
+      "rank": 23,
+      "symbol": "near",
+      "instrument": "NEAR-USDT-SWAP"
+    },
+    {
+      "id": "litecoin",
+      "rank": 24,
+      "symbol": "ltc",
+      "instrument": "LTC-USDT-SWAP"
+    },
+    {
+      "id": "canton-network",
+      "rank": 25,
+      "symbol": "cc",
+      "instrument": null
+    },
+    {
+      "id": "avalanche-2",
+      "rank": 26,
+      "symbol": "avax",
+      "instrument": "AVAX-USDT-SWAP"
+    },
+    {
+      "id": "tether-gold",
+      "rank": 27,
+      "symbol": "xaut",
+      "instrument": null
+    },
+    {
+      "id": "usd1-wlfi",
+      "rank": 28,
+      "symbol": "usd1",
+      "instrument": null
+    },
+    {
+      "id": "uniswap",
+      "rank": 29,
+      "symbol": "uni",
+      "instrument": "UNI-USDT-SWAP"
+    },
+    {
+      "id": "ripple-usd",
+      "rank": 30,
+      "symbol": "rlusd",
+      "instrument": null
+    },
+    {
+      "id": "sui",
+      "rank": 31,
+      "symbol": "sui",
+      "instrument": "SUI-USDT-SWAP"
+    },
+    {
+      "id": "the-open-network",
+      "rank": 32,
+      "symbol": "gram",
+      "instrument": null
+    },
+    {
+      "id": "global-dollar",
+      "rank": 33,
+      "symbol": "usdg",
+      "instrument": null
+    },
+    {
+      "id": "ondo-us-dollar-yield",
+      "rank": 34,
+      "symbol": "usdy",
+      "instrument": null
+    },
+    {
+      "id": "paypal-usd",
+      "rank": 35,
+      "symbol": "pyusd",
+      "instrument": null
+    },
+    {
+      "id": "hedera-hashgraph",
+      "rank": 36,
+      "symbol": "hbar",
+      "instrument": "HBAR-USDT-SWAP"
+    },
+    {
+      "id": "bittensor",
+      "rank": 37,
+      "symbol": "tao",
+      "instrument": "TAO-USDT-SWAP"
+    },
+    {
+      "id": "hashnote-usyc",
+      "rank": 38,
+      "symbol": "usyc",
+      "instrument": null
+    },
+    {
+      "id": "spiko-amundi-overnight-swap-fund-eur",
+      "rank": 39,
+      "symbol": "eursafo",
+      "instrument": null
+    },
+    {
+      "id": "quant-network",
+      "rank": 40,
+      "symbol": "qnt",
+      "instrument": "QNT-USDT-SWAP"
+    },
+    {
+      "id": "crypto-com-chain",
+      "rank": 41,
+      "symbol": "cro",
+      "instrument": "CRO-USDT-SWAP"
+    },
+    {
+      "id": "shiba-inu",
+      "rank": 42,
+      "symbol": "shib",
+      "instrument": "SHIB-USDT-SWAP"
+    },
+    {
+      "id": "rain",
+      "rank": 43,
+      "symbol": "rain",
+      "instrument": null
+    },
+    {
+      "id": "memecore",
+      "rank": 44,
+      "symbol": "m",
+      "instrument": null
+    },
+    {
+      "id": "falcon-finance",
+      "rank": 45,
+      "symbol": "usdf",
+      "instrument": null
+    },
+    {
+      "id": "okb",
+      "rank": 46,
+      "symbol": "okb",
+      "instrument": "OKB-USDT-SWAP"
+    },
+    {
+      "id": "united-stables",
+      "rank": 47,
+      "symbol": "u",
+      "instrument": null
+    },
+    {
+      "id": "pax-gold",
+      "rank": 48,
+      "symbol": "paxg",
+      "instrument": null
+    },
+    {
+      "id": "blackrock-usd-institutional-digital-liquidity-fund",
+      "rank": 49,
+      "symbol": "buidl",
+      "instrument": null
+    },
+    {
+      "id": "usdd",
+      "rank": 50,
+      "symbol": "usdd",
+      "instrument": null
+    },
+    {
+      "id": "aave",
+      "rank": 51,
+      "symbol": "aave",
+      "instrument": "AAVE-USDT-SWAP"
+    },
+    {
+      "id": "pepe",
+      "rank": 52,
+      "symbol": "pepe",
+      "instrument": "PEPE-USDT-SWAP"
+    },
+    {
+      "id": "bitway",
+      "rank": 53,
+      "symbol": "btw",
+      "instrument": null
+    },
+    {
+      "id": "world-liberty-financial",
+      "rank": 54,
+      "symbol": "wlfi",
+      "instrument": "WLFI-USDT-SWAP"
+    },
+    {
+      "id": "ondo-finance",
+      "rank": 55,
+      "symbol": "ondo",
+      "instrument": "ONDO-USDT-SWAP"
+    },
+    {
+      "id": "bfusd",
+      "rank": 56,
+      "symbol": "bfusd",
+      "instrument": null
+    },
+    {
+      "id": "ethena",
+      "rank": 57,
+      "symbol": "ena",
+      "instrument": "ENA-USDT-SWAP"
+    },
+    {
+      "id": "venice-token",
+      "rank": 58,
+      "symbol": "vvv",
+      "instrument": "VVV-USDT-SWAP"
+    },
+    {
+      "id": "htx-dao",
+      "rank": 59,
+      "symbol": "htx",
+      "instrument": null
+    },
+    {
+      "id": "aster-2",
+      "rank": 60,
+      "symbol": "aster",
+      "instrument": null
+    },
+    {
+      "id": "mantle",
+      "rank": 61,
+      "symbol": "mnt",
+      "instrument": null
+    },
+    {
+      "id": "just",
+      "rank": 62,
+      "symbol": "jst",
+      "instrument": null
+    },
+    {
+      "id": "polkadot",
+      "rank": 63,
+      "symbol": "dot",
+      "instrument": "DOT-USDT-SWAP"
+    },
+    {
+      "id": "internet-computer",
+      "rank": 64,
+      "symbol": "icp",
+      "instrument": "ICP-USDT-SWAP"
+    },
+    {
+      "id": "morpho",
+      "rank": 65,
+      "symbol": "morpho",
+      "instrument": "MORPHO-USDT-SWAP"
+    },
+    {
+      "id": "bitget-token",
+      "rank": 66,
+      "symbol": "bgb",
+      "instrument": null
+    },
+    {
+      "id": "open-usd",
+      "rank": 67,
+      "symbol": "ousd",
+      "instrument": null
+    },
+    {
+      "id": "pieverse",
+      "rank": 68,
+      "symbol": "pieverse",
+      "instrument": null
+    },
+    {
+      "id": "sky",
+      "rank": 69,
+      "symbol": "sky",
+      "instrument": "SKY-USDT-SWAP"
+    },
+    {
+      "id": "usdgo",
+      "rank": 70,
+      "symbol": "usdgo",
+      "instrument": null
+    },
+    {
+      "id": "ethereum-classic",
+      "rank": 71,
+      "symbol": "etc",
+      "instrument": "ETC-USDT-SWAP"
+    },
+    {
+      "id": "worldcoin-wld",
+      "rank": 72,
+      "symbol": "wld",
+      "instrument": "WLD-USDT-SWAP"
+    },
+    {
+      "id": "pump-fun",
+      "rank": 73,
+      "symbol": "pump",
+      "instrument": "PUMP-USDT-SWAP"
+    },
+    {
+      "id": "kucoin-shares",
+      "rank": 74,
+      "symbol": "kcs",
+      "instrument": null
+    },
+    {
+      "id": "polygon-ecosystem-token",
+      "rank": 75,
+      "symbol": "pol",
+      "instrument": "POL-USDT-SWAP"
+    },
+    {
+      "id": "midnight-3",
+      "rank": 76,
+      "symbol": "night",
+      "instrument": "NIGHT-USDT-SWAP"
+    },
+    {
+      "id": "pearl-2",
+      "rank": 77,
+      "symbol": "pearl",
+      "instrument": null
+    },
+    {
+      "id": "arbitrum",
+      "rank": 78,
+      "symbol": "arb",
+      "instrument": "ARB-USDT-SWAP"
+    },
+    {
+      "id": "jupiter-exchange-solana",
+      "rank": 79,
+      "symbol": "jup",
+      "instrument": "JUP-USDT-SWAP"
+    },
+    {
+      "id": "kaspa",
+      "rank": 80,
+      "symbol": "kas",
+      "instrument": null
+    },
+    {
+      "id": "render-token",
+      "rank": 81,
+      "symbol": "render",
+      "instrument": "RENDER-USDT-SWAP"
+    },
+    {
+      "id": "algorand",
+      "rank": 82,
+      "symbol": "algo",
+      "instrument": "ALGO-USDT-SWAP"
+    },
+    {
+      "id": "gho",
+      "rank": 83,
+      "symbol": "gho",
+      "instrument": null
+    },
+    {
+      "id": "gatechain-token",
+      "rank": 84,
+      "symbol": "gt",
+      "instrument": null
+    },
+    {
+      "id": "cosmos",
+      "rank": 85,
+      "symbol": "atom",
+      "instrument": "ATOM-USDT-SWAP"
+    },
+    {
+      "id": "superstate-short-duration-us-government-securities-fund-ustb",
+      "rank": 86,
+      "symbol": "ustb",
+      "instrument": null
+    },
+    {
+      "id": "nexo",
+      "rank": 87,
+      "symbol": "nexo",
+      "instrument": null
+    },
+    {
+      "id": "pi-network",
+      "rank": 88,
+      "symbol": "pi",
+      "instrument": "PI-USDT-SWAP"
+    },
+    {
+      "id": "janus-henderson-anemoy-aaa-clo-fund",
+      "rank": 89,
+      "symbol": "jaaa",
+      "instrument": null
+    },
+    {
+      "id": "injective-protocol",
+      "rank": 90,
+      "symbol": "inj",
+      "instrument": "INJ-USDT-SWAP"
+    },
+    {
+      "id": "lighter",
+      "rank": 91,
+      "symbol": "lit",
+      "instrument": null
+    },
+    {
+      "id": "beldex",
+      "rank": 92,
+      "symbol": "bdx",
+      "instrument": null
+    },
+    {
+      "id": "usual-usd",
+      "rank": 93,
+      "symbol": "usd0",
+      "instrument": null
+    },
+    {
+      "id": "xdce-crowd-sale",
+      "rank": 94,
+      "symbol": "xdc",
+      "instrument": null
+    },
+    {
+      "id": "euro-coin",
+      "rank": 95,
+      "symbol": "eurc",
+      "instrument": null
+    },
+    {
+      "id": "true-usd",
+      "rank": 96,
+      "symbol": "tusd",
+      "instrument": null
+    },
+    {
+      "id": "blockstack",
+      "rank": 97,
+      "symbol": "stx",
+      "instrument": "STX-USDT-SWAP"
+    },
+    {
+      "id": "pancakeswap-token",
+      "rank": 98,
+      "symbol": "cake",
+      "instrument": null
+    },
+    {
+      "id": "eutbl",
+      "rank": 99,
+      "symbol": "eutbl",
+      "instrument": null
+    },
+    {
+      "id": "filecoin",
+      "rank": 100,
+      "symbol": "fil",
+      "instrument": "FIL-USDT-SWAP"
+    }
+  ],
+  "specs": {
+    "BTC-USDT-SWAP": [
+      "0.01",
+      "1",
+      "0.01",
+      "0.01"
+    ],
+    "ETH-USDT-SWAP": [
+      "0.1",
+      "1",
+      "0.01",
+      "0.01"
+    ],
+    "BNB-USDT-SWAP": [
+      "0.01",
+      "1",
+      "1",
+      "1"
+    ],
+    "XRP-USDT-SWAP": [
+      "100",
+      "1",
+      "0.01",
+      "0.01"
+    ],
+    "SOL-USDT-SWAP": [
+      "1",
+      "1",
+      "0.01",
+      "0.01"
+    ],
+    "TRX-USDT-SWAP": [
+      "1000",
+      "1",
+      "0.01",
+      "0.01"
+    ],
+    "HYPE-USDT-SWAP": [
+      "0.1",
+      "1",
+      "1",
+      "1"
+    ],
+    "ZEC-USDT-SWAP": [
+      "0.01",
+      "1",
+      "1",
+      "1"
+    ],
+    "DOGE-USDT-SWAP": [
+      "1000",
+      "1",
+      "0.01",
+      "0.01"
+    ],
+    "LINK-USDT-SWAP": [
+      "1",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "ADA-USDT-SWAP": [
+      "100",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "XLM-USDT-SWAP": [
+      "100",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "BCH-USDT-SWAP": [
+      "0.1",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "NEAR-USDT-SWAP": [
+      "10",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "LTC-USDT-SWAP": [
+      "1",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "AVAX-USDT-SWAP": [
+      "1",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "UNI-USDT-SWAP": [
+      "1",
+      "1",
+      "1",
+      "1"
+    ],
+    "SUI-USDT-SWAP": [
+      "1",
+      "1",
+      "1",
+      "1"
+    ],
+    "HBAR-USDT-SWAP": [
+      "100",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "TAO-USDT-SWAP": [
+      "0.01",
+      "1",
+      "1",
+      "1"
+    ],
+    "QNT-USDT-SWAP": [
+      "1",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "CRO-USDT-SWAP": [
+      "10",
+      "1",
+      "1",
+      "1"
+    ],
+    "SHIB-USDT-SWAP": [
+      "1000000",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "OKB-USDT-SWAP": [
+      "0.01",
+      "1",
+      "1",
+      "1"
+    ],
+    "AAVE-USDT-SWAP": [
+      "0.1",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "PEPE-USDT-SWAP": [
+      "10000000",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "WLFI-USDT-SWAP": [
+      "10",
+      "1",
+      "1",
+      "1"
+    ],
+    "ONDO-USDT-SWAP": [
+      "10",
+      "1",
+      "1",
+      "1"
+    ],
+    "ENA-USDT-SWAP": [
+      "10",
+      "1",
+      "1",
+      "1"
+    ],
+    "VVV-USDT-SWAP": [
+      "0.1",
+      "1",
+      "1",
+      "1"
+    ],
+    "DOT-USDT-SWAP": [
+      "1",
+      "1",
+      "1",
+      "1"
+    ],
+    "ICP-USDT-SWAP": [
+      "0.01",
+      "1",
+      "1",
+      "1"
+    ],
+    "MORPHO-USDT-SWAP": [
+      "1",
+      "1",
+      "1",
+      "1"
+    ],
+    "SKY-USDT-SWAP": [
+      "100",
+      "1",
+      "1",
+      "1"
+    ],
+    "ETC-USDT-SWAP": [
+      "10",
+      "1",
+      "0.01",
+      "0.01"
+    ],
+    "WLD-USDT-SWAP": [
+      "1",
+      "1",
+      "1",
+      "1"
+    ],
+    "PUMP-USDT-SWAP": [
+      "1000",
+      "1",
+      "1",
+      "1"
+    ],
+    "POL-USDT-SWAP": [
+      "10",
+      "1",
+      "1",
+      "1"
+    ],
+    "NIGHT-USDT-SWAP": [
+      "100",
+      "1",
+      "1",
+      "1"
+    ],
+    "ARB-USDT-SWAP": [
+      "10",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "JUP-USDT-SWAP": [
+      "10",
+      "1",
+      "1",
+      "1"
+    ],
+    "RENDER-USDT-SWAP": [
+      "1",
+      "1",
+      "1",
+      "1"
+    ],
+    "ALGO-USDT-SWAP": [
+      "10",
+      "1",
+      "1",
+      "1"
+    ],
+    "ATOM-USDT-SWAP": [
+      "1",
+      "1",
+      "1",
+      "1"
+    ],
+    "PI-USDT-SWAP": [
+      "1",
+      "1",
+      "1",
+      "1"
+    ],
+    "INJ-USDT-SWAP": [
+      "0.1",
+      "1",
+      "1",
+      "1"
+    ],
+    "STX-USDT-SWAP": [
+      "10",
+      "1",
+      "0.1",
+      "0.1"
+    ],
+    "FIL-USDT-SWAP": [
+      "0.1",
+      "1",
+      "1",
+      "1"
+    ]
+  }
+}

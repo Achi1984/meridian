@@ -1,0 +1,38 @@
+name: Top 100 hourly breakout and retest paper pilot
+on:
+  push:
+    branches: [paper/top100-breakout-20261125]
+    paths: ['.github/workflows/top100-breakout.yml']
+permissions:
+  contents: read
+jobs:
+  first:
+    runs-on: ubuntu-latest
+    timeout-minutes: 255
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - run: python -m unittest discover -s scripts/research -p test_top100_paper.py
+      - run: python scripts/research/top100_paper.py direction 1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: top100-breakout-first
+          path: direction/
+          if-no-files-found: error
+  finish:
+    needs: first
+    runs-on: ubuntu-latest
+    timeout-minutes: 255
+    steps:
+      - uses: actions/checkout@v4
+        with: {persist-credentials: false}
+      - uses: actions/download-artifact@v4
+        with: {name: top100-breakout-first, path: direction}
+      - run: python scripts/research/top100_paper.py direction 2
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: top100-breakout-final
+          path: direction/
+          if-no-files-found: error
