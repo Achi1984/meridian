@@ -1,0 +1,37 @@
+name: Bounded holder RPC sample
+on:
+  push:
+    branches: [paper/holder-rpc-probe-20261125]
+    paths: ['.github/workflows/holder-rpc-probe.yml']
+permissions:
+  contents: read
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - working-directory: scripts/memecoin-paper/research
+        run: |
+          python -m unittest test_holder_signal
+          python -u - <<'PY'
+          import json, time
+          from holder_signal import HolderSampler
+          mint = '6hEQjd3hPGkhr9JH6mBzHqGdJEDiRRWFwgbqFRpxAQeK'
+          sampler = HolderSampler()
+          try:
+              for index in range(6):
+                  sampler.refresh(mint)
+                  time.sleep(10)
+                  result = sampler.at_entry(mint, time.time())
+                  print(json.dumps(result))
+                  if result['state'] != 'unknown':
+                      break
+                  time.sleep(20)
+              else:
+                  raise SystemExit('No usable holder sample')
+          finally:
+              sampler.pool.shutdown()
+          PY
