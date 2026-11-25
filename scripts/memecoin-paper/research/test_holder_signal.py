@@ -23,6 +23,28 @@ class HolderEvidenceTests(unittest.TestCase):
         with patch('holder_signal.signer_address', return_value=False), self.assertRaises(ValueError):
             measure('mint', read)
 
+    def test_token_2022_balance_coverage(self):
+        from holder_signal import TOKEN_2022
+        keys = [f'key{i}' for i in range(10)]
+        def row(kind, **info):
+            return dict(owner=TOKEN_2022, data=dict(parsed=dict(type=kind, info=info)))
+        mint = row('mint', supply='100', extensions=[dict(extension='metadataPointer')])
+        accounts = [row('account', mint='m', owner=k, tokenAmount=dict(amount='5'),
+                        extensions=[dict(extension='immutableOwner')]) for k in keys]
+        def read(method, params):
+            if method == 'getTokenLargestAccounts':
+                return dict(context=dict(slot=7), value=[dict(address=k) for k in keys])
+            return dict(context=dict(slot=7), value=[mint, *accounts])
+        with patch('holder_signal.signer_address', return_value=True):
+            self.assertEqual(measure('m', read)['largestOwnerBps'], 500)
+            accounts[0]['owner'] = TOKEN
+            with self.assertRaisesRegex(ValueError, 'unsupported account'):
+                measure('m', read)
+            accounts[0]['owner'] = TOKEN_2022
+            accounts[0]['data']['parsed']['info']['extensions'] = [dict(extension='confidentialTransferAccount')]
+            with self.assertRaisesRegex(ValueError, 'unsupported token extension'):
+                measure('m', read)
+
     def test_curve_and_invalid_address(self):
         # RFC 8032 Ed25519 basepoint compressed to base58
         self.assertTrue(signer_address('6x5SYnLroiN7WYq8NQYU9KHcH4YjpBbwpUfVu3EB7ieH'))
