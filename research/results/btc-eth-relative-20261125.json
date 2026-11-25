@@ -1,0 +1,128 @@
+{
+  "start": 1792454400,
+  "end": 1794873600,
+  "metric": "Percent of gross two-leg notional. Equal quote notionals. Independent round trips, 5 bp fee and 10 bp slippage per side per leg, funding and observed spread unavailable.",
+  "earlier": {
+    "signals": 4,
+    "opportunities": 56,
+    "positive": 0,
+    "meanGrossPct": -0.1534963740425055,
+    "meanAfterModeledCostsPct": -0.4534963740425055,
+    "trades": [
+      {
+        "signal": 1792778400,
+        "entry": 1792782000,
+        "exit": 1792803600,
+        "long": "ETH",
+        "grossPct": -0.06394555150918135
+      },
+      {
+        "signal": 1793340000,
+        "entry": 1793343600,
+        "exit": 1793365200,
+        "long": "BTC",
+        "grossPct": -0.3212881456778671
+      },
+      {
+        "signal": 1793383200,
+        "entry": 1793386800,
+        "exit": 1793408400,
+        "long": "ETH",
+        "grossPct": -0.1996771025966182
+      },
+      {
+        "signal": 1793491200,
+        "entry": 1793494800,
+        "exit": 1793516400,
+        "long": "ETH",
+        "grossPct": -0.029074696386355292
+      }
+    ]
+  },
+  "later": {
+    "signals": 11,
+    "opportunities": 56,
+    "positive": 5,
+    "meanGrossPct": -0.01483094658744027,
+    "meanAfterModeledCostsPct": -0.31483094658744026,
+    "trades": [
+      {
+        "signal": 1793793600,
+        "entry": 1793797200,
+        "exit": 1793818800,
+        "long": "ETH",
+        "grossPct": 1.05651603121808
+      },
+      {
+        "signal": 1794182400,
+        "entry": 1794186000,
+        "exit": 1794207600,
+        "long": "BTC",
+        "grossPct": 0.10905349865725777
+      },
+      {
+        "signal": 1794312000,
+        "entry": 1794315600,
+        "exit": 1794337200,
+        "long": "BTC",
+        "grossPct": 0.7142442746984723
+      },
+      {
+        "signal": 1794420000,
+        "entry": 1794423600,
+        "exit": 1794445200,
+        "long": "ETH",
+        "grossPct": -0.24132653386874092
+      },
+      {
+        "signal": 1794441600,
+        "entry": 1794445200,
+        "exit": 1794466800,
+        "long": "BTC",
+        "grossPct": 0.02996571196169362
+      },
+      {
+        "signal": 1794484800,
+        "entry": 1794488400,
+        "exit": 1794510000,
+        "long": "BTC",
+        "grossPct": -0.6356645604705224
+      },
+      {
+        "signal": 1794528000,
+        "entry": 1794531600,
+        "exit": 1794553200,
+        "long": "ETH",
+        "grossPct": -0.3482973382299026
+      },
+      {
+        "signal": 1794636000,
+        "entry": 1794639600,
+        "exit": 1794661200,
+        "long": "ETH",
+        "grossPct": 0.12743650152097774
+      },
+      {
+        "signal": 1794657600,
+        "entry": 1794661200,
+        "exit": 1794682800,
+        "long": "ETH",
+        "grossPct": -0.7349419806117585
+      },
+      {
+        "signal": 1794765600,
+        "entry": 1794769200,
+        "exit": 1794790800,
+        "long": "ETH",
+        "grossPct": -0.1857793744384051
+      },
+      {
+        "signal": 1794808800,
+        "entry": 1794812400,
+        "exit": 1794834000,
+        "long": "ETH",
+        "grossPct": -0.05434664289899471
+      }
+    ]
+  }
+}
