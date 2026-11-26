@@ -12,6 +12,7 @@ export function auditHolderReport(status, journal) {
   const seen = new Map();
   const accounts = Object.fromEntries(['C','H'].map(k => [k, {cash:1000*micro, open:new Map(), net:0, closed:0}]));
   const entryStates = {high:0, belowThreshold:0, unknown:0};
+  let maxOwnerBps = null;
   let missed = 0, avoided = 0, skipped = 0, last;
   for (const line of journal.trim().split(/\r?\n/)) {
     const row = JSON.parse(line);
@@ -33,6 +34,7 @@ export function auditHolderReport(status, journal) {
             evidence.state !== (largestOwnerBps >= c.thresholdBps ? 'high' : 'belowThreshold')) {
           throw Error('holder measurement');
         }
+        maxOwnerBps = Math.max(maxOwnerBps ?? 0, largestOwnerBps);
       }
       entryStates[evidence.state]++;
     }
@@ -69,12 +71,13 @@ export function auditHolderReport(status, journal) {
         a.closed !== record.closedTrades || a.open.size !== record.openPositions.length ||
         new Set(record.openPositions.map(p => p.positionId)).size !== a.open.size ||
         record.openPositions.some(p => a.open.get(p.positionId)?.qty !== p.qty)) throw Error('balance');
-    rows.push({net:a.net/micro, open:a.open.size, closed:a.closed});
+    const openCost = [...a.open.values()].reduce((total, position) => total + position.cost, 0);
+    rows.push({net:a.net/micro, open:a.open.size, closed:a.closed, openCost:openCost/micro});
   }
   const delta = (accounts.H.net-accounts.C.net)/micro;
   if (last?.event !== status.lastEvent || last.at !== status.updatedAt || skipped !== c.skippedReferenceEntries ||
       delta !== c.realizedDeltaUsdc || Object.entries(entryStates).some(([state, count]) => count !== (c.entryStates[state] ?? 0))) throw Error('comparison');
-  return {rows, delta, skipped, unknown:entryStates.unknown, missed:missed/micro, avoided:avoided/micro,
+  return {rows, delta, skipped, maxOwnerBps, measured:entryStates.high + entryStates.belowThreshold, unknown:entryStates.unknown, missed:missed/micro, avoided:avoided/micro,
     updatedAt:status.updatedAt, final:status.lastEvent === 'finished'};
 }
 
@@ -92,14 +95,19 @@ export function mountHolderComparison(section, add, read, amount) {
     const date = new Date(report.updatedAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
     add(body, 'strong', (report.final ? 'Endstand' : 'Zwischenstand') + ' · ' + date + ' (Wien) · ' + origin);
     report.rows.forEach((a, i) => add(body, 'p', (i ? 'H · Filter' : 'C · Referenz') + ' · realisiert ' +
-      amount(a.net) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen'));
+      amount(a.net) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen' +
+      (a.open ? ' · Einstand inkl. Kaufgebühren ' + amount(a.openCost) : '')));
     add(body, 'p', 'Differenz H zu C · ' + amount(report.delta));
-    if (report.skipped !== undefined) add(body, 'p', report.skipped + ' ausgelassene Einstiege · vermiedene Verluste ' +
-      amount(report.avoided) + ' · entgangene Gewinne ' + amount(report.missed) + ' · unbekannte Halterdaten bei ' +
-      report.unknown + ' Einstiegssignalen.');
+    const maxShare = report.maxOwnerBps === null ? '' : ' · höchster gemessener Einzelanteil ' +
+      (report.maxOwnerBps / 100).toLocaleString('de-AT', {maximumFractionDigits:2}) + ' %';
+    add(body, 'p', 'Halterdaten bei ' + report.measured + ' von ' + (report.measured + report.unknown) +
+      ' Einstiegssignalen' + maxShare);
+    add(body, 'p', report.skipped + ' ausgelassene Einstiege · vermiedene Verluste ' +
+      amount(report.avoided) + ' · entgangene Gewinne ' + amount(report.missed));
   }
-  render({updatedAt:1795698134, final:true, rows:[{net:24.646325,closed:14,open:4},
-    {net:19.527430,closed:12,open:4}], delta:-5.118895}, 'Laufprotokoll vom 26. November');
+  render({updatedAt:1795727317, final:true, rows:[{net:-22.021548,closed:16,open:2,openCost:40.1},
+    {net:-22.021548,closed:16,open:2,openCost:40.1}], delta:0, measured:18, unknown:0,
+    maxOwnerBps:651, skipped:0, missed:0, avoided:0}, 'Geprüftes Journal vom 26. November');
   const label = add(card, 'label', 'Bericht prüfen · status.json und events.jsonl auswählen ');
   const input = add(label, 'input', '');
   input.type = 'file';
