@@ -19,7 +19,12 @@ class HolderEvidenceTests(unittest.TestCase):
                            tokenAmount=dict(amount='10')) for i in range(11)]
             return dict(context=dict(slot=22), value=[record('mint', supply='200'), *rows])
         with patch('holder_signal.signer_address', return_value=True):
-            self.assertEqual(measure('mint', read)['largestOwnerBps'], 1000)
+            result = measure('mint', read)
+            self.assertEqual(result['largestOwnerBps'], 1000)
+            self.assertEqual(result['supplyRaw'], '200')
+            self.assertEqual(result['largestObservedOwners'], [
+                dict(owner='w0', amountRaw='20', tokenAccounts=[
+                    dict(address='a0', amountRaw='10'), dict(address='a10', amountRaw='10')])])
         with patch('holder_signal.signer_address', return_value=False), self.assertRaises(ValueError):
             measure('mint', read)
 
@@ -36,7 +41,9 @@ class HolderEvidenceTests(unittest.TestCase):
                 return dict(context=dict(slot=7), value=[dict(address=k) for k in keys])
             return dict(context=dict(slot=7), value=[mint, *accounts])
         with patch('holder_signal.signer_address', return_value=True):
-            self.assertEqual(measure('m', read)['largestOwnerBps'], 500)
+            result = measure('m', read)
+            self.assertEqual(result['largestOwnerBps'], 500)
+            self.assertEqual([entry['owner'] for entry in result['largestObservedOwners']], keys)
             accounts[0]['owner'] = TOKEN
             with self.assertRaisesRegex(ValueError, 'unsupported account'):
                 measure('m', read)
