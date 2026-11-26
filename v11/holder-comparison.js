@@ -1,0 +1,125 @@
+const api = 'https://api.github.com/repos/Achi1984/meridian/actions';
+const runs = 'https://github.com/Achi1984/meridian/actions/runs/';
+const micro = 1_000_000;
+const fee = 50_000;
+const safe = Number.isSafeInteger;
+
+export function auditHolderReport(status, journal) {
+  const c = status.holderComparison;
+  if (status.ledgerVerified !== true || !['handoff','finished'].includes(status.lastEvent) ||
+      c?.thresholdBps !== 2000 || c.reference !== 'C' || c.filtered !== 'H' ||
+      !safe(status.startedAt) || !safe(status.updatedAt) || status.updatedAt < status.startedAt) throw Error('status');
+  const seen = new Map();
+  const accounts = Object.fromEntries(['C','H'].map(k => [k, {cash:1000*micro, open:new Map(), net:0, closed:0}]));
+  let missed = 0, avoided = 0, skipped = 0, unknown = 0, last;
+  for (const line of journal.trim().split(/\r?\n/)) {
+    const row = JSON.parse(line);
+    if (!row.eventId || !safe(row.at)) throw Error('event');
+    if (seen.has(row.eventId)) {
+      if (seen.get(row.eventId) !== JSON.stringify(row)) throw Error('duplicate');
+      continue;
+    }
+    if (!seen.size && (row.event !== 'start' || row.at !== status.startedAt)) throw Error('start');
+    seen.set(row.eventId, JSON.stringify(row));
+    last = row;
+    if (row.event === 'entry' && row.arm === 'wave' && row.holderEvidence.state === 'unknown') unknown++;
+    for (const fill of row.fills) {
+      if (!['C','H'].includes(fill.account)) continue;
+      const a = accounts[fill.account];
+      const id = fill.positionId;
+      if (!id || !safe(fill.qty) || fill.qty <= 0 || !safe(fill.usdcRaw) || fill.usdcRaw <= 0) throw Error('fill');
+      if (fill.side === 'buy') {
+        if (a.open.has(id) || row.event !== 'entry' ||
+            !['high','unknown','belowThreshold'].includes(row.holderEvidence?.state)) throw Error('entry');
+        const high = row.holderEvidence.state === 'high';
+        if (high && fill.account === 'H') throw Error('filter');
+        if (high) skipped++;
+        a.cash -= fill.usdcRaw + fee;
+        a.open.set(id, {cost:fill.usdcRaw + fee, qty:fill.qty, high});
+      } else {
+        const buy = a.open.get(id);
+        if (fill.side !== 'sell' || !buy || buy.qty !== fill.qty) throw Error('exit');
+        const proceeds = fill.usdcRaw - fee;
+        const net = proceeds - buy.cost;
+        a.cash += proceeds;
+        a.net += net;
+        a.closed++;
+        a.open.delete(id);
+        if (buy.high) { missed += Math.max(net, 0); avoided += Math.max(-net, 0); }
+      }
+    }
+  }
+  const rows = [];
+  for (const key of ['C','H']) {
+    const a = accounts[key], record = status.accounts[key];
+    if (record.policy !== 'fixed' || a.cash/micro !== record.cashUsdc || a.net/micro !== record.realizedUsdc ||
+        a.closed !== record.closedTrades || a.open.size !== record.openPositions.length ||
+        new Set(record.openPositions.map(p => p.positionId)).size !== a.open.size ||
+        record.openPositions.some(p => a.open.get(p.positionId)?.qty !== p.qty)) throw Error('balance');
+    rows.push({net:a.net/micro, open:a.open.size, closed:a.closed});
+  }
+  const delta = (accounts.H.net-accounts.C.net)/micro;
+  if (last?.event !== status.lastEvent || last.at !== status.updatedAt || skipped !== c.skippedReferenceEntries ||
+      delta !== c.realizedDeltaUsdc || unknown !== (c.entryStates.unknown ?? 0)) throw Error('comparison');
+  return {rows, delta, skipped, unknown, missed:missed/micro, avoided:avoided/micro,
+    updatedAt:status.updatedAt, final:status.lastEvent === 'finished'};
+}
+
+export function mountHolderComparison(section, add, read, amount) {
+  const card = add(section, 'section', '');
+  card.className = 'solana-comparison';
+  add(card, 'h3', 'Halterkonzentration · Solana');
+  add(card, 'small', 'Je 1.000 USDC. H überspringt Einstiege ab 20 % gemessenem Anteil eines Halters. Bei unbekanntem Anteil gelten die Regeln von C.');
+  const live = add(card, 'p', 'Laufstatus wird geladen.');
+  const source = add(card, 'a', 'Laufprotokoll öffnen');
+  source.href = runs + '45622083781';
+  const body = add(card, 'section', '');
+  function render(report, origin) {
+    body.replaceChildren();
+    const date = new Date(report.updatedAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
+    add(body, 'strong', (report.final ? 'Endstand' : 'Zwischenstand') + ' · ' + date + ' (Wien) · ' + origin);
+    report.rows.forEach((a, i) => add(body, 'p', (i ? 'H · Filter' : 'C · Referenz') + ' · realisiert ' +
+      amount(a.net) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen'));
+    add(body, 'p', 'Differenz H zu C · ' + amount(report.delta));
+    if (report.skipped !== undefined) add(body, 'p', report.skipped + ' ausgelassene Einstiege · vermiedene Verluste ' +
+      amount(report.avoided) + ' · entgangene Gewinne ' + amount(report.missed) + ' · unbekannte Halterdaten bei ' +
+      report.unknown + ' Einstiegssignalen.');
+  }
+  render({updatedAt:1795698134, final:true, rows:[{net:24.646325,closed:14,open:4},
+    {net:19.527430,closed:12,open:4}], delta:-5.118895}, 'Laufprotokoll vom 26. November');
+  const label = add(card, 'label', 'Bericht prüfen · status.json und events.jsonl auswählen ');
+  const input = add(label, 'input', '');
+  input.type = 'file';
+  input.multiple = true;
+  const notice = add(card, 'p', '');
+  notice.setAttribute('role', 'status');
+  let revision = 0;
+  input.addEventListener('change', async () => {
+    const request = ++revision;
+    try {
+      const files = Array.from(input.files);
+      const pair = ['status.json','events.jsonl'].map(name => files.find(f => f.name === name));
+      if (pair.some(f => !f || f.size > 16*1024*1024)) throw Error('files');
+      const [status, journal] = await Promise.all(pair.map(f => f.text()));
+      const report = auditHolderReport(JSON.parse(status), journal);
+      if (request !== revision) return;
+      render(report, 'lokales Handelsjournal');
+      notice.textContent = 'Beide Konten und die Filterwirkung sind abgeglichen.';
+    } catch {
+      if (request === revision) notice.textContent = 'Import fehlgeschlagen. Beide Dateien desselben Haltertests auswählen.';
+    }
+  });
+  let pending;
+  return function refresh() {
+    if (pending) return pending;
+    pending = read(api + '/runs?branch=paper%2Fholder-token2022-forward&per_page=20').then(feed => {
+      const run = feed.workflow_runs.find(r => r.path === '.github/workflows/holder-concentration.yml');
+      if (!safe(run?.id) || !safe(run.run_attempt)) throw Error('run');
+      const state = {in_progress:'läuft', queued:'in Warteschlange', success:'abgeschlossen', failure:'fehlgeschlagen',
+        cancelled:'abgebrochen'}[run.conclusion || run.status] || run.status;
+      live.textContent = 'Paperlauf ' + run.id + ' · Versuch ' + run.run_attempt + ' · ' + state;
+      source.href = runs + run.id + '/attempts/' + run.run_attempt;
+    }).catch(() => { live.textContent = 'Aktueller Laufstatus nicht abrufbar.'; }).finally(() => { pending = null; });
+    return pending;
+  };
+}
