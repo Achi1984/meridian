@@ -1,1 +1,1 @@
-{"runId": 45678525838, "stage": "first", "asOf": 1795644000, "accounts": {"direct": {"open": 2, "closed": 0, "pending": 0, "realized": 0.0}, "retest": {"open": 2, "closed": 0, "pending": 0, "realized": 0.0}}}
+{"runId": 45678525838, "stage": "final", "asOf": 1795658400, "accounts": {"direct": {"open": 2, "closed": 2, "pending": 0, "realized": 2.7220054957038826}, "retest": {"open": 2, "closed": 2, "pending": 0, "realized": 3.2540105846250973}}}
