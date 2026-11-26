@@ -89,6 +89,31 @@ class ScannerTests(unittest.TestCase):
         self.assertNotIn(30,incomplete['ranks'])
         self.assertTrue(all(30 in e['ranks'] for e in complete))
 
+    def test_peer_strength_prioritizes_only_eligible_candidates(self):
+        rows = [dict(self.row, mint=str(i), pool=str(i)) for i in range(5)]
+        def fetch(url, age):
+            if '/trades' in url:
+                return {'data': []}
+            pool = int(url.split('/pools/')[1].split('/')[0])
+            bars = [[at, 1, 2, 1, 1 + pool / 10, volume]
+                    for at, _, _, _, _, volume in self.bars]
+            return {'data': {'attributes': {'ohlcv_list': bars}}}
+        def quote(src, dst, qty):
+            if src == '4':
+                raise ValueError('missing resale')
+            return SIZE
+        events = []
+        with patch('newcomer_scanner.sample', return_value=rows):
+            chosen = scan(lambda kind, **r: events.append(r), fetch, quote, lambda: 3600)
+        self.assertEqual([r['mint'] for r in chosen], ['3', '0', '1', '2'])
+        self.assertEqual(events[3]['shortlistRank'], 1)
+        self.assertEqual(events[3]['peerPriority'], 'confirmed')
+        self.assertNotIn('shortlistRank', events[4])
+        with patch('newcomer_scanner.sample', return_value=rows[:3]):
+            events.clear()
+            scan(lambda kind, **r: events.append(r), fetch, quote, lambda: 3600)
+        self.assertEqual(events[0]['peerPriority'], 'insufficient')
+
     def test_trending_discovers_older_launch_and_deduplicates(self):
         from newcomer_scanner import GT, WSOL, sample
         row = dict(self.row, mint='m', quote=WSOL, dex='pumpswap', liquidity=6000)

@@ -1,6 +1,7 @@
 """Volume leaderboards for a sampled universe of new Solana launchpad mints."""
 import time
-from math import ceil
+from statistics import median
+from math import ceil, isfinite
 from itertools import chain
 from datetime import datetime
 from urllib.error import HTTPError
@@ -108,6 +109,26 @@ def metrics(row, candles, trades, end):
     return result
 
 
+def add_peer_comparison(candidates, cutoff):
+    # Compare full candles on identical boundaries, excluding the candidate itself.
+    for minutes in (5, 30, 60):
+        returns = {}
+        for row in candidates:
+            window = row['windows'].get(minutes, {})
+            change = window.get('changePct')
+            if (row['earliest30mAt'] is not None and row['earliest30mAt']-1800 <= cutoff-minutes*60
+                    and window.get('observedMinutes') == minutes and type(change) in (int, float)
+                    and isfinite(change)):
+                returns[row['row']['mint']] = change
+        for row in candidates:
+            peers = [change for mint, change in returns.items() if mint != row['row']['mint']]
+            benchmark = median(peers) if len(peers) >= 3 else None
+            change = returns.get(row['row']['mint'])
+            row.setdefault('solanaNewcomerPeers', {})[minutes] = dict(
+                count=len(peers), medianChangePct=benchmark,
+                excessPp=change-benchmark if change is not None and benchmark is not None else None)
+
+
 def rank_complete_windows(records, end):
     for record in records:
         # Even the first candle of a pool can cover only part of a minute.
@@ -174,6 +195,7 @@ def scan(emit, fetch=None, quote=spot_quote, now=time.time, *, ranked_windows_on
                 raise
             result['reasons'].append('marketDataUnavailable')
     rank_complete_windows(records, end)
+    add_peer_comparison(records, end)
     selected = []
     for record in records:
         row, ranks, reasons = record['row'], record['ranks'], record['reasons']
@@ -194,10 +216,18 @@ def scan(emit, fetch=None, quote=spot_quote, now=time.time, *, ranked_windows_on
                 if isinstance(exc, HTTPError) and exc.code == 429:
                     raise
                 reasons.append('quoteUnavailable')
+        excess = [record['solanaNewcomerPeers'][w]['excessPp'] for w in (5, 30)]
+        if None in excess:
+            record['peerPriority'] = 'insufficient'
+        else:
+            record['peerPriority'] = 'confirmed' if min(excess) > 0 else 'unconfirmed'
         if not reasons:
-            selected.append((ranks[5], row))
+            selected.append(record)
+    selected.sort(key=lambda r: (r['peerPriority'] != 'confirmed', r['ranks'][5]))
+    for rank, record in enumerate(selected, 1):
+        record['shortlistRank'] = rank
     for record in records:
         emit('scannerCandidate', asOf=end, **record)
     emit('scannerSummary', asOf=end, sampled=len(records), qualified=len(selected),
          scope='Jupiter discovery intersecting GeckoTerminal first pools, three new-pool pages and the available trending feed; deepest sampled pool per mint')
-    return [row for _, row in sorted(selected, key=lambda item: item[0])]
+    return [record["row"] for record in selected]
