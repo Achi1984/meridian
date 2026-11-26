@@ -517,6 +517,27 @@ export function mountLiveScanner(section) {
       (age >= 30 ? ' · Daten veraltet' : '') + (failed ? ' · Aktualisierung fehlgeschlagen' : '') +
       (latest.warnings.length ? ' · Datenquelle eingeschränkt' : '');
     result.replaceChildren();
+    const market = latest.dailyMarketContext;
+    if (market) {
+      const btc = market.btc?.medianChangePct, meme = market.meme?.medianChangePct;
+      const spread = Number.isFinite(btc) && Number.isFinite(meme) ? meme - btc : null;
+      add(result, 'p', '24 h · BTC ' + fmt(btc, ' %') + ' · Memecoin-Median ' +
+        fmt(meme, ' %') + ' · Abstand ' + fmt(spread, ' Pp.'));
+    }
+    const shortlist = latest.candidates.filter(c => Number.isInteger(c.shortlistRank))
+      .sort((a,b) => a.shortlistRank-b.shortlistRank);
+    if (shortlist.length) {
+      add(result,'h4','Paper-Vorauswahl');
+      const list = add(result,'ol','');
+      const labels = {confirmed:'Stärke bestätigt', unconfirmed:'Stärke unbestätigt',
+        insufficient:'Vergleichsdaten fehlen'};
+      for (const c of shortlist) {
+        const item = add(list,'li','');
+        mint(item,c);
+        add(item,'span',' · ' + labels[c.peerPriority] + ' · 5 / 30 Min. ' +
+          [5,30].map(w => fmt(c.solanaNewcomerPeers?.[w]?.excessPp,' Pp.')).join(' / '));
+      }
+    }
     const w = select.value || '5';
     const ranked = latest.candidates.filter(c => Number.isInteger(c.ranks[w]))
       .sort((a,b) => a.ranks[w]-b.ranks[w]);
