@@ -156,6 +156,9 @@ function mountCampaign(parent, add, read, amount, campaign) {
       const last = row.trades.at(-1);
       if (last) add(strategy,'small',(last.action === 'exit' ? 'Verkauf' : 'Kauf') + ' · ' + vienna(last.at)).setAttribute('style','display:block');
       const balance = add(line,'td','');
+      add(balance,'small','Freies Cash · ' + amount(row.cash)).setAttribute('style','display:block');
+      if (row.missing > 0) add(strategy,'small',row.missing + ' fehlende Verkaufsquotes')
+        .setAttribute('style','display:block');
       const value = add(balance,'span',row.equity === null ? 'Bewertung offen' : amount(row.equity));
       value.className = row.equity === null ? 'account-value af-waiting' : 'account-value';
       const pnl = add(balance,'span','Realisiert · ' + (row.net > 0 ? '+' : '') + amount(row.net));
@@ -168,6 +171,9 @@ function mountCampaign(parent, add, read, amount, campaign) {
         snapshot.lastQuoteAt <= snapshot.updatedAt) add(metrics,'p','Letzte Rückverkaufsquote · ' + vienna(snapshot.lastQuoteAt));
     const f = rows.find(row => row.key === 'F');
     if (f) {
+      const b = rows.find(row => row.key === 'B');
+      add(metrics,'p','F gegenüber B · realisiert ' + amount(f.net-b.net) + ' · Kontowert ' +
+        (f.equity === null || b.equity === null ? 'Bewertung offen' : amount(f.equity-b.equity)));
       const c = rows.find(row => row.key === 'C');
       add(metrics,'p','F gegenüber C · realisiert ' + amount(f.net-c.net) + ' · Kontowert ' +
         (f.equity === null || c.equity === null ? 'Bewertung offen' : amount(f.equity-c.equity)));
