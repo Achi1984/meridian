@@ -93,21 +93,32 @@ def measure(mint, read=rpc):
         return details
     supply = int(info(values[0], 'mint')['supply'])
     amounts = Counter()
+    contributions = []
     sampled = 0
-    for row in values[1:]:
+    for key, row in zip(keys, values[1:]):
         account = info(row, 'account')
         amount = int(account['tokenAmount']['amount'])
         if account['mint'] != mint or amount < 0:
             raise ValueError('invalid token amount')
         sampled += amount
         if amount and account['owner'] not in ('1'*32, '1nc1nerator11111111111111111111111111111111') and signer_address(account['owner']):
-            amounts[account['owner']] += amount
+            owner = account['owner']
+            amounts[owner] += amount
+            contributions.append((owner, key, amount))
     if len(amounts) < 10:
         raise ValueError('fewer than ten observed signer addresses')
     if not amounts or not 0 < sampled <= supply:
         raise ValueError('insufficient sample')
-    return dict(tokenProgram=program, slot=batch['context']['slot'], sampleAccounts=len(keys), observedOwners=len(amounts),
-                largestOwnerBps=max(amounts.values())*10000//supply,
+    largest = max(amounts.values())
+    # Keep all equally large authorities. Their role cannot be inferred from the key.
+    leaders = [
+        dict(owner=owner, amountRaw=str(largest),
+             tokenAccounts=[dict(address=key, amountRaw=str(amount))
+                            for authority, key, amount in contributions if authority == owner])
+        for owner in sorted(amounts) if amounts[owner] == largest
+    ]
+    return dict(largestObservedOwners=leaders, supplyRaw=str(supply), tokenProgram=program, slot=batch['context']['slot'], sampleAccounts=len(keys), observedOwners=len(amounts),
+                largestOwnerBps=largest*10000//supply,
                 sampledSupplyBps=sampled*10000//supply)
 
 
