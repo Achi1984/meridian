@@ -15,6 +15,7 @@ async function read(url, raw = false) {
   return response.json();
 }
 
+import {mountHolderComparison} from './holder-comparison.js';
 import {mountEightHourComparison} from './solana-eight-hour.js?v=B19-M11-FIX1';
 
 // The experiment stores raw USDC in millionths and charges 0.05 USDC per fill.
@@ -239,6 +240,7 @@ export function mountSolanaReport(section) {
     return child;
   };
   const refreshSwing = mountSwingCard(section, add);
+  const refreshHolder = mountHolderComparison(section, add, read, amount);
   const refreshComparison = mountEightHourComparison(section, add, read, amount);
   const refresh = add(section,'button','Aktualisieren');
   refresh.type = 'button';
@@ -302,6 +304,7 @@ export function mountSolanaReport(section) {
     refresh.disabled = true;
     live.textContent = 'Laufstatus wird geladen …';
     void refreshSwing();
+    void refreshHolder();
     void refreshComparison();
     const [, report] = await Promise.allSettled([
       refreshStatus(true),
@@ -465,7 +468,8 @@ export function mountSolanaReport(section) {
     clearInterval(swingTimer);
     if (section.open && !doc.hidden) {
       void refreshSwing();
-      swingTimer = setInterval(refreshSwing, 300000);
+      void refreshHolder();
+      swingTimer = setInterval(() => { void refreshSwing(); void refreshHolder(); }, 300000);
     }
   }
   section.addEventListener('toggle',syncSwingTimer);
