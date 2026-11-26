@@ -12,6 +12,8 @@ export function auditHolderReport(status, journal) {
       !safe(status.startedAt) || !safe(status.updatedAt) || status.updatedAt < status.startedAt) throw Error('status');
   const seen = new Map();
   const entries = new Map();
+  const filteredTrades = new Map();
+  let lastExitQuoteAt = null;
   const accounts = Object.fromEntries(['C','H'].map(k => [k, {cash:1000*micro, open:new Map(), net:0, closed:0}]));
   const entryStates = {high:0, belowThreshold:0, unknown:0};
   let maxOwnerBps = null;
@@ -53,6 +55,8 @@ export function auditHolderReport(status, journal) {
       }
       entries.set(id, {at:row.at, qty:row.qty, state:evidence.state});
     }
+    if (row.arm === 'wave' && ['resaleMark','exit'].includes(row.event) &&
+        safe(row.usdcRaw) && row.usdcRaw > 0) lastExitQuoteAt = row.at;
     for (const fill of row.fills) {
       if (!['C','H'].includes(fill.account)) continue;
       const a = accounts[fill.account];
@@ -63,7 +67,10 @@ export function auditHolderReport(status, journal) {
             id !== row.positionId || fill.qty !== row.qty || fill.usdcRaw !== stake) throw Error('entry fill');
         const high = row.holderEvidence.state === 'high';
         if (high && fill.account === 'H') throw Error('filter');
-        if (high) skipped++;
+        if (high) {
+          skipped++;
+          filteredTrades.set(id, {id, net:null});
+        }
         a.cash -= fill.usdcRaw + fee;
         a.open.set(id, {cost:fill.usdcRaw + fee, qty:fill.qty, high});
       } else {
@@ -77,7 +84,7 @@ export function auditHolderReport(status, journal) {
         a.net += net;
         a.closed++;
         a.open.delete(id);
-        if (buy.high) { missed += Math.max(net, 0); avoided += Math.max(-net, 0); }
+        if (buy.high) { filteredTrades.get(id).net = net/micro; missed += Math.max(net, 0); avoided += Math.max(-net, 0); }
       }
     }
   }
@@ -94,7 +101,7 @@ export function auditHolderReport(status, journal) {
   const delta = (accounts.H.net-accounts.C.net)/micro;
   if (last?.event !== status.lastEvent || last.at !== status.updatedAt || skipped !== c.skippedReferenceEntries ||
       delta !== c.realizedDeltaUsdc || Object.entries(entryStates).some(([state, count]) => count !== (c.entryStates[state] ?? 0))) throw Error('comparison');
-  return {rows, delta, skipped, maxOwnerBps, measured:entryStates.high + entryStates.belowThreshold, unknown:entryStates.unknown, missed:missed/micro, avoided:avoided/micro,
+  return {rows, filteredTrades:[...filteredTrades.values()], lastExitQuoteAt, delta, skipped, maxOwnerBps, measured:entryStates.high + entryStates.belowThreshold, unknown:entryStates.unknown, missed:missed/micro, avoided:avoided/micro,
     updatedAt:status.updatedAt, final:status.lastEvent === 'finished'};
 }
 
@@ -112,9 +119,16 @@ export function mountHolderComparison(section, add, read, amount) {
     const date = new Date(report.updatedAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
     add(body, 'strong', (report.final ? 'Endstand' : 'Zwischenstand') + ' · ' + date + ' (Wien) · ' + origin);
     report.rows.forEach((a, i) => add(body, 'p', (i ? 'H · Filter' : 'C · Referenz') + ' · realisiert ' +
-      amount(a.net) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen' +
+      amount(a.net) + ' · freies Cash ' + amount(1000 + a.net - a.openCost) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen' +
       (a.open ? ' · Einstand inkl. Kaufgebühren ' + amount(a.openCost) : '')));
     add(body, 'p', 'Differenz H zu C · ' + amount(report.delta));
+    if ('lastExitQuoteAt' in report) {
+      const stamp = report.lastExitQuoteAt && new Date(report.lastExitQuoteAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
+      add(body, 'p', 'Letzter erfolgreicher Wave-Verkaufskurs im Journal · ' + (stamp || 'keiner'));
+    }
+    for (const trade of report.filteredTrades ?? []) {
+      add(body, 'p', trade.id + ' · C ' + (trade.net === null ? 'offen' : amount(trade.net) + ' realisiert'));
+    }
     const maxShare = report.maxOwnerBps === null ? '' : ' · höchster gemessener Einzelanteil ' +
       (report.maxOwnerBps / 100).toLocaleString('de-AT', {maximumFractionDigits:2}) + ' %';
     add(body, 'p', 'Halterdaten bei ' + report.measured + ' von ' + (report.measured + report.unknown) +
