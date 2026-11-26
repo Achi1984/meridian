@@ -1,0 +1,129 @@
+{
+  "runId": 45702565197,
+  "startedAt": 1795641301,
+  "endsAt": 1795670101,
+  "updatedAt": 1795656265,
+  "lastEvent": "handoff",
+  "session": 50,
+  "accounts": {
+    "A": {
+      "policy": "trailing",
+      "cashUsdc": 995.204646,
+      "equityUsdc": 995.204646,
+      "realizedUsdc": -4.795354,
+      "closedTrades": 3,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 13.369732,
+      "cashIfOpenWorthZeroUsdc": 995.204646,
+      "realizedWithoutBestMintUsdc": -7.70996
+    },
+    "B": {
+      "policy": "standard",
+      "cashUsdc": 998.348196,
+      "equityUsdc": 998.348196,
+      "realizedUsdc": -1.651804,
+      "closedTrades": 3,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 10.226182,
+      "cashIfOpenWorthZeroUsdc": 998.348196,
+      "realizedWithoutBestMintUsdc": -5.359106
+    },
+    "C": {
+      "policy": "fixed",
+      "cashUsdc": 997.390703,
+      "equityUsdc": 997.390703,
+      "realizedUsdc": -2.609297,
+      "closedTrades": 3,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 11.183675,
+      "cashIfOpenWorthZeroUsdc": 997.390703,
+      "realizedWithoutBestMintUsdc": -5.523903
+    },
+    "E": {
+      "policy": "failedRecovery",
+      "cashUsdc": 991.737278,
+      "equityUsdc": 991.737278,
+      "realizedUsdc": -8.262722,
+      "closedTrades": 3,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 9.364466,
+      "cashIfOpenWorthZeroUsdc": 991.737278,
+      "realizedWithoutBestMintUsdc": -11.012531
+    },
+    "F": {
+      "policy": "smallPoolFixed",
+      "cashUsdc": 994.476097,
+      "equityUsdc": 994.476097,
+      "realizedUsdc": -5.523903,
+      "closedTrades": 2,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 9.364466,
+      "cashIfOpenWorthZeroUsdc": 994.476097,
+      "realizedWithoutBestMintUsdc": -8.273712
+    },
+    "D": {
+      "policy": "staged",
+      "cashUsdc": 997.940454,
+      "equityUsdc": 997.940454,
+      "realizedUsdc": -2.059546,
+      "closedTrades": 3,
+      "openPositions": [],
+      "missingExitQuotes": 0,
+      "sampledMaxDrawdownUsdc": 10.633924,
+      "cashIfOpenWorthZeroUsdc": 997.940454,
+      "realizedWithoutBestMintUsdc": -5.359106,
+      "fills": [
+        {
+          "at": 1795642263,
+          "mint": "H9Kr6dQRpNJtJA8DUKLb4xhbeCvv6AoTWK6BdQdypump",
+          "session": 4,
+          "reason": "stop",
+          "qty": 123994940721,
+          "proceedsRaw": 11826288,
+          "netRaw": -8273712
+        },
+        {
+          "at": 1795646830,
+          "mint": "FE7zN2fJJppwrU71mQfuXmjgKmcGfVuCpMYrhwAhpump",
+          "session": 18,
+          "reason": "tp1",
+          "qty": 462539376478,
+          "proceedsRaw": 11442905,
+          "netRaw": 1367906
+        },
+        {
+          "at": 1795647069,
+          "mint": "FE7zN2fJJppwrU71mQfuXmjgKmcGfVuCpMYrhwAhpump",
+          "session": 18,
+          "reason": "tp2",
+          "qty": 231269688239,
+          "proceedsRaw": 6085788,
+          "netRaw": 1023288
+        },
+        {
+          "at": 1795647310,
+          "mint": "FE7zN2fJJppwrU71mQfuXmjgKmcGfVuCpMYrhwAhpump",
+          "session": 18,
+          "reason": "time",
+          "qty": 231269688240,
+          "proceedsRaw": 5970867,
+          "netRaw": 908366
+        },
+        {
+          "at": 1795648450,
+          "mint": "6HS1aeSk7osT5B1CzLp1HTRTAweFr5wurfMHS4vppump",
+          "session": 20,
+          "reason": "time",
+          "qty": 19162189597,
+          "proceedsRaw": 23014606,
+          "netRaw": 2914606
+        }
+      ]
+    }
+  }
+}
