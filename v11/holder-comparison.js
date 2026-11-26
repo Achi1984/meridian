@@ -11,7 +11,8 @@ export function auditHolderReport(status, journal) {
       !safe(status.startedAt) || !safe(status.updatedAt) || status.updatedAt < status.startedAt) throw Error('status');
   const seen = new Map();
   const accounts = Object.fromEntries(['C','H'].map(k => [k, {cash:1000*micro, open:new Map(), net:0, closed:0}]));
-  let missed = 0, avoided = 0, skipped = 0, unknown = 0, last;
+  const entryStates = {high:0, belowThreshold:0, unknown:0};
+  let missed = 0, avoided = 0, skipped = 0, last;
   for (const line of journal.trim().split(/\r?\n/)) {
     const row = JSON.parse(line);
     if (!row.eventId || !safe(row.at)) throw Error('event');
@@ -22,7 +23,19 @@ export function auditHolderReport(status, journal) {
     if (!seen.size && (row.event !== 'start' || row.at !== status.startedAt)) throw Error('start');
     seen.set(row.eventId, JSON.stringify(row));
     last = row;
-    if (row.event === 'entry' && row.arm === 'wave' && row.holderEvidence.state === 'unknown') unknown++;
+    if (row.event === 'entry' && row.arm === 'wave') {
+      const evidence = row.holderEvidence;
+      if (!evidence || !Object.hasOwn(entryStates, evidence.state)) throw Error('holder state');
+      if (evidence.state !== 'unknown') {
+        const {largestOwnerBps, sampledSupplyBps} = evidence;
+        if (!safe(largestOwnerBps) || !safe(sampledSupplyBps) || largestOwnerBps < 0 ||
+            largestOwnerBps > sampledSupplyBps || sampledSupplyBps > 10000 ||
+            evidence.state !== (largestOwnerBps >= c.thresholdBps ? 'high' : 'belowThreshold')) {
+          throw Error('holder measurement');
+        }
+      }
+      entryStates[evidence.state]++;
+    }
     for (const fill of row.fills) {
       if (!['C','H'].includes(fill.account)) continue;
       const a = accounts[fill.account];
@@ -60,8 +73,8 @@ export function auditHolderReport(status, journal) {
   }
   const delta = (accounts.H.net-accounts.C.net)/micro;
   if (last?.event !== status.lastEvent || last.at !== status.updatedAt || skipped !== c.skippedReferenceEntries ||
-      delta !== c.realizedDeltaUsdc || unknown !== (c.entryStates.unknown ?? 0)) throw Error('comparison');
-  return {rows, delta, skipped, unknown, missed:missed/micro, avoided:avoided/micro,
+      delta !== c.realizedDeltaUsdc || Object.entries(entryStates).some(([state, count]) => count !== (c.entryStates[state] ?? 0))) throw Error('comparison');
+  return {rows, delta, skipped, unknown:entryStates.unknown, missed:missed/micro, avoided:avoided/micro,
     updatedAt:status.updatedAt, final:status.lastEvent === 'finished'};
 }
 
