@@ -1,6 +1,7 @@
 const api = 'https://api.github.com/repos/Achi1984/meridian/actions';
 const runs = 'https://github.com/Achi1984/meridian/actions/runs/';
 const micro = 1_000_000;
+const stake = 20 * micro;
 const fee = 50_000;
 const safe = Number.isSafeInteger;
 
@@ -10,6 +11,7 @@ export function auditHolderReport(status, journal) {
       c?.thresholdBps !== 2000 || c.reference !== 'C' || c.filtered !== 'H' ||
       !safe(status.startedAt) || !safe(status.updatedAt) || status.updatedAt < status.startedAt) throw Error('status');
   const seen = new Map();
+  const entries = new Map();
   const accounts = Object.fromEntries(['C','H'].map(k => [k, {cash:1000*micro, open:new Map(), net:0, closed:0}]));
   const entryStates = {high:0, belowThreshold:0, unknown:0};
   let maxOwnerBps = null;
@@ -37,6 +39,19 @@ export function auditHolderReport(status, journal) {
         maxOwnerBps = Math.max(maxOwnerBps ?? 0, largestOwnerBps);
       }
       entryStates[evidence.state]++;
+      const id = row.positionId;
+      if (!safe(row.session) || !row.mint || id !== row.session + ':wave:' + row.mint ||
+          !safe(row.qty) || row.qty <= 0 || row.inputRaw !== stake) throw Error('entry quote');
+      const previous = entries.get(id);
+      if (previous && (previous.at !== row.at || previous.qty !== row.qty ||
+          previous.state !== evidence.state)) throw Error('conflicting entry');
+      for (const key of ['C','H']) {
+        const expected = !previous && accounts[key].cash >= stake + fee &&
+          (key === 'C' || evidence.state !== 'high');
+        const fills = row.fills.filter(fill => fill.account === key);
+        if (fills.length !== Number(expected)) throw Error('entry admission');
+      }
+      entries.set(id, {at:row.at, qty:row.qty, state:evidence.state});
     }
     for (const fill of row.fills) {
       if (!['C','H'].includes(fill.account)) continue;
@@ -44,8 +59,8 @@ export function auditHolderReport(status, journal) {
       const id = fill.positionId;
       if (!id || !safe(fill.qty) || fill.qty <= 0 || !safe(fill.usdcRaw) || fill.usdcRaw <= 0) throw Error('fill');
       if (fill.side === 'buy') {
-        if (a.open.has(id) || row.event !== 'entry' ||
-            !['high','unknown','belowThreshold'].includes(row.holderEvidence?.state)) throw Error('entry');
+        if (a.open.has(id) || row.event !== 'entry' || row.arm !== 'wave' ||
+            id !== row.positionId || fill.qty !== row.qty || fill.usdcRaw !== stake) throw Error('entry fill');
         const high = row.holderEvidence.state === 'high';
         if (high && fill.account === 'H') throw Error('filter');
         if (high) skipped++;
@@ -53,7 +68,9 @@ export function auditHolderReport(status, journal) {
         a.open.set(id, {cost:fill.usdcRaw + fee, qty:fill.qty, high});
       } else {
         const buy = a.open.get(id);
-        if (fill.side !== 'sell' || !buy || buy.qty !== fill.qty) throw Error('exit');
+        if (fill.side !== 'sell' || !buy || buy.qty !== fill.qty || row.arm !== 'wave' ||
+            !['resaleMark','exit'].includes(row.event) || id !== row.positionId ||
+            id !== row.session + ':wave:' + row.mint || row.qty !== fill.qty || row.usdcRaw !== fill.usdcRaw) throw Error('exit fill');
         const proceeds = fill.usdcRaw - fee;
         const net = proceeds - buy.cost;
         a.cash += proceeds;
@@ -126,8 +143,15 @@ export function mountHolderComparison(section, add, read, amount) {
       if (request !== revision) return;
       render(report, 'lokales Handelsjournal');
       notice.textContent = 'Beide Konten und die Filterwirkung sind abgeglichen.';
-    } catch {
-      if (request === revision) notice.textContent = 'Import fehlgeschlagen. Beide Dateien desselben Haltertests auswählen.';
+    } catch (error) {
+      if (request !== revision) return;
+      const messages = {
+        'entry admission':'Einstieg fehlt oder widerspricht Filter bzw. verfügbarem Guthaben.',
+        'entry fill':'Kaufbuchung passt nicht zum protokollierten Einstieg.',
+        'exit fill':'Verkaufsbuchung passt nicht zum protokollierten Ausstieg.'
+      };
+      notice.textContent = 'Import fehlgeschlagen. ' +
+        (messages[error.message] ?? 'Bitte Status und Journal desselben Haltertests prüfen.');
     }
   });
   let pending;
