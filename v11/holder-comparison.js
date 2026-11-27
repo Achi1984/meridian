@@ -125,18 +125,23 @@ export function mountHolderComparison(section, add, read, amount) {
     body.replaceChildren();
     const date = new Date(report.updatedAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
     add(body, 'small', (report.final ? 'Endstand' : 'Zwischenstand') + ' · ' + date + ' Wien');
+    const effect = add(body, 'p', '');
+    effect.className = 'paper-metric';
+    add(effect, 'span', 'Filtereffekt · realisiert');
+    add(effect, 'strong', amount(report.delta)).className =
+      report.delta > 0 ? 'paper-gain' : report.delta < 0 ? 'paper-loss' : '';
+    add(body, 'small', report.skipped + ' Einstiege ausgelassen');
+    const info = add(body,'details','');
+    add(info,'summary','Konten & Filterwirkung');
     report.rows.forEach((a,i) => {
-      const row = add(body,'p','');
+      const row = add(info,'p','');
       row.className = 'paper-metric';
       add(row,'span',i ? 'Mit Filter' : 'Referenz');
       add(row,'strong',amount(a.net)).className = a.net > 0 ? 'paper-gain' : a.net < 0 ? 'paper-loss' : '';
     });
-    const info = add(body,'details','');
-    add(info,'summary','Konten & Filterwirkung');
     add(info,'p',origin);
     report.rows.forEach((a,i) => add(info,'p',(i ? 'Filter' : 'Referenz') + ' · Kasse ' +
       amount(1000 + a.net - a.openCost) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen'));
-    add(info,'p','Filterdifferenz ' + amount(report.delta));
     if ('lastExitQuoteAt' in report) {
       const stamp = report.lastExitQuoteAt && new Date(report.lastExitQuoteAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
       add(info, 'p', 'Letzter erfolgreicher Wave-Verkaufskurs im Journal · ' + (stamp || 'keiner'));
@@ -183,6 +188,14 @@ export function mountHolderComparison(section, add, read, amount) {
     add(exits, 'p', e.bothClosed + ' gemeinsame Abschlüsse · ' + e.sharedStillOpenOnEitherSide + ' Paare offen');
     if (e.bothClosed > 0) add(exits, 'p', 'Netto · Fixes Ziel ' + amount(e.pairedFixedNetUsdc) +
       ' · Trailing ' + amount(e.pairedTrailingNetUsdc));
+    const profile = e.pairedOutcomes;
+    if (e.bothClosed > 0 && profile && Number.isFinite(profile.medianDeltaUsdc) &&
+        [profile.trailingBetter, profile.fixedBetter, profile.equal].every(n => safe(n) && n >= 0) &&
+        profile.trailingBetter + profile.fixedBetter + profile.equal === e.bothClosed) {
+      add(exits, 'p', 'Trailing je Trade · ' + profile.trailingBetter + ' besser · ' +
+        profile.fixedBetter + ' schlechter · ' + profile.equal + ' gleich');
+      add(exits, 'p', 'Mittlere Differenz (Median) · ' + amount(profile.medianDeltaUsdc));
+    }
     if (e.bothClosed >= 2) {
       add(exits, 'p', 'Ohne jeweils einen Trade · Differenz Trailing minus fixes Ziel ' +
         amount(e.minDeltaAfterOmittingOneUsdc) + ' bis ' + amount(e.maxDeltaAfterOmittingOneUsdc));
@@ -260,7 +273,8 @@ export function mountHolderComparison(section, add, read, amount) {
       if (!safe(run?.id) || !safe(run.run_attempt)) throw Error('run');
       const state = {in_progress:'läuft', queued:'in Warteschlange', pending:'in Warteschlange', waiting:'wartet', requested:'angefordert', success:'abgeschlossen', failure:'fehlgeschlagen',
         cancelled:'abgebrochen'}[run.conclusion || run.status] || run.status;
-      live.className = run.status === 'in_progress' ? 'paper-live' : 'paper-wait';
+      live.className = run.status === 'in_progress' ? 'paper-live' :
+        run.conclusion === 'success' ? '' : 'paper-wait';
       live.textContent = 'Versuch ' + run.run_attempt + ' · ' + state + (waiting.some(r => r.id !== run.id) ? ' · Folgelauf wartet' : '');
       source.textContent = 'Lauf ' + run.id + ' · Versuch ' + run.run_attempt;
       source.href = runs + run.id + '/attempts/' + run.run_attempt;

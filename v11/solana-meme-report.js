@@ -73,7 +73,7 @@ export function swingDecisionSummary(candidates) {
   return [...totals].sort(([a,n],[b,m]) => m-n || a.localeCompare(b,'de'));
 }
 
-function swingStatus(state) {
+function swingStatus(state, failed = false) {
   const entries = Object.keys(state.positions).length;
   const pools = Object.keys(state.candidates).length;
   const elapsed = state.lastTick-state.start;
@@ -83,8 +83,11 @@ function swingStatus(state) {
   const time = new Date(state.lastTick*1000).toLocaleString('de-AT',{
     timeZone:'Europe/Vienna', day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   const stale = Date.now()/1000-state.lastTick > 1200 && elapsed < 72*3600;
-  return phase + ' · ' + pools + ' Pools · ' + entries + ' Einstiege · ' +
-    time + (stale ? ' · Datenstand veraltet' : '');
+  return {
+    text: phase + ' · ' + pools + ' Pools · ' + entries + ' Einstiege · ' + time +
+      (stale ? ' · Datenstand veraltet' : '') + (failed ? ' · Abruf fehlgeschlagen' : ''),
+    tone: failed || stale ? 'paper-wait' : ''
+  };
 }
 
 const reportRefresh = new WeakMap();
@@ -119,7 +122,9 @@ export function mountCommandPaper(doc, access) {
   const status = doc.createElement('p');
   status.setAttribute('role','status');
   status.textContent = 'Letzter Scan wird geladen …';
-  card.append(title,status);
+  const results = doc.createElement('div');
+  results.hidden = true;
+  card.append(title,status,results);
   portfolio.before(card);
   let timer, busy = false, snapshot;
   const visible = () => access.isUnlocked() && !doc.hidden && !command.hidden;
@@ -128,12 +133,30 @@ export function mountCommandPaper(doc, access) {
     busy = true;
     try {
       const state = await read(swingSource,true);
-      swingAccounts(state);
+      const accounts = swingAccounts(state);
       if (snapshot && state.lastTick < snapshot.lastTick) throw Error('Older checkpoint');
       snapshot = state;
-      status.textContent = swingStatus(state);
+      const summary = swingStatus(state);
+      status.textContent = summary.text;
+      status.className = summary.tone;
+      results.replaceChildren();
+      results.hidden = Object.keys(state.positions).length === 0;
+      if (!results.hidden) {
+        for (const account of accounts) {
+          const row = doc.createElement('p');
+          row.className = 'paper-metric';
+          const label = doc.createElement('span');
+          label.textContent = account.key === 'fixed' ? 'Fixziel · realisiert' : 'Teilverkauf · realisiert';
+          const value = doc.createElement('strong');
+          value.textContent = amount(account.realized);
+          value.className = account.realized > 0 ? 'paper-gain' : account.realized < 0 ? 'paper-loss' : '';
+          row.append(label, value);
+          results.append(row);
+        }
+      }
     } catch {
-      status.textContent = snapshot ? swingStatus(snapshot) + ' · Abruf fehlgeschlagen' :
+      status.className = 'paper-wait';
+      status.textContent = snapshot ? swingStatus(snapshot, true).text :
         'Letzter Scan derzeit nicht abrufbar.';
     } finally { busy = false; }
   }
@@ -194,7 +217,9 @@ export function mountSwingCard(section, add, load = read) {
       }
       collector = state.collectorRunId ?? swingRun;
       source.href = runs + collector;
-      status.textContent = swingStatus(state);
+      const summary = swingStatus(state);
+      status.textContent = summary.text;
+      status.className = summary.tone;
       body.replaceChildren();
       for (const row of rows) {
         const line = add(body,'p','');
@@ -210,6 +235,7 @@ export function mountSwingCard(section, add, load = read) {
       decisions.hidden = Object.keys(state.candidates).length === 0;
       last = state.lastTick;
     } catch {
+      status.className = 'paper-wait';
       if (!last) status.textContent = 'Laufstand derzeit nicht abrufbar.';
       else if (!status.textContent.includes('Abruf fehlgeschlagen')) status.textContent += ' · Abruf fehlgeschlagen';
     } finally { await refreshWorker(); pending = false; }
