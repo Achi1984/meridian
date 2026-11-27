@@ -22,7 +22,7 @@ export function mountLedgerManual(root,{access,createClient=createLedgerManualCl
     field('Separater Schreibschlüssel (nicht das App-Passwort)',key),
     el('p','Der Schreibschlüssel wird nur für diesen Speichervorgang verwendet. Kurse werden nicht manuell gespeichert.'),save);
   editor.append(summary,form);section.append(el('h3','Ledger · manuelle Bestände'),
-    el('p','Manuelle Mengen · öffentliche USDT-Kurse · separat von Pionex'),load,status,content,editor);root.append(section);
+    el('p','Öffentliche USDT-Kurse · nur Ledger, kein Gesamtvermögen'),load,status,content,editor);root.append(section);
   let ready=false,disposed=false;
   const client=createClient({getToken:access.getToken,onLock:()=>access.lock(),onChange:s=>{
     if(disposed)return;ready=s.status==='ready';save.disabled=!ready;load.disabled=['loading','saving','locked'].includes(s.status);
