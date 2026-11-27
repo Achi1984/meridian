@@ -112,8 +112,9 @@ export function mountHolderComparison(section, add, read, amount) {
   add(card, 'small', 'Je 1.000 USDC. H überspringt Einstiege ab 20 % gemessenem Anteil eines Halters. Bei unbekanntem Anteil gelten die Regeln von C.');
   const live = add(card, 'p', 'Laufstatus wird geladen.');
   const source = add(card, 'a', 'Laufprotokoll öffnen');
-  source.href = runs + '45622083781';
+  source.href = 'https://github.com/Achi1984/meridian/actions/workflows/holder-concentration.yml';
   const body = add(card, 'section', '');
+  body.style.overflowWrap = 'anywhere';
   function render(report, origin) {
     body.replaceChildren();
     const date = new Date(report.updatedAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
@@ -136,9 +137,45 @@ export function mountHolderComparison(section, add, read, amount) {
     add(body, 'p', report.skipped + ' ausgelassene Einstiege · vermiedene Verluste ' +
       amount(report.avoided) + ' · entgangene Gewinne ' + amount(report.missed));
   }
-  render({updatedAt:1795727317, final:true, rows:[{net:-22.021548,closed:16,open:2,openCost:40.1},
-    {net:-22.021548,closed:16,open:2,openCost:40.1}], delta:0, measured:18, unknown:0,
-    maxOwnerBps:651, skipped:0, missed:0, avoided:0}, 'Geprüftes Journal vom 26. November');
+  const exits = add(card, 'section', '');
+  let displayedKey = '';
+  let displayedAt = 0;
+  let localReport = false;
+  async function showPublished(runId, attempt) {
+    const key = runId + '-' + attempt;
+    if (localReport || key === displayedKey) return;
+    const url = 'https://api.github.com/repos/Achi1984/meridian/contents/holder-' + key +
+      '.json?ref=paper-dashboard-data';
+    const data = await read(url, true);
+    if (localReport) return;
+    const h = data.holder, e = data.exits;
+    if (data.source?.runId !== runId || data.source.attempt !== attempt || !h?.final ||
+        !safe(h.updatedAt) || !Array.isArray(h.rows) || h.rows.length !== 2 ||
+        !safe(e?.bothClosed) || !safe(e.sharedStillOpenOnEitherSide) ||
+        e.sharedEntries !== e.bothClosed + e.sharedStillOpenOnEitherSide ||
+        ![e.pairedFixedNetUsdc, e.pairedTrailingNetUsdc].every(Number.isFinite) ||
+        (e.bothClosed >= 2 && ![e.minDeltaAfterOmittingOneUsdc, e.maxDeltaAfterOmittingOneUsdc].every(Number.isFinite))) {
+      throw Error('dashboard report');
+    }
+    if (h.updatedAt < displayedAt) return;
+    render(h, 'Lauf ' + runId + ' · Versuch ' + attempt);
+    exits.replaceChildren();
+    add(exits, 'strong', 'Ausstiege bei kleinen Pools');
+    add(exits, 'p', e.bothClosed + ' gemeinsame Abschlüsse · ' + e.sharedStillOpenOnEitherSide + ' Paare offen');
+    if (e.bothClosed > 0) add(exits, 'p', 'Netto · Fixes Ziel ' + amount(e.pairedFixedNetUsdc) +
+      ' · Trailing ' + amount(e.pairedTrailingNetUsdc));
+    if (e.bothClosed >= 2) {
+      add(exits, 'p', 'Ohne jeweils einen Trade · Differenz Trailing minus fixes Ziel ' +
+        amount(e.minDeltaAfterOmittingOneUsdc) + ' bis ' + amount(e.maxDeltaAfterOmittingOneUsdc));
+      if (e.minDeltaAfterOmittingOneUsdc < 0 && e.maxDeltaAfterOmittingOneUsdc > 0) {
+        add(exits, 'strong', 'Ein einzelner Trade kann die Rangfolge drehen.');
+      }
+    }
+    add(exits, 'a', 'Quelllauf des Ergebnisses').href = runs + runId + '/attempts/' + attempt;
+    displayedKey = key;
+    displayedAt = h.updatedAt;
+  }
+  add(body, 'p', 'Bestätigter Endstand wird geladen.');
   const label = add(card, 'label', 'Bericht prüfen · status.json und events.jsonl auswählen ');
   const input = add(label, 'input', '');
   input.type = 'file';
@@ -156,6 +193,8 @@ export function mountHolderComparison(section, add, read, amount) {
       const report = auditHolderReport(JSON.parse(status), journal);
       if (request !== revision) return;
       render(report, 'lokales Handelsjournal');
+      localReport = true;
+      exits.replaceChildren();
       notice.textContent = 'Beide Konten und die Filterwirkung sind abgeglichen.';
     } catch (error) {
       if (request !== revision) return;
@@ -171,14 +210,34 @@ export function mountHolderComparison(section, add, read, amount) {
   let pending;
   return function refresh() {
     if (pending) return pending;
-    pending = read(api + '/runs?branch=paper%2Fholder-token2022-forward&per_page=20').then(feed => {
+    pending = read(api + '/workflows/holder-concentration.yml/runs?branch=paper%2Fholder-token2022-forward&per_page=5').then(async feed => {
       const run = feed.workflow_runs.find(r => r.path === '.github/workflows/holder-concentration.yml');
       if (!safe(run?.id) || !safe(run.run_attempt)) throw Error('run');
       const state = {in_progress:'läuft', queued:'in Warteschlange', success:'abgeschlossen', failure:'fehlgeschlagen',
         cancelled:'abgebrochen'}[run.conclusion || run.status] || run.status;
       live.textContent = 'Paperlauf ' + run.id + ' · Versuch ' + run.run_attempt + ' · ' + state;
       source.href = runs + run.id + '/attempts/' + run.run_attempt;
-    }).catch(() => { live.textContent = 'Aktueller Laufstatus nicht abrufbar.'; }).finally(() => { pending = null; });
+      // A rerun shares its run ID with earlier attempts. Only completed attempts have reports.
+      const candidates = [];
+      for (const item of feed.workflow_runs) {
+        if (!safe(item.id) || !safe(item.run_attempt)) continue;
+        const first = item.conclusion === 'success' ? item.run_attempt : item.run_attempt - 1;
+        for (let attempt = first; attempt >= Math.max(1, first - 1); attempt--) {
+          candidates.push([item.id, attempt]);
+        }
+      }
+      candidates.push([45900543591, 1]);
+      for (const [id, attempt] of candidates) {
+        try { await showPublished(id, attempt); return; } catch { /* Try an earlier verified report. */ }
+      }
+      if (!displayedKey && !localReport) body.textContent = 'Bestätigter Endstand derzeit nicht abrufbar.';
+    }).catch(async () => {
+      live.textContent = 'Aktueller Laufstatus nicht abrufbar.';
+      if (!displayedKey && !localReport) {
+        try { await showPublished(45900543591, 1); }
+        catch { if (!localReport) body.textContent = 'Bestätigter Endstand derzeit nicht abrufbar.'; }
+      }
+    }).finally(() => { pending = null; });
     return pending;
   };
 }
