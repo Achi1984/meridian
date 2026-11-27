@@ -745,8 +745,8 @@ test('early Strategies navigation remains active when its module bootstrap initi
   }finally{await hosted.close();}
 });
 
-test('Command reaches live decisions even if the research bootstrap fails',async()=>{
-  const name='Command reaches live decisions even if the research bootstrap fails';
+test('Command retains the live summary while Strategies can retry a failed bootstrap',async()=>{
+  const name='Command retains the live summary while Strategies can retry a failed bootstrap';
   if(typeof WebSocket!=='function'){
     const child=runFlaggedBrowserTest(name,60000);
     assert.equal(child.status,0,child.stdout+child.stderr);
@@ -782,9 +782,9 @@ test('Command reaches live decisions even if the research bootstrap fails',async
         }
         assert.fail(predicate);
       };
-      await wait("document.querySelector('#command-paper-live')?.innerText.includes('Letzter Scan')");
-      await evaluate("document.querySelector('#command-paper-live button').click();true");
-      await wait("document.querySelector('#solana-meme-paper details')?.open && document.querySelector('#solana-meme-paper li')?.innerText.includes('Erster Kursanstieg fehlt')");
+      await wait("document.querySelector('#command-paper-live')?.innerText.includes('1 Pools')");
+      assert.equal(await evaluate("document.querySelectorAll('#command-paper-live button, #command-paper-live a').length"),0);
+      await evaluate("document.querySelector('[data-v=strategies]').click();true");
       await wait("document.querySelector('#strategy-load-status button')?.textContent==='Erneut laden'");
       await evaluate("document.querySelector('#strategy-load-status button').click();true");
       await wait("!!document.getElementById('paper-research-section')");
