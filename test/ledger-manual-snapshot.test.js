@@ -31,6 +31,10 @@ test('valuation uses latest returned public quotes, never screenshot dollars; st
     assert.equal(buildLedgerManualModel(snapshot(),{tickers,pricesAt:now,now}).total,null);
   assert.equal(buildLedgerManualModel(snapshot(),{tickers:[{symbol:'BTCUSDT',price:'100'}],pricesAt:now-180001,now}).total,null);
 });
+test('USDT is valued directly in its own unit without an exchange quote',()=>{
+  const account={...snapshot(),holdings:[{symbol:'USDT',quantity:'12.34'}]};
+  assert.equal(buildLedgerManualModel(account,{now}).total,12.34);
+});
 const response=(data,status=200)=>new Response(JSON.stringify(data),{status});
 test('public quote request carries no credential; private save needs explicit separate key and fresh revision',async()=>{
   const calls=[],states=[];const c=createLedgerManualClient({getToken:()=> 'read-fixture',now:()=>now,onChange:s=>states.push(s),fetchImpl:async(url,opts)=>{
