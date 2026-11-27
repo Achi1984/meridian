@@ -15,13 +15,53 @@ jobs:
         with:
           persist-credentials: false
       - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_small_pool_trailing.py
-      - uses: actions/download-artifact@v4
+      - name: Verify the final journal from the triggering attempt
+        id: journal
+        uses: actions/github-script@v7
         with:
-          name: abc-final
-          path: journal
-          run-id: ${{ github.event.workflow_run.id }}
-          github-token: ${{ github.token }}
-      - run: python scripts/memecoin-paper/research/small_pool_trailing.py journal > comparison.json
+          script: |
+            const run = context.payload.workflow_run
+            const source = {...context.repo, run_id: run.id, per_page: 100}
+            const jobs = await github.paginate(
+              'GET /repos/{owner}/{repo}/actions/runs/{run_id}/attempts/{attempt_number}/jobs',
+              {...source, attempt_number: run.run_attempt}
+            )
+            const finishes = jobs.filter(job => job.name === 'finish' &&
+              job.run_attempt === run.run_attempt && job.conclusion === 'success')
+            if (finishes.length !== 1) throw new Error('Expected one successful finish job for this attempt')
+            const [finish] = finishes
+            const artifacts = await github.paginate(github.rest.actions.listWorkflowRunArtifacts,
+              {...source, name: 'abc-final'})
+            const matches = artifacts.filter(a => a.name === 'abc-final' &&
+              Date.parse(a.created_at) >= Date.parse(finish.started_at) &&
+              Date.parse(a.created_at) <= Date.parse(finish.completed_at))
+            if (matches.length !== 1 || matches[0].expired) throw new Error('Missing, expired or ambiguous final journal')
+            const [artifact] = matches
+            const response = await github.rest.actions.downloadArtifact({
+              ...context.repo, artifact_id: artifact.id, archive_format: 'zip'
+            })
+            const archive = Buffer.from(response.data)
+            const hash = require('node:crypto').createHash('sha256').update(archive).digest('hex')
+            if (artifact.digest !== 'sha256:' + hash) throw new Error('Final journal digest mismatch')
+            require('node:fs').writeFileSync('journal.zip', archive)
+            core.info('Verified abc-final ' + artifact.id + ' for run ' + run.id + ', attempt ' + run.run_attempt)
+            core.setOutput('artifact_id', String(artifact.id))
+            core.setOutput('digest', artifact.digest)
+      - name: Compare recorded exits and identify the source journal
+        env:
+          SOURCE_RUN: ${{ github.event.workflow_run.id }}
+          SOURCE_ATTEMPT: ${{ github.event.workflow_run.run_attempt }}
+          SOURCE_ARTIFACT: ${{ steps.journal.outputs.artifact_id }}
+          SOURCE_DIGEST: ${{ steps.journal.outputs.digest }}
+        run: |
+          set -euo pipefail
+          mkdir -p journal
+          unzip -p journal.zip status.json > journal/status.json
+          unzip -p journal.zip events.jsonl > journal/events.jsonl
+          python scripts/memecoin-paper/research/small_pool_trailing.py journal |
+            jq --argjson run "$SOURCE_RUN" --argjson attempt "$SOURCE_ATTEMPT" \
+               --argjson artifact "$SOURCE_ARTIFACT" --arg digest "$SOURCE_DIGEST" \
+               '. + {source: {runId: $run, attempt: $attempt, artifactId: $artifact, digest: $digest}}' > comparison.json
       - uses: actions/upload-artifact@v4
         with:
           name: small-pool-exits-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
