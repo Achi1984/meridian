@@ -140,3 +140,13 @@
     grid-template-columns: 1fr;
   }
 }
+
+    #app .paper-gain{color:#74dfad} #app .paper-loss{color:#ffa6aa} #app .paper-wait{color:#ffd187}
+    #app .paper-live{color:#85d9ef}
+    #app .paper-metric{display:flex;justify-content:space-between;gap:12px;align-items:baseline;margin:6px 0;font-variant-numeric:tabular-nums}
+    #app .paper-metric strong{white-space:nowrap}
+    #app .solana-comparison a{color:#92caff}
+    #app .solana-comparison details a{display:block;margin:8px 0}
+    #app .scanner-ranks{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+    #app .scanner-ranks td,#app .scanner-ranks th{padding:6px 4px;text-align:start;overflow-wrap:anywhere}
+    @media(max-width:600px){#app .scanner-ranks :is(th,td):nth-child(3),#app .scanner-ranks :is(th,td):nth-child(5),#app .scanner-ranks :is(th,td):nth-child(7){display:none}}
