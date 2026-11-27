@@ -176,6 +176,15 @@ export function mountHolderComparison(section, add, read, amount) {
         add(exits, 'strong', 'Ein einzelner Trade kann die Rangfolge drehen.');
       }
     }
+    const delay = e.delayedSales;
+    if (delay) {
+      add(exits, 'strong', 'Verkaufskurs nach fünf Sekunden');
+      add(exits, 'p', delay.quoted + ' Folgekurse bei ' + delay.sales + ' Paper-Verkäufen · ' +
+        delay.unavailable + ' nicht verfügbar · ' + delay.busy + ' gleichzeitig belegt · ' + delay.missing + ' ohne Messung');
+      if (delay.quoted) add(exits, 'p', 'Netto auf denselben Verkäufen · ursprünglich ' +
+        amount(delay.originalNetUsdc) + ' · zum Folgeangebot ' + amount(delay.delayedNetUsdc) +
+        ' · von Gewinn zu Verlust: ' + delay.profitToLoss);
+    }
     const guard = e.confirmedLoss;
     if (guard) {
       add(exits, 'strong', 'Paper-Test · bestätigter Verlustausstieg');
