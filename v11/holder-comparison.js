@@ -121,10 +121,12 @@ export function mountHolderComparison(section, add, read, amount) {
   queuedLink.hidden = true;
   const body = add(card, 'section', '');
   body.style.overflowWrap = 'anywhere';
-  function render(report, origin) {
+  function render(report, origin, attempt) {
     body.replaceChildren();
     const date = new Date(report.updatedAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
-    add(body, 'small', (report.final ? 'Endstand' : 'Zwischenstand') + ' · ' + date + ' Wien');
+    const resultLabel = attempt ? 'Letzter Abschluss · Versuch ' + attempt :
+      'Lokales Journal · ' + (report.final ? 'Endstand' : 'Zwischenstand');
+    add(body, 'small', resultLabel + ' · ' + date + ' Wien');
     const effect = add(body, 'p', '');
     effect.className = 'paper-metric';
     add(effect, 'span', 'Filtereffekt · realisiert');
@@ -186,7 +188,7 @@ export function mountHolderComparison(section, add, read, amount) {
       throw Error('dashboard report');
     }
     if (h.updatedAt < displayedAt) return;
-    render(h, 'Lauf ' + runId + ' · Versuch ' + attempt);
+    render(h, 'Lauf ' + runId + ' · Versuch ' + attempt, attempt);
     exits.replaceChildren();
     add(exits, 'strong', 'Ausstiege bei kleinen Pools');
     add(exits, 'p', e.bothClosed + ' gemeinsame Abschlüsse · ' + e.sharedStillOpenOnEitherSide + ' Paare offen');
@@ -278,7 +280,7 @@ export function mountHolderComparison(section, add, read, amount) {
       const state = {in_progress:'läuft', queued:'in Warteschlange', pending:'in Warteschlange', waiting:'wartet', requested:'angefordert', success:'abgeschlossen', failure:'fehlgeschlagen',
         cancelled:'abgebrochen'}[run.conclusion || run.status] || run.status;
       live.className = run.status === 'in_progress' ? 'paper-live' :
-        run.conclusion === 'success' ? '' : 'paper-wait';
+        ['failure','timed_out','action_required'].includes(run.conclusion) ? 'paper-wait' : '';
       live.textContent = 'Versuch ' + run.run_attempt + ' · ' + state + (waiting.some(r => r.id !== run.id) ? ' · Folgelauf wartet' : '');
       source.textContent = 'Lauf ' + run.id + ' · Versuch ' + run.run_attempt;
       source.href = runs + run.id + '/attempts/' + run.run_attempt;

@@ -1,0 +1,116 @@
+--- v11/index.html
++++ historical shell
+@@ -65,2 +65,5 @@
+     .card{box-shadow:0 12px 30px #00000025,inset 0 1px #ffffff08}
++    .trust-cell:nth-child(1){border-top:2px solid var(--brand);background:linear-gradient(160deg,#162c42,#101b28 70%)}
++    .trust-cell:nth-child(2){border-top:2px solid var(--attention);background:linear-gradient(160deg,#352b18,#101b28 70%)}
++    .trust-cell:nth-child(3){border-top:2px solid var(--research);background:linear-gradient(160deg,#292342,#101b28 70%)}
+     .state-dot{background:var(--attention)}
+@@ -68,9 +71,11 @@
+     #view-bots .view-placeholder{border-top:3px solid var(--attention)}
++    #view-market .view-placeholder{border-top:3px solid var(--research)}
+     #view-strategies .view-placeholder{border-top:3px solid #d49aff}
++    #nav button[data-v="depot"].active{color:var(--brand)}
++    #nav button[data-v="bots"].active{color:var(--positive)}
++    #nav button[data-v="market"].active{color:var(--research)}
++    #nav button[data-v="strategies"].active{color:#d49aff}
+ 
+-    .card.decision{padding:0;background:#111b29}
+-    .decision details{margin:0;border:0;background:transparent}
+-    .decision summary.card-head{min-height:44px;margin:0;padding:8px 14px;cursor:pointer}
+-    .decision details>h2,.decision details>p{margin-inline:14px}
+-    .decision details>p{margin-bottom:12px}
++    .decision{border-color:#466b96;background:linear-gradient(125deg,#1b3550,#142538 56%,#111c2b);position:relative}
++    .decision::before{content:"";position:absolute;top:15px;bottom:15px;left:0;width:3px;border-radius:0 3px 3px 0;background:#79b7fb}
+     .card-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:13px}
+@@ -85,3 +90,3 @@
+     .caption{font-size:11px;color:#aebdcc;line-height:1.55}
+-    .trust-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:13px}
++    .trust-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+     .trust-cell{border:1px solid #344356;border-radius:12px;padding:11px 8px;background:#101b28;min-width:0}
+@@ -107,3 +112,3 @@
+     .section-footer{margin-top:14px;color:#7d91a6;font-size:11px;text-align:center}
+-    #nav{position:fixed;z-index:10;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,minmax(44px,1fr));gap:2px;background:#0d1522f5;border-top:1px solid #2c3d50;padding:8px max(6px,calc((100vw - 740px)/2)) calc(8px + var(--safe-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
++    #nav{position:fixed;z-index:10;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;background:#0d1522f5;border-top:1px solid #2c3d50;padding:8px max(6px,calc((100vw - 740px)/2)) calc(8px + var(--safe-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+     #nav button{appearance:none;-webkit-appearance:none;color:#91a5b9;background:none;border:0;border-radius:12px;min-height:53px;padding:6px 1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;min-width:0}
+@@ -131,5 +136,3 @@
+     .limited{border-color:#776346;color:var(--state-unknown);background:#30271c}
+-    #command-portfolio .state-label{color:var(--muted)}
+-    #command-portfolio:is([data-state="stale"],[data-state="unavailable"]) .state-label,
+-    #command-bots-status[data-warning="true"]{color:var(--state-unknown)}
++    .state-label{color:var(--state-unknown)}
+     .card-head,.section-title{flex-wrap:wrap}
+@@ -157,3 +160,3 @@
+     /* Narrow screens give the longer full labels more room without shrinking text or touch targets. */
+-    @media(max-width:350px){.container{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.trust-grid{grid-template-columns:1fr}.trust-cell{display:flex;justify-content:space-between;gap:8px;padding:10px 12px}.trust-cell span{margin-top:0}.card-head{gap:8px}.section-title{align-items:flex-start}}
++    @media(max-width:350px){#nav{grid-template-columns:minmax(44px,1.2fr) minmax(44px,.8fr) minmax(44px,.75fr) minmax(44px,1.15fr) minmax(44px,1.1fr)}.container{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.trust-grid{grid-template-columns:1fr}.trust-cell{display:flex;justify-content:space-between;gap:8px;padding:10px 12px}.trust-cell span{margin-top:0}.card-head{gap:8px}.section-title{align-items:flex-start}}
+     @media(forced-colors:active){.limited,.preview-status,.state-controls button{border-color:CanvasText}.state-controls button[aria-pressed="true"],#nav button.active{outline:2px solid Highlight;outline-offset:-3px}}
+@@ -403,2 +406,4 @@
+   <style id="m11-compact-nav">
++    @media(max-width:430px){#nav{grid-template-columns:repeat(4,minmax(44px,1fr)) minmax(44px,1.3fr)}}
++    @media(max-width:350px){#nav{grid-template-columns:minmax(44px,1.2fr) minmax(44px,.8fr) minmax(44px,.75fr) minmax(44px,1.15fr) minmax(44px,1.35fr)}}
+   </style>
+@@ -410,9 +415,2 @@
+     .view .card-head{row-gap:6px}
+-    .decision .limited{background:transparent;color:var(--muted);border-color:var(--line)}
+-    .command-bot-metadata:focus-within{border-color:var(--brand)}
+-    .command-bot-metadata>summary::after,.decision summary::after{
+-      content:"";width:7px;height:7px;flex:none;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(45deg)
+-    }
+-    .command-bot-metadata[open]>summary::after,.decision details[open]>summary::after{transform:rotate(225deg)}
+-    .decision summary .limited{margin-left:auto;transform:none;font-size:12px}
+     .trust-grid .trust-cell span{font-size:12px;color:var(--muted)}
+@@ -423,3 +421,3 @@
+     #nav button[data-v].active{
+-      color:#a9d4ff;background:#193751;box-shadow:inset 0 3px currentColor
++      background:#193751;box-shadow:inset 0 3px currentColor
+     }
+@@ -432,2 +430,4 @@
+     #paper-bot-overview-root button:disabled{color:#aab6c5;background:#202c3b;border-color:#475666}
++    #view-market .view-placeholder{gap:8px}
++    #view-market .view-placeholder p{max-width:64ch;margin-top:0}
+     .view .eyebrow,.section-intro .sub{display:none}
+@@ -450,2 +450,3 @@
+       #view-command>*{grid-column:1/-1;min-width:0;margin-block:0}
++      #view-command>[aria-labelledby="command-bots-heading"],#view-command>.decision{grid-column:span 1}
+     }
+@@ -456,3 +457,3 @@
+     #command-portfolio[data-state="not_loaded"] .trust-cell:has([data-command-depot-status]){display:none}
+-    #command-portfolio[data-state="not_loaded"] .trust-grid{grid-template-columns:1fr}
++    #command-portfolio[data-state="not_loaded"] .trust-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+   </style>
+@@ -585,3 +586,3 @@
+       <div class="section-intro">
+-        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Command</h1><p class="sub">Depot- und Botstatus auf einen Blick.</p></div>
++        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Command</h1><p class="sub">Depot-, Bot- und Marktstatus auf einen Blick.</p></div>
+       </div>
+@@ -594,2 +595,9 @@
+           <div class="trust-cell"><strong>BOTS</strong><span id="command-bots-status">Unbekannt</span></div>
++          <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
++        </div>
++      </section>
++      <section class="card" aria-labelledby="command-bots-heading">
++        <div class="card-head"><h2 id="command-bots-heading">Bot-Snapshot</h2><span class="limited">Nur lesend</span></div>
++        <div id="command-bot-overview" class="command-bot-overview" role="status" aria-live="polite" aria-atomic="true" data-state="locked">
++          <p>Gesperrt</p>
+         </div>
+@@ -602,8 +610,2 @@
+         </details>
+-      </section>
+-      <section class="card" aria-labelledby="command-bots-heading">
+-        <div class="card-head"><h2 id="command-bots-heading">Bot-Snapshot</h2><span class="limited">Nur lesend</span></div>
+-        <div id="command-bot-overview" class="command-bot-overview" role="status" aria-live="polite" aria-atomic="true" data-state="locked">
+-          <p>Gesperrt</p>
+-        </div>
+       </section>
+@@ -670,2 +672,6 @@
+     </section>
++    <section id="view-market" class="view" aria-labelledby="forecast-heading" hidden>
++      <div class="eyebrow">MARKT &amp; SZENARIEN</div><h1 id="forecast-heading">Forecast</h1>
++      <div class="card view-placeholder"><span class="limited module-availability">In Vorbereitung</span><h2>Marktszenarien nachvollziehbar prüfen</h2><p>Geplant sind FIB-Zonen und Szenarien mit verifizierten Quellen und sichtbarer Unsicherheit. Aktuell sind keine Forecast-Daten oder Live-Signale verfügbar.</p></div>
++    </section>
+     <section id="view-strategies" class="view" aria-labelledby="strategies-heading" hidden>
+@@ -682,2 +688,3 @@
+     <button type="button" data-v="bots" aria-controls="view-bots"><span class="nav-icon" aria-hidden="true">▦</span><span>BOTS</span></button>
++    <button type="button" data-v="market" aria-controls="view-market"><span class="nav-icon" aria-hidden="true">⌁</span><span>FORECAST</span></button>
+     <button type="button" data-v="strategies" aria-controls="view-strategies"><span class="nav-icon" aria-hidden="true">◇</span><span>STRATEGIEN</span></button>

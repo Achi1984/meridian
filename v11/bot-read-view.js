@@ -396,6 +396,8 @@ export function renderBotReadState(root, state, filters = {}) {
 export function renderCommandBotOverview(root, data, onJump, statusRoot=null) {
   if(statusRoot){
     const confirmed=data.status==='fresh'&&Number.isSafeInteger(data.count)&&data.count>=0;
+    statusRoot.setAttribute('data-warning',String(!Object.hasOwn(LABELS,data.status) ||
+      ['stale','unavailable'].includes(data.status) || (data.status==='fresh' && !confirmed)));
     statusRoot.textContent=confirmed?data.count+' Bots im Snapshot':
       (Object.hasOwn(LABELS,data.status)?LABELS[data.status]:LABELS.unavailable)[0];
     if(data.status==='fresh'&&!confirmed)statusRoot.textContent=LABELS.unavailable[0];
@@ -414,18 +416,23 @@ export function renderCommandBotOverview(root, data, onJump, statusRoot=null) {
   const sources={PIONEX_BOT_API:'Pionex Bot API',PIONEX_WALLET_BOT_DETAIL:'Pionex Wallet Botdetail'};
   const timestamp=typeof data.snapshotAt==='string'&&Number.isFinite(Date.parse(data.snapshotAt))
     ?data.snapshotAt:null;
-  const localizedTime=timestamp?new Intl.DateTimeFormat('de-AT',{dateStyle:'medium',timeStyle:'short'}).format(new Date(timestamp))+' (lokale Zeit)':'Zeit unbekannt';
+  const observedAt=timestamp?new Date(timestamp):null;
+  const today=observedAt && observedAt.toDateString()===new Date().toDateString();
+  const localizedTime=observedAt?new Intl.DateTimeFormat('de-AT',today?{timeStyle:'short'}:
+    {dateStyle:'medium',timeStyle:'short'}).format(observedAt):'Zeit unbekannt';
   const count=Number.isSafeInteger(data.count)&&data.count>=0?data.count:'Unbekannt';
   const distribution=data.distribution||{};
   const distributionCount=key=>Number.isSafeInteger(distribution[key])&&distribution[key]>=0
     ?distribution[key]:'Unbekannt';
   const source=Object.hasOwn(sources,data.source)?sources[data.source]:'Unbekannt';
-  const summary=element(document,'p',localizedTime+' · '+count+' Bots · nur lesend');
-  summary.className='command-bot-summary';root.append(summary);
+  const pnl=data.counts?.pnl;
+  const known=Number.isSafeInteger(count) && Number.isSafeInteger(pnl?.available) && pnl.available>=0 &&
+    Number.isSafeInteger(pnl.unavailable) && pnl.unavailable>=0 && pnl.available+pnl.unavailable===count;
   const metadata=element(document,'details');metadata.className='command-bot-metadata';
-  const metadataSummary=element(document,'summary','Quelle & Zeit');
-  metadataSummary.setAttribute('aria-label','Quelle und exakter Snapshot-Zeitpunkt');
-  metadata.append(metadataSummary);
+  const summary=element(document,'summary',(Number.isSafeInteger(count)?count+' Bots':'Botanzahl unbekannt')+' · '+(known?'P/L bei '+pnl.available+' bestätigt':'P/L-Abdeckung unbekannt')+
+    ' · Stand '+localizedTime);
+  summary.className='command-bot-summary';
+  metadata.append(summary);
   const metadataBody=element(document,'div');
   metadataBody.append(element(document,'p',coverageText(data.coverage)));
   const scope=scopeText(data);
@@ -437,11 +444,11 @@ export function renderCommandBotOverview(root, data, onJump, statusRoot=null) {
   if(timestamp)exactTimestamp.setAttribute('datetime',timestamp);
   metadataBody.append(element(document,'p','Snapshot-Zeit exakt (UTC): '),exactTimestamp);
   appendExpiry(metadataBody,data);
-  metadata.append(metadataBody);root.append(metadata);appendDataSummary(root,data);
-  if(data.count===0)root.append(element(document,'p',EMPTY_SNAPSHOT));
-  if(!data.losses.length)root.append(element(document,'p','Keine bestätigten negativen P/L-Werte.'));
+  metadata.append(metadataBody);root.append(metadata);appendDataSummary(metadataBody,data);
+  if(data.count===0)metadataBody.append(element(document,'p',EMPTY_SNAPSHOT));
+  if(!data.losses.length)metadataBody.append(element(document,'p','Keine bestätigten negativen P/L-Werte.'));
   else{
-    root.append(element(document,'p','Bestätigte negative P/L-Werte · keine Risikorangfolge.'));
+    metadataBody.append(element(document,'p','Bestätigte negative P/L-Werte · keine Risikorangfolge.'));
     const losses=element(document,'ul');
     losses.setAttribute('aria-label','Bestätigte negative P/L-Werte laut Quelle');
     for(const loss of data.losses){
@@ -466,7 +473,7 @@ export function renderCommandBotOverview(root, data, onJump, statusRoot=null) {
       body.append(element(document,'p','P/L laut Quelle · Originalwert: '+loss.pnlDetail));
       details.append(body);row.append(button,details);item.append(row);losses.append(item);
     }
-    root.append(losses);
+    metadataBody.append(losses);
   }
 }
 

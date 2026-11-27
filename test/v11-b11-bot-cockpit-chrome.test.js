@@ -278,7 +278,8 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               referencesVisible:cards.some(c=>c.querySelector('summary').innerText.includes('Referenz')),
               tinyPositive:cards.find(c=>c.id.endsWith('e'.repeat(20)))?.querySelector('.bot-pnl-positive')?.innerText,
               tinyCapital:cards.find(c=>c.id.endsWith('b'.repeat(20)))?.querySelector('.bot-card-capital strong')?.innerText,
-              command:command.innerText,lossButtons:command.querySelectorAll('button').length,
+              command:command.querySelector('.command-bot-summary').textContent,
+              folded:!command.querySelector('.command-bot-metadata').open,lossButtons:command.querySelectorAll('button').length,
               commandState:command.dataset.state,commandPill:document.getElementById('command-bots-status').textContent,
               summaryTexts:['a','b','c'].map(ref=>cards.find(c=>c.id.endsWith(ref.repeat(20)))
                 ?.querySelector('summary').innerText),
@@ -388,13 +389,14 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               .map(node=>ratio(getComputedStyle(node).color,getComputedStyle(node.closest('.bot-card')).backgroundColor));
           })()`);
           assert.ok(pnlContrast.length>=2&&pnlContrast.every(ratio=>ratio>=4.5),JSON.stringify(pnlContrast));
-          assert.match(fresh.command,/7 Bots · nur lesend/);assert.match(fresh.command,/Quelle & Zeit/);
-          assert.match(fresh.command,/Bestätigte negative P\/L-Werte/);
-          const commandMetadata=await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').innerText`);
+          assert.equal(fresh.folded,true);
+          assert.match(fresh.command,/7 Bots · P\/L bei 5 bestätigt · Stand/);
+          const commandMetadata=await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').textContent`);
+          assert.match(commandMetadata,/Bestätigte negative P\/L-Werte/);
           assert.match(commandMetadata,/Quelle: Pionex Bot API · Richtung: Long 3 · Short 2 · Neutral 1 · Unbekannt 1/);
           const exactCommandTimestamp=commandMetadata.match(/\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/)?.[0];
           assert.ok(exactCommandTimestamp);
-          const localCommandTimestamp=await evaluate(`new Intl.DateTimeFormat('de-DE',{dateStyle:'medium',timeStyle:'short'}).format(new Date(${JSON.stringify(exactCommandTimestamp)}))+' (lokale Zeit)'`);
+          const localCommandTimestamp=await evaluate(`new Intl.DateTimeFormat('de-AT',{hour:'2-digit',minute:'2-digit'}).format(new Date(${JSON.stringify(exactCommandTimestamp)}))`);
           assert.ok(fresh.command.includes(localCommandTimestamp),fresh.command);
           assert.ok(['bot-symbol-search','bot-direction-filter','bot-category-filter','bot-sort-filter',
             'bot-tp-filter','bot-pnl-filter','bot-read-refresh','bot-read-lock'].every(id=>fresh.touch.some(([,targetId])=>targetId===id)),
@@ -500,6 +502,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.match(await evaluate(`document.getElementById('bot-read-root').innerText`),/1 von 7 Bots im Snapshot/);
           assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-data-summary').innerText`),globalSummary);
           await evaluate(`document.querySelector('#nav [data-v="command"]').click();
+            document.querySelector('#command-bot-overview .command-bot-metadata').open=true;
             document.querySelectorAll('#command-bot-overview button')[1].focus()`);
           await key('Enter','Enter',13);
           assert.equal(await evaluate(`document.activeElement===document.querySelector('#bot-card-${'b'.repeat(20)} summary')`),true);
@@ -673,6 +676,11 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.equal(await evaluate('window.__botReads'),1,'local filter, sort, reset and navigation must not fetch');
 
           await evaluate(`document.querySelector('#nav [data-v="command"]').click()`);
+          const metadata="document.querySelector('#command-bot-overview .command-bot-metadata')";
+          await evaluate(`${metadata}.open=false;
+            ${metadata}.querySelector('summary').focus()`);
+          await key('Enter','Enter',13);
+          assert.equal(await evaluate(`${metadata}.open`),true);
           const commandTargets=await evaluate(`[...document.querySelectorAll('#command-bot-overview button')].map(b=>b.getBoundingClientRect().height)`);
           assert.ok(commandTargets.every(height=>height>=44),JSON.stringify(commandTargets));
           await evaluate(`document.querySelector('#command-bot-overview .command-bot-details summary').focus()`);
@@ -681,11 +689,8 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.match(await evaluate(`document.querySelector('#command-bot-overview .command-bot-details').innerText`),
             /Technische Referenz: a{20}[\s\S]*P\/L laut Quelle · Originalwert: -25 USD/);
           await key('Enter','Enter',13);
-          await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata summary').focus()`);
-          await key('Enter','Enter',13);
           assert.match(await evaluate(`document.querySelector('#command-bot-overview .command-bot-metadata').innerText`),
             /Snapshot-Zeit exakt \(UTC\):\s*\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z/);
-          await key('Enter','Enter',13);
           if(evidence&&screenshotWidths.has(size.width)){
             await evaluate("document.getElementById('command-bot-overview').scrollIntoView({block:'start'})");
             const image=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
@@ -870,6 +875,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
               const search=document.getElementById('bot-symbol-search');search.value='NO_MATCH';
               search.dispatchEvent(new Event('input',{bubbles:true}));
               document.querySelector('#nav [data-v="command"]').click();
+              document.querySelector('#command-bot-overview .command-bot-metadata').open=true;
               const jump=document.querySelector('#command-bot-overview button');
               window.__largeJumpRef=jump.getAttribute('aria-label').match(/Referenz ([a-f0-9]{20})/)[1];
               jump.focus();

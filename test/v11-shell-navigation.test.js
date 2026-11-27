@@ -5,8 +5,8 @@ import {test} from 'node:test';
 import vm from 'node:vm';
 const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 const js=html.match(/<script>([\s\S]*?)<\/script>/)?.[1];
-const keys=['command','depot','bots','market','strategies'];
-test('A0: all five tabs activate exactly one view and one aria-current',()=>{
+const keys=['command','depot','bots','strategies'];
+test('A0: all four tabs activate exactly one view and one aria-current',()=>{
  assert.ok(js);
  const classes=on=>{const s=new Set(on?['active']:[]);return {
    toggle:(k,v)=>v?s.add(k):s.delete(k),contains:k=>s.has(k)};};

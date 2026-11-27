@@ -4,13 +4,13 @@ import {readFileSync} from 'node:fs';
 import {test} from 'node:test';
 
 const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
-const keys=['command','depot','bots','market','strategies'];
-const labels=['COMMAND','DEPOT','BOTS','FORECAST','STRATEGIEN'];
+const keys=['command','depot','bots','strategies'];
+const labels=['COMMAND','DEPOT','BOTS','STRATEGIEN'];
 const nav=html.match(/<nav\b[^>]*id="nav"[^>]*>([\s\S]*?)<\/nav>/i)?.[1];
 const buttons=[...(nav||'').matchAll(/<button\b([^>]*data-v="([^"]+)"[^>]*)>([\s\S]*?)<\/button>/g)];
 const scripts=[...html.matchAll(/<script>([\s\S]*?)<\/script>/g)];
 
-test('A0: five accessible linked tabs, unique IDs and initial view',()=>{
+test('A0: four accessible linked tabs, unique IDs and initial view',()=>{
  assert.ok(nav,'navigation exists');
  assert.deepEqual(buttons.map(m=>m[2]),keys);
  const ids=[...html.matchAll(/\bid="([^"]+)"/g)].map(m=>m[1]);

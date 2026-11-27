@@ -46,7 +46,7 @@ function harness(){
       getAttribute:key=>attrs.get(key)
     };
   });
-  assert.deepEqual(tabs.map(tab=>tab.dataset.v),['command','depot','bots','market','strategies'],
+  assert.deepEqual(tabs.map(tab=>tab.dataset.v),['command','depot','bots','strategies'],
     'the actual v11 nav tab mapping changed');
   const views=new Map(tabs.map((tab,index)=>[tab.dataset.v,{
     id:'view-'+tab.dataset.v,hidden:index!==0,classList:new Classes(index===0),innerHTML:'',
@@ -82,22 +82,22 @@ function invokeHandlersInVm(tab,callbacks){
 }
 
 test('actual v9 go() changes active classes but leaves the v11 visibility and ARIA state stale',()=>{
-  const h=harness(),button=h.tabs.find(tab=>tab.dataset.v==='market');
+  const h=harness(),button=h.tabs.find(tab=>tab.dataset.v==='bots');
   assert.equal(typeof button.onclick,'function','v9 assigns a per-button navigation handler');
   assert.equal(typeof h.callbacks.get('click'),'function','v11 installs delegated navigation');
 
-  h.context.go('market');
+  h.context.go('bots');
 
-  assert.equal(h.views.get('market').classList.contains('active'),true);
+  assert.equal(h.views.get('bots').classList.contains('active'),true);
   assert.equal(button.classList.contains('active'),true);
-  assert.equal(h.views.get('market').hidden,true,'v9 go() does not unhide the v11 destination');
+  assert.equal(h.views.get('bots').hidden,true,'v9 go() does not unhide the v11 destination');
   assert.equal(h.views.get('command').hidden,false,'v9 go() leaves the v11 initial view visible');
   assert.equal(button.getAttribute('aria-current'),undefined,'v9 go() does not set destination aria-current');
   assert.equal(h.tabs[0].getAttribute('aria-current'),'page','v9 go() leaves aria-current on COMMAND');
-  assert.equal(h.views.get('market').innerHTML,'v9-render:market','the extracted production renderer ran');
+  assert.equal(h.views.get('bots').innerHTML,'v9-render:bots','the extracted production renderer ran');
 
   h.callbacks.get('click')({target:{closest:()=>button}});
-  assert.equal(h.views.get('market').hidden,false,'the actual v11 delegated owner controls hidden state');
+  assert.equal(h.views.get('bots').hidden,false,'the actual v11 delegated owner controls hidden state');
   assert.equal(h.views.get('command').hidden,true);
   assert.equal(button.getAttribute('aria-current'),'page');
   assert.equal(h.tabs[0].getAttribute('aria-current'),undefined);
