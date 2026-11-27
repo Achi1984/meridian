@@ -83,6 +83,9 @@ jobs:
                 "",
                 "Fixes Ziel besser bei \($p.fixedBetter), Trailing besser bei \($p.trailingBetter), Gleichstand bei \($p.equal).",
                 "",
+                ([$p.trades[].trailingMinusFixedExitSeconds] as $seconds |
+                  "Trailing verkaufte bei \([$seconds[] | select(. > 0)] | length) Positionen später, bei \([$seconds[] | select(. < 0)] | length) früher und bei \([$seconds[] | select(. == 0)] | length) zum selben Zeitpunkt."),
+                "",
                 "Bei \($lost) Positionen erzielte das fixe Ziel einen Gewinn und Trailing einen Verlust. Bei \($saved) war es umgekehrt."
               else "Ein Vergleich des realisierten Netto-PnL ist noch offen." end),
               "",
