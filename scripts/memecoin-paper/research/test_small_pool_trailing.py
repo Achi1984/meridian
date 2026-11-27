@@ -14,6 +14,10 @@ class TrailingComparisonTest(unittest.TestCase):
         result = delayed_sale_profile([probe], {'a':sale, 'b':sale})
         self.assertEqual((result['originalNetUsdc'], result['delayedNetUsdc'],
                           result['profitToLoss'], result['missing']), (1, -1, 1, 1))
+        second = dict(probe, sourceEventId='b', responseDelaySeconds=20)
+        timing = delayed_sale_profile([probe, second], {'a':sale, 'b':sale})
+        self.assertEqual((timing['medianResponseSeconds'], timing['maxResponseSeconds']), (13, 20))
+        self.assertIsNone(delayed_sale_profile([], {})['medianResponseSeconds'])
         for invalid in (dict(probe, qty=76), dict(probe, responseDelaySeconds=4)):
             with self.assertRaises(ValueError):
                 delayed_sale_profile([invalid], {'a':sale})
