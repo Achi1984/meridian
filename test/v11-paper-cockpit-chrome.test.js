@@ -1,5 +1,5 @@
 import {pionexReadEndpoints} from './helpers/pilot-log-fixture.mjs';
-import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
+import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, top100Endpoint, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -458,7 +458,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
-        const approvedExternal=new Set([...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,swingCheckpointEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
+        const approvedExternal=new Set([...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,top100Endpoint,swingCheckpointEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
           SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
           SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
         assert.ok(resources.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
@@ -470,8 +470,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.progressSettled(),3);
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B20-M11-FIX5');
-          const view=await import('./paper-cockpit-view.js?v=B20-M11-FIX5');
+          const model=await import('./paper-cockpit-model.js?v=B20-M11-FIX6');
+          const view=await import('./paper-cockpit-view.js?v=B20-M11-FIX6');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));

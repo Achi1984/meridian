@@ -1,4 +1,4 @@
-import {buildLedgerManualModel} from './ledger-manual-model.js?v=B20-M11-FIX5';
+import {buildLedgerManualModel} from './ledger-manual-model.js?v=B20-M11-FIX6';
 const BASE='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/';
 const PRICES='https://data-api.binance.vision/api/v3/ticker/price';
 export function createLedgerManualClient({getToken,onChange=()=>{},onLock=()=>{},fetchImpl=globalThis.fetch,now=Date.now}={}){
@@ -19,18 +19,18 @@ export function createLedgerManualClient({getToken,onChange=()=>{},onLock=()=>{}
       return JSON.parse(text+decoder.decode());
     }finally{ctl.signal.removeEventListener('abort',abort);abort();reader.releaseLock();}
   }
-  async function load(){
+  async function load(payload){
     if(disposed||controller)return;clear();const credential=token();if(!credential){lock();return;}
     const id=generation,ctl=new AbortController();controller=ctl;emit({status:'loading'});
     const timer=setTimeout(()=>ctl.abort(),10000);
     try{
-      const [dashboard,quotes]=await Promise.all([
-        read(BASE+'dashboard',{headers:{accept:'application/json',authorization:'Bearer '+credential}},ctl),
-        read(PRICES,{headers:{accept:'application/json'}},ctl).then(data=>({data,at:now()})).catch(()=>null)]);
+      const dashboard=payload===undefined?await read(BASE+'dashboard',{headers:{accept:'application/json',authorization:'Bearer '+credential}},ctl):payload;
       if(id!==generation||disposed)return;if(token()!==credential){lock();return;}
       if(dashboard?.private!==true||!Number.isSafeInteger(dashboard.data?.privateRevision))throw Error('shape');
       revision=dashboard.data.privateRevision;owner=credential;
       const snapshot=dashboard.data.portfolio?.ledgerManualSnapshot;
+      const quotes=buildLedgerManualModel(snapshot,{now:now()})?await read(PRICES,{headers:{accept:'application/json'}},ctl).then(data=>({data,at:now()})).catch(()=>null):null;
+      if(id!==generation||disposed)return;if(token()!==credential){lock();return;}
       const model=buildLedgerManualModel(snapshot,{tickers:quotes?.data,pricesAt:quotes?.at,now:now()});
       if(snapshot&&!model)throw Error('snapshot');
       emit({status:'ready',model});

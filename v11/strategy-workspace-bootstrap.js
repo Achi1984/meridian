@@ -1,14 +1,14 @@
-import {mountTop100} from './top100-report.js?v=B20-M11-FIX5';
-import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B20-M11-FIX5';
-import {createAdvisorSection} from './paper-advisor-view.js?v=B20-M11-FIX5';
-import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B20-M11-FIX5';
-import {createStrategyArenaView} from './strategy-arena.js?v=B20-M11-FIX5';
-import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B20-M11-FIX5';
-import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B20-M11-FIX5';
-import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B20-M11-FIX5';
-import {renderPaperReadiness} from './paper-readiness-view.js?v=B20-M11-FIX5';
-import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B20-M11-FIX5';
-import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B20-M11-FIX5';
+import {mountTop100} from './top100-report.js?v=B20-M11-FIX6';
+import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B20-M11-FIX6';
+import {createAdvisorSection} from './paper-advisor-view.js?v=B20-M11-FIX6';
+import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B20-M11-FIX6';
+import {createStrategyArenaView} from './strategy-arena.js?v=B20-M11-FIX6';
+import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B20-M11-FIX6';
+import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B20-M11-FIX6';
+import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B20-M11-FIX6';
+import {renderPaperReadiness} from './paper-readiness-view.js?v=B20-M11-FIX6';
+import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B20-M11-FIX6';
+import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B20-M11-FIX6';
 
 let catalogRoot = document.getElementById('strategy-catalog');
 let catalogStatus = document.getElementById('strategy-load-status');
@@ -16,6 +16,7 @@ let arenaRoot = document.getElementById('strategy-arena-root');
 let arena = null;
 let advisorController = null;
 let refreshSolanaStatus = null;
+let refreshTop100 = null;
 let paperCockpit = null;
 let spotPaperCockpit = null;
 let spotPaperHost8hDashboard = null;
@@ -54,7 +55,7 @@ function mountWorkspace(){
   refreshSolanaStatus = refresh;
   const scanner = collapsedSection('solana-scanner-live','Solana-Memecoin-Scanner · Live',solana);
   mountLiveScanner(scanner);
-  mountTop100(collapsedSection('top100-paper','Top 100 · Ausbruch und Rücktest',botReports));
+  refreshTop100=mountTop100(collapsedSection('top100-paper','Top 100 · Ausbruch und Rücktest',botReports));
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
   pairedSourceStatus.id='paired-paper-source-status';
@@ -119,6 +120,7 @@ function requestWorkspaceLoad(){
   const active=document.querySelector('#nav button[data-v="strategies"][aria-current="page"]');
   if(active){
     refreshSolanaStatus?.();
+    refreshTop100?.();
     advisorController?.setActive(true);
     paperCockpit?.setActive(true);
     spotPaperCockpit?.setActive(true);

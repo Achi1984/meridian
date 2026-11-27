@@ -1,5 +1,5 @@
-import {createLedgerManualClient} from './ledger-manual-client.js?v=B20-M11-FIX5';
-import {parseLedgerManualText} from './ledger-manual-model.js?v=B20-M11-FIX5';
+import {createLedgerManualClient} from './ledger-manual-client.js?v=B20-M11-FIX6';
+import {parseLedgerManualText} from './ledger-manual-model.js?v=B20-M11-FIX6';
 const messages={locked:'App entsperren, um Ledger-Bestände zu laden.',loading:'Ledger-Bestände und öffentliche Kurse werden geladen.',
   ready:'Manuell erfasste Mengen; keine automatische Wallet-Abfrage.',saving:'Ledger-Mengen werden gespeichert.',
   saved:'Gespeichert. Ledger neu laden, um den gespeicherten Stand mit aktuellen Kursen anzuzeigen.',
@@ -23,19 +23,25 @@ export function mountLedgerManual(root,{access,createClient=createLedgerManualCl
     el('p','Der Schreibschlüssel wird nur für diesen Speichervorgang verwendet. Kurse werden nicht manuell gespeichert.'),save);
   editor.append(summary,form);section.append(el('h3','Ledger · manuelle Bestände'),
     el('p','Öffentliche USDT-Kurse · nur Ledger, kein Gesamtvermögen'),load,status,content,editor);root.append(section);
+  const command=doc.getElementById?.('command-portfolio'),tile=el('div'),balance=el('strong');
+  tile.className='command-ledger';tile.hidden=true;
+  tile.append(el('span','Ledger'),balance);command?.append(tile);
   let ready=false,disposed=false;
   const client=createClient({getToken:access.getToken,onLock:()=>access.lock(),onChange:s=>{
     if(disposed)return;ready=s.status==='ready';save.disabled=!ready;load.disabled=['loading','saving','locked'].includes(s.status);
     status.textContent=messages[s.status]||messages.unavailable;content.replaceChildren();
     if(s.status==='locked'){quantities.value='';observed.value='';key.value='';editor.open=false;}
     if(s.status==='saving')key.value='';
+    tile.hidden=s.status==='locked';balance.textContent=s.status==='loading'?'Lädt …':'Bewertung offen';
     if(!ready)return;
     if(!s.model){
       status.textContent='Noch kein manueller Ledger-Mengenstand gespeichert. Das bestätigt weder ein leeres Wallet noch einen Wert von null.';
       content.append(el('p','Unter „Mengen bearbeiten“ kannst du deine geprüften Mengen und deren Bestandszeit erfassen. Es erfolgt keine automatische Wallet-Abfrage.'));
       return;
     }
-    const m=s.model;content.append(el('p','Mengenstand: '+new Date(m.observedAt).toLocaleString('de-AT')));
+    const m=s.model;
+    balance.textContent=m.total===null?'Kurse unvollständig':new Intl.NumberFormat('de-AT',{minimumFractionDigits:2,maximumFractionDigits:2}).format(m.total)+' USDT';
+    content.append(el('p','Mengenstand: '+new Date(m.observedAt).toLocaleString('de-AT')));
     const list=el('ul');for(const row of m.holdings){
       list.append(el('li',row.symbol+': '+row.quantity+' · '+(row.value===null?'Bewertung nicht verfügbar':new Intl.NumberFormat('de-AT',{maximumFractionDigits:2,minimumFractionDigits:2}).format(row.value)+' USDT')));
     }content.append(list,el('p',m.total===null?'Ledger-Gesamtbewertung unvollständig; fehlende Kurse sind nicht null.':'Ledger-Bewertung: '+new Intl.NumberFormat('de-AT',{maximumFractionDigits:2,minimumFractionDigits:2}).format(m.total)+' USDT'));
@@ -53,5 +59,5 @@ export function mountLedgerManual(root,{access,createClient=createLedgerManualCl
   const unregister=access.registerReader(()=>client.lock(),()=>client.revalidate());
   const unsubscribe=access.subscribe(s=>{if(s.status==='unlocked'){load.disabled=false;status.textContent='Ledger laden, bevor Mengen gespeichert werden.';}else client.lock();});
   load.disabled=!access.isUnlocked();status.textContent=load.disabled?messages.locked:'Ledger laden, bevor Mengen gespeichert werden.';
-  return {dispose(){client.dispose();disposed=true;unregister();unsubscribe();load.removeEventListener('click',loadHandler);form.removeEventListener('submit',saveHandler);section.remove();}};
+  return {loadFromDashboard:payload=>client.load(payload),dispose(){tile.remove();client.dispose();disposed=true;unregister();unsubscribe();load.removeEventListener('click',loadHandler);form.removeEventListener('submit',saveHandler);section.remove();}};
 }

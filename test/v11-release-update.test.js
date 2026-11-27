@@ -35,7 +35,7 @@ test('release identity requires exactly five coherent approved local entries',()
 });
 
 test('served index is recognized without a second manually maintained version manifest',()=>{
-  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B20-M11-FIX5');
+  assert.equal(readReleaseHtml(readFileSync(new URL('../v11/index.html',import.meta.url),'utf8')),'B20-M11-FIX6');
 });
 
 test('a cached B20.2 page upgrades to the compact dashboard',async()=>{
@@ -43,7 +43,7 @@ test('a cached B20.2 page upgrades to the compact dashboard',async()=>{
   const f=fixture({currentRelease:'B20-M11-FIX2',
     fetchImpl:async()=>new Response(index,{headers:{'content-type':'text/html; charset=utf-8'}})});
   await f.update.check();
-  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B20-M11-FIX5#view-bots']);
+  assert.deepEqual(f.navigation,['https://example.test/meridian/v11/?view=bots&m11build=B20-M11-FIX6#view-bots']);
 });
 
 test('locked safe tab checks only public HTML without credentials and reloads a newer release once',async()=>{

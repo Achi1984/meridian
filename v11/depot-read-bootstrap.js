@@ -1,8 +1,8 @@
-import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX5';
-import {createDepotReadClient} from './depot-read-client.js?v=B20-M11-FIX5';
-import {createDepotReadView} from './depot-read-view.js?v=B20-M11-FIX5';
-import {mountLedgerReview} from './ledger-review-view.js?v=B20-M11-FIX5';
-import {mountLedgerManual} from './ledger-manual-view.js?v=B20-M11-FIX5';
+import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX6';
+import {createDepotReadClient} from './depot-read-client.js?v=B20-M11-FIX6';
+import {createDepotReadView} from './depot-read-view.js?v=B20-M11-FIX6';
+import {mountLedgerReview} from './ledger-review-view.js?v=B20-M11-FIX6';
+import {mountLedgerManual} from './ledger-manual-view.js?v=B20-M11-FIX6';
 
 // Use the authenticated reader for visible Pionex snapshots.
 export function mountDepotReadAccess(document,window,{
@@ -20,7 +20,7 @@ export function mountDepotReadAccess(document,window,{
   try{
     view=createView(root,{pionexOnly,commandRoot:document.getElementById('command-portfolio'),getToken:access.getToken,
       createClient:options=>{
-        const reader=createClient({...options,pionexOnly,getToken:access.getToken,onChange:state=>{
+        const reader=createClient({...options,pionexOnly,onLedgerSnapshot:payload=>ledgerReview?.loadFromDashboard?.(payload),getToken:access.getToken,onChange:state=>{
           cancelExpiry();
           if(disposed)return;
           if(state.status==='locked'&&access.isUnlocked()){access.lock();return;}
@@ -43,7 +43,10 @@ export function mountDepotReadAccess(document,window,{
       }});
     unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
     stopAutoRefresh=refreshOnOpen(document,access,['command', 'depot', 'bots'],()=>{if(!reading)client?.refresh();},now);
-    if(ledgerManual)ledgerReview=createLedgerManualView(root,{access});
+    if(ledgerManual){
+      ledgerReview=createLedgerManualView(root,{access});
+
+    }
     else if(!pionexOnly)ledgerReview=createLedgerView(root,{access});
   }catch{
     stopAutoRefresh();cancelExpiry();unregister();unsubscribe();ledgerReview?.dispose();

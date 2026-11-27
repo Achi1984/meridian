@@ -1,3 +1,4 @@
+import {paperGroupPnl} from './paper-group-pnl.js?v=B20-M11-FIX6';
 const runId = 45678525838;
 const repo = 'Achi1984/meridian';
 const source = 'https://api.github.com/repos/' + repo + '/contents/top100-' + runId + '.json?ref=paper-dashboard-data';
@@ -33,6 +34,7 @@ export function mountTop100(section) {
   const sourceLine = element('p','');
   sourceLine.append(link);
   section.append(status, accounts, button, sourceLine);
+  const headline=paperGroupPnl(section);headline();
   let rendered = false;
   async function refresh() {
     if (button.disabled) return;
@@ -47,6 +49,8 @@ export function mountTop100(section) {
       if (!response.ok) throw Error('unavailable');
       const report = await response.json();
       const rows = dashboardRows(report);
+      headline('Realisiert','USDT',rows.slice(0,2).map(a=>[a.name,a.realized]),
+        rows.some(a=>a.pending)?'Funding offen':'');
       const fragment = document.createDocumentFragment();
       for (const a of rows) {
         fragment.append(element('h4', a.name), element('p', a.equity === null
@@ -59,6 +63,7 @@ export function mountTop100(section) {
       status.textContent = (report.stage === 'final' ? 'Abschlussbericht' : 'Zwischenbericht') + ' · Datenstand ' + time + ' (Wien)';
       rendered = true;
     } catch {
+      headline();
       if (!rendered) status.textContent = 'Bericht derzeit nicht abrufbar.';
       else if (!status.textContent.endsWith('Abruf fehlgeschlagen.')) status.textContent += ' · Abruf fehlgeschlagen.';
     } finally {
@@ -67,4 +72,5 @@ export function mountTop100(section) {
   }
   section.addEventListener('toggle', () => { if (section.open) refresh(); });
   button.addEventListener('click', refresh);
+  return refresh;
 }

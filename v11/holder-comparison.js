@@ -1,4 +1,4 @@
-import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX5';
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX6';
 const api = 'https://api.github.com/repos/Achi1984/meridian/actions';
 const runs = 'https://github.com/Achi1984/meridian/actions/runs/';
 const micro = 1_000_000;

@@ -1,4 +1,5 @@
-import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX5';
+import {paperGroupPnl} from './paper-group-pnl.js?v=B20-M11-FIX6';
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX6';
 const repo = 'Achi1984/meridian';
 const workflow = 'solana-meme-paper-bot.yml';
 const api = 'https://api.github.com/repos/' + repo;
@@ -16,8 +17,8 @@ async function read(url, raw = false) {
   return response.json();
 }
 
-import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX5';
-import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX5';
+import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX6';
+import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX6';
 
 // The experiment stores raw USDC in millionths and charges 0.05 USDC per fill.
 const swingRun = 45624335706;
@@ -185,6 +186,7 @@ export function mountSwingCard(section, add, load = read) {
   status.setAttribute('role','status');
   const body = add(card,'div','');
   const clock = add(card,'meridian-run-clock','');
+  const headline=paperGroupPnl(section);headline();
   const decisions = add(card,'details','');
   add(decisions,'summary','Einstiegsgründe');
   const reasons = add(decisions,'ul','');
@@ -214,7 +216,7 @@ export function mountSwingCard(section, add, load = read) {
     } catch { worker.textContent = 'Datensammlung · Status derzeit nicht abrufbar'; }
   }
   let last = 0, pending = false;
-  return async function refreshSwing() {
+  return async function refreshSwing({worker=true}={}) {
     if (pending) return;
     pending = true;
     try {
@@ -231,6 +233,7 @@ export function mountSwingCard(section, add, load = read) {
       status.textContent = summary.text;
       status.className = summary.tone;
       body.replaceChildren();
+      headline('Realisiert','USDC',rows.map(row=>[row.key==='fixed'?'Festziel':'Teilverkauf',row.realized]));
       for (const row of rows) {
         const line = add(body,'p','');
         line.className = 'paper-account';
@@ -248,9 +251,10 @@ export function mountSwingCard(section, add, load = read) {
       last = state.lastTick;
     } catch {
       status.className = 'paper-wait';
+      headline();
       if (!last) status.textContent = 'Laufstand derzeit nicht abrufbar.';
       else if (!status.textContent.includes('Abruf fehlgeschlagen')) status.textContent += ' · Abruf fehlgeschlagen';
-    } finally { await refreshWorker(); pending = false; }
+    } finally { if(worker)await refreshWorker(); pending = false; }
   };
 }
 
@@ -505,7 +509,7 @@ export function mountSolanaReport(section) {
   section.addEventListener('toggle',syncSwingTimer);
   doc.addEventListener('visibilitychange',syncSwingTimer);
   refresh.addEventListener('click',update);
-  return refreshStatus;
+  return ()=>{void refreshSwing({worker:section.open});return refreshStatus();};
 }
 
 export function mountLiveScanner(section) {

@@ -1,5 +1,6 @@
-import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX5';
-import {appAccess} from './app-access.js?v=B20-M11-FIX5';
+import {paperGroupPnl} from './paper-group-pnl.js?v=B20-M11-FIX6';
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX6';
+import {appAccess} from './app-access.js?v=B20-M11-FIX6';
 
 const NUMBER = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 8});
 const PERCENT = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 2});
@@ -403,9 +404,11 @@ export function mountAdvisor(root, access = appAccess) {
   const fileInput = root.querySelector('[data-advisor-file]');
   const status = root.querySelector('[data-advisor-status]');
   const result = root.querySelector('[data-advisor-result]');
+  const headline=paperGroupPnl(root);headline();
+  const eurResults=report=>['model','reference'].map(key=>[labels[key],Number.isFinite(report.arms[key].equityEur)?report.arms[key].equityEur-1000:null]);
   let generation = 0;
   function clear() {
-    generation++;
+    generation++;headline();
     fileInput.value = '';
     result.replaceChildren();
     delete result.dataset.asOf;
@@ -434,25 +437,27 @@ export function mountAdvisor(root, access = appAccess) {
       if (!response.ok) throw new Error('Report unavailable');
       const {report, pilotAudit, decisions, trades, krakenUsd, comparison, usdRound} = await response.json();
       if (controller !== request || !access.isUnlocked()) return;
-      let asOf;
+      let asOf,unit,rows;
       if (usdRound?.schema === 'MERIDIAN_USD_ROUND_V1' && usdRound.pair === 'BTC/USD' &&
           timestamp(usdRound.at) && timestamp(usdRound.start)) {
         renderUsdRound(result, usdRound);
-        asOf = usdRound.at;
+        asOf = usdRound.at;unit='USD';rows=['v3','v4'].map(key=>[key.toUpperCase(),usdRound.arms[key].netUsd]);
       } else {
         if (!validAdvisorReport(report) || !pilotAudit ||
             !['closedModelTrades','maxObservedDrawdownPct','modeledApiUsd','apiBudgetUsd','unresolvedReserveUsd'].every(key => nonnegative(pilotAudit[key]))) {
           throw new Error('Invalid report');
         }
         renderAdvisorReport(result, report, pilotAudit, decisions, trades, krakenUsd, comparison);
-        asOf = report.asOf;
+        asOf = report.asOf;unit='EUR';rows=eurResults(report);
       }
       result.dataset.asOf = asOf;
       const stale = Date.now() - Date.parse(asOf) > 15 * 60 * 1000;
+      headline('Netto',unit,rows,stale?'Daten veraltet':'');
       status.dataset.state = stale ? 'warning' : 'fresh';
       status.textContent = (stale ? 'Veralteter Datenstand · ' : 'Datenstand · ') + DATE.format(new Date(asOf));
     } catch {
       if (controller === request && access.isUnlocked()) {
+        headline();
         status.dataset.state = 'warning';
         const last = result.dataset.asOf;
         status.textContent = 'Abruf fehlgeschlagen.' + (last ? ' Letzter Stand · ' + DATE.format(new Date(last)) : '');
@@ -491,6 +496,7 @@ export function mountAdvisor(root, access = appAccess) {
       if (current !== generation || !access.isUnlocked()) return;
       if (!validAdvisorReport(report)) throw new Error('invalid report');
       renderAdvisorReport(result, report);
+      headline('Netto','EUR',eurResults(report),'Lokaler Bericht');
       status.textContent = 'Lokaler Bericht · ' + DATE.format(new Date(report.asOf));
     } catch {
       if (current === generation) status.textContent = 'Datei unlesbar oder kein gültiger Meridian-Modellbericht.';
