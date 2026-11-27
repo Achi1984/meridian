@@ -17,7 +17,9 @@ def score(directory):
     fixed_positions = {}
     seen = {}
     cash = START
-    skipped_capacity = fixed_net = fixed_closed = 0
+    skipped = []
+    fixed_results = {}
+    trailing_results = {}
     trades = []
     bought = set()
     last = None
@@ -48,12 +50,11 @@ def score(directory):
                     cash -= SIZE + FEE
                     open_positions[key] = dict(qty=qty, peak=0, marks=0)
                 else:
-                    skipped_capacity += 1
+                    skipped.append(key)
             elif fill['side'] == 'sell' and fixed_positions.pop(key) == qty:
                 if row['event'] not in ('resaleMark', 'exit') or row['usdcRaw'] != fill['usdcRaw']:
                     raise ValueError('Invalid F exit')
-                fixed_closed += 1
-                fixed_net += fill['usdcRaw'] - SIZE - 2 * FEE
+                fixed_results[key] = fill['usdcRaw'] - SIZE - 2 * FEE
             else:
                 raise ValueError('Unknown F fill')
 
@@ -69,6 +70,7 @@ def score(directory):
         trail = position['peak'] * 10 >= SIZE and 2 * net <= position['peak']
         if trail or row['event'] == 'exit':
             cash += bid - FEE
+            trailing_results[key] = net
             trades.append(dict(positionId=key, at=row['at'], netUsdc=net / UNIT,
                                reason='trailing' if trail else 'timed'))
             del open_positions[key]
@@ -77,15 +79,32 @@ def score(directory):
                 position['peak'] = max(position['peak'], net)
             position['marks'] += 1
 
+    fixed_net = sum(fixed_results.values())
+    fixed_closed = len(fixed_results)
     if (not last or last['event'] != 'finished' or last['at'] != status['updatedAt']
             or fixed_closed != reference['closedTrades'] or fixed_net / UNIT != reference['realizedUsdc']
             or fixed_positions != {p['positionId']: p['qty'] for p in reference['openPositions']}):
         raise ValueError('Journal does not reconcile with final F account')
     realized = cash - START + len(open_positions) * (SIZE + FEE)
-    return dict(startedAt=status['startedAt'], endedAt=status['updatedAt'], initialUsdc=START / UNIT,
+    paired = fixed_results.keys() & trailing_results.keys()
+    fixed_paired = sum(fixed_results[key] for key in paired)
+    trailing_paired = sum(trailing_results[key] for key in paired)
+    skipped_closed = [key for key in skipped if key in fixed_results]
+    comparison = dict(
+        sharedEntries=len(bought) - len(skipped),
+        bothClosed=len(paired),
+        sharedStillOpenOnEitherSide=len(bought) - len(skipped) - len(paired),
+        pairedFixedNetUsdc=fixed_paired / UNIT,
+        pairedTrailingNetUsdc=trailing_paired / UNIT,
+        pairedTrailingMinusFixedUsdc=(trailing_paired - fixed_paired) / UNIT,
+        skippedFixedClosed=len(skipped_closed),
+        skippedFixedStillOpen=len(skipped) - len(skipped_closed),
+        skippedFixedRealizedUsdc=sum(fixed_results[key] for key in skipped_closed) / UNIT,
+    )
+    return dict(comparison=comparison, startedAt=status['startedAt'], endedAt=status['updatedAt'], initialUsdc=START / UNIT,
                 fixed=dict(realizedUsdc=fixed_net / UNIT, closed=fixed_closed, open=len(fixed_positions)),
                 trailing=dict(realizedUsdc=realized / UNIT, cashUsdc=cash / UNIT, closed=len(trades),
-                              open=list(open_positions), skippedForCash=skipped_capacity, trades=trades))
+                              open=list(open_positions), skippedForCash=len(skipped), trades=trades))
 
 
 if __name__ == '__main__':
