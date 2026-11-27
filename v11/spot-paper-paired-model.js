@@ -2,8 +2,8 @@ import {
   projectSpotPaperPairedDashboard,
   SPOT_PAPER_PAIRED_NEXT_RUN_MODELS,
   SPOT_PAPER_PAIRED_DASHBOARD_SCHEMA
-} from '../scripts/spot-paper-paired-report/contract.mjs?v=B20-M11-FIX4';
-import {validateProgress} from '../scripts/spot-paper-paired-progress/contract.mjs?v=B20-M11-FIX4';
+} from '../scripts/spot-paper-paired-report/contract.mjs?v=B20-M11-FIX5';
+import {validateProgress} from '../scripts/spot-paper-paired-progress/contract.mjs?v=B20-M11-FIX5';
 
 const ARM_DEFINITIONS = Object.freeze([
   {id: 'baseline', label: 'Baseline'},

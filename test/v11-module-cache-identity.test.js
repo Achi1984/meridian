@@ -8,7 +8,7 @@ const indexUrl=new URL('index.html',v11Root);
 const bridgeRoot=new URL('../scripts/memecoin-paper-report-bridge/',v11Root);
 const spotBridgeRoot=new URL('../scripts/spot-paper-report-bridge/',v11Root);
 const pairedProgressRoot=new URL('../scripts/spot-paper-paired-progress/',v11Root);
-const CACHE_ID='?v=B20-M11-FIX4';
+const CACHE_ID='?v=B20-M11-FIX5';
 const diskPath=url=>fileURLToPath(new URL(url.pathname,url));
 const readModule=url=>readFileSync(diskPath(url),'utf8');
 const exists=url=>existsSync(diskPath(url));
@@ -109,11 +109,11 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
   assert.deepEqual([...graph.modules].sort(),expectedModules);
   assert.deepEqual([...graph.external].sort(),[
     '../ledger-manual-snapshot.js','../portfolio-data-contract.js','../public/js/m11-agent-status.js',
-    '../research/strategy-paper-arena.js','../scripts/memecoin-paper-report-bridge/contract.mjs?v=B20-M11-FIX4',
-    '../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11-FIX4',
-    '../scripts/spot-paper-paired-progress/contract.mjs?v=B20-M11-FIX4',
-    '../scripts/spot-paper-paired-report/contract.mjs?v=B20-M11-FIX4',
-    '../scripts/spot-paper-report-bridge/contract.mjs?v=B20-M11-FIX4','../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B20-M11-FIX4',
+    '../research/strategy-paper-arena.js','../scripts/memecoin-paper-report-bridge/contract.mjs?v=B20-M11-FIX5',
+    '../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11-FIX5',
+    '../scripts/spot-paper-paired-progress/contract.mjs?v=B20-M11-FIX5',
+    '../scripts/spot-paper-paired-report/contract.mjs?v=B20-M11-FIX5',
+    '../scripts/spot-paper-report-bridge/contract.mjs?v=B20-M11-FIX5','../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B20-M11-FIX5',
     '../v8-clean/live-price-core-r18.js'
   ]);
   assert.ok(graph.references.get('app-access.js')>=4,'status shares the existing central access module');
@@ -122,7 +122,7 @@ test('served M11 and Paper bridge module graph shares one versioned identity',()
   assert.ok(graph.references.get('bot-read-client.js')>=2,'shared bot client is reached by both read surfaces');
   for(const [module,identities] of graph.identities){
     assert.equal(identities.size,1,`${module} must resolve to one shared URL identity`);
-    assert.match([...identities][0],/\?v=B20-M11-FIX4$/);
+    assert.match([...identities][0],/\?v=B20-M11-FIX5$/);
   }
 });
 
@@ -132,24 +132,24 @@ test('agent-status browser harness shares the served B18 bootstrap, client and a
   const statusModules=imports.filter(url=>url.pathname.startsWith('/v11/'))
     .map(url=>url.pathname.slice('/v11/'.length)+url.search).sort();
   assert.deepEqual(statusModules,[
-    'agent-status-bootstrap.js?v=B20-M11-FIX4',
-    'agent-status-client.js?v=B20-M11-FIX4',
-    'app-access.js?v=B20-M11-FIX4'
+    'agent-status-bootstrap.js?v=B20-M11-FIX5',
+    'agent-status-client.js?v=B20-M11-FIX5',
+    'app-access.js?v=B20-M11-FIX5'
   ]);
 });
 
 test('nested stale FIX15 edges fail the same graph assertion',()=>{
   const fixtureRoot=new URL('file:///fixture/v11/');
   const fixture=new Map([
-    ['/fixture/v11/entry.js',"import './nested.js?v=B20-M11-FIX4';"],
+    ['/fixture/v11/entry.js',"import './nested.js?v=B20-M11-FIX5';"],
     ['/fixture/v11/nested.js',"import './leaf.js?v=B16-M11-FIX15';"],
     ['/fixture/v11/leaf.js','export const ready=true;']
   ]);
-  assert.throws(()=>scanGraph([new URL('entry.js?v=B20-M11-FIX4',fixtureRoot)],{
+  assert.throws(()=>scanGraph([new URL('entry.js?v=B20-M11-FIX5',fixtureRoot)],{
     root:fixtureRoot,
     read:url=>fixture.get(url.pathname),
     fileExists:url=>fixture.has(url.pathname)
-  }),/internal v11 import must use \?v=B20-M11-FIX4/);
+  }),/internal v11 import must use \?v=B20-M11-FIX5/);
 });
 
 test('B18 cache preview remains isolated from terminal, root and PWA release identities',()=>{

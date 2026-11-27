@@ -1,5 +1,5 @@
-import {createLedgerManualClient} from './ledger-manual-client.js?v=B20-M11-FIX4';
-import {parseLedgerManualText} from './ledger-manual-model.js?v=B20-M11-FIX4';
+import {createLedgerManualClient} from './ledger-manual-client.js?v=B20-M11-FIX5';
+import {parseLedgerManualText} from './ledger-manual-model.js?v=B20-M11-FIX5';
 const messages={locked:'App entsperren, um Ledger-Bestände zu laden.',loading:'Ledger-Bestände und öffentliche Kurse werden geladen.',
   ready:'Manuell erfasste Mengen; keine automatische Wallet-Abfrage.',saving:'Ledger-Mengen werden gespeichert.',
   saved:'Gespeichert. Ledger neu laden, um den gespeicherten Stand mit aktuellen Kursen anzuzeigen.',

@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B20-M11-FIX4';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B20-M11-FIX4';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B20-M11-FIX5';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B20-M11-FIX5';
 
 const LABELS = {
   locked: ['Gesperrt', 'Meridian entsperren, um die Bots zu laden.'],
@@ -240,21 +240,49 @@ export function renderBotReadState(root, state, filters = {}) {
   section.setAttribute('data-state',data.status);
   status.replaceChildren(element(document,'strong',LABELS[data.status][0]));
   if(data.status==='fresh'){
-    const context=element(document,'p','Snapshot-Zeit (lokale Zeit): ');
+    const context=element(document,'p','Stand ');
     const stamp=element(document,'time',new Date(data.snapshotAt).toLocaleString('de-AT'));
     stamp.setAttribute('datetime',data.snapshotAt);stamp.setAttribute('title','UTC: '+data.snapshotAt);
-    context.append(stamp,element(document,'span',' · bestätigt keinen laufenden Bot-Prozess.'));
+    context.append(stamp);
     status.append(context);
   }else if(data.status!=='loading')status.append(element(document,'p',LABELS[data.status][1]));
+  const diagnosticsOpen=sameRead && details.querySelector?.('.bot-diagnostics')?.hasAttribute('open');
   details.replaceChildren();
   details.setAttribute('aria-busy',data.status==='loading'?'true':'false');
   if (data.status === 'fresh') {
     const resultCount=element(document,'p',data.bots.length+' von '+data.count+' Bots im Snapshot');
     resultCount.setAttribute('role','status');resultCount.setAttribute('aria-live','polite');
-    details.append(resultCount);appendDataSummary(details,data);
-    details.append(element(document,'p',coverageText(data.coverage)));appendExpiry(details,data);
+    details.append(resultCount);
+    if(data.bots.length){
+      const totals=new Map();
+      let known=0;
+      for(const bot of data.bots){
+        if(!Number.isFinite(bot.capitalValue)||!bot.capitalUnit)continue;
+        totals.set(bot.capitalUnit,(totals.get(bot.capitalUnit)||0)+bot.capitalValue);
+        known++;
+      }
+      const capital=element(document,'p',known===data.bots.length?'Bot-Kapital · ':'Erfasstes Bot-Kapital · ');
+      const amounts=Array.from(totals,([unit,value])=>
+        ['USD','USDT','USDC'].includes(unit)?formatMoney(value,unit):valueLabel(value,' '+unit,true));
+      const value=element(document,'strong',amounts.join(' + ')||MISSING);
+      if(known)value.className='bot-capital-total';
+      capital.append(value);
+      if(known<data.bots.length)capital.append(element(document,'small',' · '+known+' von '+data.bots.length+' mit Kapitalangabe'));
+      details.append(capital);
+    }
+    const diagnostics=element(document,'details');
+    diagnostics.className='bot-diagnostics metric-notes';
+    if(diagnosticsOpen)diagnostics.setAttribute('open','');
+    diagnostics.append(element(document,'summary','Snapshot-Details'),
+      element(document,'p','Der Snapshot bestätigt keinen laufenden Bot-Prozess.'));
+    appendDataSummary(diagnostics,data);
+    if(data.coverage?.status==='PARTIAL'){
+      const coverage=element(document,'p','Teilabdeckung · '+data.coverage.representedRows+' von '+data.coverage.listRows+' Einträgen dargestellt');
+      coverage.className='coverage-warning';details.append(coverage);
+    }
+    diagnostics.append(element(document,'p',coverageText(data.coverage)));appendExpiry(diagnostics,data);
     const scope=scopeText(data);
-    if(scope)details.append(element(document,'p',scope));
+    if(scope)diagnostics.append(element(document,'p',scope));
     if (!data.count) details.append(element(document,'p',EMPTY_SNAPSHOT));
     else if (!data.bots.length) details.append(element(document,'p','Keine Bots entsprechen den Filtern.'));
     else {
@@ -263,8 +291,7 @@ export function renderBotReadState(root, state, filters = {}) {
       expandAll.setAttribute('type','button');collapseAll.setAttribute('type','button');
       expandAll.setAttribute('aria-label','Alle angezeigten Bots aufklappen');
       collapseAll.setAttribute('aria-label','Alle angezeigten Bots zuklappen');
-      disclosureControls.append(expandAll,collapseAll,element(document,'p','Gilt für die aktuell angezeigten Bots.'));
-      details.append(disclosureControls);
+      disclosureControls.append(expandAll,collapseAll);
       const list=element(document,'ul');list.className='bot-card-list';
       const disclosures=[];
       expandAll.addEventListener('click',()=>disclosures.forEach(set=>set(true)));
@@ -291,11 +318,11 @@ export function renderBotReadState(root, state, filters = {}) {
       }
       function listFor(asset){
         const bots=groups.get(asset);
-        if(!bots||bots.length===1)return list;
+        if(!bots)return list;
         if(containers.has(asset))return containers.get(asset);
         const item=element(document,'li'),group=element(document,'details');
         group.className='bot-asset-group';group.setAttribute('data-asset',asset);
-        const summary=element(document,'summary'),label=element(document,'strong',asset+' · '+bots.length+' Bots');
+        const summary=element(document,'summary'),label=element(document,'strong',asset+' · '+bots.length+(bots.length===1?' Bot':' Bots'));
         const values=bots.map(bot=>bot.pnlValue),complete=values.every(Number.isFinite);
         const total=complete?values.reduce((a,b)=>a+b,0):null;
         const amount=element(document,'strong','P/L '+(total===0?'0,00 USD':formatMoney(total,'USD',true)));
@@ -435,8 +462,9 @@ export function renderBotReadState(root, state, filters = {}) {
         body.append(close);
         card.append(summary,body);item.append(card);listFor(assetOf(bot)).append(item);
       }
-      details.append(list);
+      details.append(list,disclosureControls);
     }
+    details.append(diagnostics);
   }
   return data.status;
 }
@@ -537,6 +565,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     portfolio.replaceChildren(element(document,'h4','Pionex-Bewertung'));
     const valid=status==='fresh'&&model?.source==='SERVER_PIONEX_CURRENT'&&model?.currency==='USD/USDT'&&typeof model.totalUsd==='number'&&
       Number.isFinite(model.totalUsd)&&model.totalUsd>=0;
+    portfolio.setAttribute('data-confirmed',String(valid));
     const value=element(document,'p',valid
       ?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(model.totalUsd)+' '+model.currency
       :'—');
@@ -563,6 +592,9 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       portfolio.append(element(document,'p',labels[status]||labels.unavailable));
     }
   }
+  const filterDetails=element(document,'details');
+  filterDetails.className='metric-notes bot-filter-details';
+  filterDetails.append(element(document,'summary','Filter und Sortierung'),filterPanel);
   filterPanel.className='bot-overview-filters';
   const filterState={query:'',direction:'all',category:'all',sort:'symbol',tpStatus:'all',pnlAvailability:'all'};
   const search=element(document,'input');search.type='search';search.id='bot-symbol-search';
@@ -593,11 +625,11 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const reset=element(document,'button','Filter zurücksetzen');reset.setAttribute('type','button');
   reset.setAttribute('aria-label','Alle Botfilter zurücksetzen');filterPanel.append(reset);
   const returnSelection=element(document,'button','Zur vorherigen Auswahl zurück');
-  returnSelection.setAttribute('type','button');returnSelection.hidden=true;filterPanel.append(returnSelection);
+  returnSelection.setAttribute('type','button');returnSelection.hidden=true;
   const refresh=element(document,'button','Bots aktualisieren'),lock=element(document,'button','Botansicht sperren');
   refresh.id='bot-read-refresh';lock.id='bot-read-lock';
   refresh.setAttribute('type','button');lock.setAttribute('type','button');
-  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),portfolio,filterPanel,controls,content);
+  controls.append(refresh,lock);section.append(element(document,'h3','Meine Pionex Bots'),portfolio,filterDetails,controls,returnSelection,content);
   root.replaceChildren(section);
   let disposed=false,client,action=0,latestState={status:'locked'},previousSelection=null,unsubscribeDepot=()=>{};
   const clearPreviousSelection=()=>{previousSelection=null;returnSelection.hidden=true;};
@@ -640,7 +672,9 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       resetFilterState();
       renderBotReadState(content,state,filterState);
     }
-    filterPanel.hidden=status!=='fresh';
+    filterDetails.hidden=status!=='fresh';
+    filterPanel.hidden=filterDetails.hidden;
+    if(filterDetails.hidden)filterDetails.removeAttribute('open');
     refresh.setAttribute('aria-disabled',status==='loading'?'true':'false');
     notifySnapshot(state);
   };
@@ -658,7 +692,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const returnToSelection=()=>{
     if(disposed||!previousSelection||latestState?.status!=='fresh')return;
     const selection=previousSelection;clearPreviousSelection();
-    applyFilters(selection);updateFilters();search.focus?.();
+    applyFilters(selection);updateFilters();filterDetails.setAttribute('open','');search.focus?.();
   };
   const jumpToBot=ref=>{
     if(disposed||typeof ref!=='string'||latestState?.status!=='fresh'||

@@ -1,14 +1,14 @@
-import {mountTop100} from './top100-report.js?v=B20-M11-FIX4';
-import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B20-M11-FIX4';
-import {createAdvisorSection} from './paper-advisor-view.js?v=B20-M11-FIX4';
-import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B20-M11-FIX4';
-import {createStrategyArenaView} from './strategy-arena.js?v=B20-M11-FIX4';
-import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B20-M11-FIX4';
-import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B20-M11-FIX4';
-import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B20-M11-FIX4';
-import {renderPaperReadiness} from './paper-readiness-view.js?v=B20-M11-FIX4';
-import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B20-M11-FIX4';
-import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B20-M11-FIX4';
+import {mountTop100} from './top100-report.js?v=B20-M11-FIX5';
+import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B20-M11-FIX5';
+import {createAdvisorSection} from './paper-advisor-view.js?v=B20-M11-FIX5';
+import {CAMPAIGN_SOURCE, renderStrategyCatalog} from './strategy-catalog.js?v=B20-M11-FIX5';
+import {createStrategyArenaView} from './strategy-arena.js?v=B20-M11-FIX5';
+import {mountPaperCockpit} from './paper-cockpit-controller.js?v=B20-M11-FIX5';
+import {mountSpotPaperCockpit} from './spot-paper-cockpit-controller.js?v=B20-M11-FIX5';
+import {mountSpotPaperHost8hDashboard} from './spot-paper-host8h-controller.js?v=B20-M11-FIX5';
+import {renderPaperReadiness} from './paper-readiness-view.js?v=B20-M11-FIX5';
+import {mountPaperBotReportWorkspace} from './paper-bot-report-bootstrap.js?v=B20-M11-FIX5';
+import {mountSpotPaperThreeWayResearch} from './spot-paper-three-way-controller.js?v=B20-M11-FIX5';
 
 let catalogRoot = document.getElementById('strategy-catalog');
 let catalogStatus = document.getElementById('strategy-load-status');

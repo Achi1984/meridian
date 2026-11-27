@@ -1,4 +1,4 @@
-import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX4';
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX5';
 const original = {id:45185444796, start:1795440944, title:'Einstiege · Referenzlauf',
   names:{A:'Soforteinstieg', B:'Käufer-Erholung', C:'Käufer-Erholung mit 10 % Nettoziel'}};
 const recovery = {id:45210142704, start:1795449172, title:'Ausstiege · Käufer-Erholung',
