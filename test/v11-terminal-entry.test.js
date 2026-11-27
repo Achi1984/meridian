@@ -1422,7 +1422,7 @@ async function browserRun(call,start,width,height,server){
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(evidence,`v11-bot-compact-${width}-expanded.png`),Buffer.from(shot.data,'base64'));
       }
-      await evaluate(`document.querySelector('#bot-read-root summary').click();true`);
+      await evaluate(`document.querySelector('#bot-read-root .bot-card summary').click();true`);
       assert.equal((await cardMetrics()).open,false);
       if(evidence){
         await evaluate(`document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'center'});true`);
@@ -1605,11 +1605,11 @@ async function browserRun(call,start,width,height,server){
         fits:section.scrollWidth<=section.clientWidth+1};
     } finally {window.fetch=fetchOriginal;section.open=false;}
   })()`,true);
-  assert.match(paperSnapshot.compact.text,/Memecoins · 48 Stunden/);
+  assert.match(paperSnapshot.compact.text,/24 h Einstieg .* 48 h Beobachtung/);
   assert.match(paperSnapshot.compact.text,/1 Pools · 0 Einstiege/);
   assert.equal(paperSnapshot.compact.rows,6);
   assert.ok(paperSnapshot.compact.fits);
-  assert.equal(paperSnapshot.compact.pnlColor,'rgb(255, 155, 164)');
+  assert.equal(paperSnapshot.compact.pnlColor,'rgb(255, 155, 155)');
   assert.equal(paperSnapshot.compact.statusColor,'rgb(145, 216, 255)');
   assert.match(paperSnapshot.compact.text,/Erste vier Stunden · läuft/);
   assert.match(paperSnapshot.compact.text,/10 % Nettoziel/);
