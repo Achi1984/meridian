@@ -108,7 +108,9 @@ export function auditHolderReport(status, journal) {
 export function mountHolderComparison(section, add, read, amount) {
   const card = add(section, 'section', '');
   card.className = 'solana-comparison';
-  add(card, 'h3', 'Halterkonzentration · Solana');
+  const heading = add(card, 'h3', 'Halterkonzentration · Solana');
+  heading.id = 'solana-holder-heading';
+  heading.tabIndex = -1;
   add(card, 'small', 'Je 1.000 USDC. H überspringt Einstiege ab 20 % gemessenem Anteil eines Halters. Bei unbekanntem Anteil gelten die Regeln von C.');
   const live = add(card, 'p', 'Laufstatus wird geladen.');
   const source = add(card, 'a', 'Laufprotokoll öffnen');
@@ -127,8 +129,11 @@ export function mountHolderComparison(section, add, read, amount) {
       const stamp = report.lastExitQuoteAt && new Date(report.lastExitQuoteAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
       add(body, 'p', 'Letzter erfolgreicher Wave-Verkaufskurs im Journal · ' + (stamp || 'keiner'));
     }
-    for (const trade of report.filteredTrades ?? []) {
-      add(body, 'p', trade.id + ' · C ' + (trade.net === null ? 'offen' : amount(trade.net) + ' realisiert'));
+    const trades = report.filteredTrades ?? [];
+    const details = trades.length ? add(body, 'details', '') : null;
+    if (details) add(details, 'summary', 'Ausgelassene Trades ansehen (' + trades.length + ')');
+    for (const trade of trades) {
+      add(details, 'p', trade.id + ' · C ' + (trade.net === null ? 'offen' : amount(trade.net) + ' realisiert'));
     }
     const maxShare = report.maxOwnerBps === null ? '' : ' · höchster gemessener Einzelanteil ' +
       (report.maxOwnerBps / 100).toLocaleString('de-AT', {maximumFractionDigits:2}) + ' %';
@@ -170,6 +175,15 @@ export function mountHolderComparison(section, add, read, amount) {
       if (e.minDeltaAfterOmittingOneUsdc < 0 && e.maxDeltaAfterOmittingOneUsdc > 0) {
         add(exits, 'strong', 'Ein einzelner Trade kann die Rangfolge drehen.');
       }
+    }
+    const guard = e.confirmedLoss;
+    if (guard) {
+      add(exits, 'strong', 'Paper-Test · bestätigter Verlustausstieg');
+      add(exits, 'p', 'Verkauf nach zwei Rückverkaufskursen mit mindestens 10 % Nettoverlust.');
+      add(exits, 'p', guard.matchedClosed + ' gemeinsame Abschlüsse · Trailing ' +
+        amount(guard.ordinaryNetUsdc) + ' · mit Verlustausstieg ' + amount(guard.guardedNetUsdc));
+      add(exits, 'p', guard.triggered + ' Verlustausstiege · ' + guard.open + ' offen · ' +
+        guard.unmatchedClosed + ' einseitige Abschlüsse · ' + guard.skipped + ' Einstiege wegen Guthaben ausgelassen');
     }
     add(exits, 'a', 'Quelllauf des Ergebnisses').href = runs + runId + '/attempts/' + attempt;
     displayedKey = key;

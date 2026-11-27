@@ -115,26 +115,40 @@ export function mountCommandPaper(doc, access) {
   card.className = 'card';
   card.id = 'command-paper-live';
   const title = doc.createElement('h2');
-  title.textContent = 'Memecoin-Paperbot · 48 Stunden';
+  title.textContent = 'Solana-Paperbots';
   const status = doc.createElement('p');
   status.setAttribute('role','status');
   status.textContent = 'Letzter Scan wird geladen …';
   const open = doc.createElement('button');
   open.type = 'button';
   open.className = 'strategy-entry-link';
-  open.textContent = 'Einstiegsgründe ansehen';
-  card.append(title,status,open);
+  open.textContent = '48-Stunden-Bot · Einstiegsgründe';
+  const holder = doc.createElement('button');
+  holder.type = 'button';
+  holder.className = 'strategy-entry-link';
+  holder.textContent = 'Haltertest & Ausstiege öffnen';
+  card.append(title,status,open,holder);
   portfolio.before(card);
   const anchor = doc.getElementById('strategy-load-status');
   const section = doc.getElementById('solana-meme-paper') || ensureSolanaSection(doc,anchor).section;
-  open.addEventListener('click',()=>{
-    if (!access.isUnlocked()) return;
+  function openSection() {
     doc.querySelector('#nav button[data-v="strategies"]').click();
     section.open = true;
+  }
+  open.addEventListener('click',()=>{
+    if (!access.isUnlocked()) return;
+    openSection();
     const reasons = section.querySelector('.solana-comparison details');
     if (reasons) reasons.open = true;
     section.querySelector('summary').focus();
     section.scrollIntoView({block:'start'});
+  });
+  holder.addEventListener('click',()=>{
+    if (!access.isUnlocked()) return;
+    openSection();
+    const heading = section.querySelector('#solana-holder-heading');
+    heading.focus();
+    heading.scrollIntoView({block:'start'});
   });
   let timer, busy = false, snapshot;
   const visible = () => access.isUnlocked() && !doc.hidden && !command.hidden;
@@ -146,7 +160,7 @@ export function mountCommandPaper(doc, access) {
       swingAccounts(state);
       if (snapshot && state.lastTick < snapshot.lastTick) throw Error('Older checkpoint');
       snapshot = state;
-      status.textContent = swingStatus(state);
+      status.textContent = '48-Stunden-Bot · ' + swingStatus(state);
     } catch {
       status.textContent = snapshot ? swingStatus(snapshot) + ' · Abruf fehlgeschlagen' :
         'Letzter Scan derzeit nicht abrufbar.';

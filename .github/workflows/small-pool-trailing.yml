@@ -117,10 +117,12 @@ jobs:
           import {auditHolderReport} from './v11/holder-comparison.js';
           const read = path => fs.readFileSync(path, 'utf8');
           const holder = auditHolderReport(JSON.parse(read('journal/status.json')), read('journal/events.jsonl'));
-          const {source, endedAt, comparison, pairedExits} = JSON.parse(read('comparison.json'));
+          const {source, endedAt, comparison, pairedExits, confirmedLossExit} = JSON.parse(read('comparison.json'));
           if (!holder.final || holder.updatedAt !== endedAt) throw Error('Journal time mismatch');
           const {minDeltaAfterOmittingOneUsdc, maxDeltaAfterOmittingOneUsdc} = pairedExits;
           const exits = {...comparison, minDeltaAfterOmittingOneUsdc, maxDeltaAfterOmittingOneUsdc};
+          const {account, ...guard} = confirmedLossExit;
+          exits.confirmedLoss = {...guard, open:account.open.length, skipped:account.skippedForCash};
           fs.appendFileSync(process.env.GITHUB_OUTPUT, 'report=' + JSON.stringify({source, holder, exits}) + '\n');
           JS
 

@@ -22,7 +22,7 @@ def paired_exit_detail(fixed, trailing):
                 maxDeltaAfterOmittingOneUsdc=(total - min(deltas)) / UNIT if len(deltas) > 1 else None)
 
 
-def score(directory):
+def score(directory, *, confirmed_loss_exit=False):
     status = json.loads((directory / 'status.json').read_text())
     if status.get('ledgerVerified') is not True or status['lastEvent'] != 'finished':
         raise ValueError('Expected a completed, reconciled journal')
@@ -65,7 +65,7 @@ def score(directory):
                 fixed_positions[key] = qty
                 if cash >= SIZE + FEE:
                     cash -= SIZE + FEE
-                    open_positions[key] = dict(qty=qty, peak=0, marks=0)
+                    open_positions[key] = dict(qty=qty, peak=0, marks=0, loss_at=None)
                 else:
                     skipped.append(key)
             elif fill['side'] == 'sell' and fixed_positions.pop(key) == qty:
@@ -88,11 +88,20 @@ def score(directory):
         net = bid - SIZE - 2 * FEE
         # As in A, the initial resale check cannot arm the trail.
         trail = position['peak'] * 10 >= SIZE and 2 * net <= position['peak']
-        if trail or row['event'] == 'exit':
+        stop = False
+        if confirmed_loss_exit:
+            # Two successive available full-size quotes, at distinct timestamps.
+            previous = position['loss_at']
+            if net * 10 <= -SIZE:
+                stop = previous is not None and row['at'] > previous
+                position['loss_at'] = row['at']
+            else:
+                position['loss_at'] = None
+        if stop or trail or row['event'] == 'exit':
             cash += bid - FEE
             trailing_results[key] = net
             trades.append(dict(positionId=key, at=row['at'], netUsdc=net / UNIT,
-                               reason='trailing' if trail else 'timed'))
+                               reason='confirmedLoss' if stop else 'trailing' if trail else 'timed'))
             del open_positions[key]
         else:
             if position['marks']:
@@ -138,7 +147,24 @@ def score(directory):
                               open=list(open_positions), skippedForCash=len(skipped), trades=trades))
 
 
+def compare_policies(directory):
+    baseline = score(directory)
+    candidate = score(directory, confirmed_loss_exit=True)['trailing']
+    reference = baseline['trailing']
+    def outcomes(account):
+        return {trade['positionId']: round(trade['netUsdc'] * UNIT) for trade in account['trades']}
+    ordinary, guarded = outcomes(reference), outcomes(candidate)
+    shared = ordinary.keys() & guarded.keys()
+    baseline['confirmedLossExit'] = dict(
+        account=candidate, matchedClosed=len(shared),
+        ordinaryNetUsdc=sum(ordinary[key] for key in shared) / UNIT,
+        guardedNetUsdc=sum(guarded[key] for key in shared) / UNIT,
+        triggered=sum(trade['reason'] == 'confirmedLoss' for trade in candidate['trades']),
+        unmatchedClosed=len(ordinary.keys() ^ guarded.keys()))
+    return baseline
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('directory', type=Path)
-    print(json.dumps(score(parser.parse_args().directory), indent=2))
+    print(json.dumps(compare_policies(parser.parse_args().directory), indent=2))
