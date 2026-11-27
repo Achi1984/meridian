@@ -103,6 +103,17 @@ jobs:
               "",
               "Der Trailing-Replay ließ \(.trailing.skippedForCash) Einstiege wegen fehlenden Guthabens aus."
           ' comparison.json >> "$GITHUB_STEP_SUMMARY"
+      - name: Compare entry costs on the fixed small-pool account
+        run: |
+          jq -r '
+            "### Sofortiger Rückverkauf beim Einstieg · Konto F",
+            "Kostenband vor Netzwerkgebühren. Netto-PnL der geschlossenen Paper-Trades nach simulierten Gebühren.",
+            "| Kostenband | Geschlossen | Davon Verlust | Offen | Netto (USDC) |",
+            "| --- | ---: | ---: | ---: | ---: |",
+            (.entryCostProfile | to_entries[] |
+              ({"upTo3Pct":"Bis 3 %","over3To5Pct":"Über 3 bis 5 %","unknown":"Unbekannt"}[.key]) as $label |
+              "| \($label) | \(.value.closed) | \(.value.losses) | \(.value.open) | \(.value.netUsdc) |")
+          ' comparison.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: small-pool-exits-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}

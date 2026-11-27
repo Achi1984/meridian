@@ -3,10 +3,24 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from small_pool_trailing import paired_exit_detail, score
+from small_pool_trailing import entry_cost_profile, paired_exit_detail, score
 
 
 class TrailingComparisonTest(unittest.TestCase):
+    def test_entry_cost_uses_initial_full_size_quote_only(self):
+        usdc = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+        rows = []
+        for mint, bid in [('a', 19_400_000), ('b', 19_000_000), ('c', 20_000_000)]:
+            common = dict(positionId=mint, qty=12, mint=mint, provider='Jupiter')
+            rows.append(dict(common, event='entry', inputRaw=20_000_000, inputMint=usdc, outputMint=mint))
+            if mint == 'c':
+                rows.append(dict(event='missingExitQuote'))
+            rows.append(dict(common, event='resaleMark', inputRaw=12, inputMint=mint, outputMint=usdc, usdcRaw=bid))
+        bands = entry_cost_profile(rows, {'a','b','c'}, {'b':-100_000, 'c':3_000_000})
+        self.assertEqual(bands['upTo3Pct']['open'], 1)
+        self.assertEqual(bands['over3To5Pct']['losses'], 1)
+        self.assertEqual(bands['unknown']['netUsdc'], 3)
+
     def test_missing_quote_does_not_sell_and_first_mark_does_not_arm(self):
         key = '1:wave:mint'
         def fill(side, amount):
