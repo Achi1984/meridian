@@ -86,6 +86,7 @@ function swingStatus(state, failed = false) {
     timeZone:'Europe/Vienna', day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   const stale = Date.now()/1000-state.lastTick > 1200 && elapsed < 72*3600;
   return {
+    note: [phase, entries === 0 && '0 Einstiege', stale && 'Datenstand veraltet', failed && 'Abruf fehlgeschlagen'].filter(Boolean).join(' · '),
     text: phase + ' · ' + pools + ' Pools · ' + entries + ' Einstiege · ' + time +
       (stale ? ' · Datenstand veraltet' : '') + (failed ? ' · Abruf fehlgeschlagen' : ''),
     tone: failed || stale ? 'paper-wait' : ''
@@ -215,14 +216,14 @@ export function mountSwingCard(section, add, load = read) {
         labels[phase] || 'Status unbekannt');
     } catch { worker.textContent = 'Datensammlung · Status derzeit nicht abrufbar'; }
   }
-  let last = 0, pending = false;
+  let previous, pending = false;
   return async function refreshSwing({worker=true}={}) {
     if (pending) return;
     pending = true;
     try {
       const state = await load(swingSource, true);
       const rows = swingAccounts(state);
-      if (state.lastTick < last) throw Error('Older checkpoint');
+      if (previous && state.lastTick < previous.state.lastTick) throw Error('Older checkpoint');
       if (state.collectorRunId !== undefined && (!count(state.collectorRunId) || !state.collectorRunId)) {
         throw Error('Invalid collector');
       }
@@ -233,7 +234,8 @@ export function mountSwingCard(section, add, load = read) {
       status.textContent = summary.text;
       status.className = summary.tone;
       body.replaceChildren();
-      headline('Realisiert','USDC',rows.map(row=>[row.key==='fixed'?'Festziel':'Teilverkauf',row.realized]));
+      const models = rows.map(row => [row.key === 'fixed' ? 'Festziel' : 'Teilverkauf', row.realized]);
+      headline('Realisiert', 'USDC', models, summary.note);
       for (const row of rows) {
         const line = add(body,'p','');
         line.className = 'paper-account';
@@ -248,12 +250,17 @@ export function mountSwingCard(section, add, load = read) {
         add(reasons,'li',total + (total === 1 ? ' Pool · ' : ' Pools · ') + label);
       }
       decisions.hidden = Object.keys(state.candidates).length === 0;
-      last = state.lastTick;
+      previous = {state, models};
     } catch {
       status.className = 'paper-wait';
-      headline();
-      if (!last) status.textContent = 'Laufstand derzeit nicht abrufbar.';
-      else if (!status.textContent.includes('Abruf fehlgeschlagen')) status.textContent += ' · Abruf fehlgeschlagen';
+      if (previous) {
+        const summary = swingStatus(previous.state, true);
+        status.textContent = summary.text;
+        headline('Realisiert', 'USDC', previous.models, summary.note);
+      } else {
+        headline();
+        status.textContent = 'Laufstand derzeit nicht abrufbar.';
+      }
     } finally { if(worker)await refreshWorker(); pending = false; }
   };
 }
