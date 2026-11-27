@@ -79,7 +79,9 @@ def score(directory):
         if not position or row.get('arm') != 'wave' or row['event'] not in ('resaleMark', 'exit'):
             continue
         bid = row['usdcRaw']
-        if type(bid) is not int or bid <= 0 or row['qty'] != position['qty']:
+        if (type(bid) is not int or bid <= 0
+                or type(row['qty']) is not int or row['qty'] != position['qty']
+                or key != f"{row['session']}:wave:{row['mint']}"):
             raise ValueError('Invalid full-size exit quote')
         net = bid - SIZE - 2 * FEE
         # As in A, the initial resale check cannot arm the trail.
