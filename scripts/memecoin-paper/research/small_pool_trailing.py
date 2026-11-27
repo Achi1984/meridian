@@ -54,6 +54,38 @@ def entry_cost_profile(events, entries, realized):
     return bands
 
 
+def delayed_sale_profile(rows, sales):
+    seen = set()
+    original = delayed = reversals = busy = unavailable = quoted = 0
+    for row in rows:
+        key = row['sourceEventId']
+        sale = sales.get(key)
+        if (key in seen or sale is None or row['signalAt'] != sale['at']
+                or any(row[field] != sale[field] for field in ('mint', 'qty', 'positionId'))
+                or row['primaryRaw'] != sale['usdcRaw']):
+            raise ValueError('Delayed quote does not match a unique F sale')
+        seen.add(key)
+        if row['state'] == 'busy':
+            busy += 1
+        elif row['state'] == 'unavailable':
+            unavailable += 1
+        elif row['state'] == 'quoted':
+            bid = row['delayedRaw']
+            if (type(bid) is not int or bid <= 0 or not
+                    5 <= row['requestDelaySeconds'] <= row['responseDelaySeconds'] < float('inf')):
+                raise ValueError('Invalid delayed quote or timing')
+            basis = SIZE + 2 * FEE
+            original += sale['usdcRaw'] - basis
+            delayed += bid - basis
+            reversals += int(sale['usdcRaw'] > basis > bid)
+            quoted += 1
+        else:
+            raise ValueError('Unknown delayed quote state')
+    return dict(sales=len(sales), quoted=quoted, busy=busy, unavailable=unavailable,
+                missing=len(sales)-len(seen), originalNetUsdc=original / UNIT,
+                delayedNetUsdc=delayed / UNIT, profitToLoss=reversals)
+
+
 def score(directory, *, confirmed_loss_exit=False):
     status = json.loads((directory / 'status.json').read_text())
     if status.get('ledgerVerified') is not True or status['lastEvent'] != 'finished':
@@ -66,6 +98,7 @@ def score(directory, *, confirmed_loss_exit=False):
     seen = {}
     cash = START
     skipped = []
+    sales = {}
     fixed_results = {}
     fixed_exit_at = {}
     trailing_results = {}
@@ -103,6 +136,7 @@ def score(directory, *, confirmed_loss_exit=False):
             elif fill['side'] == 'sell' and fixed_positions.pop(key) == qty:
                 if row['event'] not in ('resaleMark', 'exit') or row['usdcRaw'] != fill['usdcRaw']:
                     raise ValueError('Invalid F exit')
+                sales[event_id] = row
                 fixed_exit_at[key] = row['at']
                 fixed_results[key] = fill['usdcRaw'] - SIZE - 2 * FEE
             else:
@@ -172,7 +206,12 @@ def score(directory, *, confirmed_loss_exit=False):
             raise ValueError('Expected integer exit timestamps')
         pair.update(fixedExitAt=fixed_at, trailingExitAt=trailing_at,
                     trailingMinusFixedExitSeconds=trailing_at - fixed_at)
-    return dict(comparison=comparison, pairedExits=detail,
+    measurement = {}
+    probes = directory / 'exit-requotes.jsonl'
+    if not confirmed_loss_exit and probes.is_file():
+        with probes.open() as stream:
+            measurement['delayedSales'] = delayed_sale_profile(map(json.loads, stream), sales)
+    return dict(comparison=comparison, pairedExits=detail, **measurement,
                 entryCostProfile=entry_cost_profile(seen.values(), bought, fixed_results),
                 startedAt=status['startedAt'], endedAt=status['updatedAt'], initialUsdc=START / UNIT,
                 fixed=dict(realizedUsdc=fixed_net / UNIT, closed=fixed_closed, open=len(fixed_positions)),

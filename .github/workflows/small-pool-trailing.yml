@@ -60,6 +60,10 @@ jobs:
           mkdir -p journal
           unzip -p journal.zip status.json > journal/status.json
           unzip -p journal.zip events.jsonl > journal/events.jsonl
+          unzip -Z1 journal.zip > archive-files.txt
+          if grep -Fxq exit-requotes.jsonl archive-files.txt; then
+            unzip -p journal.zip exit-requotes.jsonl > journal/exit-requotes.jsonl
+          fi
           python scripts/memecoin-paper/research/small_pool_trailing.py journal |
             jq --argjson run "$SOURCE_RUN" --argjson attempt "$SOURCE_ATTEMPT" \
                --argjson artifact "$SOURCE_ARTIFACT" --arg digest "$SOURCE_DIGEST" \
@@ -128,11 +132,12 @@ jobs:
           import {auditHolderReport} from './v11/holder-comparison.js';
           const read = path => fs.readFileSync(path, 'utf8');
           const holder = auditHolderReport(JSON.parse(read('journal/status.json')), read('journal/events.jsonl'));
-          const {source, endedAt, comparison, pairedExits, confirmedLossExit} = JSON.parse(read('comparison.json'));
+          const {source, endedAt, comparison, pairedExits, confirmedLossExit, delayedSales} = JSON.parse(read('comparison.json'));
           if (!holder.final || holder.updatedAt !== endedAt) throw Error('Journal time mismatch');
           const {minDeltaAfterOmittingOneUsdc, maxDeltaAfterOmittingOneUsdc} = pairedExits;
           const exits = {...comparison, minDeltaAfterOmittingOneUsdc, maxDeltaAfterOmittingOneUsdc};
           const {account, ...guard} = confirmedLossExit;
+          if (delayedSales) exits.delayedSales = delayedSales;
           exits.confirmedLoss = {...guard, open:account.open.length, skipped:account.skippedForCash};
           fs.appendFileSync(process.env.GITHUB_OUTPUT, 'report=' + JSON.stringify({source, holder, exits}) + '\n');
           JS

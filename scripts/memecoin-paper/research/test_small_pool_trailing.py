@@ -3,10 +3,23 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from small_pool_trailing import entry_cost_profile, paired_exit_detail, score
+from small_pool_trailing import delayed_sale_profile, entry_cost_profile, paired_exit_detail, score
 
 
 class TrailingComparisonTest(unittest.TestCase):
+    def test_delayed_net_only_includes_matched_quotes(self):
+        sale = dict(at=10, mint='a', qty=77, positionId='1:wave:a', usdcRaw=21_100_000)
+        probe = dict(sale, sourceEventId='a', signalAt=10, primaryRaw=sale['usdcRaw'],
+                     state='quoted', delayedRaw=19_100_000, requestDelaySeconds=5, responseDelaySeconds=6)
+        result = delayed_sale_profile([probe], {'a':sale, 'b':sale})
+        self.assertEqual((result['originalNetUsdc'], result['delayedNetUsdc'],
+                          result['profitToLoss'], result['missing']), (1, -1, 1, 1))
+        for invalid in (dict(probe, qty=76), dict(probe, responseDelaySeconds=4)):
+            with self.assertRaises(ValueError):
+                delayed_sale_profile([invalid], {'a':sale})
+        with self.assertRaises(ValueError):
+            delayed_sale_profile([probe, probe], {'a':sale})
+
     def test_entry_cost_uses_initial_full_size_quote_only(self):
         usdc = 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
         rows = []
