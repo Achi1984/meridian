@@ -24,12 +24,26 @@ class TrailingComparisonTest(unittest.TestCase):
                           accounts={'F':dict(policy='smallPoolFixed', closedTrades=1,
                                              realizedUsdc=4, openPositions=[])})
             (path / 'status.json').write_text(json.dumps(status))
-            def replay(events):
+            def replay(events, **options):
                 (path / 'events.jsonl').write_text('\n'.join(map(json.dumps, events + [row('finished', 7)])))
-                return score(path)
+                return score(path, **options)
             for fields in (dict(mint='other'), dict(session=2), dict(qty=10.0)):
                 with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, 'exit quote'):
                     replay(rows[:-1] + [dict(rows[-1], **fields)])
+            # A missing quote cannot execute a stop; recovery resets the loss sequence.
+            first_loss = dict(rows[2], usdcRaw=18_100_000)
+            second_loss = dict(rows[-1], usdcRaw=17_100_000)
+            candidate_rows = rows[:2] + [first_loss, rows[4], second_loss]
+            def guarded(sequence):
+                # The recorded fixed sale closes F independently of this challenger.
+                return replay(sequence + [dict(rows[3], at=7, eventId='reference')],
+                              confirmed_loss_exit=True)['trailing']
+            stopped = guarded(candidate_rows)
+            self.assertEqual((stopped['trades'][0]['reason'], stopped['cashUsdc']), ('confirmedLoss', 997))
+            for middle in (dict(rows[-1], at=3, usdcRaw=17_100_000),
+                           dict(rows[-1], usdcRaw=20_100_000)):
+                ready = guarded(rows[:2] + [first_loss, middle])
+                self.assertEqual(ready['open'], [key])
             before = replay(rows[:-1])
             self.assertEqual(before['trailing']['open'], [key])
             self.assertEqual(before['trailing']['realizedUsdc'], 0)
