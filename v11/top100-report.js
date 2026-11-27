@@ -18,7 +18,7 @@ export function dashboardRows(report) {
   return [...rows, {name:'Cash halten', equity:1000, open:0, closed:0, pending:0, realized:0}];
 }
 
-export function mountTop100(section) {
+function mountPilot(section) {
   const element = (tag, text) => {
     const node = document.createElement(tag);
     node.textContent = text;
@@ -77,5 +77,96 @@ export function mountTop100(section) {
   }
   section.addEventListener('toggle', () => { if (section.open) refresh(); });
   button.addEventListener('click', refresh);
+  return refresh;
+}
+
+const followupBranch = 'paper/top100-confirmation-20261127';
+const firstFollowup = 46069348362;
+const models = [['direct','Ausbruch'], ['retest','Rücktest'], ['confirmed','Stundenbestätigung']];
+
+export function followupRows(report, id) {
+  if (report?.runId !== id || !['initial','first','final'].includes(report.stage) ||
+      !count(report.asOf) || !count(report.start) || !count(report.observations)) throw Error('report');
+  return models.map(([key,name]) => {
+    const a = report.accounts?.[key];
+    if (!a || !count(a.closed) || !count(a.open) || !Number.isFinite(a.realizedGross) ||
+        !Number.isFinite(a.fees) || a.fees < 0 ||
+        ![a.funding,a.openGross,a.equity].every(v => v === null || Number.isFinite(v))) throw Error('account');
+    const complete = a.openGross !== null && a.funding !== null;
+    if (complete !== (a.equity !== null) ||
+        (complete && Math.abs(1000 + a.realizedGross + a.openGross - a.fees + a.funding - a.equity) > 0.000001))
+      throw Error('balance');
+    return {name,...a};
+  });
+}
+
+export function mountTop100(section) {
+  const doc = section.ownerDocument;
+  function add(parent, tag, text) {
+    const item = doc.createElement(tag);
+    item.textContent = text;
+    parent.append(item);
+    return item;
+  }
+  const status = add(section,'p','Folgeversuch wird geladen …');
+  status.setAttribute('role','status');
+  const accounts = add(section,'div','');
+  const action = add(section,'button','Bericht aktualisieren');
+  action.type = 'button';
+  const link = add(section,'a','Folgeversuch auf GitHub');
+  const archive = add(section,'details','');
+  add(archive,'summary','Vorheriger Pilotlauf');
+  mountPilot(archive);
+  const headline = paperGroupPnl(section);
+  headline();
+  const api = 'https://api.github.com/repos/' + repo;
+  let id = firstFollowup, last = null;
+  link.href = 'https://github.com/' + repo + '/actions/runs/' + id;
+  async function read(url, raw = false) {
+    const r = await fetch(url,{cache:'no-store', credentials:'omit', signal:AbortSignal.timeout(10000),
+      headers:{Accept:raw ? 'application/vnd.github.raw+json' : 'application/vnd.github+json'}});
+    if (!r.ok) throw Error('fetch');
+    return r.json();
+  }
+  async function refresh() {
+    if (action.disabled) return;
+    action.disabled = true;
+    try {
+      try {
+        const feed = await read(api + '/actions/runs?branch=' + encodeURIComponent(followupBranch) + '&event=push&per_page=20');
+        for (const run of feed.workflow_runs) {
+          if (run.path === '.github/workflows/top100-breakout.yml' && run.head_branch === followupBranch && count(run.id))
+            id = Math.max(id,run.id);
+        }
+      } catch { /* The known campaign has its own versioned report. */ }
+      link.href = 'https://github.com/' + repo + '/actions/runs/' + id;
+      if (last && last.id !== id) { last = null; accounts.replaceChildren(); headline(); }
+      const report = await read(api + '/contents/top100-followup-' + id + '.json?ref=paper-dashboard-data',true);
+      const rows = followupRows(report,id);
+      if (last && report.asOf < last.asOf) throw Error('older report');
+      const stage = {initial:'Startbericht', first:'Zwischenbericht', final:'Abschlussbericht'}[report.stage];
+      const values = rows.map(a=>[a.name,a.equity === null ? null : a.equity-1000]);
+      last = {id,asOf:report.asOf,values,stage};
+      headline('Gesamt-P/L','USDT',values,stage);
+      const stamp = report.stage === 'initial' ? report.start : report.asOf;
+      status.textContent = stage + ' · ' + new Date(stamp*1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'}) + ' Wien';
+      accounts.replaceChildren();
+      const show = v => v === null ? 'offen' : money(v);
+      for (const a of rows) {
+        const panel = add(accounts,'details','');
+        add(panel,'summary',a.name + ' · Kontowert ' + show(a.equity));
+        add(panel,'p',a.closed + ' geschlossen · ' + a.open + ' offen');
+        add(panel,'p','Realisiert brutto ' + show(a.realizedGross) + ' · Offen brutto ' + show(a.openGross));
+        add(panel,'p','Gebühren ' + show(a.fees) + ' · Funding ' + show(a.funding));
+      }
+    } catch {
+      if (last) {
+        headline('Gesamt-P/L','USDT',last.values,last.stage + ' · Abruf fehlgeschlagen');
+        if (!status.textContent.endsWith('Abruf fehlgeschlagen')) status.textContent += ' · Abruf fehlgeschlagen';
+      } else status.textContent = 'Bericht zum Folgeversuch derzeit nicht abrufbar.';
+    } finally { action.disabled = false; }
+  }
+  section.addEventListener('toggle', () => { if (section.open) refresh(); });
+  action.addEventListener('click', refresh);
   return refresh;
 }

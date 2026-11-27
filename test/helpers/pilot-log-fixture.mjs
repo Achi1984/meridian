@@ -5,6 +5,10 @@ export const pilotEndpoint = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/
 export const pilotStatusEndpoint = 'https://api.github.com/repos/Achi1984/meridian/actions/workflows/solana-meme-paper-bot.yml/runs?branch=main&per_page=5';
 
 export const top100Endpoint='https://api.github.com/repos/Achi1984/meridian/contents/top100-45678525838.json?ref=paper-dashboard-data';
+export const followupEndpoints = [
+  'https://api.github.com/repos/Achi1984/meridian/actions/runs?branch=paper%2Ftop100-confirmation-20261127&event=push&per_page=20',
+  'https://api.github.com/repos/Achi1984/meridian/contents/top100-followup-46069348362.json?ref=paper-dashboard-data'
+];
 export const swingCheckpointEndpoint = 'https://api.github.com/repos/Achi1984/meridian/contents/studies/swing48/45624335706/state.json?ref=paper%2Fsecond-wave-48h-data';
 
 export const pionexReadEndpoints=['dashboard','asset-watch','pionex-history?range=1w'].map(path=>
@@ -15,7 +19,9 @@ export async function servePilotFixture(call, event, payload) {
   const runStatus = url === pilotStatusEndpoint;
   const checkpoint = url === swingCheckpointEndpoint;
   const pionex=pionexReadEndpoints.includes(url);
-  if (url!==top100Endpoint && !runStatus && !checkpoint && !pionex && url !== pilotEndpoint) return false;
+  const followup = followupEndpoints.includes(url);
+  if (!followup && url!==top100Endpoint && !runStatus && !checkpoint && !pionex && url !== pilotEndpoint) return false;
+  if (followup) payload = url === followupEndpoints[0] ? {workflow_runs:[]} : null;
   if(pionex)payload={};
   if (checkpoint) payload = {start:1000,lastTick:1600,candidates:{pool:{}},positions:{},cash:{fixed:1e9,runner:1e9}};
   if (runStatus) payload = {workflow_runs:[{id:55,run_number:5,status:'in_progress'}]};
@@ -23,7 +29,7 @@ export async function servePilotFixture(call, event, payload) {
   if (!preflight) {
     assert.equal(method, 'GET');
     const authorization = Object.entries(headers).find(([key]) => key.toLowerCase() === 'authorization');
-    if (url===top100Endpoint || runStatus || checkpoint) assert.equal(authorization,undefined);
+    if (followup || url===top100Endpoint || runStatus || checkpoint) assert.equal(authorization,undefined);
     else assert.match(authorization?.[1] || '', /^Bearer .+/);
   }
   await call('Fetch.fulfillRequest', {
