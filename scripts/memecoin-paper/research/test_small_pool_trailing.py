@@ -27,6 +27,9 @@ class TrailingComparisonTest(unittest.TestCase):
             def replay(events):
                 (path / 'events.jsonl').write_text('\n'.join(map(json.dumps, events + [row('finished', 7)])))
                 return score(path)
+            for fields in (dict(mint='other'), dict(session=2), dict(qty=10.0)):
+                with self.subTest(fields=fields), self.assertRaisesRegex(ValueError, 'exit quote'):
+                    replay(rows[:-1] + [dict(rows[-1], **fields)])
             before = replay(rows[:-1])
             self.assertEqual(before['trailing']['open'], [key])
             self.assertEqual(before['trailing']['realizedUsdc'], 0)
