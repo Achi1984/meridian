@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from small_pool_trailing import score
+from small_pool_trailing import paired_exit_detail, score
 
 
 class TrailingComparisonTest(unittest.TestCase):
@@ -70,3 +70,16 @@ class TrailingComparisonTest(unittest.TestCase):
             sharedEntries=49, bothClosed=0, sharedStillOpenOnEitherSide=49,
             pairedFixedNetUsdc=0, pairedTrailingNetUsdc=0, pairedTrailingMinusFixedUsdc=0,
             skippedFixedClosed=1, skippedFixedStillOpen=1, skippedFixedRealizedUsdc=4))
+
+    def test_paired_exit_sensitivity_uses_only_joint_closures(self):
+        fixed = dict(a=0, b=3_000_000, c=-1, open_in_trailing=100)
+        trailing = dict(c=-1, a=1_000_000, b=1_000_000, open_in_fixed=50)
+        detail = paired_exit_detail(fixed, trailing)
+        self.assertEqual([trade['positionId'] for trade in detail['trades']], ['c', 'a', 'b'])
+        self.assertEqual((detail['trailingBetter'], detail['fixedBetter'], detail['equal']), (1, 1, 1))
+        self.assertEqual(detail['minDeltaAfterOmittingOneUsdc'], -2)
+        self.assertEqual(detail['maxDeltaAfterOmittingOneUsdc'], 1)
+        for subset in ({}, {'a': 1}):
+            detail = paired_exit_detail(fixed, subset)
+            self.assertIsNone(detail['minDeltaAfterOmittingOneUsdc'])
+            self.assertIsNone(detail['maxDeltaAfterOmittingOneUsdc'])
