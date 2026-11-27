@@ -8,6 +8,8 @@ permissions:
   actions: read
 jobs:
   compare:
+    outputs:
+      dashboard: ${{ steps.dashboard.outputs.report }}
     if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.path == '.github/workflows/holder-concentration.yml'
     runs-on: ubuntu-latest
     steps:
@@ -105,3 +107,48 @@ jobs:
         with:
           name: small-pool-exits-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
           path: comparison.json
+
+      - name: Prepare verified dashboard results
+        id: dashboard
+        shell: bash
+        run: |
+          node --input-type=module <<'JS'
+          import fs from 'node:fs';
+          import {auditHolderReport} from './v11/holder-comparison.js';
+          const read = path => fs.readFileSync(path, 'utf8');
+          const holder = auditHolderReport(JSON.parse(read('journal/status.json')), read('journal/events.jsonl'));
+          const {source, endedAt, comparison, pairedExits} = JSON.parse(read('comparison.json'));
+          if (!holder.final || holder.updatedAt !== endedAt) throw Error('Journal time mismatch');
+          const {minDeltaAfterOmittingOneUsdc, maxDeltaAfterOmittingOneUsdc} = pairedExits;
+          const exits = {...comparison, minDeltaAfterOmittingOneUsdc, maxDeltaAfterOmittingOneUsdc};
+          fs.appendFileSync(process.env.GITHUB_OUTPUT, 'report=' + JSON.stringify({source, holder, exits}) + '\n');
+          JS
+
+  publish:
+    needs: compare
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Publish this attempt to the dashboard data branch
+        uses: actions/github-script@v7
+        env:
+          REPORT: ${{ needs.compare.outputs.dashboard }}
+        with:
+          script: |
+            const report = JSON.parse(process.env.REPORT)
+            const run = context.payload.workflow_run
+            if (report.source.runId !== run.id || report.source.attempt !== run.run_attempt) {
+              throw Error('Dashboard source mismatch')
+            }
+            const branch = 'paper-dashboard-data'
+            const path = 'holder-' + run.id + '-' + run.run_attempt + '.json'
+            const content = Buffer.from(process.env.REPORT + '\n').toString('base64')
+            try {
+              await github.rest.repos.createOrUpdateFileContents({...context.repo, path, branch,
+                message: 'Publish verified paper results for ' + run.id + '/' + run.run_attempt, content})
+            } catch (error) {
+              if (![409, 422].includes(error.status)) throw error
+              const {data} = await github.rest.repos.getContent({...context.repo, path, ref: branch})
+              if (data.content.replace(/\s/g, '') !== content) throw error
+            }
