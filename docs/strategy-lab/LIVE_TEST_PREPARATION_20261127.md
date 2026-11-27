@@ -15,6 +15,10 @@ Vom Repository-Stamm aus `python3 scripts/research/quote_rehearsal.py` starten. 
 
 Beobachtete BTC-Probe am 27. November: 0,16 Kontrakte, 95,63776 USDT Nominalwert, Buchalter 126 ms. Modellgebühren für beide Seiten 0,095637680 USDT, Spreadkosten 0,00016 USDT. Die Gebühr ist eine Modellannahme. Marktbewegung zwischen zwei Aufträgen, zusätzliche Slippage und Funding sind in dieser Momentaufnahme offen.
 
+## Solana-Routenprobe
+
+Die bestehenden Funktionen `spot_quote` und `quote` aus `new_pool_watch.py` wurden mit 20 virtuellen USDC aufgerufen. Für den Token GG5FcmGmpWbokcDS1c5jDX8oaoG3owFGKEvYxYEUJYdK aus dem Haltervergleich lieferte Jupiter HTTP 400; Raydium lieferte keine passende Einstiegsroute. Der Test endete vor einem simulierten Einstieg. Bei der Gegenprobe USDC → Wrapped SOL → USDC waren beide Wege verfügbar. Mit der konservativen Ausgabemenge jeder Teilquote ergaben sich 19,601764 USDC über Jupiter bzw. 19,594059 über Raydium. Dies sind quotierte Mindestbeträge ohne Netzwerkgebühren. Beide Prüfungen liefen ohne Signatur.
+
 ## Ablauf für eine erste Ausführungsprobe
 
 1. Vor dem Test Konto, Handelsplatz, Instrument, maximale Positionsgröße, maximalen Gesamtverlust, maximale Laufzeit und Umgang mit einer offenen Position beim Abbruch festlegen. Die Beträge der virtuellen Konten gehören ausschließlich zum Papervergleich.
