@@ -2,6 +2,7 @@
 import argparse
 import json
 from pathlib import Path
+from statistics import median
 
 from meme_paper_account import FEE, SIZE, START, UNIT
 
@@ -56,6 +57,7 @@ def entry_cost_profile(events, entries, realized):
 
 def delayed_sale_profile(rows, sales):
     seen = set()
+    response_delays = []
     original = delayed = reversals = busy = unavailable = quoted = 0
     for row in rows:
         key = row['sourceEventId']
@@ -78,12 +80,15 @@ def delayed_sale_profile(rows, sales):
             original += sale['usdcRaw'] - basis
             delayed += bid - basis
             reversals += int(sale['usdcRaw'] > basis > bid)
+            response_delays.append(row['responseDelaySeconds'])
             quoted += 1
         else:
             raise ValueError('Unknown delayed quote state')
     return dict(sales=len(sales), quoted=quoted, busy=busy, unavailable=unavailable,
                 missing=len(sales)-len(seen), originalNetUsdc=original / UNIT,
-                delayedNetUsdc=delayed / UNIT, profitToLoss=reversals)
+                delayedNetUsdc=delayed / UNIT, profitToLoss=reversals,
+                medianResponseSeconds=median(response_delays) if response_delays else None,
+                maxResponseSeconds=max(response_delays, default=None))
 
 
 def score(directory, *, confirmed_loss_exit=False):
