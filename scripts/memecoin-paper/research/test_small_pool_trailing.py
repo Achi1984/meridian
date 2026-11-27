@@ -40,6 +40,14 @@ class TrailingComparisonTest(unittest.TestCase):
             self.assertEqual(after['trailing']['trades'][0]['at'], 6)
             self.assertEqual(after['comparison']['pairedTrailingMinusFixedUsdc'], -2)
             self.assertEqual(after['comparison']['bothClosed'], 1)
+            pair = after['pairedExits']['trades'][0]
+            self.assertEqual((pair['fixedExitAt'], pair['trailingExitAt'],
+                              pair['trailingMinusFixedExitSeconds']), (4, 6, 2))
+            simultaneous = replay(rows[:3] + [dict(rows[3], event='exit')])
+            self.assertEqual(simultaneous['pairedExits']['trades'][0]['trailingMinusFixedExitSeconds'], 0)
+            earlier = replay(rows[:3] + [dict(rows[3], fills=[]), rows[-1],
+                                         dict(row('exit', 7, rows[3]['fills'], usdcRaw=24_100_000), eventId='fixed-exit')])
+            self.assertEqual(earlier['pairedExits']['trades'][0]['trailingMinusFixedExitSeconds'], -1)
             with self.assertRaisesRegex(ValueError, 'Conflicting'):
                 replay(rows + [dict(rows[-1], usdcRaw=1)])
 
