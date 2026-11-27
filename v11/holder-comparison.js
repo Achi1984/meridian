@@ -286,6 +286,7 @@ export function mountHolderComparison(section, add, read, amount) {
       if (!displayedKey && !localReport) body.textContent = 'Bestätigter Endstand derzeit nicht abrufbar.';
     }).catch(async () => {
       queuedLink.hidden = true;
+      live.className = 'paper-wait';
       live.textContent = 'Aktueller Laufstatus nicht abrufbar.';
       if (!displayedKey && !localReport) {
         try { await showPublished(45900543591, 1); }
