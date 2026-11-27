@@ -35,6 +35,7 @@ def score(directory):
     cash = START
     skipped = []
     fixed_results = {}
+    fixed_exit_at = {}
     trailing_results = {}
     trades = []
     bought = set()
@@ -70,6 +71,7 @@ def score(directory):
             elif fill['side'] == 'sell' and fixed_positions.pop(key) == qty:
                 if row['event'] not in ('resaleMark', 'exit') or row['usdcRaw'] != fill['usdcRaw']:
                     raise ValueError('Invalid F exit')
+                fixed_exit_at[key] = row['at']
                 fixed_results[key] = fill['usdcRaw'] - SIZE - 2 * FEE
             else:
                 raise ValueError('Unknown F fill')
@@ -119,7 +121,17 @@ def score(directory):
         skippedFixedStillOpen=len(skipped) - len(skipped_closed),
         skippedFixedRealizedUsdc=sum(fixed_results[key] for key in skipped_closed) / UNIT,
     )
-    return dict(comparison=comparison, pairedExits=paired_exit_detail(fixed_results, trailing_results),
+    detail = paired_exit_detail(fixed_results, trailing_results)
+    trailing_exit_at = {trade['positionId']: trade['at'] for trade in trades}
+    for pair in detail['trades']:
+        key = pair['positionId']
+        fixed_at = fixed_exit_at[key]
+        trailing_at = trailing_exit_at[key]
+        if type(fixed_at) is not int or type(trailing_at) is not int:
+            raise ValueError('Expected integer exit timestamps')
+        pair.update(fixedExitAt=fixed_at, trailingExitAt=trailing_at,
+                    trailingMinusFixedExitSeconds=trailing_at - fixed_at)
+    return dict(comparison=comparison, pairedExits=detail,
                 startedAt=status['startedAt'], endedAt=status['updatedAt'], initialUsdc=START / UNIT,
                 fixed=dict(realizedUsdc=fixed_net / UNIT, closed=fixed_closed, open=len(fixed_positions)),
                 trailing=dict(realizedUsdc=realized / UNIT, cashUsdc=cash / UNIT, closed=len(trades),
