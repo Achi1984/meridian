@@ -6,6 +6,7 @@ from pathlib import Path
 import signal
 from uuid import uuid4
 from new_pool_watch import quote as raydium_quote
+from exit_requote import ExitRequotes
 from campaign_ledger import reconcile, verify_journal
 import time
 
@@ -400,6 +401,7 @@ def run(directory, segment, holder_test=False):
                 replayed.add(row.get('eventId'))
     end = started + 8*3600
     handoff = started + 4*3600
+    requotes = ExitRequotes(directory/'exit-requotes.jsonl', collector.spot_quote, collector.USDC) if holder_test else None
     sampled_sessions = set()
     with journal.open('a', buffering=1) as out:
         def emit(kind, **fields):
@@ -447,6 +449,8 @@ def run(directory, segment, holder_test=False):
                 emit('quoteComparison', sourceEventId=row['eventId'], provider='Raydium',
                      inputMint=row['mint'], outputMint=collector.USDC, inputRaw=row['qty'],
                      primaryAt=row['at'], primaryRaw=row['usdcRaw'], referenceRaw=reference)
+            if requotes:
+                requotes.observe(row)
             if kind in ('entry','exit','sessionEnd','finished','sessionInterrupted','resume','ready'):
                 for name, account in accounts.items():
                     print(json.dumps(dict(at=row['at'], event=kind, account=name,
@@ -489,6 +493,8 @@ def run(directory, segment, holder_test=False):
             emit('sessionInterrupted', reason='campaignDeadline')
         finally:
             signal.setitimer(signal.ITIMER_REAL, 0)
+            if requotes:
+                requotes.close()
         emit('handoff' if segment == 1 else 'finished')
 
 
@@ -503,4 +509,3 @@ if __name__ == '__main__':
     cli.add_argument('--holder-test', action='store_true')
     args = cli.parse_args()
     run(args.directory, args.segment, args.holder_test)
-
