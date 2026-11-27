@@ -1,5 +1,5 @@
-import {mountReleaseUpdate} from './release-update.js?v=B19-M11-FIX1';
-import {appAccess} from './app-access.js?v=B19-M11-FIX1';
+import {mountReleaseUpdate} from './release-update.js?v=B20-M11';
+import {appAccess} from './app-access.js?v=B20-M11';
 
 export function mountAppAccess(document,window,{access=appAccess}={}){
   const app=document.getElementById('app');
@@ -125,7 +125,7 @@ if(typeof document!=='undefined'&&typeof window!=='undefined'){
     checking = true;
     catalogStatus.textContent = 'Strategien werden geladen …';
     try {
-      const path = './strategy-workspace-bootstrap.js?v=B19-M11-FIX1';
+      const path = './strategy-workspace-bootstrap.js?v=B20-M11';
       await import(retry ? path + '&retry=' + Date.now() : path);
       window.ensureStrategyWorkspace?.();
       if (!document.getElementById('paper-research-section')) throw Error('Workspace unavailable');
@@ -145,8 +145,8 @@ if(typeof document!=='undefined'&&typeof window!=='undefined'){
       commandMounted = true;
       const fallback = document.getElementById('paper-entry-retry');
       try {
-        const paper = fallback ? await import('./solana-meme-report.js?v=B19-M11-FIX1&retry=' + Date.now()) :
-          await import('./solana-meme-report.js?v=B19-M11-FIX1');
+        const paper = fallback ? await import('./solana-meme-report.js?v=B20-M11&retry=' + Date.now()) :
+          await import('./solana-meme-report.js?v=B20-M11');
         paper.mountCommandPaper(document,appAccess);
         fallback?.remove();
       } catch {

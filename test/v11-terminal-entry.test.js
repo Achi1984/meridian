@@ -12,6 +12,7 @@ const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 // Restore the reviewed shell with exact, ordered hunks before checking its earlier lineage.
 function restoreCommandShell(source) {
   const patch=readFileSync(new URL('./fixtures/v11/restore-command-shell.patch',import.meta.url),'utf8');
+  source=source.replace('        <li><strong>Meridian 11 · B19</strong><span class="version-status">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>\n','');
   const lines=source.split('\n');
   const hunks=patch.trimEnd().split(/^@@ /m).slice(1);
   for(const hunk of hunks.reverse()){
@@ -40,8 +41,8 @@ const terminal=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8')
 const preimageBlob='e7fe56dd456641e40b54f5d5b047176523c27592';
 const paperBridgeImportMap='<script type="importmap">\n{"imports":{"../scripts/memecoin-paper-report-bridge/contract.mjs":"../scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX12"}}\n</script>\n';
 function restorePaperModuleIdentity(source){
-  assert.equal(source.split('?v=B19-M11-FIX1').length-1,6,'six exact four-hour report cache references');
-  source=source.replaceAll('?v=B19-M11-FIX1','?v=B16-M11-FIX12');
+  assert.equal(source.split('?v=B20-M11').length-1,6,'six exact four-hour report cache references');
+  source=source.replaceAll('?v=B20-M11','?v=B16-M11-FIX12');
   assert.equal(source.split(paperBridgeImportMap).length-1,1,'one fixed versioned Paper bridge import map');
   source=source.replace(paperBridgeImportMap,'');
   assert.equal(source.split('?v=B16-M11-FIX12').length-1,5,'five versioned M11 entrypoints');
@@ -710,7 +711,7 @@ const b16CacheDelta=[
 const b17CacheDelta=[
   [
     '<script type="module" src="./app-access-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11"></script>',
-    '<script type="module" src="./app-access-bootstrap.js?v=B19-M11-FIX1"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B19-M11-FIX1"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B19-M11-FIX1"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B19-M11-FIX1"></script>'
+    '<script type="module" src="./app-access-bootstrap.js?v=B20-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B20-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B20-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11"></script>'
   ]
 ];
 const commandPresentationDeltas=[
@@ -842,7 +843,7 @@ function restoreB2(source){
   source=source.replace(layout,'');
   const development=source.match(/    <details id="autonomy-status"[^]*?    <\/details>\n/)?.[0];
   source=source.replace(development,'').replace('    <section id="version-panel"',development+'    <section id="version-panel"');
-  source=source.replace("        <li><strong>Meridian 11 · B19</strong><span class=\"version-status\">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>\n","").replace("11 · Vorschau B19<","11 · Vorschau B18<").replace("Diese Vorschau · B19:</b> Klarere Live-Paperbot-Auswertung. <b>Vorige Vorschau · B18","Diese Vorschau · B18");
+  source=source.replace("        <li><strong>Meridian 11 · B20</strong><span class=\"version-status\">Vorschau</span><p>Command bündelt Paperbots und Kontostatus. Details lassen sich aufklappen.</p></li>\n","").replace("11 · Vorschau B20<","11 · Vorschau B18<").replace("Diese Vorschau · B20:</b> Vier Tabs und kompakte Paperbot-Details. <b>Vorige Vorschau · B18","Diese Vorschau · B18");
   const compact=source.match(/  <style id="dashboard-compact-b18">[^]*?<\/style>\n/)?.[0];
   assert.ok(compact);
   assert.equal(gitBlob(compact),'a89ca6314036346283daa475d75b986dc832515c');
@@ -876,11 +877,11 @@ function restoreB2(source){
   }
   source=restorePaperModuleIdentity(source);
   assert.equal(source.split('?v=B16-M11-FIX11').length-1,5,'five restored B16 M11 entrypoints');
-  source=source.replaceAll('?v=B16-M11-FIX11','?v=B19-M11-FIX1');
+  source=source.replaceAll('?v=B16-M11-FIX11','?v=B20-M11');
   for(const addition of [
     '  <link rel="stylesheet" href="../public/css/m11-agent-status.css">\n',
     '        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>\n',
-    '<script type="module" src="./agent-status-bootstrap.js?v=B19-M11-FIX1"></script>\n'
+    '<script type="module" src="./agent-status-bootstrap.js?v=B20-M11"></script>\n'
   ]){
     assert.equal(source.split(addition).length-1,1,'one exact agent-status mount addition');
     source=source.replace(addition,'');
@@ -1034,7 +1035,7 @@ function deploymentServer(){
       path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
       path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
       path.startsWith('/meridian/scripts/spot-paper-paired-progress/')||
-      path.startsWith('/meridian/scripts/spot-paper-research/'))&&url.search==='?v=B19-M11-FIX1';
+      path.startsWith('/meridian/scripts/spot-paper-research/'))&&url.search==='?v=B20-M11';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -1104,7 +1105,7 @@ function deploymentServer(){
         path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
         path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
         path.startsWith('/meridian/scripts/spot-paper-paired-progress/')||
-        path.startsWith('/meridian/scripts/spot-paper-research/')?'?v=B19-M11-FIX1':'')).join(' '):"'none'";
+        path.startsWith('/meridian/scripts/spot-paper-research/')?'?v=B20-M11':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+host8hEndpoint+' '+origin+'/meridian/v11/index.html '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -1131,11 +1132,11 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await releaseResponse.text(),html);
     const connectPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('connect-src '));
     assert.ok(connectPolicy.trim().split(/\s+/).includes(releaseUrl.href),'exact public release HTML allowed');
-    const catalogUrl=new URL('strategy-catalog.js?v=B19-M11-FIX1',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B20-M11',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B19-M11-FIX1)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B20-M11)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -1145,7 +1146,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const bridgeIndexUrl=new URL('../scripts/memecoin-paper-report-bridge/index.mjs?v=B19-M11-FIX1',releaseUrl);
+    const bridgeIndexUrl=new URL('../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11',releaseUrl);
     const bridgeIndex=await fetch(bridgeIndexUrl);
     assert.equal(bridgeIndex.status,200,'connector bridge entry must be served');
     assert.match(bridgeIndex.headers.get('content-type'),/^text\/javascript/);
@@ -1161,9 +1162,9 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await contract.text(),
       readFileSync(new URL('../scripts/memecoin-paper-report-bridge/contract.mjs',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(contractUrl.href),'versioned contract URL is allowed by script-src');
-    const arenaUrl=new URL('strategy-arena.js?v=B19-M11-FIX1',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B20-M11',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B19-M11-FIX1)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B20-M11)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -1172,7 +1173,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
-    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B19-M11-FIX1)['"]/);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B20-M11)['"]/);
     assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
     const historicalUrl=new URL(historicalImport[1],arenaUrl);
     const historical=await fetch(historicalUrl);
@@ -1181,7 +1182,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
     assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
-    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B19-M11-FIX1)['"]/);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B20-M11)['"]/);
     assert.ok(producerImport,'Arena imports the bounded producer export adapter');
     const producerUrl=new URL(producerImport[1],arenaUrl);
     const producer=await fetch(producerUrl);
@@ -1190,7 +1191,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
-    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B19-M11-FIX1)['"]/);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B20-M11)['"]/);
     assert.ok(rendererImport,'Arena imports the isolated result renderer');
     const rendererUrl=new URL(rendererImport[1],arenaUrl);
     const renderer=await fetch(rendererUrl);
@@ -1200,17 +1201,17 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     for(const [path,file,type] of [
-      ['ledger-manual-client.js?v=B19-M11-FIX1','v11/ledger-manual-client.js','javascript'],
-      ['ledger-manual-model.js?v=B19-M11-FIX1','v11/ledger-manual-model.js','javascript'],
-      ['ledger-manual-view.js?v=B19-M11-FIX1','v11/ledger-manual-view.js','javascript'],
+      ['ledger-manual-client.js?v=B20-M11','v11/ledger-manual-client.js','javascript'],
+      ['ledger-manual-model.js?v=B20-M11','v11/ledger-manual-model.js','javascript'],
+      ['ledger-manual-view.js?v=B20-M11','v11/ledger-manual-view.js','javascript'],
       ['../ledger-manual-snapshot.js','ledger-manual-snapshot.js','javascript'],
-      ['paper-readiness.js?v=B19-M11-FIX1','v11/paper-readiness.js','javascript'],
-      ['paper-readiness-view.js?v=B19-M11-FIX1','v11/paper-readiness-view.js','javascript'],
-      ['paper-cockpit-model.js?v=B19-M11-FIX1','v11/paper-cockpit-model.js','javascript'],
-      ['paper-cockpit-view.js?v=B19-M11-FIX1','v11/paper-cockpit-view.js','javascript'],
-      ['release-update.js?v=B19-M11-FIX1','v11/release-update.js','javascript'],
-      ['agent-status-bootstrap.js?v=B19-M11-FIX1','v11/agent-status-bootstrap.js','javascript'],
-      ['agent-status-client.js?v=B19-M11-FIX1','v11/agent-status-client.js','javascript'],
+      ['paper-readiness.js?v=B20-M11','v11/paper-readiness.js','javascript'],
+      ['paper-readiness-view.js?v=B20-M11','v11/paper-readiness-view.js','javascript'],
+      ['paper-cockpit-model.js?v=B20-M11','v11/paper-cockpit-model.js','javascript'],
+      ['paper-cockpit-view.js?v=B20-M11','v11/paper-cockpit-view.js','javascript'],
+      ['release-update.js?v=B20-M11','v11/release-update.js','javascript'],
+      ['agent-status-bootstrap.js?v=B20-M11','v11/agent-status-bootstrap.js','javascript'],
+      ['agent-status-client.js?v=B20-M11','v11/agent-status-client.js','javascript'],
       ['../public/js/m11-agent-status.js','public/js/m11-agent-status.js','javascript'],
       ['../public/css/m11-agent-status.css','public/css/m11-agent-status.css','css']
     ]){

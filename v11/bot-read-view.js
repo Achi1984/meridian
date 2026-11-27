@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B19-M11-FIX1';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B19-M11-FIX1';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B20-M11';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B20-M11';
 
 const LABELS = {
   locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
