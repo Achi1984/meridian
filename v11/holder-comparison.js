@@ -128,6 +128,12 @@ export function mountHolderComparison(section, add, read, amount) {
     const resultLabel = attempt ? 'Letzter Abschluss · Versuch ' + attempt :
       'Lokales Journal · ' + (report.final ? 'Endstand' : 'Zwischenstand');
     add(body, 'small', resultLabel + ' · ' + date + ' Wien');
+    report.rows.forEach((a,i) => {
+      const row = add(body,'p','');
+      row.className = 'paper-metric';
+      add(row,'span',i ? 'Mit Filter · realisiert' : 'Referenz · realisiert');
+      add(row,'strong',amount(a.net)).className = a.net > 0 ? 'paper-gain' : a.net < 0 ? 'paper-loss' : '';
+    });
     const effect = add(body, 'p', '');
     effect.className = 'paper-metric';
     add(effect, 'span', 'Filtereffekt · realisiert');
@@ -139,13 +145,7 @@ export function mountHolderComparison(section, add, read, amount) {
       ' ausgelassen · ' + coverage);
     if (signals > 0 && report.measured === 0) sample.className = 'paper-wait';
     const info = add(body,'details','');
-    add(info,'summary','Konten & Filterwirkung');
-    report.rows.forEach((a,i) => {
-      const row = add(info,'p','');
-      row.className = 'paper-metric';
-      add(row,'span',i ? 'Mit Filter' : 'Referenz');
-      add(row,'strong',amount(a.net)).className = a.net > 0 ? 'paper-gain' : a.net < 0 ? 'paper-loss' : '';
-    });
+    add(info,'summary','Trades & Filterwirkung');
     add(info,'p',origin);
     report.rows.forEach((a,i) => add(info,'p',(i ? 'Filter' : 'Referenz') + ' · Kasse ' +
       amount(1000 + a.net - a.openCost) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen'));
@@ -180,8 +180,12 @@ export function mountHolderComparison(section, add, read, amount) {
     const data = await read(url, true);
     if (localReport) return;
     const h = data.holder, e = data.exits;
-    if (data.source?.runId !== runId || data.source.attempt !== attempt || !h?.final ||
+    if (data.source?.runId !== runId || data.source.attempt !== attempt || h?.final !== true ||
         !safe(h.updatedAt) || !Array.isArray(h.rows) || h.rows.length !== 2 ||
+        !h.rows.every(row => row && Number.isFinite(row.net) && Number.isFinite(row.openCost) &&
+          row.openCost >= 0 && [row.closed, row.open].every(n => safe(n) && n >= 0)) ||
+        !Number.isFinite(h.delta) ||
+        Math.round(h.rows[1].net * micro) - Math.round(h.rows[0].net * micro) !== Math.round(h.delta * micro) ||
         !safe(e?.bothClosed) || !safe(e.sharedStillOpenOnEitherSide) ||
         e.sharedEntries !== e.bothClosed + e.sharedStillOpenOnEitherSide ||
         ![e.pairedFixedNetUsdc, e.pairedTrailingNetUsdc].every(Number.isFinite) ||
@@ -301,7 +305,7 @@ export function mountHolderComparison(section, add, read, amount) {
       }
       // A rerun shares its run ID with earlier attempts. Only completed attempts have reports.
       const candidates = [];
-      for (const item of feed.workflow_runs) {
+      for (const item of recent) {
         if (!safe(item.id) || !safe(item.run_attempt)) continue;
         const first = item.conclusion === 'success' ? item.run_attempt : item.run_attempt - 1;
         for (let attempt = first; attempt >= Math.max(1, first - 1); attempt--) {
