@@ -1,6 +1,6 @@
 import {
   MAX_PROGRESS_BYTES, PROGRESS_ENDPOINT, canonicalJson, validIdentity, validateProgress
-} from '../scripts/spot-paper-paired-progress/contract.mjs?v=B20-M11-FIX1';
+} from '../scripts/spot-paper-paired-progress/contract.mjs?v=B20-M11-FIX2';
 
 export const SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT = PROGRESS_ENDPOINT;
 export const SPOT_PAPER_PAIRED_PROGRESS_TIMEOUT_MS = 8_000;

@@ -1,3 +1,4 @@
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX2';
 const api = 'https://api.github.com/repos/Achi1984/meridian/actions';
 const runs = 'https://github.com/Achi1984/meridian/actions/runs/';
 const micro = 1_000_000;
@@ -268,6 +269,7 @@ export function mountHolderComparison(section, add, read, amount) {
         (messages[error.message] ?? 'Bitte Status und Journal desselben Haltertests prüfen.');
     }
   });
+  const clock = add(card,'meridian-run-clock','');
   let pending;
   return function refresh() {
     if (pending) return pending;
@@ -282,6 +284,13 @@ export function mountHolderComparison(section, add, read, amount) {
       live.className = run.status === 'in_progress' ? 'paper-live' :
         ['failure','timed_out','action_required'].includes(run.conclusion) ? 'paper-wait' : '';
       live.textContent = 'Versuch ' + run.run_attempt + ' · ' + state + (waiting.some(r => r.id !== run.id) ? ' · Folgelauf wartet' : '');
+      clock.hidden = !['in_progress','completed'].includes(run.status);
+      if (!clock.hidden) {
+        const start = Date.parse(run.run_started_at) / 1000;
+        const finished = run.status === 'completed';
+        updateRunClock(clock, {start, observed:finished ? Date.parse(run.updated_at) / 1000 : Date.now() / 1000,
+          end:start + 8 * 3600, finished});
+      }
       source.textContent = 'Lauf ' + run.id + ' · Versuch ' + run.run_attempt;
       source.href = runs + run.id + '/attempts/' + run.run_attempt;
       const next = waiting.find(item => item.id !== run.id);
@@ -307,6 +316,7 @@ export function mountHolderComparison(section, add, read, amount) {
     }).catch(async () => {
       queuedLink.hidden = true;
       live.className = 'paper-wait';
+      clock.hidden = true;
       live.textContent = 'Aktueller Laufstatus nicht abrufbar.';
       if (!displayedKey && !localReport) {
         try { await showPublished(45900543591, 1); }

@@ -1,3 +1,4 @@
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX2';
 const repo = 'Achi1984/meridian';
 const workflow = 'solana-meme-paper-bot.yml';
 const api = 'https://api.github.com/repos/' + repo;
@@ -15,8 +16,8 @@ async function read(url, raw = false) {
   return response.json();
 }
 
-import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX1';
-import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX1';
+import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX2';
+import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX2';
 
 // The experiment stores raw USDC in millionths and charges 0.05 USDC per fill.
 const swingRun = 45624335706;
@@ -90,6 +91,11 @@ function swingStatus(state, failed = false) {
   };
 }
 
+function updateSwingClock(clock, state) {
+  const end = state.start + 72 * 3600;
+  updateRunClock(clock, {start:state.start, observed:state.lastTick, end});
+}
+
 const reportRefresh = new WeakMap();
 
 export function ensureSolanaSection(doc, before) {
@@ -124,7 +130,8 @@ export function mountCommandPaper(doc, access) {
   status.textContent = 'Letzter Scan wird geladen …';
   const results = doc.createElement('div');
   results.hidden = true;
-  card.append(title,status,results);
+  const clock = doc.createElement('meridian-run-clock');
+  card.append(title,status,clock,results);
   portfolio.before(card);
   let timer, busy = false, snapshot;
   const visible = () => access.isUnlocked() && !doc.hidden && !command.hidden;
@@ -136,6 +143,7 @@ export function mountCommandPaper(doc, access) {
       const accounts = swingAccounts(state);
       if (snapshot && state.lastTick < snapshot.lastTick) throw Error('Older checkpoint');
       snapshot = state;
+      updateSwingClock(clock, state);
       const summary = swingStatus(state);
       status.textContent = summary.text;
       status.className = summary.tone;
@@ -176,6 +184,7 @@ export function mountSwingCard(section, add, load = read) {
   const status = add(card,'p','Laufstand wird geladen.');
   status.setAttribute('role','status');
   const body = add(card,'div','');
+  const clock = add(card,'meridian-run-clock','');
   const decisions = add(card,'details','');
   add(decisions,'summary','Einstiegsgründe');
   const reasons = add(decisions,'ul','');
@@ -217,6 +226,7 @@ export function mountSwingCard(section, add, load = read) {
       }
       collector = state.collectorRunId ?? swingRun;
       source.href = runs + collector;
+      updateSwingClock(clock, state);
       const summary = swingStatus(state);
       status.textContent = summary.text;
       status.className = summary.tone;
@@ -262,6 +272,7 @@ export function mountSolanaReport(section) {
   badge.className = 'pilot-status';
   const live = add(archive,'p','Laufstatus wird beim Öffnen geladen.');
   live.setAttribute('role','status');
+  const pilotClock = add(archive,'meridian-run-clock','');
   const notice = add(archive,'p','');
   notice.hidden = true;
   const body = add(archive,'div','');
@@ -295,6 +306,12 @@ export function mountSolanaReport(section) {
       }
     }
     live.textContent = run && states[run.status] ? 'Letzter Pilot · ' + label : 'Laufstatus unbekannt';
+    pilotClock.hidden = !['in_progress','completed'].includes(run?.status);
+    if (!pilotClock.hidden) {
+      const finished = run.status === 'completed';
+      updateRunClock(pilotClock, {start:Date.parse(run.run_started_at) / 1000,
+        observed:finished ? Date.parse(run.updated_at) / 1000 : Date.now() / 1000, finished});
+    }
     linkRun(live,run);
     if (run && states[run.status] === 'Wartet') {
       const active = observedRuns.find(item=>item?.status === 'in_progress' && item.id !== run.id);

@@ -1,3 +1,4 @@
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX2';
 const original = {id:45185444796, start:1795440944, title:'Einstiege · Referenzlauf',
   names:{A:'Soforteinstieg', B:'Käufer-Erholung', C:'Käufer-Erholung mit 10 % Nettoziel'}};
 const recovery = {id:45210142704, start:1795449172, title:'Ausstiege · Käufer-Erholung',
@@ -158,6 +159,8 @@ function mountCampaign(parent, add, read, amount, campaign) {
       const pnl = add(balance,'span','Realisiert · ' + (row.net > 0 ? '+' : '') + amount(row.net));
       pnl.className = 'account-pnl ' + (row.net > 0 ? 'af-positive' : row.net < 0 ? 'af-negative' : 'af-muted');
     }
+    updateRunClock(add(result,'meridian-run-clock',''), {start:snapshot.startedAt, end:snapshot.endsAt,
+      observed:snapshot.updatedAt, finished:snapshot.lastEvent === 'finished', snapshot:source === 'Lokaler Bericht'});
     add(result,'small',source + ' · ' + at + ' (Wien)');
     metrics.replaceChildren();
     add(metrics,'p',snapshot.ledgerVerified === true ? 'Journalabgleich bestätigt' : 'Journalabgleich nicht bestätigt');

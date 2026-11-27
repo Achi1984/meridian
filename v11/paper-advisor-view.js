@@ -1,4 +1,5 @@
-import {appAccess} from './app-access.js?v=B20-M11-FIX1';
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX2';
+import {appAccess} from './app-access.js?v=B20-M11-FIX2';
 
 const NUMBER = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 8});
 const PERCENT = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 2});
@@ -71,6 +72,8 @@ function renderUsdRound(root, round) {
   }
   const title = doc.createElement('h3');
   title.textContent = 'BTC/USD · 1.000 USD je Paper-Konto';
+  const clock = doc.createElement('meridian-run-clock');
+  updateRunClock(clock, {start:Date.parse(round.start) / 1000, observed:Date.parse(round.at) / 1000});
   table.createCaption().textContent = 'Gemeinsamer Start · ' + DATE.format(new Date(round.start));
   row(table.createTHead(), ['Strategie', 'Kontowert', 'Netto', 'Abschlüsse', 'Aktive Tage', 'Max. Rückgang'], true);
   const body = table.createTBody();
@@ -120,9 +123,9 @@ function renderUsdRound(root, round) {
     const coverage = doc.createElement('small');
     coverage.textContent = 'Aktivität der letzten 24 Stunden · ' + activity.observed + ' von ' +
       activity.expected + ' erwarteten Intervallen erfasst.';
-    root.replaceChildren(title, scroll, costs, slot, decisions, coverage);
+    root.replaceChildren(title, clock, scroll, costs, slot, decisions, coverage);
   } else {
-    root.replaceChildren(title, scroll, costs, slot, decisions);
+    root.replaceChildren(title, clock, scroll, costs, slot, decisions);
   }
   const heading = doc.createElement('h4');
   heading.textContent = 'BTC-Futures im Vergleich zu V3 Spot';
@@ -272,6 +275,8 @@ export function renderAdvisorReport(root, report, audit, decisions, trades, krak
       if (Date.parse(comparison.at) < latestSlot) {
         add(content, 'p', 'Für den jüngsten Takt steht der gemeinsame Vergleich noch aus.');
       }
+      updateRunClock(add(content,'meridian-run-clock',''), {start:Date.parse(comparison.start) / 1000,
+        observed:Date.parse(comparison.at) / 1000});
       add(content,'small','Start · '+DATE.format(new Date(comparison.start))+' · Gemeinsamer Stand · '+DATE.format(new Date(comparison.at)));
     } else {
       add(content,'small','Gemeinsamer Bericht ausstehend');

@@ -1,4 +1,4 @@
-import {isSpotPaperDashboardDto} from '../scripts/spot-paper-report-bridge/contract.mjs?v=B20-M11-FIX1';
+import {isSpotPaperDashboardDto} from '../scripts/spot-paper-report-bridge/contract.mjs?v=B20-M11-FIX2';
 
 function amount(value, signed = false) {
   if (value === null) return {label: 'Unbekannt', tone: 'tone-muted'};
