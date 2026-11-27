@@ -22,6 +22,38 @@ def paired_exit_detail(fixed, trailing):
                 maxDeltaAfterOmittingOneUsdc=(total - min(deltas)) / UNIT if len(deltas) > 1 else None)
 
 
+def entry_cost_profile(events, entries, realized):
+    """Group F trades by the pre-buy quote emitted directly after the entry."""
+    bands = {name: dict(closed=0, losses=0, open=0, netRaw=0)
+             for name in ('upTo3Pct', 'over3To5Pct', 'unknown')}
+    measured = {}
+    previous = {}
+    for row in events:
+        key = previous.get('positionId')
+        if (previous.get('event') == 'entry' and key in entries
+                and row.get('event') == 'resaleMark' and row.get('positionId') == key
+                and row.get('mint') == previous['mint'] and row.get('qty') == previous['qty']
+                and row.get('inputRaw') == previous['qty'] and previous.get('inputRaw') == SIZE
+                and previous.get('outputMint') == row.get('inputMint') == previous['mint']
+                and previous.get('inputMint') == row.get('outputMint') == 'EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'
+                and previous.get('provider') == row.get('provider') == 'Jupiter'):
+            bid = row.get('usdcRaw')
+            if type(bid) is int and 100 * bid >= 95 * SIZE:
+                measured[key] = 'upTo3Pct' if 100 * bid >= 97 * SIZE else 'over3To5Pct'
+        previous = row
+    for key in entries:
+        band = bands[measured.get(key, 'unknown')]
+        if key in realized:
+            band['closed'] += 1
+            band['losses'] += int(realized[key] < 0)
+            band['netRaw'] += realized[key]
+        else:
+            band['open'] += 1
+    for band in bands.values():
+        band['netUsdc'] = band.pop('netRaw') / UNIT
+    return bands
+
+
 def score(directory, *, confirmed_loss_exit=False):
     status = json.loads((directory / 'status.json').read_text())
     if status.get('ledgerVerified') is not True or status['lastEvent'] != 'finished':
@@ -141,6 +173,7 @@ def score(directory, *, confirmed_loss_exit=False):
         pair.update(fixedExitAt=fixed_at, trailingExitAt=trailing_at,
                     trailingMinusFixedExitSeconds=trailing_at - fixed_at)
     return dict(comparison=comparison, pairedExits=detail,
+                entryCostProfile=entry_cost_profile(seen.values(), bought, fixed_results),
                 startedAt=status['startedAt'], endedAt=status['updatedAt'], initialUsdc=START / UNIT,
                 fixed=dict(realizedUsdc=fixed_net / UNIT, closed=fixed_closed, open=len(fixed_positions)),
                 trailing=dict(realizedUsdc=realized / UNIT, cashUsdc=cash / UNIT, closed=len(trades),
