@@ -1,10 +1,10 @@
-name: Top 100 hourly breakout and retest paper pilot
+name: Top 100 follow-up · three paper accounts
 on:
   push:
-    branches: [paper/top100-breakout-20261125]
+    branches: [paper/top100-confirmation-20261127]
     paths: ['.github/workflows/top100-breakout.yml']
 permissions:
-  contents: read
+  contents: write
 jobs:
   first:
     runs-on: ubuntu-latest
@@ -13,6 +13,21 @@ jobs:
       - uses: actions/checkout@v4
         with: {persist-credentials: false}
       - run: python -m unittest discover -s scripts/research -p test_top100_paper.py
+      - run: python scripts/research/top100_paper.py direction 0
+      - name: Publish initial paper balances
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          file="top100-followup-$GITHUB_RUN_ID.json"
+          python scripts/research/top100_followup_report.py direction/state.json initial > "$RUNNER_TEMP/report.json"
+          api="repos/$GITHUB_REPOSITORY/contents/$file"
+          args=()
+          if [[ 'initial' != 'initial' ]]; then
+            sha=$(gh api "$api?ref=paper-dashboard-data" --jq '.sha')
+            args+=(-f "sha=$sha")
+          fi
+          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish initial Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" "${args[@]}" >/dev/null
       - run: python scripts/research/top100_paper.py direction 1
       - uses: actions/upload-artifact@v4
         if: always()
@@ -20,6 +35,20 @@ jobs:
           name: top100-breakout-first
           path: direction/
           if-no-files-found: error
+      - name: Publish first paper balances
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          file="top100-followup-$GITHUB_RUN_ID.json"
+          python scripts/research/top100_followup_report.py direction/state.json first > "$RUNNER_TEMP/report.json"
+          api="repos/$GITHUB_REPOSITORY/contents/$file"
+          args=()
+          if [[ 'first' != 'initial' ]]; then
+            sha=$(gh api "$api?ref=paper-dashboard-data" --jq '.sha')
+            args+=(-f "sha=$sha")
+          fi
+          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish first Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" "${args[@]}" >/dev/null
   finish:
     needs: first
     runs-on: ubuntu-latest
@@ -36,3 +65,17 @@ jobs:
           name: top100-breakout-final
           path: direction/
           if-no-files-found: error
+      - name: Publish final paper balances
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          file="top100-followup-$GITHUB_RUN_ID.json"
+          python scripts/research/top100_followup_report.py direction/state.json final > "$RUNNER_TEMP/report.json"
+          api="repos/$GITHUB_REPOSITORY/contents/$file"
+          args=()
+          if [[ 'final' != 'initial' ]]; then
+            sha=$(gh api "$api?ref=paper-dashboard-data" --jq '.sha')
+            args+=(-f "sha=$sha")
+          fi
+          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish final Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" "${args[@]}" >/dev/null
