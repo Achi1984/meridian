@@ -136,10 +136,7 @@ def settle(t):
 
 
 def observe(state,slot):
-    day=datetime.fromtimestamp(time.time(),timezone.utc).date().isoformat()
-    if day not in state['universes']:
-        state['universes'][day]=universe()
-    specs=state['universes'][day]['specs']
+    specs=next(iter(state['universes'].values()))['specs']
     active=dict(specs)
     for account in state['accounts'].values():
         active.update({i:p['spec'] for i,p in account['open'].items()})
@@ -151,7 +148,7 @@ def observe(state,slot):
         if 'error' in f:
             continue
         f['relativeToBtc24h']=f['return24h']-btc if btc is not None else None
-        if f['side'] or inst in state['pending']:
+        if f['side'] or inst in state['pending'] or inst in state['confirmations']:
             for path,key,extra in [('public/open-interest','oi',{'instType':'SWAP'}),('public/funding-rate','fundingRate',{})]:
                 try:
                     d=ok(path,instId=inst,**extra)[0]
@@ -160,6 +157,11 @@ def observe(state,slot):
                         f['nextFunding']=int(d['fundingTime'])
                 except (OSError,KeyError,ValueError):
                     f[key]=None
+    confirmed = state['confirmations']
+    state['confirmations'] = {
+        inst: dict(p, retestSlot=slot) for inst, p in state['pending'].items()
+        if 'close' in signals.get(inst, {}) and retest(signals[inst], p, slot)
+    }
     # Exit first; re-entry after closing on the same bar is excluded.
     for name,account in state['accounts'].items():
         for inst,f in signals.items():
@@ -182,7 +184,14 @@ def observe(state,slot):
             if 'error' in f or inst in account['open'] or any(t['instrument']==inst and t['exit']['ts']>=slot*1000 for t in account['closed']):
                 continue
             p=state['pending'].get(inst)
-            if name=='retest':
+            if name == 'confirmed':
+                signal = confirmed.get(inst)
+                if not signal or slot != signal['retestSlot'] + HOUR:
+                    continue
+                side, level = signal['side'], signal['level']
+                if side * (f['close'] - level) <= 0:
+                    continue
+            elif name=='retest':
                 if not p or not retest(f,p,slot):
                     continue
                 side,level=p['side'],p['level']
@@ -229,17 +238,15 @@ def observe(state,slot):
 def run(directory,segment):
     directory.mkdir(exist_ok=True)
     path=directory/'state.json'
-    if segment==1:
+    if segment==0:
         if path.exists():
             raise ValueError('existing state')
+        # Freeze the common pilot universe for a comparable second campaign.
         u=json.loads(Path(__file__).with_name('top100_start.json').read_text())
         now=int(time.time())
-        if not 0<=now-u['at']<3600 or now//86400!=u['at']//86400:
-            u=universe()
-            now=int(time.time())
         state=dict(start=now,lastSlot=now//HOUR*HOUR,universes={datetime.fromtimestamp(now,timezone.utc).date().isoformat():u},
-                   accounts={n:dict(initialUsdt=1000,open={},closed=[]) for n in ('direct','retest')},
-                   cashBenchmarkUsdt=1000,pending={},observations=[])
+                   accounts={n:dict(initialUsdt=1000,open={},closed=[]) for n in ('direct','retest','confirmed')},
+                   cashBenchmarkUsdt=1000,pending={},confirmations={},observations=[])
     else:
         state=json.loads(path.read_text())
     def save():
@@ -248,6 +255,8 @@ def run(directory,segment):
         tmp.replace(path)
     save()
     print('Ready',len(next(iter(state['universes'].values()))['specs']),'mapped live swaps',flush=True)
+    if segment == 0:
+        return
     end=state['start']+segment*4*HOUR
     while time.time()<end:
         slot=state['lastSlot']+HOUR
@@ -261,6 +270,7 @@ def run(directory,segment):
         except (ValueError,KeyError,OSError) as e:
             state['observations'].append(dict(slot=slot,error=str(e)[:150]))
             state['pending'].clear()
+            state['confirmations'].clear()
         state['lastSlot']=slot
         save()
 
@@ -268,6 +278,6 @@ def run(directory,segment):
 if __name__=='__main__':
     parser=argparse.ArgumentParser()
     parser.add_argument('directory',type=Path)
-    parser.add_argument('segment',type=int,choices=(1,2))
+    parser.add_argument('segment',type=int,choices=(0,1,2))
     args=parser.parse_args()
     run(args.directory,args.segment)
