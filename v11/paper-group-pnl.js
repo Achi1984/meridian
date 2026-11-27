@@ -13,7 +13,8 @@ export function paperGroupPnl(section) {
     label.textContent=kind;
     line.append(label);
     for(const [name,value] of rows){
-      const item=doc.createElement('span');
+      const item=doc.createElement('output');
+      item.setAttribute('role','none');
       const valid=Number.isFinite(value);
       const cents=valid?Math.sign(value)*Math.round(Math.abs(value)*100):0;
       const amount=valid?new Intl.NumberFormat('de-AT',{minimumFractionDigits:2,maximumFractionDigits:2,signDisplay:'exceptZero'}).format(cents/100)+' '+unit:'offen';
@@ -21,6 +22,6 @@ export function paperGroupPnl(section) {
       if(cents)item.className=cents>0?'paper-gain':'paper-loss';
       line.append(item);
     }
-    if(note){const status=doc.createElement('span');status.textContent=note;line.append(status);}
+    if(note){const status=doc.createElement('em');status.textContent=note;line.append(status);}
   };
 }

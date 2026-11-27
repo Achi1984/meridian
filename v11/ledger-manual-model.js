@@ -11,7 +11,7 @@ export function buildLedgerManualModel(snapshot,{tickers,pricesAt,now=Date.now()
     }
   }
   const holdings=clean.holdings.map(h=>{
-    const quantity=Number(h.quantity),price=prices.get(h.symbol+'USDT')??null;
+    const quantity=Number(h.quantity),price=h.symbol==='USDT'?1:(prices.get(h.symbol+'USDT')??null);
     const value=quantity===0?0:price===null?null:quantity*price;
     return {...h,price,value:Number.isFinite(value)?value:null};
   });
