@@ -150,3 +150,7 @@
     #app .scanner-ranks{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
     #app .scanner-ranks td,#app .scanner-ranks th{padding:6px 4px;text-align:start;overflow-wrap:anywhere}
     @media(max-width:600px){#app .scanner-ranks :is(th,td):nth-child(3),#app .scanner-ranks :is(th,td):nth-child(5),#app .scanner-ranks :is(th,td):nth-child(7){display:none}}
+
+#app #depot-read-root button {
+  min-height: 45px;
+}
