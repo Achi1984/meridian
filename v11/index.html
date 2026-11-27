@@ -188,6 +188,7 @@
     .bot-card-top{grid-area:top;display:grid;grid-template-columns:minmax(0,1fr) minmax(92px,40%);gap:8px;align-items:center;min-width:0}
     .bot-card-identity{min-width:0}
     .bot-asset-group{border:1px solid #40576b;border-radius:12px;padding:0 12px;background:#111e2b}
+    .bot-read-view .bot-asset-group:not([open])>.bot-card-list{display:none}
     .bot-asset-group>summary{cursor:pointer;display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 10px;min-height:44px;padding:10px 0;overflow-wrap:anywhere}
     .bot-asset-group[open] .bot-card:not([open]) summary span:last-child{transform:none}
     .bot-asset-group>summary>small{color:#b9c8d6}
