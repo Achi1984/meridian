@@ -1,4 +1,4 @@
-import {presentSpotPaperCockpit} from './spot-paper-cockpit-model.js?v=B20-M11-FIX3';
+import {presentSpotPaperCockpit} from './spot-paper-cockpit-model.js?v=B20-M11-FIX4';
 
 const views = new WeakMap();
 

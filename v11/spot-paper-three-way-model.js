@@ -1,4 +1,4 @@
-import {isSpotPaperThreeWayDashboardEnvelope, ARM_IDS} from '../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B20-M11-FIX3';
+import {isSpotPaperThreeWayDashboardEnvelope, ARM_IDS} from '../scripts/spot-paper-research/three-way-dashboard-contract.mjs?v=B20-M11-FIX4';
 function freshness(observedAt, now, staleAfterMs) {
   const timestamp = Date.parse(observedAt);
   if (!Number.isFinite(timestamp) || !Number.isSafeInteger(now) || !Number.isSafeInteger(staleAfterMs) || staleAfterMs < 0 || timestamp > now) return {status: 'UNKNOWN', ageMs: null};

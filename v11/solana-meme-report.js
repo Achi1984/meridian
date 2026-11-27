@@ -1,4 +1,4 @@
-import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX3';
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX4';
 const repo = 'Achi1984/meridian';
 const workflow = 'solana-meme-paper-bot.yml';
 const api = 'https://api.github.com/repos/' + repo;
@@ -16,8 +16,8 @@ async function read(url, raw = false) {
   return response.json();
 }
 
-import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX3';
-import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX3';
+import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX4';
+import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX4';
 
 // The experiment stores raw USDC in millionths and charges 0.05 USDC per fill.
 const swingRun = 45624335706;

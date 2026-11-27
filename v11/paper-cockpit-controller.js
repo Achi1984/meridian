@@ -1,7 +1,7 @@
-import {appAccess} from './app-access.js?v=B20-M11-FIX3';
-import {createPaperReportConnector} from './paper-report-connector.js?v=B20-M11-FIX3';
-import {presentPaperCockpitReport} from './paper-cockpit-model.js?v=B20-M11-FIX3';
-import {renderPaperCockpit} from './paper-cockpit-view.js?v=B20-M11-FIX3';
+import {appAccess} from './app-access.js?v=B20-M11-FIX4';
+import {createPaperReportConnector} from './paper-report-connector.js?v=B20-M11-FIX4';
+import {presentPaperCockpitReport} from './paper-cockpit-model.js?v=B20-M11-FIX4';
+import {renderPaperCockpit} from './paper-cockpit-view.js?v=B20-M11-FIX4';
 
 export const PAPER_REPORT_ENDPOINT =
   'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/paper-report';
