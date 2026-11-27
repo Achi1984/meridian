@@ -62,6 +62,32 @@ jobs:
             jq --argjson run "$SOURCE_RUN" --argjson attempt "$SOURCE_ATTEMPT" \
                --argjson artifact "$SOURCE_ARTIFACT" --arg digest "$SOURCE_DIGEST" \
                '. + {source: {runId: $run, attempt: $attempt, artifactId: $artifact, digest: $digest}}' > comparison.json
+      - name: Show paired paper outcomes in the run summary
+        run: |
+          jq -r '
+            .comparison as $c | .pairedExits as $p |
+              ([$p.trades[] | select(.fixedNetUsdc > 0 and .trailingNetUsdc < 0)] | length) as $lost |
+              ([$p.trades[] | select(.fixedNetUsdc < 0 and .trailingNetUsdc > 0)] | length) as $saved |
+              "### Fixes Ziel und Trailing im Paper-Test",
+              "",
+              "Quelllauf \(.source.runId), Versuch \(.source.attempt), Journal \(.source.artifactId).",
+              "",
+              "Von \($c.sharedEntries) gemeinsamen Einstiegen sind \($c.bothClosed) auf beiden Seiten geschlossen. Bei \($c.sharedStillOpenOnEitherSide) ist mindestens ein Ausstieg offen.",
+              "",
+              (if $c.bothClosed > 0 then
+                "| Netto-PnL der gemeinsam geschlossenen Positionen | USDC |",
+                "| --- | ---: |",
+                "| Fixes Ziel | \($c.pairedFixedNetUsdc) |",
+                "| Trailing | \($c.pairedTrailingNetUsdc) |",
+                "| Differenz (Trailing minus fixes Ziel) | \($c.pairedTrailingMinusFixedUsdc) |",
+                "",
+                "Fixes Ziel besser bei \($p.fixedBetter), Trailing besser bei \($p.trailingBetter), Gleichstand bei \($p.equal).",
+                "",
+                "Bei \($lost) Positionen erzielte das fixe Ziel einen Gewinn und Trailing einen Verlust. Bei \($saved) war es umgekehrt."
+              else "Ein Vergleich des realisierten Netto-PnL ist noch offen." end),
+              "",
+              "Der Trailing-Replay ließ \(.trailing.skippedForCash) Einstiege wegen fehlenden Guthabens aus."
+          ' comparison.json >> "$GITHUB_STEP_SUMMARY"
       - uses: actions/upload-artifact@v4
         with:
           name: small-pool-exits-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
