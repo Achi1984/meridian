@@ -5,7 +5,7 @@ import vm from 'node:vm';
 
 const html = readFileSync(new URL('../v11/index.html', import.meta.url), 'utf8');
 const script = html.match(/<script>([\s\S]*?)<\/script>/)[1];
-const keys = ['command', 'depot', 'bots', 'market', 'strategies'];
+const keys = ['command', 'depot', 'bots', 'strategies'];
 
 function fixture() {
   let focused = null;
@@ -64,7 +64,7 @@ test('A2: presentation states announce explicit examples and preserve control fo
     assert.match(f.description.textContent, /unbestimmt|unbekannt|kein Ersatzwert/);
     assert.equal(f.focused(), control);
     assert.equal(f.controls.filter(c => c.attributes.get('aria-pressed') === 'true').length, 1);
-    assert.deepEqual(f.views.map(v => v.hidden), [false, true, true, true, true]);
+    assert.deepEqual(f.views.map(v => v.hidden), keys.map(key => key !== 'command'));
   }
 });
 
@@ -79,7 +79,7 @@ test('A2: foreign clicks and unsupported example states cannot create verified d
   assert.match(f.title.textContent, /Daten unbekannt/);
   assert.equal(f.controls[0].attributes.get('aria-pressed'), 'true');
   f.click(f.nav, {dataset: {v: 'invalid'}});
-  assert.deepEqual(f.views.map(v => v.hidden), [false, true, true, true, true]);
+  assert.deepEqual(f.views.map(v => v.hidden), keys.map(key => key !== 'command'));
 });
 
 test('A2: examples stay in the single source disclosure; skip link and live-region semantics exist', () => {

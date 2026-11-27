@@ -59,10 +59,10 @@ for(const width of [320,375,390,430]){
  console.log('V11_CDP_WIDTH',width,JSON.stringify(x));
  assert.equal(x.width,width,'real innerWidth');assert.equal(x.viewport,width,'real clientWidth');
  assert.equal(x.dpr,1);assert.ok(x.body<=width+1&&x.root<=width+1,'overflow '+width);
- assert.equal(x.decision,1);assert.equal(x.nav.length,5);
- assert.match(x.decisionBackground,/125deg.*rgb\(27, 53, 80\)/,'A1 gradient must survive CSS cascade');
- assert.deepEqual(x.sourceLabels,['Noch nicht geladen','Noch nicht geladen','Unbekannt'],'unrefreshed readers retain their actual states without verifying sources');
- assert.equal(x.commandBotsAccent,x.attentionColor,'unknown BOTS surface uses attention, not category status');
+ assert.equal(x.decision,1);assert.equal(x.nav.length,4);
+ assert.equal(x.decisionBackground,'none','risk row has a neutral background');
+ assert.deepEqual(x.sourceLabels,['Noch nicht geladen','Noch nicht geladen'],'unrefreshed readers retain their actual states without verifying sources');
+ assert.notEqual(x.commandBotsAccent,x.attentionColor,'unloaded sources have a neutral border');
  assert.notEqual(x.commandBotsAccent,x.positiveColor,'unknown BOTS surface cannot imply positive verification');
  assert.equal(x.obsoleteBotsPlaceholderAbsent,true,'removed Bot placeholder must stay absent');
  assert.equal(x.botReadMounted,true,'Bot reader mounts before a manual read');
@@ -70,16 +70,16 @@ for(const width of [320,375,390,430]){
  assert.equal(x.botCards,0,'unrefreshed Bot reader has no snapshot cards');
  assert.equal(x.botSnapshotCountVisible,false,'unrefreshed Bot reader does not claim a snapshot count');
  assert.equal(x.confirmedActiveCountVisible,false,'snapshot data does not imply a confirmed running-bot count');
- assert.match(x.unknownBotsBackground,/rgb\(53, 43, 24\)/,'unknown BOTS trust-cell uses amber dark background');
+ assert.equal(x.unknownBotsBackground,'none','unloaded sources have no decorative gradient');
  assert.equal(x.stateColor,'rgb(240, 202, 133)','A2 unknown-state color stays independent');
- const categoryColors={command:'rgb(169, 212, 255)',depot:'rgb(123, 182, 255)',bots:'rgb(46, 207, 154)',market:'rgb(182, 155, 255)',strategies:'rgb(212, 154, 255)'};
+ const activeColor='rgb(169, 212, 255)';
  for(const n of x.nav){
   assert.ok(n.fit&&n.oneLine,'wrapped/clipped label '+width+' '+n.name);
   assert.equal(n.font,10,'A1 label size '+width+' '+n.name);
   assert.ok(n.height>=44,'touch floor '+width+' '+n.name);
  }
  for(const v of x.views){
-  assert.equal(v.color,categoryColors[v.name],'active category '+v.name);
+  assert.equal(v.color,activeColor,'active category '+v.name);
   assert.deepEqual(v.visible,['view-'+v.name]);
   assert.deepEqual(v.current,[v.name]);
   assert.ok(v.body<=width+1&&v.root<=width+1,'view overflow '+width+' '+v.name);

@@ -9,7 +9,24 @@ import {join} from 'node:path';
 import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
-const globalHtml=html
+// Restore the reviewed shell with exact, ordered hunks before checking its earlier lineage.
+function restoreCommandShell(source) {
+  const patch=readFileSync(new URL('./fixtures/v11/restore-command-shell.patch',import.meta.url),'utf8');
+  const lines=source.split('\n');
+  const hunks=patch.trimEnd().split(/^@@ /m).slice(1);
+  for(const hunk of hunks.reverse()){
+    const [header,...rows]=hunk.split('\n');
+    const match=/^-(\d+)(?:,\d+)? \+\d+(?:,\d+)? @@/.exec(header);
+    assert.ok(match,'valid historical patch header');
+    const start=Number(match[1])-1;
+    const before=rows.filter(row=>row.startsWith(' ')||row.startsWith('-')).map(row=>row.slice(1));
+    const after=rows.filter(row=>row.startsWith(' ')||row.startsWith('+')).map(row=>row.slice(1));
+    assert.deepEqual(lines.slice(start,start+before.length),before,'exact command shell patch context');
+    lines.splice(start,before.length,...after);
+  }
+  return lines.join('\n');
+}
+const globalHtml=restoreCommandShell(html)
   .replace("        <details>\n          <summary class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></summary>\n        <h2>Keine bestätigte Risikoprüfung</h2>\n        <p>Fehlende Daten sind keine Entwarnung.</p>\n        </details>\n", "        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n\n")
   .replace("          <p>LESEANSICHT · KEINE HANDELSSTEUERUNG</p>\n", '')
   .replace("    </div>\n    <section id=\"version-panel\" class=\"version-panel\" aria-labelledby=\"version-history-heading\" hidden>\n","    </div>\n    <nav class=\"terminal-entry\" aria-label=\"M11-Strategien\">\n      <a class=\"strategy-entry-link\" href=\"#view-strategies\" data-open-strategies>Strategien öffnen</a>\n    </nav>\n    <section id=\"version-panel\" class=\"version-panel\" aria-labelledby=\"version-history-heading\" hidden>\n").replace("        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n\n      </section>\n","        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n        <h2>Keine bestätigte Risikoprüfung</h2>\n        <p>Fehlende Daten sind keine Entwarnung.</p>\n      </section>\n").replace("      </details>\n\n    </section>\n","      </details>\n      <p class=\"section-footer\">MERIDIAN 11 · LESEANSICHT · KEINE HANDELSSTEUERUNG</p>\n    </section>\n");
@@ -1291,7 +1308,7 @@ async function browserRun(call,start,width,height,server){
   assert.ok(initial.outsideHistory&&initial.historyHidden,'keyboard shortcut is outside the closed history');
   assert.ok(await evaluate("document.querySelector('#nav [data-v=strategies]').getBoundingClientRect().height>=44"),'persistent strategy target is at least 44px tall');
 
-  for(const tab of ['command','depot','bots','market','strategies']){
+  for(const tab of ['command','depot','bots','strategies']){
     await evaluate(`document.querySelector('#nav button[data-v="${tab}"]').focus();true`);
     await key('Enter','Enter',13);
     assert.deepEqual(await evaluate(`({

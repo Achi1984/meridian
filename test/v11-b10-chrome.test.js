@@ -11,7 +11,7 @@ import {startV11StaticServer} from './helpers/v11-static-server.mjs';
 const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium'].find(path=>path&&existsSync(path));
 const sizes=[{width:320,height:568,mobile:true},{width:375,height:667,mobile:true},
   {width:390,height:844,mobile:true},{width:1440,height:900,mobile:false}];
-const views=['command','depot','bots','market','strategies'];
+const views=['command','depot','bots','strategies'];
 const evidence=process.env.V11_B10_EVIDENCE_DIR;
 
 test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachable views at exact sizes',{timeout:120000},async()=>{
@@ -59,6 +59,11 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
         commandHeading:document.querySelector('#command-heading').innerText,
         primaryImmediatelyAfterHeading:document.querySelector('.section-intro').nextElementSibling.id,
         portfolioBeforeRisk:document.querySelector('#command-portfolio').compareDocumentPosition(document.querySelector('[data-decision-owner]'))&Node.DOCUMENT_POSITION_FOLLOWING,
+        riskBeforeBots:document.querySelector('[data-decision-owner]').compareDocumentPosition(document.querySelector('[aria-labelledby="command-bots-heading"]'))&Node.DOCUMENT_POSITION_FOLLOWING,
+        riskRow:(()=>{
+          const card=document.querySelector('[data-decision-owner]');
+          return {closed:!card.querySelector('details').open,height:card.getBoundingClientRect().height};
+        })(),
         portfolioRects:(()=>{
           const value=document.querySelector('#command-portfolio .portfolio-value').getBoundingClientRect();
           const status=document.querySelector('#command-portfolio .portfolio-description').getBoundingClientRect();
@@ -74,7 +79,9 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       assert.ok(initial.body<=initial.viewport+1&&initial.root<=initial.viewport+1,'initial page overflow '+size.width);
       assert.equal(initial.statusOpen,false);assert.equal(initial.statusText,'');
       assert.equal(initial.commandHeading,'Command');assert.equal(initial.primaryImmediatelyAfterHeading,'command-paper-live');
-      assert.ok(initial.portfolioBeforeRisk,'portfolio must precede explanatory risk content');
+      assert.ok(initial.portfolioBeforeRisk && initial.riskBeforeBots,'risk belongs between portfolio and bot snapshot');
+      assert.ok(initial.riskRow.closed && initial.riskRow.height>=44 && initial.riskRow.height<=64,
+        'risk begins as one accessible collapsed row: '+JSON.stringify(initial.riskRow));
       assert.ok(initial.header<Math.min(360,size.height*0.65),'bounded readable header: '+initial.header+'px');
       assert.ok(initial.headerPadding>=8,'header includes breathing room before safe-area padding');
       assert.equal(initial.headerControlsFit,true,'header labels and controls fit their available rows');

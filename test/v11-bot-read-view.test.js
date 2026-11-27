@@ -614,10 +614,13 @@ test('Command equal-symbol equal-loss actions have distinct references and direc
   const detailNames=all(target,'summary').filter(node=>node.getAttribute('aria-label')?.startsWith('Details zu'));
   assert.deepEqual(detailNames.map(node=>node.getAttribute('aria-label')),[
     'Details zu BTC · Long · Referenz '+'a'.repeat(20),'Details zu BTC · Short · Referenz '+'b'.repeat(20)]);
-  assert.ok(target.textContent.includes(new Intl.DateTimeFormat('de-AT',{dateStyle:'medium',timeStyle:'short'}).format(new Date('2026-10-18T10:00:00Z'))+' (lokale Zeit)'));
+  assert.ok(target.textContent.includes(new Intl.DateTimeFormat('de-AT',{dateStyle:'medium',timeStyle:'short'}).format(new Date('2026-10-18T10:00:00Z'))));
   assert.equal(all(target,'time')[0].textContent,'2026-10-18T10:00:00Z');
   assert.equal(all(target,'time')[0].getAttribute('datetime'),'2026-10-18T10:00:00Z');
-  assert.match(target.textContent,/Quelle & Zeit/);assert.match(target.textContent,/Long 1 · Short 1 · Neutral 0 · Unbekannt 0/);
+  const disclosure=target.querySelector('.command-bot-metadata');
+  assert.equal(disclosure.children[0].tagName,'summary');
+  assert.ok(disclosure.contains(buttons[0]) && disclosure.contains(all(target,'time')[0]));
+  assert.match(target.textContent,/Long 1 · Short 1 · Neutral 0 · Unbekannt 0/);
   buttons.forEach(button=>button.click());assert.deepEqual(selected,['a'.repeat(20),'b'.repeat(20)]);
 });
 test('Command keeps unavailable status distinct from unknown fresh metadata',()=>{
@@ -625,7 +628,7 @@ test('Command keeps unavailable status distinct from unknown fresh metadata',()=
   renderCommandBotOverview(target,{status:'fresh',source:'unknown',count:null,distribution:{},
     snapshotAt:'invalid',losses:[]});
   assert.equal(target.getAttribute('data-state'),'fresh');
-  assert.match(target.textContent,/Zeit unbekannt · Unbekannt Bots · nur lesend/);
+  assert.match(target.textContent,/Botanzahl unbekannt · P\/L-Abdeckung unbekannt · Stand Zeit unbekannt/);
   assert.match(target.textContent,/Quelle: Unbekannt/);
   assert.match(target.textContent,/Richtung: Long Unbekannt · Short Unbekannt · Neutral Unbekannt · Unbekannt Unbekannt/);
   assert.match(target.textContent,/Keine bestätigten negativen P\/L-Werte/);
@@ -633,7 +636,7 @@ test('Command keeps unavailable status distinct from unknown fresh metadata',()=
   for(const status of ['locked','stale','unavailable']){
     renderCommandBotOverview(target,{status});
     assert.equal(target.getAttribute('data-state'),status);
-    assert.notEqual(target.textContent,'Zeit unbekannt · Unbekannt Bots · nur lesend');
+    assert.notEqual(target.textContent,'Botanzahl unbekannt · P/L-Abdeckung unbekannt · Stand Zeit unbekannt');
   }
 });
 

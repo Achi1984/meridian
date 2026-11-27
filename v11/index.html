@@ -63,21 +63,16 @@
     /* A1 semantic accents: visual categories, never synthetic risk verdicts. */
     :root{--positive:#2ecf9a;--attention:#f3b94f;--critical:#f16b78;--research:#b69bff}
     .card{box-shadow:0 12px 30px #00000025,inset 0 1px #ffffff08}
-    .trust-cell:nth-child(1){border-top:2px solid var(--brand);background:linear-gradient(160deg,#162c42,#101b28 70%)}
-    .trust-cell:nth-child(2){border-top:2px solid var(--attention);background:linear-gradient(160deg,#352b18,#101b28 70%)}
-    .trust-cell:nth-child(3){border-top:2px solid var(--research);background:linear-gradient(160deg,#292342,#101b28 70%)}
     .state-dot{background:var(--attention)}
     #view-depot .view-placeholder{border-top:3px solid var(--brand)}
     #view-bots .view-placeholder{border-top:3px solid var(--attention)}
-    #view-market .view-placeholder{border-top:3px solid var(--research)}
     #view-strategies .view-placeholder{border-top:3px solid #d49aff}
-    #nav button[data-v="depot"].active{color:var(--brand)}
-    #nav button[data-v="bots"].active{color:var(--positive)}
-    #nav button[data-v="market"].active{color:var(--research)}
-    #nav button[data-v="strategies"].active{color:#d49aff}
 
-    .decision{border-color:#466b96;background:linear-gradient(125deg,#1b3550,#142538 56%,#111c2b);position:relative}
-    .decision::before{content:"";position:absolute;top:15px;bottom:15px;left:0;width:3px;border-radius:0 3px 3px 0;background:#79b7fb}
+    .card.decision{padding:0;background:#111b29}
+    .decision details{margin:0;border:0;background:transparent}
+    .decision summary.card-head{min-height:44px;margin:0;padding:8px 14px;cursor:pointer}
+    .decision details>h2,.decision details>p{margin-inline:14px}
+    .decision details>p{margin-bottom:12px}
     .card-head{display:flex;gap:12px;align-items:center;justify-content:space-between;margin-bottom:13px}
     .card-kicker{font-size:11px;letter-spacing:.13em;font-weight:790;color:#a9cffa}
     .decision h2{font-size:19px;line-height:1.27;letter-spacing:-.03em;margin-bottom:9px}
@@ -88,7 +83,7 @@
     .portfolio-value{font-size:clamp(34px,8vw,50px);font-weight:720;line-height:1.1;letter-spacing:-.06em}
     .portfolio-description{font-size:12px;color:#a9b8c9;margin-top:4px}
     .caption{font-size:11px;color:#aebdcc;line-height:1.55}
-    .trust-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;margin-top:13px}
+    .trust-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-top:13px}
     .trust-cell{border:1px solid #344356;border-radius:12px;padding:11px 8px;background:#101b28;min-width:0}
     .trust-cell strong{font-size:10px;letter-spacing:.04em;color:#e5edf8;display:block;overflow-wrap:anywhere}
     .trust-cell span{display:block;color:#8da4bd;font-size:10px;margin-top:4px;overflow-wrap:anywhere}
@@ -110,7 +105,7 @@
     .view-placeholder{padding:26px 18px;min-height:180px;display:flex;flex-direction:column;justify-content:center}
     .view-placeholder p{font-size:13px;line-height:1.7;margin-top:10px}
     .section-footer{margin-top:14px;color:#7d91a6;font-size:11px;text-align:center}
-    #nav{position:fixed;z-index:10;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:2px;background:#0d1522f5;border-top:1px solid #2c3d50;padding:8px max(6px,calc((100vw - 740px)/2)) calc(8px + var(--safe-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
+    #nav{position:fixed;z-index:10;bottom:0;left:0;right:0;display:grid;grid-template-columns:repeat(4,minmax(44px,1fr));gap:2px;background:#0d1522f5;border-top:1px solid #2c3d50;padding:8px max(6px,calc((100vw - 740px)/2)) calc(8px + var(--safe-bottom));backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}
     #nav button{appearance:none;-webkit-appearance:none;color:#91a5b9;background:none;border:0;border-radius:12px;min-height:53px;padding:6px 1px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;min-width:0}
     #nav button span{font-size:10px;line-height:1.2;font-weight:750;letter-spacing:.01em;max-width:100%;overflow-wrap:anywhere}
     #nav button .nav-icon{font-size:20px;line-height:1.15;font-weight:540;letter-spacing:0;color:inherit}
@@ -134,7 +129,9 @@
     .view h1:focus{outline:0}
     .view h1:focus-visible{outline:3px solid #9bc9ff;outline-offset:5px;border-radius:4px}
     .limited{border-color:#776346;color:var(--state-unknown);background:#30271c}
-    .state-label{color:var(--state-unknown)}
+    #command-portfolio .state-label{color:var(--muted)}
+    #command-portfolio:is([data-state="stale"],[data-state="unavailable"]) .state-label,
+    #command-bots-status[data-warning="true"]{color:var(--state-unknown)}
     .card-head,.section-title{flex-wrap:wrap}
     .card-head>*{min-width:0}
     .state-label,.section-title small{white-space:normal;overflow-wrap:anywhere}
@@ -158,7 +155,7 @@
     .preview-status[data-state="error"]{border-color:#9b5c68;background:#281c27}
     .preview-status[data-state="error"] strong{color:var(--state-error)}
     /* Narrow screens give the longer full labels more room without shrinking text or touch targets. */
-    @media(max-width:350px){#nav{grid-template-columns:minmax(44px,1.2fr) minmax(44px,.8fr) minmax(44px,.75fr) minmax(44px,1.15fr) minmax(44px,1.1fr)}.container{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.trust-grid{grid-template-columns:1fr}.trust-cell{display:flex;justify-content:space-between;gap:8px;padding:10px 12px}.trust-cell span{margin-top:0}.card-head{gap:8px}.section-title{align-items:flex-start}}
+    @media(max-width:350px){.container{padding-left:max(12px,env(safe-area-inset-left,0px));padding-right:max(12px,env(safe-area-inset-right,0px))}.trust-grid{grid-template-columns:1fr}.trust-cell{display:flex;justify-content:space-between;gap:8px;padding:10px 12px}.trust-cell span{margin-top:0}.card-head{gap:8px}.section-title{align-items:flex-start}}
     @media(forced-colors:active){.limited,.preview-status,.state-controls button{border-color:CanvasText}.state-controls button[aria-pressed="true"],#nav button.active{outline:2px solid Highlight;outline-offset:-3px}}
     /* Fixed packet A: visible terminal entry; no data or execution changes. */
     .terminal-entry{max-width:var(--container);margin:12px auto 0;display:flex;justify-content:flex-start;min-width:0}
@@ -404,8 +401,6 @@
     #paper-advisor input[type=file] {max-width:100%;display:block;margin-top:4px}
   </style>
   <style id="m11-compact-nav">
-    @media(max-width:430px){#nav{grid-template-columns:repeat(4,minmax(44px,1fr)) minmax(44px,1.3fr)}}
-    @media(max-width:350px){#nav{grid-template-columns:minmax(44px,1.2fr) minmax(44px,.8fr) minmax(44px,.75fr) minmax(44px,1.15fr) minmax(44px,1.35fr)}}
   </style>
   <style id="m11-dashboard-palette">
     .v11-shell{--muted:#b1c1d2}
@@ -413,13 +408,20 @@
     .view>h1{margin-bottom:14px}
     .view>.sub{margin-bottom:14px;max-width:64ch}
     .view .card-head{row-gap:6px}
+    .decision .limited{background:transparent;color:var(--muted);border-color:var(--line)}
+    .command-bot-metadata:focus-within{border-color:var(--brand)}
+    .command-bot-metadata>summary::after,.decision summary::after{
+      content:"";width:7px;height:7px;flex:none;border:solid currentColor;border-width:0 2px 2px 0;transform:rotate(45deg)
+    }
+    .command-bot-metadata[open]>summary::after,.decision details[open]>summary::after{transform:rotate(225deg)}
+    .decision summary .limited{margin-left:auto;transform:none;font-size:12px}
     .trust-grid .trust-cell span{font-size:12px;color:var(--muted)}
     [aria-labelledby="command-bots-heading"] .limited,.command-strategies .limited,
     [aria-labelledby="depot-summary-heading"] .limited{
       color:#bcd0e1;background:#1d2b39;border-color:#485d70
     }
     #nav button[data-v].active{
-      background:#193751;box-shadow:inset 0 3px currentColor
+      color:#a9d4ff;background:#193751;box-shadow:inset 0 3px currentColor
     }
     #nav button:not(.active){color:#adbed1}
     #depot-read-root>div:first-child{display:flex;flex-wrap:wrap;gap:8px;margin:10px 0}
@@ -428,8 +430,6 @@
       color:#c9e9ff;background:#193950;border:1px solid #527d99;border-radius:10px;padding:8px 12px
     }
     #paper-bot-overview-root button:disabled{color:#aab6c5;background:#202c3b;border-color:#475666}
-    #view-market .view-placeholder{gap:8px}
-    #view-market .view-placeholder p{max-width:64ch;margin-top:0}
     .view .eyebrow,.section-intro .sub{display:none}
     .view h1{margin:0 0 10px;font-size:clamp(25px,5vw,32px)}
     .view .section-intro{margin-bottom:0}
@@ -448,14 +448,13 @@
       .v11-shell{--container:920px}
       #view-command:not([hidden]){display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
       #view-command>*{grid-column:1/-1;min-width:0;margin-block:0}
-      #view-command>[aria-labelledby="command-bots-heading"],#view-command>.decision{grid-column:span 1}
     }
   </style>
   <style id="dashboard-compact-b18">
     #view-bots #bots-status-heading,#view-bots .bot-read-view>h3{display:none}
     #view-command .card:has(>#command-bot-overview[data-state="not_loaded"]){display:none}
     #command-portfolio[data-state="not_loaded"] .trust-cell:has([data-command-depot-status]){display:none}
-    #command-portfolio[data-state="not_loaded"] .trust-grid{grid-template-columns:repeat(2,minmax(0,1fr))}
+    #command-portfolio[data-state="not_loaded"] .trust-grid{grid-template-columns:1fr}
   </style>
   <style id="dashboard-reading-order">
     .topbar{padding-top:calc(8px + env(safe-area-inset-top,0px));padding-bottom:8px}
@@ -584,7 +583,7 @@
   <main id="app-main" class="container" tabindex="-1">
     <section id="view-command" class="view active" aria-labelledby="command-heading">
       <div class="section-intro">
-        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Command</h1><p class="sub">Depot-, Bot- und Marktstatus auf einen Blick.</p></div>
+        <div><div class="eyebrow">COMMAND CENTER</div><h1 id="command-heading">Command</h1><p class="sub">Depot- und Botstatus auf einen Blick.</p></div>
       </div>
       <section id="command-portfolio" class="card" aria-label="Portfolio">
         <div class="card-head"><span class="card-kicker">PORTFOLIO</span><span class="state-label"><span class="state-dot" aria-hidden="true"></span> NICHT VERBUNDEN</span></div>
@@ -593,13 +592,6 @@
         <div class="trust-grid" aria-label="Datenquellenstatus">
           <div class="trust-cell"><strong>DEPOT</strong><span data-command-depot-status>Unbekannt</span></div>
           <div class="trust-cell"><strong>BOTS</strong><span id="command-bots-status">Unbekannt</span></div>
-          <div class="trust-cell"><strong>MARKT</strong><span>Unbekannt</span></div>
-        </div>
-      </section>
-      <section class="card" aria-labelledby="command-bots-heading">
-        <div class="card-head"><h2 id="command-bots-heading">Bot-Snapshot</h2><span class="limited">Nur lesend</span></div>
-        <div id="command-bot-overview" class="command-bot-overview" role="status" aria-live="polite" aria-atomic="true" data-state="locked">
-          <p>Gesperrt</p>
         </div>
       </section>
       <section class="card decision" data-decision-owner="preview" aria-label="Jetzt wichtig">
@@ -608,6 +600,12 @@
         <h2>Keine bestätigte Risikoprüfung</h2>
         <p>Fehlende Daten sind keine Entwarnung.</p>
         </details>
+      </section>
+      <section class="card" aria-labelledby="command-bots-heading">
+        <div class="card-head"><h2 id="command-bots-heading">Bot-Snapshot</h2><span class="limited">Nur lesend</span></div>
+        <div id="command-bot-overview" class="command-bot-overview" role="status" aria-live="polite" aria-atomic="true" data-state="locked">
+          <p>Gesperrt</p>
+        </div>
       </section>
       <details class="command-context-details">
         <summary><span>Einordnung &amp; Grenzen</span><span aria-hidden="true">+</span></summary>
@@ -670,10 +668,6 @@
       </section>
       <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>
     </section>
-    <section id="view-market" class="view" aria-labelledby="forecast-heading" hidden>
-      <div class="eyebrow">MARKT &amp; SZENARIEN</div><h1 id="forecast-heading">Forecast</h1>
-      <div class="card view-placeholder"><span class="limited module-availability">In Vorbereitung</span><h2>Marktszenarien nachvollziehbar prüfen</h2><p>Geplant sind FIB-Zonen und Szenarien mit verifizierten Quellen und sichtbarer Unsicherheit. Aktuell sind keine Forecast-Daten oder Live-Signale verfügbar.</p></div>
-    </section>
     <section id="view-strategies" class="view" aria-labelledby="strategies-heading" hidden>
       <div class="eyebrow">HYPOTHESEN · EVIDENZ · BLOCKER</div><h1 id="strategies-heading">Strategien</h1>
       <p class="sub">Paper-Trading und Forschung · Simulierte Konten</p>
@@ -686,7 +680,6 @@
     <button type="button" data-v="command" class="active" aria-current="page" aria-controls="view-command"><span class="nav-icon" aria-hidden="true">⌂</span><span>COMMAND</span></button>
     <button type="button" data-v="depot" aria-controls="view-depot"><span class="nav-icon" aria-hidden="true">◉</span><span>DEPOT</span></button>
     <button type="button" data-v="bots" aria-controls="view-bots"><span class="nav-icon" aria-hidden="true">▦</span><span>BOTS</span></button>
-    <button type="button" data-v="market" aria-controls="view-market"><span class="nav-icon" aria-hidden="true">⌁</span><span>FORECAST</span></button>
     <button type="button" data-v="strategies" aria-controls="view-strategies"><span class="nav-icon" aria-hidden="true">◇</span><span>STRATEGIEN</span></button>
   </nav>
 </div>

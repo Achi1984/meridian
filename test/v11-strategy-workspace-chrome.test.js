@@ -372,8 +372,8 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(initial.width,size.width);
         assert.equal(initial.overflow,false);
         assert.equal(initial.active,'view-command');
-        assert.equal(initial.nav.length,5);
-        assert.deepEqual(initial.nav.map(item=>item.name),['command','depot','bots','market','strategies']);
+        assert.equal(initial.nav.length,4);
+        assert.deepEqual(initial.nav.map(item=>item.name),['command','depot','bots','strategies']);
         assert.ok(initial.nav.every(item=>item.height>=44));
         assert.equal(initial.v10Links,0);
 
