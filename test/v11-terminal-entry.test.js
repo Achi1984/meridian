@@ -12,6 +12,7 @@ const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 // Restore the reviewed shell with exact, ordered hunks before checking its earlier lineage.
 function restoreCommandShell(source) {
   const patch=readFileSync(new URL('./fixtures/v11/restore-command-shell.patch',import.meta.url),'utf8');
+  source=source.replace('        <li><strong>Meridian 11 · B19</strong><span class="version-status">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>\n','');
   const lines=source.split('\n');
   const hunks=patch.trimEnd().split(/^@@ /m).slice(1);
   for(const hunk of hunks.reverse()){
@@ -842,7 +843,6 @@ function restoreB2(source){
   source=source.replace(layout,'');
   const development=source.match(/    <details id="autonomy-status"[^]*?    <\/details>\n/)?.[0];
   source=source.replace(development,'').replace('    <section id="version-panel"',development+'    <section id="version-panel"');
-  source=source.replace('        <li><strong>Meridian 11 · B19</strong><span class="version-status">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>\n','');
   source=source.replace("        <li><strong>Meridian 11 · B20</strong><span class=\"version-status\">Vorschau</span><p>Command bündelt Paperbots und Kontostatus. Details lassen sich aufklappen.</p></li>\n","").replace("11 · Vorschau B20<","11 · Vorschau B18<").replace("Diese Vorschau · B20:</b> Vier Tabs und kompakte Paperbot-Details. <b>Vorige Vorschau · B18","Diese Vorschau · B18");
   const compact=source.match(/  <style id="dashboard-compact-b18">[^]*?<\/style>\n/)?.[0];
   assert.ok(compact);
