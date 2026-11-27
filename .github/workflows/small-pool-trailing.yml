@@ -83,6 +83,16 @@ jobs:
                 "",
                 "Fixes Ziel besser bei \($p.fixedBetter), Trailing besser bei \($p.trailingBetter), Gleichstand bei \($p.equal).",
                 "",
+                (if $c.bothClosed >= 2 then
+                  $p.minDeltaAfterOmittingOneUsdc as $min | $p.maxDeltaAfterOmittingOneUsdc as $max |
+                  "Lässt man jeweils eine geschlossene Position weg, reicht die Netto-Differenz (Trailing minus fixes Ziel) von \($min) bis \($max) USDC.",
+                  (if $min > 0 then "Trailing liegt bei jeder dieser Auslassungen vorne."
+                   elif $max < 0 then "Das fixe Ziel liegt bei jeder dieser Auslassungen vorne."
+                   elif $min < 0 and $max > 0 then "Je nach ausgelassener Position wechselt die Führung."
+                   elif $min == 0 and $max == 0 then "Bei jeder Auslassung ergibt sich Gleichstand."
+                   else "Mindestens eine Auslassung führt zum Gleichstand." end)
+                 else "Für den Vergleich ohne jeweils eine Position fehlt ein zweiter gemeinsamer Abschluss." end),
+                "",
                 ([$p.trades[].trailingMinusFixedExitSeconds] as $seconds |
                   "Trailing verkaufte bei \([$seconds[] | select(. > 0)] | length) Positionen später, bei \([$seconds[] | select(. < 0)] | length) früher und bei \([$seconds[] | select(. == 0)] | length) zum selben Zeitpunkt."),
                 "",
