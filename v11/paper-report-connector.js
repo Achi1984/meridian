@@ -1,7 +1,7 @@
 import {
   createPaperReportBridge,
   readBoundedPaperResponse
-} from '../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11-FIX3';
+} from '../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11-FIX4';
 
 export function createPaperReportConnector({
   transport,

@@ -9,7 +9,7 @@
 -    .bot-asset-group>summary::after{content:"⌄";text-align:right}
 -    .bot-asset-group[open]>summary::after{content:"⌃"}
 -    .bot-asset-group .bot-pnl-negative{color:#ff9b9b}.bot-asset-group .bot-pnl-positive{color:#6ee7b7}
-@@ -525,19 +516,0 @@
+@@ -525,64 +516,0 @@
 -  <style id="dashboard-semantic-colors">
 -    :root{--reading-value:#f1f5fa;--reading-blue:#a4ceff;--reading-positive:#6ee7b7;--reading-negative:#ff9b9b;--reading-alert:#ffd18a;--reading-muted:#afbdcd}
 -    .view .portfolio-value,.view .depot-read-view .depot-total,.view .account-value{color:var(--reading-value)}
@@ -28,27 +28,72 @@
 -    #view-depot .depot-total{margin:.4rem 0}
 -    .solana-comparison .paper-account{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:2px 8px;margin:8px 0;padding:5px 0;border-bottom:1px solid var(--line)}
 -    .paper-account>:nth-child(even){text-align:right}
+-    #app{
+-      --type-balance:1.75rem;
+-      --type-heading:1.0625rem;
+-      --type-value:1rem;
+-      --type-body:.9375rem;
+-      --type-meta:.8125rem;
+-    }
+-    #app .view :is(.portfolio-value,.depot-total){
+-      font-size:var(--type-balance);line-height:1.2;font-weight:720;letter-spacing:-.035em;
+-      font-variant-numeric:tabular-nums;overflow-wrap:anywhere
+-    }
+-    #app .view :is(h2,h3,h4),#app #view-strategies>details.card>summary{
+-      font-size:var(--type-heading);line-height:1.35;letter-spacing:normal
+-    }
+-    #app .bot-asset-group>summary,#app .bot-card>summary{letter-spacing:normal}
+-    #app .bot-card-heading,#app .bot-card-pnl strong,#app .bot-asset-group>summary>strong,
+-    #app .solana-comparison .account-value{
+-      font-size:var(--type-value);line-height:1.3;font-weight:700;font-variant-numeric:tabular-nums
+-    }
+-    #app .bot-asset-group>summary>strong:first-child,#app .bot-card-heading{color:var(--reading-value)}
+-    #app .bot-asset-group>summary>small,#app .bot-card-capital,#app .bot-card-capital strong,
+-    #app .bot-card-pnl>span,#app .bot-card-badge,#app .bot-card-disclosure,
+-    #app .bot-card-disclosure>span:first-child,#app .bot-overview-filters label,
+-    #app .solana-comparison small,#app .view .caption{
+-      font-size:var(--type-meta);line-height:1.4;letter-spacing:normal
+-    }
+-    #app .bot-asset-group>summary>small,#app .bot-card-capital,#app .bot-card-pnl>span{color:var(--reading-muted)}
+-    #app .bot-card-capital strong{color:var(--reading-value)}
+-    #app .view :is(.metric-notes,.ledger-manual,.solana-comparison) details>summary,
+-    #app .view .metric-notes>summary{
+-      font-size:var(--type-body);letter-spacing:normal;line-height:1.4;padding-inline:12px
+-    }
+-    #app .view :is(.solana-comparison th,.solana-comparison td,.scanner-ranks th,.scanner-ranks td,.solana-comparison .account-pnl){
+-      font-size:var(--type-body);line-height:1.4
+-    }
+-    #app #view-strategies a:any-link{color:var(--reading-blue)}
+-    #app .view :is(.af-running,.paper-live,meridian-run-clock){color:var(--reading-blue)}
+-    #app .view :is(.paper-gain,.af-positive,.tone-safe){color:var(--reading-positive)}
+-    #app .view :is(.paper-loss,.af-negative,.tone-danger){color:var(--reading-negative)}
+-    #app .view :is(.paper-wait,.af-waiting){color:var(--reading-alert)}
+-    #app .view :is(select,input:not([type=checkbox]),textarea){font-family:inherit;font-size:max(16px,1rem);max-width:100%}
+-    @media(max-width:600px){
+-      #app .bot-overview-filters>div:has(#bot-sort-filter){grid-column:1/-1}
+-      #app .view select{min-height:44px;border:1px solid #567a9f;border-radius:8px;background-color:#101b28;color:var(--reading-value);padding:6px 8px}
+-    }
 -  </style>
-@@ -569 +542 @@
--        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.3<small>Versionsverlauf ▾</small></button>
+@@ -614 +542 @@
+-        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.4<small>Versionsverlauf ▾</small></button>
 +        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20<small>Versionsverlauf ▾</small></button>
-@@ -580 +553 @@
+@@ -625 +553 @@
 -        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Kompakte Depotwerte, Paperbot-Timer und P/L je Asset. Quellen und Messdetails lassen sich aufklappen.</p></li>
 +        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Command bündelt Paperbots und Kontostatus. Details lassen sich aufklappen.</p></li>
-@@ -641 +614 @@
+@@ -686 +614 @@
 -          <p>Pionex-Daten werden beim Öffnen der Ansicht aktualisiert. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
 +          <p>Depot- und Botdaten werden getrennt manuell geladen. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
-@@ -648,2 +621,2 @@
+@@ -693,2 +621,2 @@
 -          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit geschütztem Depot- und Bot-Lesezugang.</p>
 -          <p><b>Daten:</b> Nach dem Entsperren lädt Meridian die Pionex-Daten der geöffneten Ansicht.</p>
 +          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>
 +          <p><b>Daten:</b> Keine automatischen Abfragen, keine Handelsfreigabe. Bot-Snapshots erst nach ausdrücklicher manueller Abfrage.</p>
-@@ -685 +658 @@
+@@ -730 +658 @@
 -      <section class="card card-muted" aria-labelledby="depot-holdings-heading" hidden>
 +      <section class="card card-muted" aria-labelledby="depot-holdings-heading">
-@@ -695 +668 @@
+@@ -740 +668 @@
 -        <p class="caption">Gebühren, Risikopuffer und Schutzstatus sind nur mit Quelldaten prüfbar.</p>
 +        <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
-@@ -697 +670 @@
+@@ -742 +670 @@
 -      <p class="caption">Automatisch aktualisiert · nur lesend</p>
 +      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>
