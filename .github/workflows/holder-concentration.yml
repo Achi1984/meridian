@@ -62,6 +62,8 @@ jobs:
               raise ValueError("Incomplete campaign or missing journal verification")
           verify_journal(campaign / "events.jsonl", status["accounts"], START, FEE)
           PY
+      - name: Report delayed full-position sell quotes
+        run: python scripts/memecoin-paper/research/exit_requote.py campaign >> "$GITHUB_STEP_SUMMARY"
       - name: Follow remaining full-size exit quotes for up to thirty minutes
         run: python scripts/memecoin-paper/research/round_review.py campaign
       - uses: actions/upload-artifact@v4
