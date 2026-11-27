@@ -19,6 +19,7 @@ def paired_exit_detail(fixed, trailing):
     total = sum(deltas)
     return dict(trades=pairs, trailingBetter=sum(d > 0 for d in deltas),
                 fixedBetter=sum(d < 0 for d in deltas), equal=deltas.count(0),
+                medianDeltaUsdc=median(deltas) / UNIT if deltas else None,
                 minDeltaAfterOmittingOneUsdc=(total - max(deltas)) / UNIT if len(deltas) > 1 else None,
                 maxDeltaAfterOmittingOneUsdc=(total - min(deltas)) / UNIT if len(deltas) > 1 else None)
 

@@ -136,6 +136,8 @@ jobs:
           if (!holder.final || holder.updatedAt !== endedAt) throw Error('Journal time mismatch');
           const {minDeltaAfterOmittingOneUsdc, maxDeltaAfterOmittingOneUsdc} = pairedExits;
           const exits = {...comparison, minDeltaAfterOmittingOneUsdc, maxDeltaAfterOmittingOneUsdc};
+          const {trailingBetter, fixedBetter, equal, medianDeltaUsdc} = pairedExits;
+          exits.pairedOutcomes = {trailingBetter, fixedBetter, equal, medianDeltaUsdc};
           const {account, ...guard} = confirmedLossExit;
           if (delayedSales) exits.delayedSales = delayedSales;
           exits.confirmedLoss = {...guard, open:account.open.length, skipped:account.skippedForCash};

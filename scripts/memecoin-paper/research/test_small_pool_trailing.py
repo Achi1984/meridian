@@ -135,6 +135,9 @@ class TrailingComparisonTest(unittest.TestCase):
         self.assertEqual((detail['trailingBetter'], detail['fixedBetter'], detail['equal']), (1, 1, 1))
         self.assertEqual(detail['minDeltaAfterOmittingOneUsdc'], -2)
         self.assertEqual(detail['maxDeltaAfterOmittingOneUsdc'], 1)
+        self.assertEqual(detail['medianDeltaUsdc'], 0)
+        self.assertEqual(paired_exit_detail(fixed, dict(a=1_000_000, b=1_000_000))['medianDeltaUsdc'], -0.5)
+        self.assertIsNone(paired_exit_detail(fixed, {})['medianDeltaUsdc'])
         for subset in ({}, {'a': 1}):
             detail = paired_exit_detail(fixed, subset)
             self.assertIsNone(detail['minDeltaAfterOmittingOneUsdc'])
