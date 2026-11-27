@@ -6,6 +6,22 @@ from pathlib import Path
 from meme_paper_account import FEE, SIZE, START, UNIT
 
 
+def paired_exit_detail(fixed, trailing):
+    pairs = []
+    deltas = []
+    for key, trailing_net in trailing.items():
+        if key in fixed:
+            delta = trailing_net - fixed[key]
+            deltas.append(delta)
+            pairs.append(dict(positionId=key, fixedNetUsdc=fixed[key] / UNIT,
+                              trailingNetUsdc=trailing_net / UNIT, trailingMinusFixedUsdc=delta / UNIT))
+    total = sum(deltas)
+    return dict(trades=pairs, trailingBetter=sum(d > 0 for d in deltas),
+                fixedBetter=sum(d < 0 for d in deltas), equal=deltas.count(0),
+                minDeltaAfterOmittingOneUsdc=(total - max(deltas)) / UNIT if len(deltas) > 1 else None,
+                maxDeltaAfterOmittingOneUsdc=(total - min(deltas)) / UNIT if len(deltas) > 1 else None)
+
+
 def score(directory):
     status = json.loads((directory / 'status.json').read_text())
     if status.get('ledgerVerified') is not True or status['lastEvent'] != 'finished':
@@ -101,7 +117,8 @@ def score(directory):
         skippedFixedStillOpen=len(skipped) - len(skipped_closed),
         skippedFixedRealizedUsdc=sum(fixed_results[key] for key in skipped_closed) / UNIT,
     )
-    return dict(comparison=comparison, startedAt=status['startedAt'], endedAt=status['updatedAt'], initialUsdc=START / UNIT,
+    return dict(comparison=comparison, pairedExits=paired_exit_detail(fixed_results, trailing_results),
+                startedAt=status['startedAt'], endedAt=status['updatedAt'], initialUsdc=START / UNIT,
                 fixed=dict(realizedUsdc=fixed_net / UNIT, closed=fixed_closed, open=len(fixed_positions)),
                 trailing=dict(realizedUsdc=realized / UNIT, cashUsdc=cash / UNIT, closed=len(trades),
                               open=list(open_positions), skippedForCash=len(skipped), trades=trades))
