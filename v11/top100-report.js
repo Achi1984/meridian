@@ -68,8 +68,8 @@ export function mountTop100(section) {
       accounts.replaceChildren(fragment);
       status.textContent = stage + ' · Datenstand ' + time + ' (Wien)';
     } catch {
-      headline();
-      if (!rendered) status.textContent = 'Bericht derzeit nicht abrufbar.';
+      if (lastReport) headline('Realisiert', 'USDT', lastReport.models, lastReport.note + ' · Abruf fehlgeschlagen');
+      if (!lastReport) status.textContent = 'Bericht derzeit nicht abrufbar.';
       else if (!status.textContent.endsWith('Abruf fehlgeschlagen.')) status.textContent += ' · Abruf fehlgeschlagen.';
     } finally {
       button.disabled = false;
