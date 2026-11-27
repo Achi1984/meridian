@@ -1,0 +1,29 @@
+diff --git b/v11/index.html a/v11/index.html
+index 110b3b0..4a33cf2 100644
+--- b/v11/index.html
++++ a/v11/index.html
+@@ -190,7 +189,0 @@
+-    .bot-asset-group{border:1px solid #40576b;border-radius:12px;padding:0 12px;background:#111e2b}
+-    .bot-asset-group>summary{cursor:pointer;display:grid;grid-template-columns:1fr auto;align-items:center;gap:4px 10px;min-height:44px;padding:10px 0;overflow-wrap:anywhere}
+-    .bot-asset-group[open] .bot-card:not([open]) summary span:last-child{transform:none}
+-    .bot-asset-group>summary>small{color:#b9c8d6}
+-    .bot-asset-group>summary::after{content:"⌄";text-align:right}
+-    .bot-asset-group[open]>summary::after{content:"⌃"}
+-    .bot-asset-group .bot-pnl-negative{color:#ff9b9b}.bot-asset-group .bot-pnl-positive{color:#6ee7b7}
+@@ -549 +542 @@
+-        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.1<small>Versionsverlauf ▾</small></button>
++        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20<small>Versionsverlauf ▾</small></button>
+@@ -560 +553 @@
+-        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Pionex-Bots sind nach Asset gruppiert. Command, Depot und Bots laden ihre Daten beim Öffnen.</p></li>
++        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Command bündelt Paperbots und Kontostatus. Details lassen sich aufklappen.</p></li>
+@@ -621 +614 @@
+-          <p>Pionex-Daten werden beim Öffnen der Ansicht aktualisiert. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
++          <p>Depot- und Botdaten werden getrennt manuell geladen. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
+@@ -628,2 +621,2 @@
+-          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit geschütztem Depot- und Bot-Lesezugang.</p>
+-          <p><b>Daten:</b> Nach dem Entsperren lädt Meridian die Pionex-Daten der geöffneten Ansicht.</p>
++          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>
++          <p><b>Daten:</b> Keine automatischen Abfragen, keine Handelsfreigabe. Bot-Snapshots erst nach ausdrücklicher manueller Abfrage.</p>
+@@ -677 +670 @@
+-      <p class="caption">Automatische Leseabfrage beim Öffnen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>
++      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>

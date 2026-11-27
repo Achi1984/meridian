@@ -6,11 +6,16 @@ export const pilotStatusEndpoint = 'https://api.github.com/repos/Achi1984/meridi
 
 export const swingCheckpointEndpoint = 'https://api.github.com/repos/Achi1984/meridian/contents/studies/swing48/45624335706/state.json?ref=paper%2Fsecond-wave-48h-data';
 
+export const pionexReadEndpoints=['dashboard','asset-watch','pionex-history?range=1w'].map(path=>
+  'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/'+path);
+
 export async function servePilotFixture(call, event, payload) {
   const {method, headers, url} = event.request;
   const runStatus = url === pilotStatusEndpoint;
   const checkpoint = url === swingCheckpointEndpoint;
-  if (!runStatus && !checkpoint && url !== pilotEndpoint) return false;
+  const pionex=pionexReadEndpoints.includes(url);
+  if (!runStatus && !checkpoint && !pionex && url !== pilotEndpoint) return false;
+  if(pionex)payload={};
   if (checkpoint) payload = {start:1000,lastTick:1600,candidates:{pool:{}},positions:{},cash:{fixed:1e9,runner:1e9}};
   if (runStatus) payload = {workflow_runs:[{id:55,run_number:5,status:'in_progress'}]};
   const preflight = method === 'OPTIONS';

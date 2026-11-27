@@ -1,8 +1,8 @@
-import {appAccess} from './app-access.js?v=B20-M11';
-import {createBotReadClient} from './bot-read-client.js?v=B20-M11';
-import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B20-M11';
+import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX1';
+import {createBotReadClient} from './bot-read-client.js?v=B20-M11-FIX1';
+import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B20-M11-FIX1';
 
-// Mounting controls never starts a request. Only the view's manual refresh can read.
+// Use the authenticated reader for visible Pionex snapshots.
 export function mountBotReadAccess(document,window,{
   access=appAccess,createClient=createBotReadClient,createView=createBotReadView,
   now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
@@ -12,6 +12,7 @@ export function mountBotReadAccess(document,window,{
   const commandRoot=document.getElementById('command-bot-overview');
   const commandStatus=document.getElementById('command-bots-status');
   let client,view,unregister=()=>{},unsubscribe=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
+  let stopAutoRefresh=()=>{},reading=false;
   function cancelExpiry(){
     expiryGeneration++;
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
@@ -24,6 +25,7 @@ export function mountBotReadAccess(document,window,{
           cancelExpiry();
           if(disposed)return;
           if(state.status==='locked'&&access.isUnlocked()){access.lock();return;}
+          reading=state.status==='loading';
           options.onChange?.(state);
           if(state.status==='fresh'&&Number.isFinite(state.model?.expiresAt)){
             const generation=expiryGeneration;
@@ -41,8 +43,9 @@ export function mountBotReadAccess(document,window,{
         }};
       }});
     unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
+    stopAutoRefresh=refreshOnOpen(document,access,['command', 'bots'],()=>{if(!reading)client?.refresh();},now);
   }catch{
-    cancelExpiry();unregister();unsubscribe();
+    stopAutoRefresh();cancelExpiry();unregister();unsubscribe();
     try{client?.dispose();}catch{}
     root.textContent='Botansicht nicht verfügbar. Bitte Seite neu laden.';
     renderCommandBotOverview(commandRoot,{status:'unavailable'},null,commandStatus);
@@ -50,7 +53,7 @@ export function mountBotReadAccess(document,window,{
   }
   return {dispose(){
     if(disposed)return;
-    disposed=true;unsubscribe();access.lock();cancelExpiry();unregister();view.dispose();client=null;
+    disposed=true;stopAutoRefresh();unsubscribe();access.lock();cancelExpiry();unregister();view.dispose();client=null;
   }};
 }
 

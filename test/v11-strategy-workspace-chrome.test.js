@@ -1,3 +1,4 @@
+import {pionexReadEndpoints} from './helpers/pilot-log-fixture.mjs';
 import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
@@ -613,7 +614,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(resetHistory.overflow,false);
         const pairedPath=new URL(SPOT_PAPER_PAIRED_REPORT_ENDPOINT).pathname;
         const progressPath=new URL(SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT).pathname;
-        assert.ok(catalog.resources.every(path=>path===new URL(pilotEndpoint).pathname||path===pairedPath||path===progressPath||
+        assert.ok(catalog.resources.every(path=>pionexReadEndpoints.some(url=>new URL(url).pathname===path)||path===new URL(pilotEndpoint).pathname||path===pairedPath||path===progressPath||
           !/\/v10\/|\/api\/|\/market|\/ticker|\/klines/i.test(path)));
         assert.ok(catalog.resources.includes('/docs/strategy-lab/campaign-20261013.json'));
         await evaluate(`(()=>{
@@ -1183,7 +1184,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         const hostilePresentation=await evaluate(`(async()=>{
-          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B20-M11');
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B20-M11-FIX1');
           const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
           const root=document.createElement('div');
           root.style.cssText='max-width:100%;min-width:0';
@@ -1208,7 +1209,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B20-M11');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B20-M11-FIX1');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});
@@ -1311,7 +1312,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(pairedReads,1,'active Strategies entry performs exactly one authorized paired read');
         assert.equal(progressReads,1,'active Strategies entry performs exactly one authorized progress read');
         assert.ok(arena.network.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
-          [pilotEndpoint,pilotStatusEndpoint,swingCheckpointEndpoint,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
+          [...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,swingCheckpointEndpoint,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
         'all external requests are blocked except the exact bounded report/progress endpoints');
         if(evidence){
           await evaluate(`document.querySelector('#strategy-arena-root .arena-model-card').scrollIntoView({block:'start'})`);

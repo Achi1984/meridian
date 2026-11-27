@@ -1,11 +1,11 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B20-M11';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B20-M11';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B20-M11-FIX1';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B20-M11-FIX1';
 
 const LABELS = {
-  locked: ['Gesperrt', 'App mit Meridian-Passwort öffnen, dann Bots manuell aktualisieren.'],
-  not_loaded: ['Noch nicht geladen', 'Zugang geöffnet. Bots manuell aktualisieren.'],
+  locked: ['Gesperrt', 'Meridian entsperren, um die Bots zu laden.'],
+  not_loaded: ['Noch nicht geladen', 'Botdaten werden beim Öffnen der Ansicht abgerufen.'],
   loading: ['Wird geladen', 'Der aktuelle Bot-Snapshot wird geprüft.'],
   fresh: ['Aktueller Snapshot · nur lesend', ''],
   stale: ['Daten veraltet', 'Botdetails werden ausgeblendet. Bitte Bots manuell aktualisieren.'],
@@ -139,6 +139,8 @@ function projection(state, filters = {}) {
         pnl:row.pnl===0?'0,00 USD':formatMoney(row.pnl,'USD',true),
         pnlDetail:row.pnl===0?'0 USD':formatExact(bot.metrics?.pnlUsd,' USD'),
         pnlTone:row.pnl === null || row.pnl===0 ? null : row.pnl < 0 ? 'negative' : 'positive',
+        capitalValue:hasUsdInvestment?investmentUsd:hasQuoteInvestment?investmentAmount:null,
+        capitalUnit:hasUsdInvestment?'USD':investmentCurrency,
         pnlValue:row.pnl,leverageValue:row.leverage,
         pnlReason:row.pnl===null?(Object.hasOwn(PNL_REASONS,bot.metrics?.pnlUnavailableReason)
           ?PNL_REASONS[bot.metrics.pnlUnavailableReason]:PNL_REASONS.USD_VALUE_MISSING):null,
@@ -210,7 +212,7 @@ export function renderBotReadState(root, state, filters = {}) {
     status.setAttribute('aria-atomic','true');
     section.append(status,details);
     root.replaceChildren(section);
-    region={section,status,details,model:null,readIdentity:null,expanded:new Set()};regions.set(root,region);
+    region={section,status,details,model:null,readIdentity:null,expanded:new Set(),expandedAssets:new Set()};regions.set(root,region);
   }
   const {section,status,details}=region;
   // A disclosure belongs to one validated snapshot, never to a future read.
@@ -220,13 +222,18 @@ export function renderBotReadState(root, state, filters = {}) {
     ?hasPreviousIdentity&&hasNextIdentity&&region.readIdentity===state.readIdentity
     :region.model===state.model);
   if(sameRead){
+    for(const group of details.querySelectorAll?.('.bot-asset-group')||[]){
+      const asset=group.getAttribute('data-asset');
+      if(group.getAttribute('open')!==null)region.expandedAssets.add(asset);
+      else region.expandedAssets.delete(asset);
+    }
     for(const card of details.querySelectorAll?.('.bot-card')||[]){
       const ref=card.id.slice('bot-card-'.length);
       if(card.getAttribute('open')!==null)region.expanded.add(ref);
       else region.expanded.delete(ref);
     }
   }else{
-    region.expanded.clear();
+    region.expanded.clear();region.expandedAssets.clear();
     region.model=data.status==='fresh'?state.model:null;
     region.readIdentity=data.status==='fresh'&&hasNextIdentity?state.readIdentity:null;
   }
@@ -269,6 +276,47 @@ export function renderBotReadState(root, state, filters = {}) {
           other.ref.slice(-length)===ref.slice(-length)))length++;
         return ref.slice(-length);
       };
+      const groups=new Map(),containers=new Map();
+      const assetOf=bot=>{
+        const [base,quote]=bot.symbol.split(/[_/-]/);
+        if(quote)return base;
+        return base.replace(/^(.+?)(?:USDT|USDC|USD)$/,'$1');
+      };
+      if(!filters.sort||filters.sort==='symbol'){
+        for(const bot of data.bots){
+          const asset=assetOf(bot);
+          if(!groups.has(asset))groups.set(asset,[]);
+          groups.get(asset).push(bot);
+        }
+      }
+      function listFor(asset){
+        const bots=groups.get(asset);
+        if(!bots||bots.length===1)return list;
+        if(containers.has(asset))return containers.get(asset);
+        const item=element(document,'li'),group=element(document,'details');
+        group.className='bot-asset-group';group.setAttribute('data-asset',asset);
+        const summary=element(document,'summary'),label=element(document,'strong',asset+' · '+bots.length+' Bots');
+        const values=bots.map(bot=>bot.pnlValue),complete=values.every(Number.isFinite);
+        const total=complete?values.reduce((a,b)=>a+b,0):null;
+        const amount=element(document,'strong','P/L '+(total===0?'0,00 USD':formatMoney(total,'USD',true)));
+        if(total>0)amount.className='bot-pnl-positive';
+        if(total<0)amount.className='bot-pnl-negative';
+        const unit=bots[0].capitalUnit;
+        const investment=unit&&bots.every(bot=>Number.isFinite(bot.capitalValue)&&bot.capitalUnit===unit)?
+          formatMoney(bots.reduce((sum,bot)=>sum+bot.capitalValue,0),unit):MISSING;
+        summary.append(label,amount,element(document,'small','Kapital '+investment));
+        if(!complete)summary.append(element(document,'small','P/L bei '+values.filter(Number.isFinite).length+' von '+bots.length+' bestätigt'));
+        const children=element(document,'ul');children.className='bot-card-list';
+        group.append(summary,children);item.append(group);list.append(item);
+        function remember(){
+          if(!details.contains(group))return;
+          if(group.getAttribute('open')!==null)region.expandedAssets.add(asset);else region.expandedAssets.delete(asset);
+        }
+        if(region.expandedAssets.has(asset))group.setAttribute('open','');
+        group.addEventListener('toggle',remember);
+        disclosures.push(open=>{if(open)group.setAttribute('open','');else group.removeAttribute('open');remember();});
+        containers.set(asset,children);return children;
+      }
       for (const bot of data.bots) {
         const item=element(document,'li'),card=element(document,'details'),summary=element(document,'summary');
         card.className='bot-card';
@@ -385,7 +433,7 @@ export function renderBotReadState(root, state, filters = {}) {
         close.setAttribute('aria-label',bot.symbol+' · '+bot.side+' · ID-Ende '+referenceTail(bot.ref)+' zuklappen');
         close.addEventListener('click',()=>{setDisclosure(false);summary.focus();});
         body.append(close);
-        card.append(summary,body);item.append(card);list.append(item);
+        card.append(summary,body);item.append(card);listFor(assetOf(bot)).append(item);
       }
       details.append(list);
     }
@@ -507,7 +555,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
         element(document,'p','Gültig bis (lokale Zeit): '),expiry,
         element(document,'p','Pionex-Wert; kein Gesamtvermögen. Bot-Kapital und P/L bleiben getrennt und werden nicht addiert.'));
     }else{
-      const labels={locked:'Gesperrt · Depotdaten ausgeblendet.',not_loaded:'Noch nicht geladen · Depot manuell aktualisieren.',
+      const labels={locked:'Gesperrt · Depotdaten ausgeblendet.',not_loaded:'Noch nicht geladen · Depotdaten werden beim Öffnen der Ansicht abgerufen.',
         loading:'Wird geladen · kein bestätigter Gesamtwert verfügbar.',stale:'Daten veraltet · Gesamtwert ausgeblendet.',
         unavailable:'Nicht verfügbar · kein bestätigter Gesamtwert.'};
       portfolio.append(element(document,'p',labels[status]||labels.unavailable));
@@ -535,7 +583,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
   const categorySelect=select('Kontraktart','bot-category-filter','category',[
     ['all','Alle Kontraktarten'],['coin-m','COIN-M'],['linear','Linear'],['unknown','Unbekannt']]);
   const sortSelect=select('Sortierung','bot-sort-filter','sort',[
-    ['symbol','Symbol (A–Z)'],['leverage','Bestätigter Hebel'],['pnl','P/L laut Quelle'],['tp','TP-Prüfstatus']]);
+    ['symbol','Nach Asset gruppiert'],['leverage','Bestätigter Hebel'],['pnl','P/L laut Quelle'],['tp','TP-Prüfstatus']]);
   const tpSelect=select('TP-Prüfung','bot-tp-filter','tpStatus',[
     ['all','Alle TP-Zustände'],['mismatch','TP abweichend'],['unknown','TP nicht prüfbar'],['match','TP entspricht oberer Range']]);
   const pnlSelect=select('P/L-Verfügbarkeit','bot-pnl-filter','pnlAvailability',[
@@ -620,6 +668,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
     nav?.click();
     const card=document.getElementById?.('bot-card-'+ref);
     if(!card)return;
+    card.closest?.('.bot-asset-group')?.setAttribute('open','');
     card.setAttribute('open','');
     const summary=card.querySelector?.('summary');
     summary?.focus();

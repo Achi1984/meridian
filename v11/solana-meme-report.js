@@ -15,8 +15,8 @@ async function read(url, raw = false) {
   return response.json();
 }
 
-import {mountHolderComparison} from './holder-comparison.js?v=B20-M11';
-import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11';
+import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX1';
+import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX1';
 
 // The experiment stores raw USDC in millionths and charges 0.05 USDC per fill.
 const swingRun = 45624335706;

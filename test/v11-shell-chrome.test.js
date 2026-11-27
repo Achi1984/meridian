@@ -61,12 +61,12 @@ for(const width of [320,375,390,430]){
  assert.equal(x.dpr,1);assert.ok(x.body<=width+1&&x.root<=width+1,'overflow '+width);
  assert.equal(x.decision,1);assert.equal(x.nav.length,4);
  assert.equal(x.decisionBackground,'none','risk row has a neutral background');
- assert.deepEqual(x.sourceLabels,['Noch nicht geladen','Noch nicht geladen'],'unrefreshed readers retain their actual states without verifying sources');
+ assert.deepEqual(x.sourceLabels,['Nicht verfügbar','Nicht verfügbar'],'unrefreshed readers retain their actual states without verifying sources');
  assert.notEqual(x.commandBotsAccent,x.attentionColor,'unloaded sources have a neutral border');
  assert.notEqual(x.commandBotsAccent,x.positiveColor,'unknown BOTS surface cannot imply positive verification');
  assert.equal(x.obsoleteBotsPlaceholderAbsent,true,'removed Bot placeholder must stay absent');
  assert.equal(x.botReadMounted,true,'Bot reader mounts before a manual read');
- assert.equal(x.botReadState,'not_loaded','unlocked Bot reader awaits manual refresh');
+ assert.equal(x.botReadState,'unavailable','automatic read handles unavailable data');
  assert.equal(x.botCards,0,'unrefreshed Bot reader has no snapshot cards');
  assert.equal(x.botSnapshotCountVisible,false,'unrefreshed Bot reader does not claim a snapshot count');
  assert.equal(x.confirmedActiveCountVisible,false,'snapshot data does not imply a confirmed running-bot count');
