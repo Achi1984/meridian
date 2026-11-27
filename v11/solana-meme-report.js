@@ -84,7 +84,7 @@ function swingStatus(state) {
     timeZone:'Europe/Vienna', day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'});
   const stale = Date.now()/1000-state.lastTick > 1200 && elapsed < 72*3600;
   return phase + ' · ' + pools + ' Pools · ' + entries + ' Einstiege · ' +
-    'Letzter Scan ' + time + ' (Wien)' + (stale ? ' · Datenstand veraltet' : '');
+    time + (stale ? ' · Datenstand veraltet' : '');
 }
 
 const reportRefresh = new WeakMap();
@@ -115,41 +115,12 @@ export function mountCommandPaper(doc, access) {
   card.className = 'card';
   card.id = 'command-paper-live';
   const title = doc.createElement('h2');
-  title.textContent = 'Solana-Paperbots';
+  title.textContent = 'Solana · 48 h';
   const status = doc.createElement('p');
   status.setAttribute('role','status');
   status.textContent = 'Letzter Scan wird geladen …';
-  const open = doc.createElement('button');
-  open.type = 'button';
-  open.className = 'strategy-entry-link';
-  open.textContent = '48-Stunden-Bot · Einstiegsgründe';
-  const holder = doc.createElement('button');
-  holder.type = 'button';
-  holder.className = 'strategy-entry-link';
-  holder.textContent = 'Haltertest & Ausstiege öffnen';
-  card.append(title,status,open,holder);
+  card.append(title,status);
   portfolio.before(card);
-  const anchor = doc.getElementById('strategy-load-status');
-  const section = doc.getElementById('solana-meme-paper') || ensureSolanaSection(doc,anchor).section;
-  function openSection() {
-    doc.querySelector('#nav button[data-v="strategies"]').click();
-    section.open = true;
-  }
-  open.addEventListener('click',()=>{
-    if (!access.isUnlocked()) return;
-    openSection();
-    const reasons = section.querySelector('.solana-comparison details');
-    if (reasons) reasons.open = true;
-    section.querySelector('summary').focus();
-    section.scrollIntoView({block:'start'});
-  });
-  holder.addEventListener('click',()=>{
-    if (!access.isUnlocked()) return;
-    openSection();
-    const heading = section.querySelector('#solana-holder-heading');
-    heading.focus();
-    heading.scrollIntoView({block:'start'});
-  });
   let timer, busy = false, snapshot;
   const visible = () => access.isUnlocked() && !doc.hidden && !command.hidden;
   async function refresh() {
@@ -160,7 +131,7 @@ export function mountCommandPaper(doc, access) {
       swingAccounts(state);
       if (snapshot && state.lastTick < snapshot.lastTick) throw Error('Older checkpoint');
       snapshot = state;
-      status.textContent = '48-Stunden-Bot · ' + swingStatus(state);
+      status.textContent = swingStatus(state);
     } catch {
       status.textContent = snapshot ? swingStatus(snapshot) + ' · Abruf fehlgeschlagen' :
         'Letzter Scan derzeit nicht abrufbar.';
@@ -183,7 +154,7 @@ export function mountSwingCard(section, add, load = read) {
   status.setAttribute('role','status');
   const body = add(card,'div','');
   const decisions = add(card,'details','');
-  add(decisions,'summary','Letzte Entscheidung je beobachtetem Pool');
+  add(decisions,'summary','Einstiegsgründe');
   const reasons = add(decisions,'ul','');
   decisions.hidden = true;
   const source = add(card,'a','Paperlauf auf GitHub');
@@ -530,16 +501,19 @@ export function mountLiveScanner(section) {
       return;
     }
     const age = Math.max(0, Math.floor((Date.now()/1000-latest.asOf)/60));
-    status.textContent = 'Stand ' + time(latest.asOf) + ' (Wien) · vor ' + age + ' Min. · ' +
+    status.className = age >= 30 || failed || latest.warnings.length ? 'paper-wait' : 'paper-live';
+    status.textContent = 'Vor ' + age + ' Min. · ' +
       latest.sampled + ' geprüft · ' + latest.qualified + ' in der Vorauswahl' +
       (age >= 30 ? ' · Daten veraltet' : '') + (failed ? ' · Aktualisierung fehlgeschlagen' : '') +
       (latest.warnings.length ? ' · Datenquelle eingeschränkt' : '');
     result.replaceChildren();
+    const more = add(result,'details','');
+    add(more,'summary','Marktdetails');
     const market = latest.dailyMarketContext;
     if (market) {
       const btc = market.btc?.medianChangePct, meme = market.meme?.medianChangePct;
       const spread = Number.isFinite(btc) && Number.isFinite(meme) ? meme - btc : null;
-      add(result, 'p', '24 h · BTC ' + fmt(btc, ' %') + ' · Memecoin-Median ' +
+      add(more, 'p', '24 h · BTC ' + fmt(btc, ' %') + ' · Memecoin-Median ' +
         fmt(meme, ' %') + ' · Abstand ' + fmt(spread, ' Pp.'));
     }
     const shortlist = latest.candidates.filter(c => Number.isInteger(c.shortlistRank))
@@ -552,8 +526,7 @@ export function mountLiveScanner(section) {
       for (const c of shortlist) {
         const item = add(list,'li','');
         mint(item,c);
-        add(item,'span',' · ' + labels[c.peerPriority] + ' · 5 / 30 Min. ' +
-          [5,30].map(w => fmt(c.solanaNewcomerPeers?.[w]?.excessPp,' Pp.')).join(' / '));
+        add(item,'span',' · ' + labels[c.peerPriority]);
       }
     }
     const w = select.value || '5';
@@ -564,8 +537,9 @@ export function mountLiveScanner(section) {
       const wrap = add(result,'div','');
       wrap.style.overflowX = 'auto';
       const table = add(wrap,'table','');
+      table.className = 'scanner-ranks';
       const header = add(add(table,'thead',''),'tr','');
-      for (const label of ['Rang','Coin','Volumen','Kurs','Käufer','Netto aus 20 USDC','Scanner-Auswahl']) {
+      for (const label of ['Rang','Coin','Volumen','Kurs','Käufer','Rückfluss¹','Scanner-Auswahl']) {
         add(header,'th',label).scope = 'col';
       }
       const body = add(table,'tbody','');
@@ -581,6 +555,8 @@ export function mountLiveScanner(section) {
         add(row,'td',c.reasons.map(r => reasons[r] || r).join(' · ') || 'Vorauswahl');
       }
     }
+    add(more,'small','¹ Rückfluss für 20 USDC Einsatz.');
+    result.append(more);
     const young = latest.candidates.filter(c => c.earliest30mAt > latest.asOf)
       .sort((a,b) => a.earliest30mAt-b.earliest30mAt);
     if (young.length) {

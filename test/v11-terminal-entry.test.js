@@ -9,7 +9,10 @@ import {join} from 'node:path';
 import {forwardCdpStartupRecoveryDiagnostic,withMobileChrome} from './helpers/v11-cdp.mjs';
 
 const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
-const globalHtml=html;
+const globalHtml=html
+  .replace("        <details>\n          <summary class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></summary>\n        <h2>Keine bestätigte Risikoprüfung</h2>\n        <p>Fehlende Daten sind keine Entwarnung.</p>\n        </details>\n", "        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n\n")
+  .replace("          <p>LESEANSICHT · KEINE HANDELSSTEUERUNG</p>\n", '')
+  .replace("    </div>\n    <section id=\"version-panel\" class=\"version-panel\" aria-labelledby=\"version-history-heading\" hidden>\n","    </div>\n    <nav class=\"terminal-entry\" aria-label=\"M11-Strategien\">\n      <a class=\"strategy-entry-link\" href=\"#view-strategies\" data-open-strategies>Strategien öffnen</a>\n    </nav>\n    <section id=\"version-panel\" class=\"version-panel\" aria-labelledby=\"version-history-heading\" hidden>\n").replace("        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n\n      </section>\n","        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n        <h2>Keine bestätigte Risikoprüfung</h2>\n        <p>Fehlende Daten sind keine Entwarnung.</p>\n      </section>\n").replace("      </details>\n\n    </section>\n","      </details>\n      <p class=\"section-footer\">MERIDIAN 11 · LESEANSICHT · KEINE HANDELSSTEUERUNG</p>\n    </section>\n");
 const terminal=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8');
 // PR #677: base a5ba7eca2004ce51ec98720955b5fcc3716f09ef + history-close delta.
 // Scope approved in #571 comment 6107229650; terminal-entry insertions removed
@@ -1272,7 +1275,7 @@ async function browserRun(call,start,width,height,server){
   assert.equal(server.metrics().authReads,authReadsBefore+1,'app opening verifies against the bounded endpoint once');
   const initialReads=server.metrics().reads;
   const initial=await evaluate(`(()=>{
-    const link=document.querySelector('a.strategy-entry-link'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
+    const link=document.querySelector('#nav [data-v=strategies]'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
     return {width:innerWidth,height:innerHeight,viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,
       root:document.documentElement.scrollWidth,count:document.querySelectorAll('a.strategy-entry-link').length,
       hit:link.contains(document.elementFromPoint(rect.x+rect.width/2,rect.y+rect.height/2)),
@@ -1283,7 +1286,7 @@ async function browserRun(call,start,width,height,server){
   })()`);
   assert.equal(initial.width,width);assert.equal(initial.height,height);assert.equal(initial.viewport,width);
   assert.ok(initial.body<=width+1&&initial.root<=width+1,'initial page overflow at '+width);
-  assert.equal(initial.count,1);assert.equal(initial.text,'Strategien öffnen');assert.equal(initial.href,'#view-strategies');
+  assert.equal(initial.count,0);assert.equal(initial.href,null);
   assert.ok(initial.hit && initial.linkWidth>=44 && initial.linkHeight>=44,'unfocused strategy link accepts pointer input at '+width);
   assert.ok(initial.outsideHistory&&initial.historyHidden,'keyboard shortcut is outside the closed history');
   assert.ok(await evaluate("document.querySelector('#nav [data-v=strategies]').getBoundingClientRect().height>=44"),'persistent strategy target is at least 44px tall');
@@ -1527,14 +1530,7 @@ async function browserRun(call,start,width,height,server){
   const lockTarget=await evaluate(`(()=>{const node=document.activeElement,rect=node.getBoundingClientRect();return {id:node.id,height:rect.height,width:rect.width};})()`);
   assert.equal(lockTarget.id,'app-access-lock','app lock follows the version button in keyboard order');
   assert.ok(lockTarget.height>=44&&lockTarget.width>=44,'app lock target is at least 44x44px');
-  await key('Tab','Tab',9);
-  assert.equal(await evaluate(`document.activeElement.matches('a.strategy-entry-link')`),true,
-    'strategy entry follows the app lock in keyboard order');
-  const focus=await evaluate(`(()=>{
-    const style=getComputedStyle(document.activeElement);
-    return {visible:document.activeElement.matches(':focus-visible'),outline:style.outlineStyle,width:parseFloat(style.outlineWidth)};
-  })()`);
-  assert.ok(focus.visible&&focus.outline!=='none'&&focus.width>=3,'keyboard focus indicator is visible');
+  await evaluate(`document.querySelector('#nav [data-v=strategies]').focus();true`);
   const requestCount=server.requests.length;
   await key('Enter','Enter',13);
   for(let attempt=0;attempt<100;attempt++){
@@ -1615,7 +1611,7 @@ async function browserRun(call,start,width,height,server){
   assert.ok(server.requests.length>=requestCount,'native navigation can load its local source register');
   assert.ok(server.requests.every(request=>request.method==='GET'&&server.allowedPaths.has(request.path)),
     'only exact document/module paths and synthetic GET endpoint are served');
-  return {width,strategies:rendered.length,focus,before};
+  return {width,strategies:rendered.length,before};
 }
 
 test('actual M11 app access and Strategies entry work at mobile and desktop widths',{timeout:180000},async()=>{

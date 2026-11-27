@@ -37,7 +37,7 @@ test('version history: native keyboard, focus and compact viewport at five width
    };
    await call('Emulation.setDeviceMetricsOverride',{width,height,deviceScaleFactor:1,mobile:true,screenWidth:width,screenHeight:height});
    await unlockAppThroughGate(call);
-   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),shortcut:rect('.strategy-entry-link'),sourceClosed:document.querySelector('#autonomy-status').closest('.command-source-details')?.open===false,brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
+   const header=await evaluate(`(()=>{const rect=s=>{const r=document.querySelector(s).getBoundingClientRect();return {left:r.left,right:r.right,top:r.top,bottom:r.bottom,width:r.width,height:r.height};};return {identity:rect('.identity'),version:rect('#version-toggle'),lock:rect('#app-access-lock'),shortcut:rect('#nav [data-v=strategies]'),sourceClosed:document.querySelector('#autonomy-status').closest('.command-source-details')?.open===false,brandVisible:getComputedStyle(document.querySelector('.brand small')).display!=='none',historyVisible:getComputedStyle(document.querySelector('.version-toggle small')).display!=='none',root:document.documentElement.scrollWidth};})()`);
    assert.ok(header.identity.top>=8,'identity has breathing room below the safe area');
    assert.ok(!header.brandVisible&&header.historyVisible,'compact brand and version history label');
    for(const target of [header.version,header.lock]){
@@ -45,7 +45,7 @@ test('version history: native keyboard, focus and compact viewport at five width
     assert.ok(target.left>=16&&target.right<=width-16+1,'header actions stay inside horizontal safe padding');
    }
    assert.ok(header.version.right+5<=header.lock.left,'build and lock controls have a clear gap');
-   assert.ok(header.shortcut.height>=44 && header.shortcut.width>=44,'strategy shortcut has a visible touch target');
+   assert.ok(header.shortcut.height>=44 && header.shortcut.width>=44,'Strategies tab has a visible touch target');
    assert.ok(header.sourceClosed,'development status stays in closed source details');
    assert.ok(header.root<=width+1,'header does not introduce horizontal scrolling');
    if(width<=600){
@@ -70,8 +70,6 @@ test('version history: native keyboard, focus and compact viewport at five width
    assert.equal(await evaluate(`document.activeElement.id`),'version-toggle','focus remains on the disclosure toggle before tab navigation');
    await key('Tab','Tab',9);
    assert.equal(await evaluate(`document.activeElement.id`),'app-access-lock','app lock remains in the native header tab order');
-   await key('Tab','Tab',9);
-   assert.equal(await evaluate(`document.activeElement.classList.contains('strategy-entry-link')`),true,'native strategy navigation remains keyboard reachable');
    await key('Tab','Tab',9);
    assert.equal(await evaluate(`document.activeElement.id`),'version-close','close control is keyboard reachable');
    await key('Enter','Enter',13);

@@ -74,7 +74,7 @@ const probe = `(() => {
   check(fits(status) && fits(text) && document.body.scrollWidth <= innerWidth + 1, 'long unknown source');
   text.textContent = 'Prüfung fehlgeschlagen. '.repeat(30);
   check(fits(status) && fits(text), 'long error text');
-  const last = document.querySelector('.section-footer');
+  const last = document.querySelector('#view-command > :last-child');
   window.scrollTo(0, document.documentElement.scrollHeight);
   check(last.getBoundingClientRect().bottom <= nav.getBoundingClientRect().top + 1, 'bottom content clearance');
   return {width: innerWidth, viewport: document.documentElement.clientWidth, cycles: 20, states, failures};

@@ -83,7 +83,7 @@ test('A2: foreign clicks and unsupported example states cannot create verified d
 });
 
 test('A2: examples stay in the single source disclosure; skip link and live-region semantics exist', () => {
-  assert.equal((html.match(/<details\b/g) || []).length, 3);
+  assert.equal((html.match(/<details\b/g) || []).length, 4, "Risk, context, sources, and autonomy disclosures");
   assert.equal((html.match(/<details class="command-source-details">/g) || []).length, 1);
   const autonomy=html.match(/<details id="autonomy-status"[\s\S]*?<\/details>/)?.[0];
   assert.ok(autonomy);
