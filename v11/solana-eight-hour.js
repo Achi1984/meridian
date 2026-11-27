@@ -140,7 +140,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
     const table = add(result,'table','');
     table.setAttribute('style','table-layout:fixed;overflow-wrap:anywhere');
     const header = add(add(table,'thead',''),'tr','');
-    for (const title of ['Strategie', 'Kontowert / realisierter PnL']) {
+    for (const title of ['Strategie', 'Ergebnis · USDC']) {
       const cell = add(header,'th',title);
       cell.scope = 'col';
       cell.setAttribute('style','white-space:normal');
@@ -151,16 +151,10 @@ function mountCampaign(parent, add, read, amount, campaign) {
       const strategy = add(line,'th',row.name);
       strategy.scope = 'row';
       add(strategy,'small',row.closed + ' geschlossen · ' + row.open + ' offen').setAttribute('style','display:block');
-      if (row.withoutBest != null) add(strategy,'small','Ohne besten Token · ' + amount(row.withoutBest))
-        .setAttribute('style','display:block');
-      const last = row.trades.at(-1);
-      if (last) add(strategy,'small',(last.action === 'exit' ? 'Verkauf' : 'Kauf') + ' · ' + vienna(last.at)).setAttribute('style','display:block');
       const balance = add(line,'td','');
-      add(balance,'small','Freies Cash · ' + amount(row.cash)).setAttribute('style','display:block');
-      if (row.missing > 0) add(strategy,'small',row.missing + ' fehlende Verkaufsquotes')
-        .setAttribute('style','display:block');
-      const value = add(balance,'span',row.equity === null ? 'Bewertung offen' : amount(row.equity));
-      value.className = row.equity === null ? 'account-value af-waiting' : 'account-value';
+      if (row.equity === null) {
+        add(balance,'small','Bewertung offen').className = 'account-value af-waiting';
+      }
       const pnl = add(balance,'span','Realisiert · ' + (row.net > 0 ? '+' : '') + amount(row.net));
       pnl.className = 'account-pnl ' + (row.net > 0 ? 'af-positive' : row.net < 0 ? 'af-negative' : 'af-muted');
     }
@@ -242,7 +236,7 @@ function mountCampaign(parent, add, read, amount, campaign) {
     const url = 'https://api.github.com/repos/' + runPath;
     const states = {
       requested:['wartet','waiting'], queued:['wartet','waiting'], pending:['wartet','waiting'],
-      waiting:['wartet','waiting'], in_progress:['läuft','running'], success:['abgeschlossen','positive'],
+      waiting:['wartet','waiting'], in_progress:['läuft','running'], success:['abgeschlossen','muted'],
       failure:['fehlgeschlagen','negative'], timed_out:['Zeitlimit erreicht','negative'],
       cancelled:['abgebrochen','muted'], skipped:['übersprungen','muted']
     };
@@ -251,10 +245,14 @@ function mountCampaign(parent, add, read, amount, campaign) {
       const {jobs} = await read(url + '/jobs');
       const first = jobs.find(job => job.name === 'first');
       const finish = jobs.find(job => job.name === 'finish');
-      const phase = first && first.status !== 'completed' ? first : finish || first;
+      const phase = first && first.status !== 'completed' ? first : finish ||
+        (first?.conclusion === 'success' ? undefined : first);
       if (phase) {
         title = phase.name === 'first' ? 'Erste vier Stunden' : 'Zweite vier Stunden';
         runState = phase.conclusion || phase.status;
+      }
+      if (first?.conclusion === 'success' && !finish && runState === 'in_progress') {
+        title = 'Übergang zur zweiten Hälfte';
       }
     } catch { /* The workflow status remains available when its jobs cannot be read. */ }
     if (!runState) {
