@@ -130,7 +130,11 @@ export function mountHolderComparison(section, add, read, amount) {
     add(effect, 'span', 'Filtereffekt · realisiert');
     add(effect, 'strong', amount(report.delta)).className =
       report.delta > 0 ? 'paper-gain' : report.delta < 0 ? 'paper-loss' : '';
-    add(body, 'small', report.skipped + ' Einstiege ausgelassen');
+    const signals = report.measured + report.unknown;
+    const coverage = signals ? report.measured + '/' + signals + ' gemessen' : 'Keine Einstiegssignale';
+    const sample = add(body, 'small', (report.skipped === 1 ? '1 Einstieg' : report.skipped + ' Einstiege') +
+      ' ausgelassen · ' + coverage);
+    if (signals > 0 && report.measured === 0) sample.className = 'paper-wait';
     const info = add(body,'details','');
     add(info,'summary','Konten & Filterwirkung');
     report.rows.forEach((a,i) => {
