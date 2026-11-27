@@ -522,6 +522,25 @@
       #command-portfolio .trust-cell{display:grid;justify-content:start;gap:2px}
     }
   </style>
+  <style id="dashboard-semantic-colors">
+    :root{--reading-value:#f1f5fa;--reading-blue:#a4ceff;--reading-positive:#6ee7b7;--reading-negative:#ff9b9b;--reading-alert:#ffd18a;--reading-muted:#afbdcd}
+    .view .portfolio-value,.view .depot-read-view .depot-total,.view .account-value{color:var(--reading-value)}
+    #app .paper-gain,.view .solana-comparison .af-positive,.view .bot-read-view .bot-pnl-positive,.view .command-bot-pnl.bot-pnl-positive{color:var(--reading-positive)}
+    #app .paper-loss,.view .solana-comparison .af-negative,.view .bot-read-view .bot-pnl-negative,.view .command-bot-pnl.bot-pnl-negative{color:var(--reading-negative)}
+    .view meridian-run-clock,#app .paper-live,#solana-meme-paper .pilot-status[data-state=running],.view .depot-history svg{color:var(--reading-blue)}
+    #app .paper-wait,.view .af-waiting,.decision summary .limited,
+    .view [data-state=stale]>.state-label,.view [data-state=unavailable]>.state-label,
+    .view [data-state=stale]>[role=status]>strong,.view [data-state=unavailable]>[role=status]>strong{color:var(--reading-alert)}
+    .view meridian-run-clock{display:block;margin-block:.35rem;font-weight:650}
+    .view meridian-run-clock[hidden]{display:none}
+    .view .metric-notes{margin:.5rem 0;color:var(--reading-muted)}
+    .view .metric-notes>summary{min-height:44px;padding:10px 0;cursor:pointer;color:var(--reading-blue)}
+    #command-portfolio[data-state=fresh] .portfolio-description,#command-portfolio[data-state=fresh] .trust-cell:has([data-command-depot-status]){display:none}
+    #command-portfolio[data-state=fresh] .trust-grid{grid-template-columns:1fr}
+    #view-depot .depot-total{margin:.4rem 0}
+    .solana-comparison .paper-account{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:2px 8px;margin:8px 0;padding:5px 0;border-bottom:1px solid var(--line)}
+    .paper-account>:nth-child(even){text-align:right}
+  </style>
 </head>
 <body>
 <section id="app-access-gate" class="app-access-gate" aria-labelledby="app-access-heading">
@@ -547,7 +566,7 @@
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
       <div class="header-actions">
-        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.2<small>Versionsverlauf ▾</small></button>
+        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.3<small>Versionsverlauf ▾</small></button>
         <button id="app-access-lock" class="app-access-lock" type="button" aria-label="App sperren">Sperren</button>
       </div>
     </div>
@@ -558,7 +577,7 @@
       </div>
       <p>Veröffentlichtes Terminal und Designvorschau sind getrennte Stände.</p>
       <ul class="version-history-list">
-        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Pionex-Bots sind nach Asset gruppiert. Command, Depot und Bots laden ihre Daten beim Öffnen.</p></li>
+        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Kompakte Depotwerte, Paperbot-Timer und P/L je Asset. Quellen und Messdetails lassen sich aufklappen.</p></li>
         <li><strong>Meridian 11 · B19</strong><span class="version-status">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>
         <li><strong>Meridian 11 · B18</strong><span class="version-status">Vorschau</span><p>Direkte Tab-Navigation, kompakte Botansicht und weniger doppelte Statusmeldungen in Command.</p></li>
         <li><strong>Meridian 11 · B17</strong><span class="version-status">Vorschau</span><p>Kompakte Kopfzeile auf dem Smartphone, kürzere Tab-Einstiege und der BTC/EUR-Live-Paperbot an erster Stelle unter Strategien.</p></li>
@@ -663,7 +682,7 @@
         <p class="caption">Depotbewertung aus serverseitigen Quellen. Der gespeicherte Verlauf wird getrennt geprüft.</p>
         <div id="depot-read-root"></div>
       </section>
-      <section class="card card-muted" aria-labelledby="depot-holdings-heading">
+      <section class="card card-muted" aria-labelledby="depot-holdings-heading" hidden>
         <h2 id="depot-holdings-heading">Deine Bestände</h2>
         <p class="caption">Einzelne Bestände und ihre Verteilung werden in dieser Ansicht noch nicht angezeigt.</p>
       </section>
@@ -673,9 +692,9 @@
       <section class="card card-muted" aria-labelledby="bots-status-heading">
         <h2 id="bots-status-heading">Deine Bots</h2>
         <div id="bot-read-root"></div>
-        <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
+        <p class="caption">Gebühren, Risikopuffer und Schutzstatus sind nur mit Quelldaten prüfbar.</p>
       </section>
-      <p class="caption">Automatische Leseabfrage beim Öffnen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>
+      <p class="caption">Automatisch aktualisiert · nur lesend</p>
     </section>
     <section id="view-strategies" class="view" aria-labelledby="strategies-heading" hidden>
       <div class="eyebrow">HYPOTHESEN · EVIDENZ · BLOCKER</div><h1 id="strategies-heading">Strategien</h1>
@@ -778,12 +797,12 @@
 })();
 </script>
 <script type="importmap">
-{"imports":{"../scripts/memecoin-paper-report-bridge/contract.mjs":"../scripts/memecoin-paper-report-bridge/contract.mjs?v=B20-M11-FIX2"}}
+{"imports":{"../scripts/memecoin-paper-report-bridge/contract.mjs":"../scripts/memecoin-paper-report-bridge/contract.mjs?v=B20-M11-FIX3"}}
 </script>
-<script type="module" src="./app-access-bootstrap.js?v=B20-M11-FIX2"></script>
-<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX2"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B20-M11-FIX2"></script>
-<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11-FIX2"></script>
-<script type="module" src="./agent-status-bootstrap.js?v=B20-M11-FIX2"></script>
+<script type="module" src="./app-access-bootstrap.js?v=B20-M11-FIX3"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX3"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B20-M11-FIX3"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11-FIX3"></script>
+<script type="module" src="./agent-status-bootstrap.js?v=B20-M11-FIX3"></script>
 </body>
 </html>

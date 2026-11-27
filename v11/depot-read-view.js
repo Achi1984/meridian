@@ -1,5 +1,5 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B20-M11-FIX2';
-import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B20-M11-FIX2';
+import {createDepotHistoryView} from './depot-history-view.js?v=B20-M11-FIX3';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B20-M11-FIX3';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','Meridian entsperren, um das Depot zu laden.'],
@@ -32,7 +32,7 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
   const document=root.ownerDocument;
   if(pionexOnly){
     const title=document.getElementById?.('depot-summary-heading');if(title)title.textContent='Pionex-Bewertung';
-    const caption=title?.closest?.('section')?.querySelector?.('.caption');if(caption)caption.textContent='Nur Pionex wird in dieser Übersicht bewertet. Kein Gesamtvermögen.';
+    const caption=title?.closest?.('section')?.querySelector?.('.caption');if(caption)caption.hidden=true;
     const holdings=document.getElementById?.('depot-holdings-heading');if(holdings)holdings.textContent='Pionex-Bestände';
     const kicker=commandRoot?.querySelector?.('.card-kicker');if(kicker)kicker.textContent='PIONEX';
   }
@@ -67,13 +67,14 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
       set('.portfolio-description',kind==='fresh'?(current?(pionexOnly?'Serverseitige Pionex-Bewertung':'Serverseitige Depotbewertung'):'Gespeicherte Depotbewertung'):LABELS[kind][1]);
       const caption=kind==='fresh'?'Stand: '+new Date(m.snapshotAt).toLocaleString('de-AT')+' · '+(current?(pionexOnly?'Nur Pionex; kein Gesamtvermögen.':'Serverseitige Quellen; lokale Ergänzungen aus V10 fehlen.'):'Gespeicherter Snapshot; keine Live-Kurse.'):
         (kind==='unavailable'||kind==='stale')?diagnose(state?.reasons):'';
-      set('.caption',caption);
+      set('.caption',current && pionexOnly ? 'Stand '+new Date(m.snapshotAt).toLocaleString('de-AT') : caption);
       const captionNode=commandRoot.querySelector('.caption');
       if(captionNode)captionNode.hidden=!caption;
       set('[data-command-depot-status]',kind==='fresh'?'Bewertung geladen':LABELS[kind][0]);
       commandRoot.dataset.state=kind;
     }
     status.replaceChildren(el('strong',current?(pionexOnly?'Pionex-Bewertung':'Depotbewertung'):LABELS[kind][0]),el('p',current?(pionexOnly?'Nur bestätigtes Pionex-Eigenkapital in USD/USDT. Kein Gesamtvermögen.':'Aus serverseitigen Depotdaten. Lokale Ergänzungen aus V10 sind nicht enthalten.'):LABELS[kind][1]));
+    if(current && pionexOnly)status.replaceChildren();
     if(kind==='unavailable'||kind==='stale'){
       const why=diagnose(state?.reasons);if(why)status.append(el('p',why));
       const sources=sourceDetails(state?.sourceIssues);if(sources)status.append(el('p',sources));
@@ -86,10 +87,15 @@ export function createDepotReadView(root,{getToken,createClient,commandRoot=null
     for(const [label,value] of [['Spot laut Depotquelle',m.spotUsd],['Pionex-Gesamteigenkapital',m.tradingUsd]])
       breakdown.append(el('dt',label),el('dd',money(value)));
     if(!pionexOnly)details.append(breakdown);
+    const notes=el('details');notes.className='metric-notes';notes.append(el('summary','Bewertungsquelle'));
     for(const [label,value] of [['Bewertungsstand (lokale Zeit)',m.snapshotAt],['Verwendete Quelle (lokale Zeit)',m.sourceAt]]){
-      const line=el('p',label+': '),time=el('time',new Date(value).toLocaleString('de-AT'));time.dateTime=value;time.title='UTC: '+value;line.append(time);details.append(line);
+      const mainTime = label === 'Bewertungsstand (lokale Zeit)';
+      const line=el('p',mainTime && pionexOnly ? 'Stand ' : label+': ');
+      const time=el('time',new Date(value).toLocaleString('de-AT'));
+      time.dateTime=value;time.title='UTC: '+value;line.append(time);
+      (mainTime ? details : notes).append(line);
     }
-    details.append(el('p',current&&pionexOnly?'Quelle: bestätigte Pionex-Bewertung aus serverseitigen Daten. Bot-Kapital und P/L werden nicht addiert.':current?'Quelle: serverseitige Depotdaten; soweit erforderlich mit öffentlichen Kursen bewertet. Zeitangabe zeigt die älteste verwendete Quelle; keine Bestätigung aller Konten.':'Quelle: gespeicherte Meridian-Depothistorie. Bestandsdetails und einzelne Börsenfristen sind hier nicht enthalten.'));
+    details.append(notes);notes.append(el('p',current&&pionexOnly?'Quelle: bestätigte Pionex-Bewertung aus serverseitigen Daten. Bot-Kapital und P/L werden nicht addiert.':current?'Quelle: serverseitige Depotdaten; soweit erforderlich mit öffentlichen Kursen bewertet. Zeitangabe zeigt die älteste verwendete Quelle; keine Bestätigung aller Konten.':'Quelle: gespeicherte Meridian-Depothistorie. Bestandsdetails und einzelne Börsenfristen sind hier nicht enthalten.'));
     if(m.excludedIncompletePoints>0)details.append(el('p','Die Historie enthält Datenlücken. Unvollständige Bewertungen wurden ausgelassen.'));
   }
   const client=createClient({getToken,onChange:render});

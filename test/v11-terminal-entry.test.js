@@ -44,8 +44,8 @@ const terminal=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8')
 const preimageBlob='e7fe56dd456641e40b54f5d5b047176523c27592';
 const paperBridgeImportMap='<script type="importmap">\n{"imports":{"../scripts/memecoin-paper-report-bridge/contract.mjs":"../scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX12"}}\n</script>\n';
 function restorePaperModuleIdentity(source){
-  assert.equal(source.split('?v=B20-M11-FIX2').length-1,6,'six exact four-hour report cache references');
-  source=source.replaceAll('?v=B20-M11-FIX2','?v=B16-M11-FIX12');
+  assert.equal(source.split('?v=B20-M11-FIX3').length-1,6,'six exact four-hour report cache references');
+  source=source.replaceAll('?v=B20-M11-FIX3','?v=B16-M11-FIX12');
   assert.equal(source.split(paperBridgeImportMap).length-1,1,'one fixed versioned Paper bridge import map');
   source=source.replace(paperBridgeImportMap,'');
   assert.equal(source.split('?v=B16-M11-FIX12').length-1,5,'five versioned M11 entrypoints');
@@ -714,7 +714,7 @@ const b16CacheDelta=[
 const b17CacheDelta=[
   [
     '<script type="module" src="./app-access-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11"></script>',
-    '<script type="module" src="./app-access-bootstrap.js?v=B20-M11-FIX2"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX2"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B20-M11-FIX2"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11-FIX2"></script>'
+    '<script type="module" src="./app-access-bootstrap.js?v=B20-M11-FIX3"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX3"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B20-M11-FIX3"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11-FIX3"></script>'
   ]
 ];
 const commandPresentationDeltas=[
@@ -880,11 +880,11 @@ function restoreB2(source){
   }
   source=restorePaperModuleIdentity(source);
   assert.equal(source.split('?v=B16-M11-FIX11').length-1,5,'five restored B16 M11 entrypoints');
-  source=source.replaceAll('?v=B16-M11-FIX11','?v=B20-M11-FIX2');
+  source=source.replaceAll('?v=B16-M11-FIX11','?v=B20-M11-FIX3');
   for(const addition of [
     '  <link rel="stylesheet" href="../public/css/m11-agent-status.css">\n',
     '        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>\n',
-    '<script type="module" src="./agent-status-bootstrap.js?v=B20-M11-FIX2"></script>\n'
+    '<script type="module" src="./agent-status-bootstrap.js?v=B20-M11-FIX3"></script>\n'
   ]){
     assert.equal(source.split(addition).length-1,1,'one exact agent-status mount addition');
     source=source.replace(addition,'');
@@ -1038,7 +1038,7 @@ function deploymentServer(){
       path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
       path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
       path.startsWith('/meridian/scripts/spot-paper-paired-progress/')||
-      path.startsWith('/meridian/scripts/spot-paper-research/'))&&url.search==='?v=B20-M11-FIX2';
+      path.startsWith('/meridian/scripts/spot-paper-research/'))&&url.search==='?v=B20-M11-FIX3';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -1108,7 +1108,7 @@ function deploymentServer(){
         path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
         path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
         path.startsWith('/meridian/scripts/spot-paper-paired-progress/')||
-        path.startsWith('/meridian/scripts/spot-paper-research/')?'?v=B20-M11-FIX2':'')).join(' '):"'none'";
+        path.startsWith('/meridian/scripts/spot-paper-research/')?'?v=B20-M11-FIX3':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+host8hEndpoint+' '+origin+'/meridian/v11/index.html '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -1135,11 +1135,11 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await releaseResponse.text(),html);
     const connectPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('connect-src '));
     assert.ok(connectPolicy.trim().split(/\s+/).includes(releaseUrl.href),'exact public release HTML allowed');
-    const catalogUrl=new URL('strategy-catalog.js?v=B20-M11-FIX2',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B20-M11-FIX3',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B20-M11-FIX2)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B20-M11-FIX3)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -1149,7 +1149,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const bridgeIndexUrl=new URL('../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11-FIX2',releaseUrl);
+    const bridgeIndexUrl=new URL('../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11-FIX3',releaseUrl);
     const bridgeIndex=await fetch(bridgeIndexUrl);
     assert.equal(bridgeIndex.status,200,'connector bridge entry must be served');
     assert.match(bridgeIndex.headers.get('content-type'),/^text\/javascript/);
@@ -1165,9 +1165,9 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await contract.text(),
       readFileSync(new URL('../scripts/memecoin-paper-report-bridge/contract.mjs',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(contractUrl.href),'versioned contract URL is allowed by script-src');
-    const arenaUrl=new URL('strategy-arena.js?v=B20-M11-FIX2',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B20-M11-FIX3',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B20-M11-FIX2)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B20-M11-FIX3)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -1176,7 +1176,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
-    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B20-M11-FIX2)['"]/);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B20-M11-FIX3)['"]/);
     assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
     const historicalUrl=new URL(historicalImport[1],arenaUrl);
     const historical=await fetch(historicalUrl);
@@ -1185,7 +1185,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
     assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
-    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B20-M11-FIX2)['"]/);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B20-M11-FIX3)['"]/);
     assert.ok(producerImport,'Arena imports the bounded producer export adapter');
     const producerUrl=new URL(producerImport[1],arenaUrl);
     const producer=await fetch(producerUrl);
@@ -1194,7 +1194,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
-    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B20-M11-FIX2)['"]/);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B20-M11-FIX3)['"]/);
     assert.ok(rendererImport,'Arena imports the isolated result renderer');
     const rendererUrl=new URL(rendererImport[1],arenaUrl);
     const renderer=await fetch(rendererUrl);
@@ -1204,17 +1204,17 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     for(const [path,file,type] of [
-      ['ledger-manual-client.js?v=B20-M11-FIX2','v11/ledger-manual-client.js','javascript'],
-      ['ledger-manual-model.js?v=B20-M11-FIX2','v11/ledger-manual-model.js','javascript'],
-      ['ledger-manual-view.js?v=B20-M11-FIX2','v11/ledger-manual-view.js','javascript'],
+      ['ledger-manual-client.js?v=B20-M11-FIX3','v11/ledger-manual-client.js','javascript'],
+      ['ledger-manual-model.js?v=B20-M11-FIX3','v11/ledger-manual-model.js','javascript'],
+      ['ledger-manual-view.js?v=B20-M11-FIX3','v11/ledger-manual-view.js','javascript'],
       ['../ledger-manual-snapshot.js','ledger-manual-snapshot.js','javascript'],
-      ['paper-readiness.js?v=B20-M11-FIX2','v11/paper-readiness.js','javascript'],
-      ['paper-readiness-view.js?v=B20-M11-FIX2','v11/paper-readiness-view.js','javascript'],
-      ['paper-cockpit-model.js?v=B20-M11-FIX2','v11/paper-cockpit-model.js','javascript'],
-      ['paper-cockpit-view.js?v=B20-M11-FIX2','v11/paper-cockpit-view.js','javascript'],
-      ['release-update.js?v=B20-M11-FIX2','v11/release-update.js','javascript'],
-      ['agent-status-bootstrap.js?v=B20-M11-FIX2','v11/agent-status-bootstrap.js','javascript'],
-      ['agent-status-client.js?v=B20-M11-FIX2','v11/agent-status-client.js','javascript'],
+      ['paper-readiness.js?v=B20-M11-FIX3','v11/paper-readiness.js','javascript'],
+      ['paper-readiness-view.js?v=B20-M11-FIX3','v11/paper-readiness-view.js','javascript'],
+      ['paper-cockpit-model.js?v=B20-M11-FIX3','v11/paper-cockpit-model.js','javascript'],
+      ['paper-cockpit-view.js?v=B20-M11-FIX3','v11/paper-cockpit-view.js','javascript'],
+      ['release-update.js?v=B20-M11-FIX3','v11/release-update.js','javascript'],
+      ['agent-status-bootstrap.js?v=B20-M11-FIX3','v11/agent-status-bootstrap.js','javascript'],
+      ['agent-status-client.js?v=B20-M11-FIX3','v11/agent-status-client.js','javascript'],
       ['../public/js/m11-agent-status.js','public/js/m11-agent-status.js','javascript'],
       ['../public/css/m11-agent-status.css','public/css/m11-agent-status.css','css']
     ]){
@@ -1387,7 +1387,7 @@ async function browserRun(call,start,width,height,server){
       assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-positive')).color`),'rgb(110, 231, 183)');
       assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').textContent`),'+8,25 USD');
       assert.ok(card.body<=width+1&&card.root<=width+1,'collapsed card overflow');
-      await evaluate(`document.querySelector('#bot-read-root summary').focus();true`);
+      await evaluate(`document.querySelector('#bot-read-root .bot-card summary').focus();true`);
       await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
       await call('Input.dispatchKeyEvent',{type:'keyUp',key:'Enter',code:'Enter',windowsVirtualKeyCode:13});
       card=await cardMetrics();assert.equal(card.open,true,'native keyboard expands card');assert.equal(card.textUnrotated,true,'open card text must not inherit icon rotation');

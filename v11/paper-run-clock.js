@@ -14,7 +14,7 @@ export function runClockText(timing, now = Date.now() / 1000) {
   const label = historical ? 'Laufzeit beim letzten Stand ' : 'Laufzeit ';
   if (end == null) return label + elapsed + ' · Ende offen';
   const remaining = Math.ceil((end - now) / 60);
-  return label + elapsed + (remaining > 0 ? ' · noch ' + minutesText(remaining) + ' bis Planende' :
+  return label + elapsed + (remaining > 0 ? ' · noch ' + minutesText(remaining) + ' geplant' :
     ' · geplantes Ende erreicht');
 }
 

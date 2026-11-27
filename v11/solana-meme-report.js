@@ -1,4 +1,4 @@
-import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX2';
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX3';
 const repo = 'Achi1984/meridian';
 const workflow = 'solana-meme-paper-bot.yml';
 const api = 'https://api.github.com/repos/' + repo;
@@ -16,8 +16,8 @@ async function read(url, raw = false) {
   return response.json();
 }
 
-import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX2';
-import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX2';
+import {mountHolderComparison} from './holder-comparison.js?v=B20-M11-FIX3';
+import {mountEightHourComparison} from './solana-eight-hour.js?v=B20-M11-FIX3';
 
 // The experiment stores raw USDC in millionths and charges 0.05 USDC per fill.
 const swingRun = 45624335706;
@@ -124,7 +124,7 @@ export function mountCommandPaper(doc, access) {
   card.className = 'card';
   card.id = 'command-paper-live';
   const title = doc.createElement('h2');
-  title.textContent = 'Solana · 48 h';
+  title.textContent = 'Solana · Paperbot';
   const status = doc.createElement('p');
   status.setAttribute('role','status');
   status.textContent = 'Letzter Scan wird geladen …';
@@ -180,7 +180,7 @@ export function mountCommandPaper(doc, access) {
 export function mountSwingCard(section, add, load = read) {
   const card = add(section,'section','');
   card.className = 'solana-comparison';
-  add(card,'h3','Memecoins · 48 Stunden');
+  add(card,'h3','Solana · 24 h Einstieg + 48 h Beobachtung');
   const status = add(card,'p','Laufstand wird geladen.');
   status.setAttribute('role','status');
   const body = add(card,'div','');
@@ -233,8 +233,10 @@ export function mountSwingCard(section, add, load = read) {
       body.replaceChildren();
       for (const row of rows) {
         const line = add(body,'p','');
+        line.className = 'paper-account';
         add(line,'strong',row.key === 'fixed' ? 'Festes Gewinnziel' : 'Teilverkauf');
-        add(line,'span','Kasse ' + amount(row.cash) + ' · ' + row.open + ' offen').className = 'account-value';
+        add(line,'span',amount(row.cash)).className = 'account-value';
+        add(line,'small','Kasse · ' + row.open + ' offen');
         add(line,'span','Realisiert ' + amount(row.realized)).className = 'account-pnl af-' +
           (row.realized > 0 ? 'positive' : row.realized < 0 ? 'negative' : 'muted');
       }
