@@ -35,36 +35,41 @@ export function mountTop100(section) {
   sourceLine.append(link);
   section.append(status, accounts, button, sourceLine);
   const headline=paperGroupPnl(section);headline();
-  let rendered = false;
+  let lastReport = null;
   async function refresh() {
     if (button.disabled) return;
     button.disabled = true;
     try {
       const response = await fetch(source, {cache:'no-store', credentials:'omit',
         headers:{Accept:'application/vnd.github.raw+json'}, signal:AbortSignal.timeout(10000)});
-      if (response.status === 404 && !rendered) {
+      if (response.status === 404 && !lastReport) {
         status.textContent = 'Wartet auf ersten Bericht.';
         return;
       }
       if (!response.ok) throw Error('unavailable');
       const report = await response.json();
       const rows = dashboardRows(report);
-      headline('Realisiert','USDT',rows.slice(0,2).map(a=>[a.name,a.realized]),
-        rows.some(a=>a.pending)?'Funding offen':'');
+      const time = new Date(report.asOf * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
+      const stage = report.stage === 'final' ? 'Abschlussbericht' : 'Zwischenbericht';
+      const models = rows.slice(0, 2).map(account => [
+        account.name + ' (' + account.open + ' offen)',
+        account.closed > 0 && account.closed === account.pending ? null : account.realized
+      ]);
+      const note = [stage, rows.some(account => account.pending) && 'Funding offen'].filter(Boolean).join(' · ');
+      lastReport = {models, note};
+      headline('Realisiert', 'USDT', models, note);
       const fragment = document.createDocumentFragment();
       for (const a of rows) {
         fragment.append(element('h4', a.name), element('p', a.equity === null
           ? 'Kontowert ausstehend' : 'Kontowert ' + money(a.equity)),
-        element('p', 'Realisiert netto ' + money(a.realized) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen'
+        element('p', (a.pending && a.closed === a.pending ? 'Realisiert netto offen' : 'Realisiert netto ' + money(a.realized)) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen'
           + (a.pending ? ' · Funding ausstehend bei ' + a.pending : '')));
       }
       accounts.replaceChildren(fragment);
-      const time = new Date(report.asOf * 1000).toLocaleString('de-AT',{timeZone:'Europe/Vienna'});
-      status.textContent = (report.stage === 'final' ? 'Abschlussbericht' : 'Zwischenbericht') + ' · Datenstand ' + time + ' (Wien)';
-      rendered = true;
+      status.textContent = stage + ' · Datenstand ' + time + ' (Wien)';
     } catch {
-      headline();
-      if (!rendered) status.textContent = 'Bericht derzeit nicht abrufbar.';
+      if (lastReport) headline('Realisiert', 'USDT', lastReport.models, lastReport.note + ' · Abruf fehlgeschlagen');
+      if (!lastReport) status.textContent = 'Bericht derzeit nicht abrufbar.';
       else if (!status.textContent.endsWith('Abruf fehlgeschlagen.')) status.textContent += ' · Abruf fehlgeschlagen.';
     } finally {
       button.disabled = false;
