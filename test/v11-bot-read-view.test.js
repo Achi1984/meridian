@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {renderBotReadState,createBotReadView,renderCommandBotOverview} from '../v11/bot-read-view.js';
 import {buildBotReadModel} from '../v11/bot-read-model.js';
 import {createBotReadClient} from '../v11/bot-read-client.js';
-import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B20-M11';
+import {publishDepotPortfolioState} from '../v11/depot-portfolio-state.js?v=B20-M11-FIX1';
 import {normalizePionexBotOrder} from '../pionex-bot-auto-sync.js';
 import {buildAssetWatchApiSnapshot} from '../asset-watch-bridge.js';
 
@@ -399,9 +399,11 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
     lower:0.00001234,upper:0.00002345,liquidationPrice:0,stopLoss:null,takeProfit:'SECRET',gridProfitUsd:999,riskBufferPct:100}});
   state.model.bots.push({...state.model.bots[0],ref:'b'.repeat(20)});
   renderBotReadState(target,state);
-  assert.equal(all(target,'details').length,2);assert.equal(all(target,'summary').length,2);
-  assert.ok(all(target,'details').every(node=>node.getAttribute('open')===null));
-   const [first,second]=all(target,'details'),[firstSummary,secondSummary]=all(target,'summary');
+  const group=all(target,'details').find(node=>node.className==='bot-asset-group');
+  assert.match(group.querySelector('summary').textContent,/BTC · 2 BotsP\/L -5,50 USDKapital 251,00 USD/);
+  assert.equal(botCards(target).length,2);assert.equal(botCards(target).map(card=>card.querySelector('summary')).length,2);
+  assert.ok(botCards(target).every(node=>node.getAttribute('open')===null));
+   const [first,second]=botCards(target),[firstSummary,secondSummary]=botCards(target).map(card=>card.querySelector('summary'));
    assert.doesNotMatch(firstSummary.textContent,/Referenz|Bot 1/);
    assert.equal(firstSummary.getAttribute('aria-label'),
      'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aaaaaa · Aufklappen');
@@ -420,12 +422,23 @@ test('collapsed native cards distinguish equal symbols and render only whitelist
    assert.match(target.textContent,/0.00001234/);
    assert.match(target.textContent,/Grid-GewinnNicht verfügbar/);assert.match(target.textContent,/RisikopufferNicht verfügbar/);
    assert.match(target.textContent,/Liquidationspreis laut QuelleNicht verfügbar/);assert.doesNotMatch(target.textContent,/SECRET|999|100 %/);
-   assert.deepEqual(all(target,'details').map(node=>node.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
+   assert.deepEqual(botCards(target).map(node=>node.id),['bot-card-'+ 'a'.repeat(20),'bot-card-'+ 'b'.repeat(20)]);
    assert.match(all(target,'div').find(node=>node.getAttribute('role')==='status').textContent,/bestätigt keinen laufenden Bot-Prozess/);
    assert.equal(all(target,'time').length,1,'freshness context appears once');
-   renderBotReadState(target,{status:'locked'});assert.equal(all(target,'details').length,0);
+   renderBotReadState(target,{status:'locked'});assert.equal(botCards(target).length,0);
    assert.doesNotMatch(target.textContent,/125.5|a{20}|b{20}/);
  });
+
+test('asset totals keep unknown P/L and mixed capital units explicit',()=>{
+  const state=fresh(), target=root(), first=state.model.bots[0];
+  first.symbol='BTC_USDT';first.metrics={investmentAmount:1,investmentCurrency:'BTC',pnlUsd:2};
+  state.model.bots.push({...first,ref:'b'.repeat(20),symbol:'BTCUSDT',metrics:{investmentUsd:60}});
+  renderBotReadState(target,state);
+  const summary=all(target,'details').find(node=>node.className==='bot-asset-group').querySelector('summary');
+  assert.match(summary.textContent,/BTC · 2 Bots/);
+  assert.match(summary.textContent,/P\/L bei 1 von 2 bestätigt/);
+  assert.doesNotMatch(summary.textContent,/2,00 USD|60,00/);
+});
 
 test('TP indicators are read-only, unknown evidence stays neutral, and mismatch warnings show exact values',()=>{
   const input=snapshot('2026-10-12T20:00:00Z');
@@ -536,7 +549,7 @@ test('collapsed card summary visibly labels TP mismatch and unknown status',()=>
      {...template,ref:'b'.repeat(14)+'abcdef',metrics:{leverage:2,investmentUsd:80,pnlUsd:1.25}}
    ];
    renderBotReadState(target,state);
-   const names=all(target,'summary').map(summary=>summary.getAttribute('aria-label'));
+   const names=botCards(target).map(card=>card.querySelector('summary')).map(summary=>summary.getAttribute('aria-label'));
    assert.deepEqual(names,[
      'BTC · Short · Hebel 5× · P/L laut Quelle -2,75 USD · Kapital 125,50 USD/USDT · TP nicht prüfbar · ID-Ende aabcdef · Aufklappen',
      'BTC · Short · Hebel 2× · P/L laut Quelle +1,25 USD · Kapital 80,00 USD/USDT · TP nicht prüfbar · ID-Ende babcdef · Aufklappen'
@@ -643,10 +656,11 @@ test('Command keeps unavailable status distinct from unknown fresh metadata',()=
 
 const change=(node,type,value)=>{node.value=value;for(const listener of node.listeners.get(type)||[])listener();};
 const returnButton=h=>all(h.target,'button').find(node=>node.text==='Zur vorherigen Auswahl zurück');
+function botCards(root){return all(root,'details').filter(card=>card.className==='bot-card');}
 function duplicateSnapshot(){const state=fresh();state.model.bots.push({...state.model.bots[0],ref:'b'.repeat(20),side:'LONG'});return state;}
 test('disclosure actions open and close visible bots and preserve filtered-out state',()=>{
   const h=mounted(),state=duplicateSnapshot();h.publish(state);
-  const cards=()=>all(h.target,'details');
+  const cards=()=>botCards(h.target);
   const button=text=>all(h.target,'button').find(node=>node.text===text);
   const nativeToggle=(card,open)=>{
     if(open)card.setAttribute('open','');else card.removeAttribute('open');
@@ -676,27 +690,27 @@ test('disclosure actions open and close visible bots and preserve filtered-out s
 
 test('disclosures retain exact reference through filtering sorting and reset within one snapshot',()=>{
   const h=mounted(),state=duplicateSnapshot();h.publish(state);
-  all(h.target,'details')[0].setAttribute('open','');
+  botCards(h.target)[0].setAttribute('open','');
   const direction=all(h.target,'select')[0],sort=all(h.target,'select')[2];
-  change(direction,'change','long');assert.equal(all(h.target,'details').length,1);
-  assert.equal(all(h.target,'details')[0].getAttribute('open'),null,'same symbol is not the same Bot');
+  change(direction,'change','long');assert.equal(botCards(h.target).length,1);
+  assert.equal(botCards(h.target)[0].getAttribute('open'),null,'same symbol is not the same Bot');
   change(sort,'change','pnl');change(direction,'change','all');
-  const [a,b]=all(h.target,'details');assert.equal(a.getAttribute('open'),'');assert.equal(b.getAttribute('open'),null);
+  const [a,b]=botCards(h.target);assert.equal(a.getAttribute('open'),'');assert.equal(b.getAttribute('open'),null);
   a.removeAttribute('open');change(sort,'change','leverage');
-  assert.equal(all(h.target,'details')[0].getAttribute('open'),null,'explicit close survives rerender');
-  all(h.target,'details')[1].setAttribute('open','');
+  assert.equal(botCards(h.target)[0].getAttribute('open'),null,'explicit close survives rerender');
+  botCards(h.target)[1].setAttribute('open','');
   all(h.target,'button').find(node=>node.text==='Filter zurücksetzen').click();
-  assert.equal(all(h.target,'details')[1].getAttribute('open'),'');assert.equal(h.calls.refresh,0);
+  assert.equal(botCards(h.target)[1].getAttribute('open'),'');assert.equal(h.calls.refresh,0);
 });
 test('Command jump and return retain original filters and reveal exact duplicate-symbol Bot',()=>{
   const h=mounted();h.publish(duplicateSnapshot());
   const search=all(h.target,'input')[0],direction=all(h.target,'select')[0],sort=all(h.target,'select')[2];
   change(search,'input','NO_MATCH');change(direction,'change','long');change(sort,'change','pnl');
   h.jump('a'.repeat(20));assert.equal(returnButton(h).hidden,false);assert.equal(search.value,'');
-  assert.equal(h.target.ownerDocument.activeElement,all(h.target,'details')[0].querySelector('summary'));
-  h.jump('b'.repeat(20));assert.equal(h.target.ownerDocument.activeElement,all(h.target,'details')[1].querySelector('summary'));
+  assert.equal(h.target.ownerDocument.activeElement,botCards(h.target)[0].querySelector('summary'));
+  h.jump('b'.repeat(20));assert.equal(h.target.ownerDocument.activeElement,botCards(h.target)[1].querySelector('summary'));
   returnButton(h).click();assert.equal(search.value,'NO_MATCH');assert.equal(direction.value,'long');assert.equal(sort.value,'pnl');
-  assert.equal(all(h.target,'details').length,0);assert.equal(returnButton(h).hidden,true);
+  assert.equal(botCards(h.target).length,0);assert.equal(returnButton(h).hidden,true);
   assert.equal(h.target.ownerDocument.activeElement,search);assert.equal(h.calls.refresh,0);
 });
 test('every invalidation and snapshot replacement drops disclosure and return memory',()=>{
@@ -936,17 +950,17 @@ test('new filters combine, preserve disclosure and Command return, reset and cle
   all(h.target,'button').find(n=>n.text==='Alle aufklappen').click();
   change(search,'input','BTC');change(direction,'change','long');change(category,'change','linear');
   change(tp,'change','mismatch');change(pnl,'change','available');change(sort,'change','tp');
-  assert.equal(all(h.target,'li').length,1);assert.equal(all(h.target,'details')[0].getAttribute('open'),'');
+  assert.equal(botCards(h.target).length,1);assert.equal(botCards(h.target)[0].getAttribute('open'),'');
   h.jump('b'.repeat(20));assert.equal(tp.value,'all');assert.equal(pnl.value,'all');
   returnButton(h).click();
   assert.deepEqual([search.value,direction.value,category.value,sort.value,tp.value,pnl.value],['BTC','long','linear','tp','mismatch','available']);
-  assert.equal(all(h.target,'li').length,1);assert.equal(all(h.target,'details')[0].getAttribute('open'),'');
+  assert.equal(botCards(h.target).length,1);assert.equal(botCards(h.target)[0].getAttribute('open'),'');
   all(h.target,'button').find(n=>n.text==='Filter zurücksetzen').click();
   assert.deepEqual([search.value,direction.value,category.value,sort.value,tp.value,pnl.value],['','all','all','symbol','all','all']);
-  assert.equal(all(h.target,'li').length,3);assert.equal(returnButton(h).hidden,true);
-  change(tp,'change','match');change(pnl,'change','available');assert.equal(all(h.target,'li').length,1,'confirmed zero P/L stays available');
+  assert.equal(botCards(h.target).length,3);assert.equal(returnButton(h).hidden,true);
+  change(tp,'change','match');change(pnl,'change','available');assert.equal(botCards(h.target).length,1,'confirmed zero P/L stays available');
   h.publish({...coverageSnapshot(),readIdentity:2});assert.equal(tp.value,'all');assert.equal(pnl.value,'all');
-  assert.ok(all(h.target,'details').every(n=>n.getAttribute('open')===null));assert.equal(h.calls.refresh,0);
+  assert.ok(botCards(h.target).every(n=>n.getAttribute('open')===null));assert.equal(h.calls.refresh,0);
   h.view.dispose();assert.equal(tp.listeners.get('change').size,0);assert.equal(pnl.listeners.get('change').size,0);
 });
 

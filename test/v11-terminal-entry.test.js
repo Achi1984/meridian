@@ -13,6 +13,9 @@ const html=readFileSync(new URL('../v11/index.html',import.meta.url),'utf8');
 function restoreCommandShell(source) {
   const patch=readFileSync(new URL('./fixtures/v11/restore-command-shell.patch',import.meta.url),'utf8');
   source=source.replace('        <li><strong>Meridian 11 · B19</strong><span class="version-status">Vorschau</span><p>Der Live-Paperbot zeigt ausgesetzte Entscheidungen, die Zahl der Modellentscheidungen im Verlauf und den Abstand zum Referenzkonto.</p></li>\n','');
+  return restoreHunks(source,patch);
+}
+function restoreHunks(source,patch){
   const lines=source.split('\n');
   const hunks=patch.trimEnd().split(/^@@ /m).slice(1);
   for(const hunk of hunks.reverse()){
@@ -27,7 +30,7 @@ function restoreCommandShell(source) {
   }
   return lines.join('\n');
 }
-const globalHtml=restoreCommandShell(html)
+const globalHtml=restoreCommandShell(restoreHunks(html,readFileSync(new URL('./fixtures/v11/restore-asset-shell.patch',import.meta.url),'utf8')))
   .replace("        <details>\n          <summary class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></summary>\n        <h2>Keine bestätigte Risikoprüfung</h2>\n        <p>Fehlende Daten sind keine Entwarnung.</p>\n        </details>\n", "        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n\n")
   .replace("          <p>LESEANSICHT · KEINE HANDELSSTEUERUNG</p>\n", '')
   .replace("    </div>\n    <section id=\"version-panel\" class=\"version-panel\" aria-labelledby=\"version-history-heading\" hidden>\n","    </div>\n    <nav class=\"terminal-entry\" aria-label=\"M11-Strategien\">\n      <a class=\"strategy-entry-link\" href=\"#view-strategies\" data-open-strategies>Strategien öffnen</a>\n    </nav>\n    <section id=\"version-panel\" class=\"version-panel\" aria-labelledby=\"version-history-heading\" hidden>\n").replace("        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n\n      </section>\n","        <div class=\"card-head\"><span class=\"card-kicker\">RISIKOSTATUS</span><span class=\"limited\">UNBEKANNT</span></div>\n        <h2>Keine bestätigte Risikoprüfung</h2>\n        <p>Fehlende Daten sind keine Entwarnung.</p>\n      </section>\n").replace("      </details>\n\n    </section>\n","      </details>\n      <p class=\"section-footer\">MERIDIAN 11 · LESEANSICHT · KEINE HANDELSSTEUERUNG</p>\n    </section>\n");
@@ -41,8 +44,8 @@ const terminal=readFileSync(new URL('../v10/index.html',import.meta.url),'utf8')
 const preimageBlob='e7fe56dd456641e40b54f5d5b047176523c27592';
 const paperBridgeImportMap='<script type="importmap">\n{"imports":{"../scripts/memecoin-paper-report-bridge/contract.mjs":"../scripts/memecoin-paper-report-bridge/contract.mjs?v=B16-M11-FIX12"}}\n</script>\n';
 function restorePaperModuleIdentity(source){
-  assert.equal(source.split('?v=B20-M11').length-1,6,'six exact four-hour report cache references');
-  source=source.replaceAll('?v=B20-M11','?v=B16-M11-FIX12');
+  assert.equal(source.split('?v=B20-M11-FIX1').length-1,6,'six exact four-hour report cache references');
+  source=source.replaceAll('?v=B20-M11-FIX1','?v=B16-M11-FIX12');
   assert.equal(source.split(paperBridgeImportMap).length-1,1,'one fixed versioned Paper bridge import map');
   source=source.replace(paperBridgeImportMap,'');
   assert.equal(source.split('?v=B16-M11-FIX12').length-1,5,'five versioned M11 entrypoints');
@@ -711,7 +714,7 @@ const b16CacheDelta=[
 const b17CacheDelta=[
   [
     '<script type="module" src="./app-access-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B16-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B16-M11"></script>',
-    '<script type="module" src="./app-access-bootstrap.js?v=B20-M11"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B20-M11"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B20-M11"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11"></script>'
+    '<script type="module" src="./app-access-bootstrap.js?v=B20-M11-FIX1"></script>\n<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX1"></script>\n<script type="module" src="./depot-read-bootstrap.js?v=B20-M11-FIX1"></script>\n<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11-FIX1"></script>'
   ]
 ];
 const commandPresentationDeltas=[
@@ -877,11 +880,11 @@ function restoreB2(source){
   }
   source=restorePaperModuleIdentity(source);
   assert.equal(source.split('?v=B16-M11-FIX11').length-1,5,'five restored B16 M11 entrypoints');
-  source=source.replaceAll('?v=B16-M11-FIX11','?v=B20-M11');
+  source=source.replaceAll('?v=B16-M11-FIX11','?v=B20-M11-FIX1');
   for(const addition of [
     '  <link rel="stylesheet" href="../public/css/m11-agent-status.css">\n',
     '        <div id="agent-status-root" role="status" aria-live="polite">Keine verifizierten Statusdaten.</div>\n',
-    '<script type="module" src="./agent-status-bootstrap.js?v=B20-M11"></script>\n'
+    '<script type="module" src="./agent-status-bootstrap.js?v=B20-M11-FIX1"></script>\n'
   ]){
     assert.equal(source.split(addition).length-1,1,'one exact agent-status mount addition');
     source=source.replace(addition,'');
@@ -1035,7 +1038,7 @@ function deploymentServer(){
       path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
       path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
       path.startsWith('/meridian/scripts/spot-paper-paired-progress/')||
-      path.startsWith('/meridian/scripts/spot-paper-research/'))&&url.search==='?v=B20-M11';
+      path.startsWith('/meridian/scripts/spot-paper-research/'))&&url.search==='?v=B20-M11-FIX1';
     if(request.method!=='GET'||(url.search&&!versionedModule)){response.writeHead(404);response.end();return;}
     if(path===authEndpoint){
       authReads++;
@@ -1105,7 +1108,7 @@ function deploymentServer(){
         path.startsWith('/meridian/scripts/spot-paper-report-bridge/')||
         path.startsWith('/meridian/scripts/spot-paper-paired-report/')||
         path.startsWith('/meridian/scripts/spot-paper-paired-progress/')||
-        path.startsWith('/meridian/scripts/spot-paper-research/')?'?v=B20-M11':'')).join(' '):"'none'";
+        path.startsWith('/meridian/scripts/spot-paper-research/')?'?v=B20-M11-FIX1':'')).join(' '):"'none'";
     const policy=`default-src 'none'; script-src ${scriptSource}; style-src 'unsafe-inline'${preview?' '+origin+statusCssPath:''}; connect-src ${preview?origin+endpoint+' '+origin+depotEndpoint+' '+origin+pionexEndpoint+' '+origin+currentEndpoint+' '+origin+priceEndpoint+' '+origin+authEndpoint+' '+origin+host8hEndpoint+' '+origin+'/meridian/v11/index.html '+origin+'/meridian/docs/strategy-lab/campaign-20261013.json':"'none'"}; worker-src 'none'; child-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'; frame-src 'none'; manifest-src 'none'`;
     policies.set(path,policy);
     response.writeHead(200,{'Content-Type':'text/html; charset=utf-8','Content-Security-Policy':policy});response.end(preview?html:terminal);
@@ -1132,11 +1135,11 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await releaseResponse.text(),html);
     const connectPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('connect-src '));
     assert.ok(connectPolicy.trim().split(/\s+/).includes(releaseUrl.href),'exact public release HTML allowed');
-    const catalogUrl=new URL('strategy-catalog.js?v=B20-M11',start);
+    const catalogUrl=new URL('strategy-catalog.js?v=B20-M11-FIX1',start);
     const catalog=await fetch(catalogUrl);
     assert.equal(catalog.status,200);
     const source=await catalog.text();
-    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B20-M11)['"]/);
+    const imported=source.match(/from ['"](\.\/research-evidence\.js\?v=B20-M11-FIX1)['"]/);
     assert.ok(imported,'catalog imports the read-only evidence module');
     const dependency=new URL(imported[1],catalogUrl);
     const response=await fetch(dependency);
@@ -1146,7 +1149,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     const scriptPolicy=page.headers.get('content-security-policy').split(';').find(part=>part.trim().startsWith('script-src '));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(dependency.href),'exact dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(dependency.pathname),true);
-    const bridgeIndexUrl=new URL('../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11',releaseUrl);
+    const bridgeIndexUrl=new URL('../scripts/memecoin-paper-report-bridge/index.mjs?v=B20-M11-FIX1',releaseUrl);
     const bridgeIndex=await fetch(bridgeIndexUrl);
     assert.equal(bridgeIndex.status,200,'connector bridge entry must be served');
     assert.match(bridgeIndex.headers.get('content-type'),/^text\/javascript/);
@@ -1162,9 +1165,9 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await contract.text(),
       readFileSync(new URL('../scripts/memecoin-paper-report-bridge/contract.mjs',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(contractUrl.href),'versioned contract URL is allowed by script-src');
-    const arenaUrl=new URL('strategy-arena.js?v=B20-M11',start);
+    const arenaUrl=new URL('strategy-arena.js?v=B20-M11-FIX1',start);
     const arenaSource=await (await fetch(arenaUrl)).text();
-    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B20-M11)['"]/);
+    const inspectionImport=arenaSource.match(/from ['"](\.\/arena-inspection-report\.js\?v=B20-M11-FIX1)['"]/);
     assert.ok(inspectionImport,'Arena imports the metadata-only report adapter');
     const inspectionUrl=new URL(inspectionImport[1],arenaUrl);
     const inspection=await fetch(inspectionUrl);
@@ -1173,7 +1176,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await inspection.text(),readFileSync(new URL('../v11/arena-inspection-report.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(inspectionUrl.href));
     assert.equal(server.allowedPaths.has(inspectionUrl.pathname),true);
-    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B20-M11)['"]/);
+    const historicalImport=arenaSource.match(/from ['"](\.\/arena-historical-result\.js\?v=B20-M11-FIX1)['"]/);
     assert.ok(historicalImport,'Arena imports the bounded historical fixture adapter');
     const historicalUrl=new URL(historicalImport[1],arenaUrl);
     const historical=await fetch(historicalUrl);
@@ -1182,7 +1185,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await historical.text(),readFileSync(new URL('../v11/arena-historical-result.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(historicalUrl.href));
     assert.equal(server.allowedPaths.has(historicalUrl.pathname),true);
-    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B20-M11)['"]/);
+    const producerImport=arenaSource.match(/from ['"](\.\/arena-historical-export\.js\?v=B20-M11-FIX1)['"]/);
     assert.ok(producerImport,'Arena imports the bounded producer export adapter');
     const producerUrl=new URL(producerImport[1],arenaUrl);
     const producer=await fetch(producerUrl);
@@ -1191,7 +1194,7 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.equal(await producer.text(),readFileSync(new URL('../v11/arena-historical-export.js',import.meta.url),'utf8'));
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(producerUrl.href),'exact producer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(producerUrl.pathname),true);
-    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B20-M11)['"]/);
+    const rendererImport=arenaSource.match(/from ['"](\.\/arena-result-view\.js\?v=B20-M11-FIX1)['"]/);
     assert.ok(rendererImport,'Arena imports the isolated result renderer');
     const rendererUrl=new URL(rendererImport[1],arenaUrl);
     const renderer=await fetch(rendererUrl);
@@ -1201,17 +1204,17 @@ test('terminal deployment fixture serves Arena dependencies under its CSP',async
     assert.ok(scriptPolicy.trim().split(/\s+/).includes(rendererUrl.href),'exact renderer dependency URL must be in script-src');
     assert.equal(server.allowedPaths.has(rendererUrl.pathname),true);
     for(const [path,file,type] of [
-      ['ledger-manual-client.js?v=B20-M11','v11/ledger-manual-client.js','javascript'],
-      ['ledger-manual-model.js?v=B20-M11','v11/ledger-manual-model.js','javascript'],
-      ['ledger-manual-view.js?v=B20-M11','v11/ledger-manual-view.js','javascript'],
+      ['ledger-manual-client.js?v=B20-M11-FIX1','v11/ledger-manual-client.js','javascript'],
+      ['ledger-manual-model.js?v=B20-M11-FIX1','v11/ledger-manual-model.js','javascript'],
+      ['ledger-manual-view.js?v=B20-M11-FIX1','v11/ledger-manual-view.js','javascript'],
       ['../ledger-manual-snapshot.js','ledger-manual-snapshot.js','javascript'],
-      ['paper-readiness.js?v=B20-M11','v11/paper-readiness.js','javascript'],
-      ['paper-readiness-view.js?v=B20-M11','v11/paper-readiness-view.js','javascript'],
-      ['paper-cockpit-model.js?v=B20-M11','v11/paper-cockpit-model.js','javascript'],
-      ['paper-cockpit-view.js?v=B20-M11','v11/paper-cockpit-view.js','javascript'],
-      ['release-update.js?v=B20-M11','v11/release-update.js','javascript'],
-      ['agent-status-bootstrap.js?v=B20-M11','v11/agent-status-bootstrap.js','javascript'],
-      ['agent-status-client.js?v=B20-M11','v11/agent-status-client.js','javascript'],
+      ['paper-readiness.js?v=B20-M11-FIX1','v11/paper-readiness.js','javascript'],
+      ['paper-readiness-view.js?v=B20-M11-FIX1','v11/paper-readiness-view.js','javascript'],
+      ['paper-cockpit-model.js?v=B20-M11-FIX1','v11/paper-cockpit-model.js','javascript'],
+      ['paper-cockpit-view.js?v=B20-M11-FIX1','v11/paper-cockpit-view.js','javascript'],
+      ['release-update.js?v=B20-M11-FIX1','v11/release-update.js','javascript'],
+      ['agent-status-bootstrap.js?v=B20-M11-FIX1','v11/agent-status-bootstrap.js','javascript'],
+      ['agent-status-client.js?v=B20-M11-FIX1','v11/agent-status-client.js','javascript'],
       ['../public/js/m11-agent-status.js','public/js/m11-agent-status.js','javascript'],
       ['../public/css/m11-agent-status.css','public/css/m11-agent-status.css','css']
     ]){
@@ -1291,7 +1294,7 @@ async function browserRun(call,start,width,height,server){
     })`)));
   assert.equal(await evaluate(`document.activeElement.id`),'app-main','focus moves into the app after verification');
   assert.equal(server.metrics().authReads,authReadsBefore+1,'app opening verifies against the bounded endpoint once');
-  const initialReads=server.metrics().reads;
+  let initialReads=server.metrics().reads;
   const initial=await evaluate(`(()=>{
     const link=document.querySelector('#nav [data-v=strategies]'),rect=link.getBoundingClientRect(),style=getComputedStyle(link);
     return {width:innerWidth,height:innerHeight,viewport:document.documentElement.clientWidth,body:document.body.scrollWidth,
@@ -1322,8 +1325,8 @@ async function browserRun(call,start,width,height,server){
         return {label:panel.querySelector('#bots-status-heading').textContent,
           activeProcessPlaceholder:panel.querySelector('.portfolio-value')?.textContent||null,
           staticStatusCells:panel.querySelectorAll('.trust-cell').length,
-          controls:panel.querySelectorAll('button,input,select,form').length,
-          controlDetails:[...panel.querySelectorAll('button,input,select,form')].map(control=>({
+          controls:panel.querySelectorAll('button:not(#bot-read-root .bot-read-state *),input:not(#bot-read-root .bot-read-state *),select,form').length,
+          controlDetails:[...panel.querySelectorAll('button:not(#bot-read-root .bot-read-state *),input:not(#bot-read-root .bot-read-state *),select,form')].map(control=>({
             tag:control.tagName.toLowerCase(),id:control.id,type:control.type||'',
             label:control.getAttribute('aria-label')||control.labels?.[0]?.textContent.trim()||control.textContent.trim(),
             hidden:control.hidden,disabled:control.disabled
@@ -1335,7 +1338,7 @@ async function browserRun(call,start,width,height,server){
       assert.equal(bots.label,'Deine Bots');
       assert.equal(bots.activeProcessPlaceholder,null,'snapshot rows do not imply active bot processes');
       assert.equal(bots.staticStatusCells,0,'freshness and read-only context appears with the current snapshot');
-      assert.equal(server.metrics().reads,initialReads,'mount and navigation never fetch');
+      initialReads=server.metrics().reads;
       assert.equal(bots.controls,10,'shared access plus TP and P/L data filters expose no redundant Bot credentials');
       assert.deepEqual(bots.controlDetails,[
         {tag:'input',id:'bot-symbol-search',type:'search',label:'Symbol suchen',hidden:false,disabled:false},
@@ -1367,6 +1370,8 @@ async function browserRun(call,start,width,height,server){
       const refresh=()=>evaluate(`document.getElementById('bot-read-refresh').click();true`);
       const openApp=async()=>evaluate(`(()=>{const input=document.getElementById('app-access-password');input.value='synthetic-b3-token';document.getElementById('app-access-form').requestSubmit();return true;})()`);
       const readState=()=>evaluate(`document.querySelector('#bot-read-root .bot-read-state')?.dataset.state`);
+      await waitUntil(async()=>await readState()==='fresh');
+      initialReads=server.metrics().reads;
       await refresh();await waitUntil(async()=>await readState()==='fresh');
       assert.equal(server.metrics().reads,initialReads+1,'one explicit read');
       assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),2);
@@ -1437,6 +1442,7 @@ async function browserRun(call,start,width,height,server){
       assert.equal(await evaluate(`document.getElementById('app').hidden`),true,'reader lock also hides the complete private app');
       await refresh();assert.equal(server.metrics().reads,initialReads+1,'locked credential cannot request');
       await openApp();await waitUntil(async()=>await evaluate(`!document.getElementById('app').hidden`));
+      await waitUntil(async()=>await readState()==='fresh');
       server.setMode('pending');const aborts=server.metrics().aborts;
       await refresh();await waitUntil(()=>server.metrics().pending===1);
       await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
@@ -1461,11 +1467,11 @@ async function browserRun(call,start,width,height,server){
       assert.equal(await evaluate(`document.getElementById('app').hidden`),true,'bot share link cannot unlock Depot or the app');
       assert.equal(server.metrics().authReads,opened,'share credential is rejected before the app endpoint');
       await openApp();await waitApp();
-      const initial=server.metrics().depotReads;
+
       const readState=()=>evaluate(`document.querySelector('#depot-read-root [data-state]')?.dataset.state`);
       const waitUntil=async check=>{for(let i=0;i<100;i++){if(await check())return;await new Promise(r=>setTimeout(r,20));}assert.fail('Depot state timeout');};
-      await waitUntil(async()=>await readState()==='not_loaded');
-      assert.equal(server.metrics().depotReads,initial,'mount/navigation never reads Depot');
+      await waitUntil(async()=>await readState()==='fresh');
+      const initial=server.metrics().depotReads;
       const refresh=()=>evaluate(`document.querySelector('#depot-read-root button').focus();document.querySelector('#depot-read-root button').click();true`);
       await refresh();await waitUntil(async()=>await readState()==='fresh');
       const depot=await evaluate(`(()=>{const root=document.getElementById('depot-read-root');
@@ -1518,7 +1524,7 @@ async function browserRun(call,start,width,height,server){
       server.setMode('denied');await refresh();await waitUntil(async()=>await readState()==='locked');
       const rejected=server.metrics().depotReads;await refresh();assert.equal(server.metrics().depotReads,rejected,'401 clears credential');
       server.setMode('pending');await openApp();await waitApp();const aborts=server.metrics().depotAborts;
-      await refresh();await waitUntil(()=>server.metrics().pending===2);
+      await waitUntil(()=>server.metrics().pending===2);
       await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
       assert.equal(await evaluate(`document.getElementById('app').hidden`),true);
       assert.equal(server.metrics().depotAborts,aborts,'visibility change retains an in-window credential');

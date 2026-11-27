@@ -4,7 +4,7 @@ import {createAppAccess} from '../v11/app-access.js';
 import {createDepotReadView} from '../v11/depot-read-view.js';
 import {createDepotReadClient} from '../v11/depot-read-client.js';
 import {mountDepotReadAccess} from '../v11/depot-read-bootstrap.js';
-import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B20-M11';
+import {subscribeDepotPortfolio} from '../v11/depot-portfolio-state.js?v=B20-M11-FIX1';
 class Node {
   constructor(document,tag){this.ownerDocument=document;this.tagName=tag;this.children=[];this.dataset={};this.attrs={};this.listeners=new Map();this.text='';}
   set textContent(value){this.text=String(value);this.children=[];}
@@ -52,7 +52,7 @@ test('locked start, central verify gives not_loaded with no extra Depot reads, C
   assert.equal(await h.access.verify('synthetic-password'),'unlocked');
   const afterVerify=h.urls.length;
   assert.equal(afterVerify,1,'only the central verify request');
-  assert.match(h.text(),/Noch nicht geladen/);assert.match(h.text(),/Depot manuell aktualisieren/);
+  assert.match(h.text(),/Noch nicht geladen/);assert.match(h.text(),/Depotdaten werden beim Öffnen/);
   assert.equal(h.command.dataset.state,'not_loaded');
   assert.match(h.fields.get('[data-command-depot-status]').textContent,/Noch nicht geladen/);
   assert.equal(h.fields.get('.portfolio-value').textContent,'—');

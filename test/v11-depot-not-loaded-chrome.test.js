@@ -15,7 +15,7 @@ const PASSWORD='synthetic-browser-gate-password';
 const evidence=process.env.V11_DEPOT_EVIDENCE_DIR;
 const sleep=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without reads',{timeout:120000},async()=>{
+test('V11 Depot Chrome: central unlock loads both Pionex surfaces automatically',{timeout:120000},async()=>{
   if(typeof WebSocket!=='function'){
     const env={...process.env};delete env.NODE_TEST_CONTEXT;
     const child=spawnSync(process.execPath,['--experimental-websocket',fileURLToPath(import.meta.url)],
@@ -41,7 +41,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
           await call('Input.dispatchKeyEvent',{type:'keyDown',key:name,code,windowsVirtualKeyCode:keyCode,...(text?{text,unmodifiedText:text}:{})});
           await call('Input.dispatchKeyEvent',{type:'keyUp',key:name,code,windowsVirtualKeyCode:keyCode});
         };
-        const counts={dashboard:0,prices:0,history:0,pionexHistory:0};let failure=null;
+        const counts={bots:0,dashboard:0,prices:0,history:0,pionexHistory:0};let failure=null;
         const cors=[{name:'Access-Control-Allow-Origin',value:'*'},{name:'Cache-Control',value:'no-store'}];
         call.onEvent('Fetch.requestPaused',event=>{void (async()=>{
           const url=event.request.url;
@@ -50,7 +50,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
               {name:'Access-Control-Allow-Methods',value:'GET'},{name:'Access-Control-Allow-Headers',value:'authorization,accept'}]});
             return;
           }
-          const kind=url.includes('/api/private/dashboard')?'dashboard':url.includes('portfolio-history')?'history':url.includes('pionex-history')?'pionexHistory':url.includes('binance.vision')?'prices':null;
+          const kind=url.includes('asset-watch')?'bots':url.includes('/api/private/dashboard')?'dashboard':url.includes('portfolio-history')?'history':url.includes('pionex-history')?'pionexHistory':url.includes('binance.vision')?'prices':null;
           if(!kind)throw Error('unexpected request');
           counts[kind]++;
           const body=kind==='prices'?[]:kind==='history'||kind==='pionexHistory'?{points:[]}:{};
@@ -102,16 +102,12 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         const showDepot=()=>navKey('depot'),showCommand=()=>navKey('command');
 
         await unlock();
-        assert.equal(counts.dashboard+counts.prices,0,'unlock must not read Depot sources');
-        assert.equal(counts.history,1,'only the central verification request');assert.equal(counts.pionexHistory,0,'unlock must not read Pionex history');
+        for(let i=0;i<200&&(await snap()).depot!=='unavailable';i++)await sleep(25);
         await showCommand();let s=await snap();
-        assert.equal(s.command,'not_loaded');assert.match(s.commandText,/Noch nicht geladen/);assert.equal(s.overflow,false);assert.equal(s.overlap,false);
-        await shot('command-not-loaded');
-        await showDepot();s=await snap();
-        assert.equal(s.depot,'not_loaded');assert.match(s.depotText,/Noch nicht geladen/);assert.match(s.depotText,/Depot manuell aktualisieren/);
-        assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerHidden,true,'Legacy Ledger review stays hidden');assert.equal(s.leak,false);
-        await shot('depot-not-loaded');
-        assert.equal(counts.dashboard+counts.prices,0);assert.equal(counts.history,1);
+        assert.equal(s.command,'unavailable');assert.equal(s.overflow,false);assert.equal(s.overlap,false);
+        await showDepot();s=await snap();assert.equal(s.depot,'unavailable');
+        assert.equal(counts.dashboard,1);assert.equal(counts.pionexHistory,1);
+        assert.equal(counts.prices,0);assert.equal(counts.history,1);
 
         // Keyboard activation of the single manual refresh CTA.
         await tabTo(isDepotButton('Depot aktualisieren'),'refresh button');
@@ -123,7 +119,7 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         assert.equal(await evaluate("document.activeElement.textContent"),'Depot aktualisieren','Shift+Tab returns to refresh');
         await key('Enter','Enter',13);
         for(let i=0;i<200&&(await snap()).depot==='loading';i++){if(failure)throw failure;await sleep(25);}
-        assert.equal(counts.dashboard,1);assert.equal(counts.prices,0);assert.equal(counts.history,1);assert.equal(counts.pionexHistory,1,'one separate history read per manual refresh');
+        assert.equal(counts.dashboard,2);assert.equal(counts.prices,0);assert.equal(counts.history,1);assert.equal(counts.pionexHistory,2,'one separate history read per manual refresh');
         s=await snap();
         assert.equal(s.depot,'unavailable');assert.match(s.depotText,/Nicht verfügbar/);
         assert.match(s.depotText,/Aktuell: unvollständig/);assert.match(s.depotText,/Pionex-Verlauf/);assert.doesNotMatch(s.depotText,/Ledger|OKX/);assert.match(s.ledgerText,/Ledger laden, bevor Mengen gespeichert werden/);
@@ -138,9 +134,9 @@ test('V11 Depot Chrome: central unlock shows not-loaded on both surfaces without
         assert.equal(await evaluate('document.getElementById("app").hidden'),true);
         s=await snap();assert.equal(s.depot,'locked');assert.equal(s.command,'locked');
         await unlock();await showDepot();s=await snap();
-        assert.equal(s.depot,'not_loaded');assert.equal(s.command,'not_loaded');
-        assert.doesNotMatch(s.depotText,/unvollständig/);
-        assert.equal(counts.dashboard,1);assert.equal(counts.pionexHistory,1,'re-unlock must not read Pionex history');assert.equal(counts.prices,0,'re-unlock must not read Depot sources');
+        for(let i=0;i<200&&(await snap()).depot!=='unavailable';i++)await sleep(25);
+        assert.equal((await snap()).command,'unavailable');
+        assert.equal(counts.dashboard,3);assert.equal(counts.pionexHistory,3);assert.equal(counts.prices,0);
         if(failure)throw failure;
         return {width:size.width,height:size.height,counts};
       },size.height);

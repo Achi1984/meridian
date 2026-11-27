@@ -1,3 +1,4 @@
+import {pionexReadEndpoints} from './helpers/pilot-log-fixture.mjs';
 import {swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
@@ -71,15 +72,15 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
         assert.equal(state.open,true);
         assert.equal(state.overflow,false);
         assert.equal(state.panelOverflow,false);
-        assert.equal(state.requests.filter(url=>url!==swingCheckpointEndpoint).length,1,'only central access verification and the public paper checkpoint');
-        assert.equal(state.depot,'not_loaded');
+        assert.equal(state.requests.filter(url=>url!==swingCheckpointEndpoint&&!pionexReadEndpoints.includes(url)).length,1,'only central access verification and the public paper checkpoint');
+        assert.equal(state.depot,'unavailable');
         const originalBots=state.bots;
 
         // All synthetic data and producer handles exist only in this CDP test harness.
         await evaluate(`(async()=>{
-          const {mountAgentStatus}=await import('/v11/agent-status-bootstrap.js?v=B20-M11');
-          const {createAgentStatusClient}=await import('/v11/agent-status-client.js?v=B20-M11');
-          const {appAccess}=await import('/v11/app-access.js?v=B20-M11');
+          const {mountAgentStatus}=await import('/v11/agent-status-bootstrap.js?v=B20-M11-FIX1');
+          const {createAgentStatusClient}=await import('/v11/agent-status-client.js?v=B20-M11-FIX1');
+          const {appAccess}=await import('/v11/app-access.js?v=B20-M11-FIX1');
           const base=Date.parse('2026-10-29T12:00:00.000Z'),iso=t=>new Date(t).toISOString();
           const binding=value=>({agentId:'synthetic-agent',taskId:'synthetic-task',value,
             observedAt:iso(base-1000),expiresAt:iso(base+1000),
@@ -183,9 +184,9 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
         assert.equal(state.depot,'locked');
         await unlockAppThroughGate(call);
         state=await read();
-        assert.equal(state.depot,'not_loaded');assert.equal(state.bots,originalBots);
-        const privateRequests=state.requests.filter(url=>url!==swingCheckpointEndpoint);
-        assert.equal(privateRequests.length,3,'three gate verifications, no private status, Bot or Depot reads');
+        assert.equal(state.depot,'unavailable');assert.equal(state.bots,originalBots);
+        const privateRequests=state.requests.filter(url=>url!==swingCheckpointEndpoint&&!pionexReadEndpoints.includes(url));
+        assert.equal(privateRequests.length,3,'three gate verifications, no additional status reads');
         assert.ok(privateRequests.every(url=>url.includes('/api/private/portfolio-history?range=1w')));
         console.log('V11_AGENT_STATUS_SIZE '+JSON.stringify({width:size.width,overflow:state.overflow,statusRequests:0}));
       },size.height);

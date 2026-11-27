@@ -1,9 +1,9 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B20-M11';
-import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B20-M11';
+import {createDepotHistoryView} from './depot-history-view.js?v=B20-M11-FIX1';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B20-M11-FIX1';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
-  locked:['Gesperrt','App mit Meridian-Passwort öffnen, dann Depot manuell aktualisieren.'],
-  not_loaded:['Noch nicht geladen','Depot manuell aktualisieren.'],
+  locked:['Gesperrt','Meridian entsperren, um das Depot zu laden.'],
+  not_loaded:['Noch nicht geladen','Depotdaten werden beim Öffnen der Ansicht abgerufen.'],
   loading:['Wird geladen','Die gespeicherte Depotbewertung wird geprüft.'],
   fresh:['Letzte vollständige Depotbewertung','Gespeicherter Snapshot · keine Live-Kurse oder aktuelle Kontovollständigkeit.'],
   stale:['Daten veraltet','Bewertung ausgeblendet. Bitte manuell aktualisieren.'],
@@ -23,7 +23,7 @@ const SOURCE_ISSUES={
   REQUIRED_PRICE_MISSING:'Mindestens ein benötigter Bewertungskurs fehlt oder ist nicht bestätigt.',
   VENUE_SOURCE_INVALID:'Eine Depotquelle ist nicht prüfbar.',CURRENT_SOURCE_INVALID:'Die aktuellen Depotdaten sind nicht prüfbar.',
   CURRENT_SOURCE_INCOMPLETE:'Die aktuellen Depotquellen sind unvollständig.',
-  CURRENT_SNAPSHOT_EXPIRED:'Die geladene Bewertung ist inzwischen abgelaufen. Bitte Depot manuell aktualisieren.'
+  CURRENT_SNAPSHOT_EXPIRED:'Die geladene Bewertung ist inzwischen abgelaufen. Bitte Depot erneut aktualisieren.'
 };
 const sourceDetails=issues=>Array.isArray(issues)?[...new Set(issues)].slice(0,3)
   .filter(code=>typeof code==='string'&&Object.hasOwn(SOURCE_ISSUES,code)).map(code=>SOURCE_ISSUES[code]).join(' '):'';

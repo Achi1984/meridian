@@ -1,3 +1,4 @@
+import {pionexReadEndpoints} from './helpers/pilot-log-fixture.mjs';
 import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
@@ -68,6 +69,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
   pilot.trades = [];
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
+      if(verificationOwned&&pionexReadEndpoints.includes(event.request.url))return;
       if (await servePilotFixture(call, event, pilot)) return;
       if(new URL(event.request.url).origin===localOrigin){
         await call('Fetch.continueRequest',{requestId:event.requestId});
@@ -456,7 +458,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
-        const approvedExternal=new Set([pilotEndpoint,pilotStatusEndpoint,swingCheckpointEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
+        const approvedExternal=new Set([...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,swingCheckpointEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
           SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
           SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
         assert.ok(resources.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
@@ -468,8 +470,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.progressSettled(),3);
         await intercepted.close();
         await evaluate(`(async()=>{
-          const model=await import('./paper-cockpit-model.js?v=B20-M11');
-          const view=await import('./paper-cockpit-view.js?v=B20-M11');
+          const model=await import('./paper-cockpit-model.js?v=B20-M11-FIX1');
+          const view=await import('./paper-cockpit-view.js?v=B20-M11-FIX1');
           const report=model.getDemoPaperCockpitReport();
           const demoReport=model.getDemoPaperCockpitReport();
           report.experiment.id='run-'+('R'.repeat(220));

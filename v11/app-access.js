@@ -146,3 +146,29 @@ export function createAppAccess({fetchImpl=globalThis.fetch,now=Date.now,schedul
 }
 
 export const appAccess=createAppAccess();
+
+// Refresh the snapshots used by the visible tab. Rapid navigation reuses the same read.
+export function refreshOnOpen(document, access, tabs, refresh, now = Date.now) {
+  const nav = document.getElementById('nav');
+  if (!nav) return () => {};
+  let lastRead = -Infinity;
+  function check() {
+    const tab = nav.querySelector('[aria-current="page"]')?.dataset.v;
+    if (document.hidden || !tabs.includes(tab) || !access.isUnlocked()) return;
+    const time = now();
+    if (time - lastRead < 30000) return;
+    lastRead = time;
+    refresh();
+  }
+  const unsubscribe = access.subscribe(state => {
+    if (state.status === 'unlocked') check();
+    else lastRead = -Infinity;
+  });
+  nav.addEventListener('click', check);
+  document.addEventListener('visibilitychange', check);
+  return () => {
+    unsubscribe();
+    nav.removeEventListener('click', check);
+    document.removeEventListener('visibilitychange', check);
+  };
+}

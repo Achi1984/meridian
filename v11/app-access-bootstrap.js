@@ -1,5 +1,5 @@
-import {mountReleaseUpdate} from './release-update.js?v=B20-M11';
-import {appAccess} from './app-access.js?v=B20-M11';
+import {mountReleaseUpdate} from './release-update.js?v=B20-M11-FIX1';
+import {appAccess} from './app-access.js?v=B20-M11-FIX1';
 
 export function mountAppAccess(document,window,{access=appAccess}={}){
   const app=document.getElementById('app');
@@ -48,7 +48,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
     lastStatus=state.status;
     if(state.status==='locked')status.textContent='Gesperrt. Das Meridian-Passwort wird nicht gespeichert.';
     else if(state.status==='checking')status.textContent='Zugang wird geprüft.';
-    else status.textContent='Zugang geprüft. Manuelle Datenabfragen bleiben getrennt.';
+    else status.textContent='Zugang geprüft.';
     if(visible){
       followStrategyLink();
       window.ensureStrategyWorkspace?.();
@@ -64,7 +64,7 @@ export function mountAppAccess(document,window,{access=appAccess}={}){
     status.textContent='Zugang wird geprüft.';
     const result=await access.verify(value);
     if(disposed||submission!==submissionGeneration)return;
-    if(result==='unlocked')status.textContent='Zugang geprüft. Manuelle Datenabfragen bleiben getrennt.';
+    if(result==='unlocked')status.textContent='Zugang geprüft.';
     else if(result==='rejected')status.textContent='Passwort nicht akzeptiert. Bitte erneut versuchen.';
     else status.textContent='Zugang derzeit nicht verfügbar. Bitte Verbindung prüfen und erneut versuchen.';
   }
@@ -125,7 +125,7 @@ if(typeof document!=='undefined'&&typeof window!=='undefined'){
     checking = true;
     catalogStatus.textContent = 'Strategien werden geladen …';
     try {
-      const path = './strategy-workspace-bootstrap.js?v=B20-M11';
+      const path = './strategy-workspace-bootstrap.js?v=B20-M11-FIX1';
       await import(retry ? path + '&retry=' + Date.now() : path);
       window.ensureStrategyWorkspace?.();
       if (!document.getElementById('paper-research-section')) throw Error('Workspace unavailable');
@@ -145,8 +145,8 @@ if(typeof document!=='undefined'&&typeof window!=='undefined'){
       commandMounted = true;
       const fallback = document.getElementById('paper-entry-retry');
       try {
-        const paper = fallback ? await import('./solana-meme-report.js?v=B20-M11&retry=' + Date.now()) :
-          await import('./solana-meme-report.js?v=B20-M11');
+        const paper = fallback ? await import('./solana-meme-report.js?v=B20-M11-FIX1&retry=' + Date.now()) :
+          await import('./solana-meme-report.js?v=B20-M11-FIX1');
         paper.mountCommandPaper(document,appAccess);
         fallback?.remove();
       } catch {

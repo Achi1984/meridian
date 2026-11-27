@@ -1,10 +1,10 @@
-import {appAccess} from './app-access.js?v=B20-M11';
-import {createDepotReadClient} from './depot-read-client.js?v=B20-M11';
-import {createDepotReadView} from './depot-read-view.js?v=B20-M11';
-import {mountLedgerReview} from './ledger-review-view.js?v=B20-M11';
-import {mountLedgerManual} from './ledger-manual-view.js?v=B20-M11';
+import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX1';
+import {createDepotReadClient} from './depot-read-client.js?v=B20-M11-FIX1';
+import {createDepotReadView} from './depot-read-view.js?v=B20-M11-FIX1';
+import {mountLedgerReview} from './ledger-review-view.js?v=B20-M11-FIX1';
+import {mountLedgerManual} from './ledger-manual-view.js?v=B20-M11-FIX1';
 
-// Mounting controls never starts a request. Only the view's manual refresh can read.
+// Use the authenticated reader for visible Pionex snapshots.
 export function mountDepotReadAccess(document,window,{
   access=appAccess,createClient=createDepotReadClient,createView=createDepotReadView,createLedgerView=mountLedgerReview,
   pionexOnly=false,ledgerManual=false,createLedgerManualView=mountLedgerManual,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout
@@ -12,6 +12,7 @@ export function mountDepotReadAccess(document,window,{
   const root=document.getElementById('depot-read-root');
   if(!root)return null;
   let client,view,ledgerReview,unregister=()=>{},unsubscribe=()=>{},disposed=false,expiryTimer=null,expiryGeneration=0;
+  let stopAutoRefresh=()=>{},reading=false;
   function cancelExpiry(){
     expiryGeneration++;
     if(expiryTimer!==null){cancelSchedule(expiryTimer);expiryTimer=null;}
@@ -23,6 +24,7 @@ export function mountDepotReadAccess(document,window,{
           cancelExpiry();
           if(disposed)return;
           if(state.status==='locked'&&access.isUnlocked()){access.lock();return;}
+          reading=state.status==='loading';
           options.onChange?.(state);
           if(state.status==='fresh'&&Number.isFinite(state.model?.expiresAt)){
             const generation=expiryGeneration;
@@ -40,17 +42,18 @@ export function mountDepotReadAccess(document,window,{
         }};
       }});
     unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
+    stopAutoRefresh=refreshOnOpen(document,access,['command', 'depot', 'bots'],()=>{if(!reading)client?.refresh();},now);
     if(ledgerManual)ledgerReview=createLedgerManualView(root,{access});
     else if(!pionexOnly)ledgerReview=createLedgerView(root,{access});
   }catch{
-    cancelExpiry();unregister();unsubscribe();ledgerReview?.dispose();
+    stopAutoRefresh();cancelExpiry();unregister();unsubscribe();ledgerReview?.dispose();
     try{client?.dispose();}catch{}
     root.textContent='Depotansicht nicht verfügbar. Bitte Seite neu laden.';
     return null;
   }
   return {dispose(){
     if(disposed)return;
-    disposed=true;unsubscribe();access.lock();cancelExpiry();unregister();ledgerReview?.dispose();view.dispose();client=null;
+    disposed=true;stopAutoRefresh();unsubscribe();access.lock();cancelExpiry();unregister();ledgerReview?.dispose();view.dispose();client=null;
   }};
 }
 
