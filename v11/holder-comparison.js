@@ -115,6 +115,8 @@ export function mountHolderComparison(section, add, read, amount) {
   const live = add(card, 'p', 'Laufstatus wird geladen.');
   const source = add(card, 'a', 'Laufprotokoll öffnen');
   source.href = 'https://github.com/Achi1984/meridian/actions/workflows/holder-concentration.yml';
+  const queuedLink = add(card, 'a', '');
+  queuedLink.hidden = true;
   const body = add(card, 'section', '');
   body.style.overflowWrap = 'anywhere';
   function render(report, origin) {
@@ -234,12 +236,21 @@ export function mountHolderComparison(section, add, read, amount) {
   return function refresh() {
     if (pending) return pending;
     pending = read(api + '/workflows/holder-concentration.yml/runs?branch=paper%2Fholder-token2022-forward&per_page=5').then(async feed => {
-      const run = feed.workflow_runs.find(r => r.path === '.github/workflows/holder-concentration.yml');
+      const recent = feed.workflow_runs.filter(r => r.path === '.github/workflows/holder-concentration.yml' &&
+        safe(r.id) && safe(r.run_attempt));
+      const waiting = recent.filter(r => ['pending','queued','waiting','requested'].includes(r.status));
+      const run = recent.find(r => r.status === 'in_progress') || waiting[0] || recent[0];
       if (!safe(run?.id) || !safe(run.run_attempt)) throw Error('run');
-      const state = {in_progress:'läuft', queued:'in Warteschlange', success:'abgeschlossen', failure:'fehlgeschlagen',
+      const state = {in_progress:'läuft', queued:'in Warteschlange', pending:'in Warteschlange', waiting:'wartet', requested:'angefordert', success:'abgeschlossen', failure:'fehlgeschlagen',
         cancelled:'abgebrochen'}[run.conclusion || run.status] || run.status;
       live.textContent = 'Paperlauf ' + run.id + ' · Versuch ' + run.run_attempt + ' · ' + state;
       source.href = runs + run.id + '/attempts/' + run.run_attempt;
+      const next = waiting.find(item => item.id !== run.id);
+      queuedLink.hidden = !next;
+      if (next) {
+        queuedLink.textContent = 'In Warteschlange · Lauf ' + next.id + ' · Versuch ' + next.run_attempt;
+        queuedLink.href = runs + next.id + '/attempts/' + next.run_attempt;
+      }
       // A rerun shares its run ID with earlier attempts. Only completed attempts have reports.
       const candidates = [];
       for (const item of feed.workflow_runs) {
@@ -255,6 +266,7 @@ export function mountHolderComparison(section, add, read, amount) {
       }
       if (!displayedKey && !localReport) body.textContent = 'Bestätigter Endstand derzeit nicht abrufbar.';
     }).catch(async () => {
+      queuedLink.hidden = true;
       live.textContent = 'Aktueller Laufstatus nicht abrufbar.';
       if (!displayedKey && !localReport) {
         try { await showPublished(45900543591, 1); }
