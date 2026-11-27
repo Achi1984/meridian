@@ -2,7 +2,7 @@ import {
   isSpotPaperReportEnvelope,
   readBoundedSpotPaperResponse,
   SPOT_PAPER_REPORT_TIMEOUT_MS
-} from '../scripts/spot-paper-report-bridge/contract.mjs?v=B20-M11-FIX2';
+} from '../scripts/spot-paper-report-bridge/contract.mjs?v=B20-M11-FIX3';
 
 function outcome(status, report = null, reason = null) {
   return {status, report, reason};

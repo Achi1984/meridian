@@ -1,8 +1,8 @@
-import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX2';
-import {createDepotReadClient} from './depot-read-client.js?v=B20-M11-FIX2';
-import {createDepotReadView} from './depot-read-view.js?v=B20-M11-FIX2';
-import {mountLedgerReview} from './ledger-review-view.js?v=B20-M11-FIX2';
-import {mountLedgerManual} from './ledger-manual-view.js?v=B20-M11-FIX2';
+import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX3';
+import {createDepotReadClient} from './depot-read-client.js?v=B20-M11-FIX3';
+import {createDepotReadView} from './depot-read-view.js?v=B20-M11-FIX3';
+import {mountLedgerReview} from './ledger-review-view.js?v=B20-M11-FIX3';
+import {mountLedgerManual} from './ledger-manual-view.js?v=B20-M11-FIX3';
 
 // Use the authenticated reader for visible Pionex snapshots.
 export function mountDepotReadAccess(document,window,{

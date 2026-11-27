@@ -1,7 +1,7 @@
 // Inactive component: mount explicitly with the existing read-client factory.
 // No network, credentials, storage or engine imports belong to this renderer.
-import {buildBotOverviewModel} from './bot-overview-model.js?v=B20-M11-FIX2';
-import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B20-M11-FIX2';
+import {buildBotOverviewModel} from './bot-overview-model.js?v=B20-M11-FIX3';
+import {subscribeDepotPortfolio} from './depot-portfolio-state.js?v=B20-M11-FIX3';
 
 const LABELS = {
   locked: ['Gesperrt', 'Meridian entsperren, um die Bots zu laden.'],
@@ -245,7 +245,7 @@ export function renderBotReadState(root, state, filters = {}) {
     stamp.setAttribute('datetime',data.snapshotAt);stamp.setAttribute('title','UTC: '+data.snapshotAt);
     context.append(stamp,element(document,'span',' · bestätigt keinen laufenden Bot-Prozess.'));
     status.append(context);
-  }else status.append(element(document,'p',LABELS[data.status][1]));
+  }else if(data.status!=='loading')status.append(element(document,'p',LABELS[data.status][1]));
   details.replaceChildren();
   details.setAttribute('aria-busy',data.status==='loading'?'true':'false');
   if (data.status === 'fresh') {
@@ -542,6 +542,7 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       :'—');
     value.className='depot-total';
     value.setAttribute('aria-label',valid?'Pionex-Bewertung: '+value.textContent:'Pionex-Bewertung nicht verfügbar');
+    portfolio.hidden = ['loading','not_loaded'].includes(status);
     portfolio.append(value);
     if(valid){
       const source=model.source==='SERVER_PIONEX_CURRENT'?'Serverseitige Pionex-Bewertung':model.source==='SERVER_PORTFOLIO_CURRENT'?'Serverseitige Depotbewertung':'Gespeicherte Depotbewertung';
@@ -550,7 +551,8 @@ export function createBotReadView(root, {createClient,getToken,onSnapshot} = {})
       const expires=Number.isSafeInteger(model.expiresAt)?new Date(model.expiresAt).toISOString():'unbekannt';
       const expiry=element(document,'time',expires==='unbekannt'?expires:new Date(expires).toLocaleString('de-AT'));
       if(expires!=='unbekannt'){expiry.setAttribute('datetime',expires);expiry.setAttribute('title','UTC: '+expires);}
-      portfolio.append(element(document,'p','Aktuell · '+source+' · Stand (lokale Zeit): '),asOf,
+      const notes=element(document,'details');notes.className='metric-notes';notes.append(element(document,'summary','Bewertungsquelle'));
+      portfolio.append(notes);notes.append(element(document,'p','Aktuell · '+source+' · Stand (lokale Zeit): '),asOf,
         element(document,'p','Quellzeit (lokale Zeit): '),sourceAt,
         element(document,'p','Gültig bis (lokale Zeit): '),expiry,
         element(document,'p','Pionex-Wert; kein Gesamtvermögen. Bot-Kapital und P/L bleiben getrennt und werden nicht addiert.'));

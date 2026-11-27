@@ -1,5 +1,5 @@
-import {createLedgerManualClient} from './ledger-manual-client.js?v=B20-M11-FIX2';
-import {parseLedgerManualText} from './ledger-manual-model.js?v=B20-M11-FIX2';
+import {createLedgerManualClient} from './ledger-manual-client.js?v=B20-M11-FIX3';
+import {parseLedgerManualText} from './ledger-manual-model.js?v=B20-M11-FIX3';
 const messages={locked:'App entsperren, um Ledger-Bestände zu laden.',loading:'Ledger-Bestände und öffentliche Kurse werden geladen.',
   ready:'Manuell erfasste Mengen; keine automatische Wallet-Abfrage.',saving:'Ledger-Mengen werden gespeichert.',
   saved:'Gespeichert. Ledger neu laden, um den gespeicherten Stand mit aktuellen Kursen anzuzeigen.',
@@ -8,9 +8,9 @@ const messages={locked:'App entsperren, um Ledger-Bestände zu laden.',loading:'
   write_unknown:'Speicherergebnis unbekannt. Nicht erneut senden; zuerst neu laden und gespeicherten Stand vergleichen.'};
 export function mountLedgerManual(root,{access,createClient=createLedgerManualClient}={}){
   const doc=root.ownerDocument,el=(tag,text)=>{const n=doc.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
-  const section=el('section'),status=el('p'),content=el('div'),load=el('button','Ledger laden / Kurse aktualisieren');
+  const section=el('section'),status=el('p'),content=el('div'),load=el('button','Ledger aktualisieren');
   section.className='card ledger-manual';status.setAttribute('role','status');load.type='button';
-  const editor=el('details'),summary=el('summary','Ledger-Mengen erfassen oder ersetzen'),form=el('form');
+  const editor=el('details'),summary=el('summary','Mengen bearbeiten'),form=el('form');
   const quantities=el('textarea'),observed=el('input'),key=el('input'),save=el('button','Ledger-Mengen speichern');
   quantities.rows=8;quantities.name='ledger-holdings';quantities.setAttribute('aria-label','Ledger-Mengen: Symbol; Menge je Zeile');
   observed.type='datetime-local';observed.name='ledger-observed-at';observed.setAttribute('aria-label','Stand der manuell geprüften Ledger-Mengen');
@@ -22,7 +22,7 @@ export function mountLedgerManual(root,{access,createClient=createLedgerManualCl
     field('Separater Schreibschlüssel (nicht das App-Passwort)',key),
     el('p','Der Schreibschlüssel wird nur für diesen Speichervorgang verwendet. Kurse werden nicht manuell gespeichert.'),save);
   editor.append(summary,form);section.append(el('h3','Ledger · manuelle Bestände'),
-    el('p','Mengen bleiben bis zu deiner nächsten Aktualisierung unverändert. Die Bewertung nutzt aktuelle öffentliche USDT-Kurse; sie ist getrennt von Pionex und kein Gesamtvermögen.'),load,status,content,editor);root.append(section);
+    el('p','Öffentliche USDT-Kurse · nur Ledger, kein Gesamtvermögen'),load,status,content,editor);root.append(section);
   let ready=false,disposed=false;
   const client=createClient({getToken:access.getToken,onLock:()=>access.lock(),onChange:s=>{
     if(disposed)return;ready=s.status==='ready';save.disabled=!ready;load.disabled=['loading','saving','locked'].includes(s.status);
@@ -32,7 +32,7 @@ export function mountLedgerManual(root,{access,createClient=createLedgerManualCl
     if(!ready)return;
     if(!s.model){
       status.textContent='Noch kein manueller Ledger-Mengenstand gespeichert. Das bestätigt weder ein leeres Wallet noch einen Wert von null.';
-      content.append(el('p','Unter „Ledger-Mengen erfassen oder ersetzen“ kannst du deine geprüften Mengen und deren Bestandszeit erfassen. Es erfolgt keine automatische Wallet-Abfrage.'));
+      content.append(el('p','Unter „Mengen bearbeiten“ kannst du deine geprüften Mengen und deren Bestandszeit erfassen. Es erfolgt keine automatische Wallet-Abfrage.'));
       return;
     }
     const m=s.model;content.append(el('p','Mengenstand: '+new Date(m.observedAt).toLocaleString('de-AT')));

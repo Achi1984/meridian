@@ -1,5 +1,3 @@
-diff --git b/v11/index.html a/v11/index.html
-index d84027c..4a33cf2 100644
 --- b/v11/index.html
 +++ a/v11/index.html
 @@ -190,8 +189,0 @@
@@ -11,20 +9,46 @@ index d84027c..4a33cf2 100644
 -    .bot-asset-group>summary::after{content:"⌄";text-align:right}
 -    .bot-asset-group[open]>summary::after{content:"⌃"}
 -    .bot-asset-group .bot-pnl-negative{color:#ff9b9b}.bot-asset-group .bot-pnl-positive{color:#6ee7b7}
-@@ -550 +542 @@
--        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.2<small>Versionsverlauf ▾</small></button>
+@@ -525,19 +516,0 @@
+-  <style id="dashboard-semantic-colors">
+-    :root{--reading-value:#f1f5fa;--reading-blue:#a4ceff;--reading-positive:#6ee7b7;--reading-negative:#ff9b9b;--reading-alert:#ffd18a;--reading-muted:#afbdcd}
+-    .view .portfolio-value,.view .depot-read-view .depot-total,.view .account-value{color:var(--reading-value)}
+-    #app .paper-gain,.view .solana-comparison .af-positive,.view .bot-read-view .bot-pnl-positive,.view .command-bot-pnl.bot-pnl-positive{color:var(--reading-positive)}
+-    #app .paper-loss,.view .solana-comparison .af-negative,.view .bot-read-view .bot-pnl-negative,.view .command-bot-pnl.bot-pnl-negative{color:var(--reading-negative)}
+-    .view meridian-run-clock,#app .paper-live,#solana-meme-paper .pilot-status[data-state=running],.view .depot-history svg{color:var(--reading-blue)}
+-    #app .paper-wait,.view .af-waiting,.decision summary .limited,
+-    .view [data-state=stale]>.state-label,.view [data-state=unavailable]>.state-label,
+-    .view [data-state=stale]>[role=status]>strong,.view [data-state=unavailable]>[role=status]>strong{color:var(--reading-alert)}
+-    .view meridian-run-clock{display:block;margin-block:.35rem;font-weight:650}
+-    .view meridian-run-clock[hidden]{display:none}
+-    .view .metric-notes{margin:.5rem 0;color:var(--reading-muted)}
+-    .view .metric-notes>summary{min-height:44px;padding:10px 0;cursor:pointer;color:var(--reading-blue)}
+-    #command-portfolio[data-state=fresh] .portfolio-description,#command-portfolio[data-state=fresh] .trust-cell:has([data-command-depot-status]){display:none}
+-    #command-portfolio[data-state=fresh] .trust-grid{grid-template-columns:1fr}
+-    #view-depot .depot-total{margin:.4rem 0}
+-    .solana-comparison .paper-account{display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:baseline;gap:2px 8px;margin:8px 0;padding:5px 0;border-bottom:1px solid var(--line)}
+-    .paper-account>:nth-child(even){text-align:right}
+-  </style>
+@@ -569 +542 @@
+-        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.3<small>Versionsverlauf ▾</small></button>
 +        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20<small>Versionsverlauf ▾</small></button>
-@@ -561 +553 @@
--        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Pionex-Bots sind nach Asset gruppiert. Command, Depot und Bots laden ihre Daten beim Öffnen.</p></li>
+@@ -580 +553 @@
+-        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Kompakte Depotwerte, Paperbot-Timer und P/L je Asset. Quellen und Messdetails lassen sich aufklappen.</p></li>
 +        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Command bündelt Paperbots und Kontostatus. Details lassen sich aufklappen.</p></li>
-@@ -622 +614 @@
+@@ -641 +614 @@
 -          <p>Pionex-Daten werden beim Öffnen der Ansicht aktualisiert. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
 +          <p>Depot- und Botdaten werden getrennt manuell geladen. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
-@@ -629,2 +621,2 @@
+@@ -648,2 +621,2 @@
 -          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit geschütztem Depot- und Bot-Lesezugang.</p>
 -          <p><b>Daten:</b> Nach dem Entsperren lädt Meridian die Pionex-Daten der geöffneten Ansicht.</p>
 +          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>
 +          <p><b>Daten:</b> Keine automatischen Abfragen, keine Handelsfreigabe. Bot-Snapshots erst nach ausdrücklicher manueller Abfrage.</p>
-@@ -678 +670 @@
--      <p class="caption">Automatische Leseabfrage beim Öffnen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>
+@@ -685 +658 @@
+-      <section class="card card-muted" aria-labelledby="depot-holdings-heading" hidden>
++      <section class="card card-muted" aria-labelledby="depot-holdings-heading">
+@@ -695 +668 @@
+-        <p class="caption">Gebühren, Risikopuffer und Schutzstatus sind nur mit Quelldaten prüfbar.</p>
++        <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
+@@ -697 +670 @@
+-      <p class="caption">Automatisch aktualisiert · nur lesend</p>
 +      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>

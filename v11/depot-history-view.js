@@ -1,4 +1,4 @@
-import {DEPOT_WINDOWS} from './depot-history-model.js?v=B20-M11-FIX2';
+import {DEPOT_WINDOWS} from './depot-history-model.js?v=B20-M11-FIX3';
 export function createDepotHistoryView(root,{onRange,pionexOnly=false}={}){
   const money=x=>pionexOnly?new Intl.NumberFormat('de-DE',{minimumFractionDigits:2,maximumFractionDigits:2}).format(x)+' USD/USDT':new Intl.NumberFormat('de-DE',{style:'currency',currency:'USD'}).format(x);
   const name=pionexOnly?'Pionex-Verlauf':'Depotverlauf';
@@ -17,7 +17,7 @@ export function createDepotHistoryView(root,{onRange,pionexOnly=false}={}){
     if(pionexOnly&&['ready','empty'].includes(model?.status)&&model.scope==='PIONEX'&&model.currency==='USD/USDT'&&model.truncated===true)
       output.append(el('p','Begrenzter Verlauf: Dieser Abruf ist auf höchstens 2.200 der neuesten gespeicherten Messpunkte begrenzt. Ältere Punkte sind nicht enthalten.'));
     if(!model||model.status!=='ready'||pionexOnly&&(model.scope!=='PIONEX'||model.currency!=='USD/USDT')){
-      output.append(el('p',model?.status==='empty'?(pionexOnly?'Noch keine Pionex-Verlaufspunkte im gewählten Zeitraum.':'Für diesen Zeitraum sind noch keine vollständigen Bewertungen gespeichert.'):'Verlauf nicht verfügbar. Depot manuell aktualisieren.'));return;
+      output.append(el('p',model?.status==='empty'?(pionexOnly?'Noch keine Pionex-Verlaufspunkte im gewählten Zeitraum.':'Für diesen Zeitraum sind noch keine vollständigen Bewertungen gespeichert.'):'Verlauf nicht verfügbar.'));return;
     }
     const vals=model.points.map(p=>p.totalUsd),low=Math.min(...vals),high=Math.max(...vals),span=high-low||Math.max(1,high*.01),base=high===low?low-span/2:low;
     const ns='http://www.w3.org/2000/svg',svg=d.createElementNS(ns,'svg');svg.setAttribute('viewBox','0 0 320 174');svg.setAttribute('role','img');
@@ -35,14 +35,16 @@ export function createDepotHistoryView(root,{onRange,pionexOnly=false}={}){
       tick.setAttribute('x',x);tick.setAttribute('y',162);tick.setAttribute('text-anchor',anchor);tick.setAttribute('fill','currentColor');tick.setAttribute('font-size','10');
       tick.textContent=new Date(time).toLocaleString('de-AT',range==='1w'?{day:'2-digit',month:'2-digit'}:{hour:'2-digit',minute:'2-digit'});svg.append(tick);
     }
-    output.append(el('p','Zeitachse: '+new Date(model.start).toLocaleString('de-AT')+' bis '+new Date(model.end).toLocaleString('de-AT')+' (lokale Zeit). Vorhandene Messungen: '+new Date(model.points[0].timestamp).toLocaleString('de-AT')+' bis '+new Date(model.points.at(-1).timestamp).toLocaleString('de-AT')+'.'));
-    if(pionexOnly)output.append(el('p','Nur bestätigtes Pionex-Eigenkapital. Zeitachse: Quellenzeit; Speicherung erfolgt später. Kein Gesamtvermögen.'));
+    const notes=el('details');notes.className='metric-notes';notes.append(el('summary','Messdetails'));
+    notes.append(el('p','Zeitachse: '+new Date(model.start).toLocaleString('de-AT')+' bis '+new Date(model.end).toLocaleString('de-AT')+' (lokale Zeit). Vorhandene Messungen: '+new Date(model.points[0].timestamp).toLocaleString('de-AT')+' bis '+new Date(model.points.at(-1).timestamp).toLocaleString('de-AT')+'.'));
+    if(pionexOnly)notes.append(el('p','Nur bestätigtes Pionex-Eigenkapital. Zeitachse: Quellenzeit; Speicherung erfolgt später. Kein Gesamtvermögen.'));
     output.append(svg,el('p',`${model.points.length} Messpunkte · Min. ${money(low)} · Max. ${money(high)}`));
+    output.append(notes);
     const first=model.points[0],last=model.points.at(-1);
-    output.append(el('p',`Erster Punkt: ${new Date(first.timestamp).toLocaleString('de-AT')} · ${money(first.totalUsd)}`),el('p',`Letzter gespeicherter Verlaufspunkt (lokale Zeit): ${new Date(last.timestamp).toLocaleString('de-AT')} · ${money(last.totalUsd)}`));
-    output.append(el('p','Der letzte Verlaufspunkt ist eine gespeicherte Messung und kann vom separat angezeigten Bewertungsstand abweichen.'));
-    output.append(el('p',model.gaps?'Datenlücken: unterbrochene oder ausgeschlossene Messungen werden nicht verbunden.':'Gespeicherte Bewertungen; vor dem ersten und nach dem letzten Punkt bleibt die Kurve offen.'));
-    output.append(el('p','Ein- und Auszahlungen können den Verlauf verändern. Keine P/L- oder Renditeberechnung; keine Cashflowbereinigung.'));
+    notes.append(el('p',`Erster Punkt: ${new Date(first.timestamp).toLocaleString('de-AT')} · ${money(first.totalUsd)}`),el('p',`Letzter gespeicherter Verlaufspunkt (lokale Zeit): ${new Date(last.timestamp).toLocaleString('de-AT')} · ${money(last.totalUsd)}`));
+    notes.append(el('p','Der letzte Verlaufspunkt ist eine gespeicherte Messung und kann vom separat angezeigten Bewertungsstand abweichen.'));
+    notes.append(el('p',model.gaps?'Datenlücken: unterbrochene oder ausgeschlossene Messungen werden nicht verbunden.':'Gespeicherte Bewertungen; vor dem ersten und nach dem letzten Punkt bleibt die Kurve offen.'));
+    notes.append(el('p','Ein- und Auszahlungen können den Verlauf verändern. Keine P/L- oder Renditeberechnung; keine Cashflowbereinigung.'));
   }
   return {render};
 }

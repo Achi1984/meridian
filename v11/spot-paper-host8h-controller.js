@@ -1,9 +1,9 @@
-import {appAccess} from './app-access.js?v=B20-M11-FIX2';
-import {renderSpotPaperHost8h} from './spot-paper-host8h-view.js?v=B20-M11-FIX2';
+import {appAccess} from './app-access.js?v=B20-M11-FIX3';
+import {renderSpotPaperHost8h} from './spot-paper-host8h-view.js?v=B20-M11-FIX3';
 import {
   presentSpotPaperHost8h,
   SPOT_PAPER_HOST8H_MAX_INPUT_BYTES
-} from './spot-paper-host8h-model.js?v=B20-M11-FIX2';
+} from './spot-paper-host8h-model.js?v=B20-M11-FIX3';
 
 export const SPOT_PAPER_HOST8H_REPORT_ENDPOINT =
   'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/spot-paper-host8h-report';
