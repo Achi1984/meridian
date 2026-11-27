@@ -1,7 +1,7 @@
 import {
   getDemoPaperCockpitReport,
   presentPaperCockpitReport
-} from './paper-cockpit-model.js?v=B20-M11-FIX1';
+} from './paper-cockpit-model.js?v=B20-M11-FIX2';
 
 const unavailable = 'Nicht verfügbar';
 const shown = value => Number.isSafeInteger(value) && value >= 0 ? String(value) : 'UNKNOWN';

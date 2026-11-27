@@ -12,7 +12,7 @@ index d84027c..4a33cf2 100644
 -    .bot-asset-group[open]>summary::after{content:"⌃"}
 -    .bot-asset-group .bot-pnl-negative{color:#ff9b9b}.bot-asset-group .bot-pnl-positive{color:#6ee7b7}
 @@ -550 +542 @@
--        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.1<small>Versionsverlauf ▾</small></button>
+-        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.2<small>Versionsverlauf ▾</small></button>
 +        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20<small>Versionsverlauf ▾</small></button>
 @@ -561 +553 @@
 -        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Pionex-Bots sind nach Asset gruppiert. Command, Depot und Bots laden ihre Daten beim Öffnen.</p></li>

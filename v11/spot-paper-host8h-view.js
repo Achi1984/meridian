@@ -2,7 +2,7 @@ import {
   createSpotPaperHost8hAdapter,
   presentSpotPaperHost8h,
   SPOT_PAPER_HOST8H_REQUESTED_DURATION_MS
-} from './spot-paper-host8h-model.js?v=B20-M11-FIX1';
+} from './spot-paper-host8h-model.js?v=B20-M11-FIX2';
 
 function node(document, parent, tag, text = '', className = '') {
   const element = document.createElement(tag);
@@ -138,6 +138,10 @@ function renderModel(root, model, document, options = {}) {
     field(document, summary, 'Aktualität', freshness(model.freshness?.status));
     if (metrics) field(document, summary, 'Tatsächliche Dauer',
       `${duration(metrics.elapsedMs)} von ${duration(SPOT_PAPER_HOST8H_REQUESTED_DURATION_MS)}`);
+    if (metrics?.provisional && Number.isSafeInteger(metrics.elapsedMs)) {
+      field(document, summary, 'Restzeit beim letzten Stand',
+        duration(Math.max(0, SPOT_PAPER_HOST8H_REQUESTED_DURATION_MS - metrics.elapsedMs)));
+    }
     field(document, summary, 'Modus', 'BTC/EUR · 1× · nur Long');
     root.append(summary);
   } else if (!options.message) {

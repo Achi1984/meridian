@@ -1,5 +1,5 @@
-import {createDepotHistoryView} from './depot-history-view.js?v=B20-M11-FIX1';
-import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B20-M11-FIX1';
+import {createDepotHistoryView} from './depot-history-view.js?v=B20-M11-FIX2';
+import {publishDepotPortfolioState} from './depot-portfolio-state.js?v=B20-M11-FIX2';
 // DOM text only. Neither credentials nor raw response bodies are rendered.
 const LABELS={
   locked:['Gesperrt','Meridian entsperren, um das Depot zu laden.'],
