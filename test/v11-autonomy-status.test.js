@@ -26,5 +26,5 @@ test('historical UI evidence is separate from current operation and draft revisi
  assert.match(strip,/datetime="2026-10-11T19:30:28Z"/);
  assert.match(strip,/https:\/\/github.com\/Achi1984\/meridian\/pull\/702/);
  assert.match(strip,/Versionsstand ist kein Lebenszeichen/);
- assert.match(html,/>11 · Vorschau B20.5<small>/);
+ assert.match(html,/>11 · Vorschau B20.6<small>/);
 });

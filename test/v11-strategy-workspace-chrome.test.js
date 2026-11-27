@@ -1,5 +1,5 @@
 import {pionexReadEndpoints} from './helpers/pilot-log-fixture.mjs';
-import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
+import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, top100Endpoint, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {createServer} from 'node:http';
 import {existsSync,mkdirSync,readFileSync,writeFileSync} from 'node:fs';
@@ -1184,7 +1184,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.match(afterStaleRead.alertText,/Export konnte nicht angenommen werden\. Kein Ergebnis wird angezeigt\./);
         assert.doesNotMatch(afterStaleRead.text,/Lifecycle completed|Engine-Ergebnis\s+COMPLETED/);
         const hostilePresentation=await evaluate(`(async()=>{
-          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B20-M11-FIX5');
+          const {renderArenaResultView}=await import('/v11/arena-result-view.js?v=B20-M11-FIX6');
           const hostile='"><img src=x onerror="alert(1)">'+ 'identity'.repeat(60);
           const root=document.createElement('div');
           root.style.cssText='max-width:100%;min-width:0';
@@ -1209,7 +1209,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.ok(hostilePresentation.columns>=190);
         if(size.width===320){
           const disposal=await evaluate(`(async()=>{
-            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B20-M11-FIX5');
+            const {createStrategyArenaView}=await import('/v11/strategy-arena.js?v=B20-M11-FIX6');
             const existingIds=new Set([...document.querySelectorAll('#strategy-arena-root [id^="arena-producer-"]')].map(node=>node.id));
             const root=document.createElement('div');document.body.append(root);
             const view=createStrategyArenaView(root,{fetchImpl:async()=>{throw Error('synthetic provenance read failure');}});
@@ -1312,7 +1312,7 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
         assert.equal(pairedReads,1,'active Strategies entry performs exactly one authorized paired read');
         assert.equal(progressReads,1,'active Strategies entry performs exactly one authorized progress read');
         assert.ok(arena.network.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
-          [...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,swingCheckpointEndpoint,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
+          [...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,top100Endpoint,swingCheckpointEndpoint,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT].includes(url)),
         'all external requests are blocked except the exact bounded report/progress endpoints');
         if(evidence){
           await evaluate(`document.querySelector('#strategy-arena-root .arena-model-card').scrollIntoView({block:'start'})`);

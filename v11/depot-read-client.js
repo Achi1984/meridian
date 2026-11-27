@@ -1,8 +1,8 @@
-import {buildPionexHistoryModel} from './pionex-history-model.js?v=B20-M11-FIX5';
-import {buildCurrentDepotModel,buildPionexDepotModel} from './depot-current-model.js?v=B20-M11-FIX5';
-import {buildDepotHistoryModel} from './depot-history-model.js?v=B20-M11-FIX5';
-import {buildDepotReadModel} from './depot-read-model.js?v=B20-M11-FIX5';
-import {parseBotReadCredential} from './bot-read-client.js?v=B20-M11-FIX5';
+import {buildPionexHistoryModel} from './pionex-history-model.js?v=B20-M11-FIX6';
+import {buildCurrentDepotModel,buildPionexDepotModel} from './depot-current-model.js?v=B20-M11-FIX6';
+import {buildDepotHistoryModel} from './depot-history-model.js?v=B20-M11-FIX6';
+import {buildDepotReadModel} from './depot-read-model.js?v=B20-M11-FIX6';
+import {parseBotReadCredential} from './bot-read-client.js?v=B20-M11-FIX6';
 
 const ENDPOINT = 'https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/portfolio-history?range=1w';
 const CURRENT_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/dashboard';
@@ -48,7 +48,7 @@ async function readBounded(response, signal) {
 
 // Manual reads only. Independent source failures preserve other verified results.
 export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=globalThis.fetch,
-  pionexOnly=false,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
+  pionexOnly=false,onLedgerSnapshot,now=Date.now,schedule=setTimeout,cancelSchedule=clearTimeout}={}){
   let generation=0,pending=null,disposed=false,current=null,stored=null,history=null,attempted=false,src=null;
   const token=()=>{try{const value=getToken();return parseDepotReadCredential(value)?value.trim():null;}catch{return null;}};
   let snapshotToken=null;
@@ -102,6 +102,8 @@ export function createDepotReadClient({getToken,onChange=()=>{},fetchImpl=global
       const [dashboard,archive]=await Promise.all([read(CURRENT_ENDPOINT,credential,ctl.signal),read(ENDPOINT.replace('portfolio-history','pionex-history'),credential,ctl.signal)]);
       if(disposed||id!==generation)return;
       pending=null;if(token()!==credential||dashboard.locked||archive.locked){lock();return;}
+      if(dashboard.data?.private===true && Number.isSafeInteger(dashboard.data.data?.privateRevision))onLedgerSnapshot?.(dashboard.data);
+      else onLedgerSnapshot?.(null);
       const c=buildPionexDepotModel(dashboard.data,{now:now()});
       current=c.status==='FRESH_SNAPSHOT'?c:c.status==='STALE'?{status:'STALE'}:null;
       history=Object.fromEntries(['1h','1d','1w'].map(range=>[range,buildPionexHistoryModel(archive.data,{now:now(),range})]));

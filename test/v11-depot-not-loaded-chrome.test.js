@@ -122,7 +122,7 @@ test('V11 Depot Chrome: central unlock loads both Pionex surfaces automatically'
         assert.equal(counts.dashboard,2);assert.equal(counts.prices,0);assert.equal(counts.history,1);assert.equal(counts.pionexHistory,2,'one separate history read per manual refresh');
         s=await snap();
         assert.equal(s.depot,'unavailable');assert.match(s.depotText,/Nicht verfügbar/);
-        assert.match(s.depotText,/Aktuell: unvollständig/);assert.match(s.depotText,/Pionex-Verlauf/);assert.doesNotMatch(s.depotText,/Ledger|OKX/);assert.match(s.ledgerText,/Ledger laden, bevor Mengen gespeichert werden/);
+        assert.match(s.depotText,/Aktuell: unvollständig/);assert.match(s.depotText,/Pionex-Verlauf/);assert.doesNotMatch(s.depotText,/Ledger|OKX/);assert.match(s.ledgerText,/Ledger-Stand konnte nicht geladen/);
         assert.equal(s.overflow,false);assert.equal(s.targets,true);assert.equal(s.ledgerHidden,true,'Legacy Ledger review stays hidden');assert.equal(s.leak,false);
         await showCommand();s=await snap();
         assert.equal(s.command,'unavailable');assert.equal(s.overlap,false);assert.equal(s.overflow,false);

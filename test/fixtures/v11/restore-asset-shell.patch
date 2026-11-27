@@ -9,7 +9,7 @@
 -    .bot-asset-group>summary::after{content:"⌄";text-align:right}
 -    .bot-asset-group[open]>summary::after{content:"⌃"}
 -    .bot-asset-group .bot-pnl-negative{color:#ff9b9b}.bot-asset-group .bot-pnl-positive{color:#6ee7b7}
-@@ -525,73 +516,0 @@
+@@ -525,79 +516,0 @@
 -  <style id="dashboard-semantic-colors">
 -    :root{--reading-value:#f1f5fa;--reading-blue:#a4ceff;--reading-positive:#6ee7b7;--reading-negative:#ff9b9b;--reading-alert:#ffd18a;--reading-muted:#afbdcd}
 -    .view .portfolio-value,.view .depot-read-view .depot-total,.view .account-value{color:var(--reading-value)}
@@ -83,26 +83,32 @@
 -    #app .bot-card-list details{margin-block:0}
 -    #app .bot-diagnostics>p,#app .bot-diagnostics>.bot-data-summary{margin-inline:12px}
 -  </style>
-@@ -623 +542 @@
--        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.5<small>Versionsverlauf ▾</small></button>
+-  <style>
+-    #app .paper-group-pnl{display:flex;flex-wrap:wrap;gap:2px 10px;grid-column:1;grid-row:2;flex-basis:100%;font-size:var(--type-meta);font-weight:600;color:var(--reading-muted)}
+-    #app .command-ledger{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin-top:12px;color:var(--reading-muted)}
+-    #app .command-ledger[hidden]{display:none}
+-    #app .command-ledger strong{color:var(--reading-blue);font-variant-numeric:tabular-nums}
+-  </style>
+@@ -629 +542 @@
+-        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.6<small>Versionsverlauf ▾</small></button>
 +        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20<small>Versionsverlauf ▾</small></button>
-@@ -634 +553 @@
+@@ -640 +553 @@
 -        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Kompakte Depotwerte, Paperbot-Timer und P/L je Asset. Quellen und Messdetails lassen sich aufklappen.</p></li>
 +        <li><strong>Meridian 11 · B20</strong><span class="version-status">Vorschau</span><p>Command bündelt Paperbots und Kontostatus. Details lassen sich aufklappen.</p></li>
-@@ -695 +614 @@
+@@ -701 +614 @@
 -          <p>Pionex-Daten werden beim Öffnen der Ansicht aktualisiert. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
 +          <p>Depot- und Botdaten werden getrennt manuell geladen. Nur lesend, keine Handlungsempfehlung oder automatische Order. Keine Aussage über Liquidationsgefahr oder Handelsschutz.</p>
-@@ -702,2 +621,2 @@
+@@ -708,2 +621,2 @@
 -          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit geschütztem Depot- und Bot-Lesezugang.</p>
 -          <p><b>Daten:</b> Nach dem Entsperren lädt Meridian die Pionex-Daten der geöffneten Ansicht.</p>
 +          <p><b>Modus:</b> Öffentliche Entwicklungs-Vorschau mit optionalem manuellem Depot- und Bot-Lesezugang.</p>
 +          <p><b>Daten:</b> Keine automatischen Abfragen, keine Handelsfreigabe. Bot-Snapshots erst nach ausdrücklicher manueller Abfrage.</p>
-@@ -739 +658 @@
+@@ -745 +658 @@
 -      <section class="card card-muted" aria-labelledby="depot-holdings-heading" hidden>
 +      <section class="card card-muted" aria-labelledby="depot-holdings-heading">
-@@ -749 +668 @@
+@@ -755 +668 @@
 -        <p class="caption">Gebühren, Risikopuffer und Schutzstatus sind nur mit Quelldaten prüfbar.</p>
 +        <p class="caption">Ohne bestätigte Botdaten sind Gebühren, Risikopuffer und Schutzstatus unbekannt. Fehlende Daten sind keine Entwarnung.</p>
-@@ -751 +670 @@
+@@ -757 +670 @@
 -      <p class="caption">Automatisch aktualisiert · nur lesend</p>
 +      <p class="caption">Nur manuelle Leseabfragen. Diese Ansicht steuert keine Bots. Strategieforschung ist von deinen Pionex-Snapshots getrennt.</p>

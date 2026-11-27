@@ -1,6 +1,6 @@
-import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX5';
-import {createBotReadClient} from './bot-read-client.js?v=B20-M11-FIX5';
-import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B20-M11-FIX5';
+import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX6';
+import {createBotReadClient} from './bot-read-client.js?v=B20-M11-FIX6';
+import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B20-M11-FIX6';
 
 // Use the authenticated reader for visible Pionex snapshots.
 export function mountBotReadAccess(document,window,{
