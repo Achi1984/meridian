@@ -586,6 +586,15 @@
       #app .view select{min-height:44px;border:1px solid #567a9f;border-radius:8px;background-color:#101b28;color:var(--reading-value);padding:6px 8px}
     }
   </style>
+  <style>
+    #app #command-portfolio[data-state=fresh] .portfolio-value,
+    #app #depot-read-root [data-state=fresh] .depot-total,
+    #app .bot-portfolio-total[data-confirmed=true] .depot-total,
+    #app .bot-capital-total{color:var(--reading-blue)}
+    #app .coverage-warning{color:var(--reading-alert)}
+    #app .bot-card-list details{margin-block:0}
+    #app .bot-diagnostics>p,#app .bot-diagnostics>.bot-data-summary{margin-inline:12px}
+  </style>
 </head>
 <body>
 <section id="app-access-gate" class="app-access-gate" aria-labelledby="app-access-heading">
@@ -611,7 +620,7 @@
         <div class="brand">MERIDIAN <span aria-label="Version 11">11</span><small>NEXT GENERATION</small></div>
       </div>
       <div class="header-actions">
-        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.4<small>Versionsverlauf ▾</small></button>
+        <button id="version-toggle" type="button" class="preview-pill version-toggle" aria-expanded="false" aria-controls="version-panel">11 · Vorschau B20.5<small>Versionsverlauf ▾</small></button>
         <button id="app-access-lock" class="app-access-lock" type="button" aria-label="App sperren">Sperren</button>
       </div>
     </div>
@@ -842,12 +851,12 @@
 })();
 </script>
 <script type="importmap">
-{"imports":{"../scripts/memecoin-paper-report-bridge/contract.mjs":"../scripts/memecoin-paper-report-bridge/contract.mjs?v=B20-M11-FIX4"}}
+{"imports":{"../scripts/memecoin-paper-report-bridge/contract.mjs":"../scripts/memecoin-paper-report-bridge/contract.mjs?v=B20-M11-FIX5"}}
 </script>
-<script type="module" src="./app-access-bootstrap.js?v=B20-M11-FIX4"></script>
-<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX4"></script>
-<script type="module" src="./depot-read-bootstrap.js?v=B20-M11-FIX4"></script>
-<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11-FIX4"></script>
-<script type="module" src="./agent-status-bootstrap.js?v=B20-M11-FIX4"></script>
+<script type="module" src="./app-access-bootstrap.js?v=B20-M11-FIX5"></script>
+<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX5"></script>
+<script type="module" src="./depot-read-bootstrap.js?v=B20-M11-FIX5"></script>
+<script type="module" src="./strategy-workspace-bootstrap.js?v=B20-M11-FIX5"></script>
+<script type="module" src="./agent-status-bootstrap.js?v=B20-M11-FIX5"></script>
 </body>
 </html>

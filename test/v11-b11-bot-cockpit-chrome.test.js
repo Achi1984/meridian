@@ -13,17 +13,17 @@ const chrome=[process.env.CHROME_BIN,'/usr/bin/google-chrome','/usr/bin/chromium
 const MOON_BOT_REF='f00df00df00df00df00d';
 const v11Root=fileURLToPath(new URL('../v11/',import.meta.url));
 const source=readFileSync(join(v11Root,'index.html'),'utf8');
-const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX4"></script>';
+const bootstrap='<script type="module" src="./bot-read-bootstrap.js?v=B20-M11-FIX5"></script>';
 const fixtureScript=`<script>
 window.__botReadMode='fresh';window.__botReads=0;window.__resolveBotRead=null;window.__botErrors=[];
 window.__appAccessReads=0;window.__releaseChecks=0;
 const nativeFetch=window.fetch.bind(window);
-window.__portfolioReady=import('./depot-portfolio-state.js?v=B20-M11-FIX4').then(({publishDepotPortfolioState})=>
+window.__portfolioReady=import('./depot-portfolio-state.js?v=B20-M11-FIX5').then(({publishDepotPortfolioState})=>
  publishDepotPortfolioState({status:'fresh',model:{status:'FRESH_SNAPSHOT',readOnly:true,executionAllowed:false,
   totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
   source:'SERVER_PIONEX_CURRENT',expiresAt:Date.now()+60000}}));
 window.__publishPortfolio=async state=>{
- const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B20-M11-FIX4');
+ const {publishDepotPortfolioState}=await import('./depot-portfolio-state.js?v=B20-M11-FIX5');
  publishDepotPortfolioState(state);
 };
 window.addEventListener('error',event=>window.__botErrors.push(event.message));
@@ -254,7 +254,10 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             executionAllowed:false,totalUsd:1234.56,snapshotAt:new Date().toISOString(),sourceAt:new Date().toISOString(),
             source:'SERVER_PIONEX_CURRENT',expiresAt:Date.now()+60000}})`);
           const openGroups=()=>evaluate(`document.querySelectorAll('.bot-asset-group:not([open]) > summary').forEach(summary=>summary.click())`);
-          assert.match(await evaluate(`document.querySelector('.bot-asset-group > summary').innerText`),/BTC · 2 Bots/);
+          assert.match(await evaluate(`document.querySelector('.bot-asset-group[data-asset=BTC] > summary').innerText`),/BTC · 2 Bots/);
+          assert.equal(await evaluate("document.querySelector('.bot-filter-details').open"),false);
+          assert.equal(await evaluate("document.querySelector('.bot-diagnostics').open"),false);
+          await evaluate("document.querySelector('.bot-filter-details>summary').click();document.querySelector('.bot-diagnostics>summary').click()");
           await openGroups();
           await evaluate('new Promise(resolve=>setTimeout(resolve,60))');
           assert.equal(await evaluate('window.__botReads'),1);
@@ -864,7 +867,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             await openGroups();
             const largeLayout=await evaluate(`(()=>{
               const root=document.getElementById('bot-read-root'),first=root.querySelector('.bot-card');
-              const filter=root.querySelector('.bot-overview-filters'),actions=filter.nextElementSibling;
+              const filter=root.querySelector('.bot-filter-details'),actions=filter.nextElementSibling;
               const filtersRect=filter.getBoundingClientRect(),actionsRect=actions.getBoundingClientRect();
               const firstRect=first.getBoundingClientRect();
               return {count:root.querySelectorAll('.bot-card').length,

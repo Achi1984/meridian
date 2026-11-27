@@ -1,5 +1,5 @@
-import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX4';
-import {appAccess} from './app-access.js?v=B20-M11-FIX4';
+import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX5';
+import {appAccess} from './app-access.js?v=B20-M11-FIX5';
 
 const NUMBER = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 8});
 const PERCENT = new Intl.NumberFormat('de-AT', {maximumFractionDigits: 2});
