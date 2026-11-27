@@ -1,0 +1,28 @@
+name: Compare small-pool fixed and trailing exits
+on:
+  workflow_run:
+    workflows: ['Meridian holder concentration paper test']
+    types: [completed]
+permissions:
+  contents: read
+  actions: read
+jobs:
+  compare:
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_repository.full_name == github.repository && github.event.workflow_run.path == '.github/workflows/holder-concentration.yml'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python -m unittest discover -s scripts/memecoin-paper/research -p test_small_pool_trailing.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: abc-final
+          path: journal
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - run: python scripts/memecoin-paper/research/small_pool_trailing.py journal > comparison.json
+      - uses: actions/upload-artifact@v4
+        with:
+          name: small-pool-exits-${{ github.event.workflow_run.id }}-${{ github.event.workflow_run.run_attempt }}
+          path: comparison.json
