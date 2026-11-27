@@ -438,6 +438,12 @@ test('asset totals keep unknown P/L and mixed capital units explicit',()=>{
   assert.match(summary.textContent,/BTC · 2 Bots/);
   assert.match(summary.textContent,/P\/L bei 1 von 2 bestätigt/);
   assert.doesNotMatch(summary.textContent,/2,00 USD|60,00/);
+  const capital=target.querySelector('.bot-capital-total');
+  assert.match(capital.textContent,/1 BTC/);
+  assert.match(capital.textContent,/60,00 USD/);
+  delete first.metrics.investmentAmount;
+  renderBotReadState(target,state);
+  assert.match(target.textContent,/Erfasstes Bot-Kapital · 60,00 USD · 1 von 2 mit Kapitalangabe/);
 });
 
 test('TP indicators are read-only, unknown evidence stays neutral, and mismatch warnings show exact values',()=>{

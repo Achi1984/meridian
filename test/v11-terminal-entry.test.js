@@ -1348,9 +1348,9 @@ async function browserRun(call,start,width,height,server){
         {tag:'select',id:'bot-tp-filter',type:'select-one',label:'TP-Prüfung',hidden:false,disabled:false},
         {tag:'select',id:'bot-pnl-filter',type:'select-one',label:'P/L-Verfügbarkeit',hidden:false,disabled:false},
         {tag:'button',id:'',type:'button',label:'Alle Botfilter zurücksetzen',hidden:false,disabled:false},
-        {tag:'button',id:'',type:'button',label:'Zur vorherigen Auswahl zurück',hidden:true,disabled:false},
         {tag:'button',id:'bot-read-refresh',type:'button',label:'Bots aktualisieren',hidden:false,disabled:false},
-        {tag:'button',id:'bot-read-lock',type:'button',label:'Botansicht sperren',hidden:false,disabled:false}
+        {tag:'button',id:'bot-read-lock',type:'button',label:'Botansicht sperren',hidden:false,disabled:false},
+        {tag:'button',id:'',type:'button',label:'Zur vorherigen Auswahl zurück',hidden:true,disabled:false}
       ]);
       assert.deepEqual(bots.executionControls,[],'the Bot view exposes no execution controls');
       assert.deepEqual(await evaluate(`(()=>{
@@ -1374,7 +1374,8 @@ async function browserRun(call,start,width,height,server){
       initialReads=server.metrics().reads;
       await refresh();await waitUntil(async()=>await readState()==='fresh');
       assert.equal(server.metrics().reads,initialReads+1,'one explicit read');
-      assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root li').length`),2);
+      await evaluate(`document.querySelectorAll('#bot-read-root .bot-asset-group > summary').forEach(s=>s.click())`);
+      assert.equal(await evaluate(`document.querySelectorAll('#bot-read-root .bot-card').length`),2);
       assert.equal(await evaluate(`document.getElementById('bot-read-root').textContent.includes('synthetic-b3-token')`),false);
       const cardMetrics=()=>evaluate(`(()=>{const c=document.querySelector('#bot-read-root .bot-card'),s=c.querySelector('summary'),r=s.getBoundingClientRect(),nav=document.querySelector('#nav').getBoundingClientRect();return {open:c.open,text:s.textContent,body:document.body.scrollWidth,root:document.documentElement.scrollWidth,summaryHeight:r.height,cardHeight:c.getBoundingClientRect().height,collapsedCards:[...document.querySelectorAll('#bot-read-root .bot-card:not([open])')].map(card=>card.getBoundingClientRect().height),navTop:nav.top,display:getComputedStyle(s).display,textUnrotated:[...s.querySelectorAll('.bot-card-heading,.bot-card-pnl,.bot-card-capital')].every(n=>getComputedStyle(n).transform==='none'),headingWidth:s.querySelector('.bot-card-heading').getBoundingClientRect().width,phrasing:s.querySelectorAll('dl,div,p').length};})()`);
       let card=await cardMetrics();
@@ -1383,9 +1384,9 @@ async function browserRun(call,start,width,height,server){
       assert.ok(card.collapsedCards.length===2&&card.collapsedCards.every(value=>value>=44),
         'collapsed card heights at '+width+': '+JSON.stringify(card.collapsedCards));
       console.log('V11_BOT_COMPACT_MEASURE',JSON.stringify({width,height,collapsedCardHeights:card.collapsedCards}));
-      assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-negative')).color`),'rgb(255, 155, 155)');
-      assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-pnl-positive')).color`),'rgb(110, 231, 183)');
-      assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').textContent`),'+8,25 USD');
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-card .bot-pnl-negative')).color`),'rgb(255, 155, 155)');
+      assert.equal(await evaluate(`getComputedStyle(document.querySelector('#bot-read-root .bot-card .bot-pnl-positive')).color`),'rgb(110, 231, 183)');
+      assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-card .bot-pnl-positive').textContent`),'+8,25 USD');
       assert.ok(card.body<=width+1&&card.root<=width+1,'collapsed card overflow');
       await evaluate(`document.querySelector('#bot-read-root .bot-card summary').focus();true`);
       await call('Input.dispatchKeyEvent',{type:'keyDown',key:'Enter',code:'Enter',windowsVirtualKeyCode:13,text:'\r',unmodifiedText:'\r'});
@@ -1428,7 +1429,7 @@ async function browserRun(call,start,width,height,server){
         await evaluate(`document.querySelector('#bot-read-root .bot-card').scrollIntoView({block:'center'});true`);
         const shot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(evidence,`v11-bot-compact-${width}-collapsed.png`),Buffer.from(shot.data,'base64'));
-        await evaluate(`document.querySelector('#bot-read-root .bot-pnl-positive').closest('.bot-card').scrollIntoView({block:'center'});true`);
+        await evaluate(`document.querySelector('#bot-read-root .bot-card .bot-pnl-positive').closest('.bot-card').scrollIntoView({block:'center'});true`);
         const positiveShot=await call('Page.captureScreenshot',{format:'png',captureBeyondViewport:false});
         writeFileSync(join(evidence,`v11-bot-compact-${width}-positive.png`),Buffer.from(positiveShot.data,'base64'));
       }
