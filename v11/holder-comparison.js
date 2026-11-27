@@ -111,40 +111,52 @@ export function mountHolderComparison(section, add, read, amount) {
   const heading = add(card, 'h3', 'Halterkonzentration · Solana');
   heading.id = 'solana-holder-heading';
   heading.tabIndex = -1;
-  add(card, 'small', 'Je 1.000 USDC. H überspringt Einstiege ab 20 % gemessenem Anteil eines Halters. Bei unbekanntem Anteil gelten die Regeln von C.');
-  const live = add(card, 'p', 'Laufstatus wird geladen.');
-  const source = add(card, 'a', 'Laufprotokoll öffnen');
+  const live = add(card, 'p', 'Laufstatus lädt …');
+  const audit = add(card, 'details', '');
+  add(audit, 'summary', 'Läufe & Journal');
+  add(audit, 'small', 'Filter ab 20 % Einzelanteil. Bei fehlender Messung gilt die Referenz.');
+  const source = add(audit, 'a', 'Laufprotokoll öffnen');
   source.href = 'https://github.com/Achi1984/meridian/actions/workflows/holder-concentration.yml';
-  const queuedLink = add(card, 'a', '');
+  const queuedLink = add(audit, 'a', '');
   queuedLink.hidden = true;
   const body = add(card, 'section', '');
   body.style.overflowWrap = 'anywhere';
   function render(report, origin) {
     body.replaceChildren();
     const date = new Date(report.updatedAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
-    add(body, 'strong', (report.final ? 'Endstand' : 'Zwischenstand') + ' · ' + date + ' (Wien) · ' + origin);
-    report.rows.forEach((a, i) => add(body, 'p', (i ? 'H · Filter' : 'C · Referenz') + ' · realisiert ' +
-      amount(a.net) + ' · freies Cash ' + amount(1000 + a.net - a.openCost) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen' +
-      (a.open ? ' · Einstand inkl. Kaufgebühren ' + amount(a.openCost) : '')));
-    add(body, 'p', 'Differenz H zu C · ' + amount(report.delta));
+    add(body, 'small', (report.final ? 'Endstand' : 'Zwischenstand') + ' · ' + date + ' Wien');
+    report.rows.forEach((a,i) => {
+      const row = add(body,'p','');
+      row.className = 'paper-metric';
+      add(row,'span',i ? 'Mit Filter' : 'Referenz');
+      add(row,'strong',amount(a.net)).className = a.net > 0 ? 'paper-gain' : a.net < 0 ? 'paper-loss' : '';
+    });
+    const info = add(body,'details','');
+    add(info,'summary','Konten & Filterwirkung');
+    add(info,'p',origin);
+    report.rows.forEach((a,i) => add(info,'p',(i ? 'Filter' : 'Referenz') + ' · Kasse ' +
+      amount(1000 + a.net - a.openCost) + ' · ' + a.closed + ' geschlossen · ' + a.open + ' offen'));
+    add(info,'p','Filterdifferenz ' + amount(report.delta));
     if ('lastExitQuoteAt' in report) {
       const stamp = report.lastExitQuoteAt && new Date(report.lastExitQuoteAt*1000).toLocaleString('de-AT', {timeZone:'Europe/Vienna'});
-      add(body, 'p', 'Letzter erfolgreicher Wave-Verkaufskurs im Journal · ' + (stamp || 'keiner'));
+      add(info, 'p', 'Letzter erfolgreicher Wave-Verkaufskurs im Journal · ' + (stamp || 'keiner'));
     }
     const trades = report.filteredTrades ?? [];
-    const details = trades.length ? add(body, 'details', '') : null;
+    const details = trades.length ? add(info, 'details', '') : null;
     if (details) add(details, 'summary', 'Ausgelassene Trades ansehen (' + trades.length + ')');
     for (const trade of trades) {
       add(details, 'p', trade.id + ' · C ' + (trade.net === null ? 'offen' : amount(trade.net) + ' realisiert'));
     }
     const maxShare = report.maxOwnerBps === null ? '' : ' · höchster gemessener Einzelanteil ' +
       (report.maxOwnerBps / 100).toLocaleString('de-AT', {maximumFractionDigits:2}) + ' %';
-    add(body, 'p', 'Halterdaten bei ' + report.measured + ' von ' + (report.measured + report.unknown) +
+    add(info, 'p', 'Halterdaten bei ' + report.measured + ' von ' + (report.measured + report.unknown) +
       ' Einstiegssignalen' + maxShare);
-    add(body, 'p', report.skipped + ' ausgelassene Einstiege · vermiedene Verluste ' +
+    add(info, 'p', report.skipped + ' ausgelassene Einstiege · vermiedene Verluste ' +
       amount(report.avoided) + ' · entgangene Gewinne ' + amount(report.missed));
   }
-  const exits = add(card, 'section', '');
+  const comparisons = add(card, 'details', '');
+  add(comparisons,'summary','Ausstiege vergleichen');
+  const exits = add(comparisons, 'section', '');
   let displayedKey = '';
   let displayedAt = 0;
   let localReport = false;
@@ -206,11 +218,11 @@ export function mountHolderComparison(section, add, read, amount) {
     displayedAt = h.updatedAt;
   }
   add(body, 'p', 'Bestätigter Endstand wird geladen.');
-  const label = add(card, 'label', 'Bericht prüfen · status.json und events.jsonl auswählen ');
+  const label = add(audit, 'label', 'Journal importieren ');
   const input = add(label, 'input', '');
   input.type = 'file';
   input.multiple = true;
-  const notice = add(card, 'p', '');
+  const notice = add(audit, 'p', '');
   notice.setAttribute('role', 'status');
   let revision = 0;
   input.addEventListener('change', async () => {
@@ -248,7 +260,9 @@ export function mountHolderComparison(section, add, read, amount) {
       if (!safe(run?.id) || !safe(run.run_attempt)) throw Error('run');
       const state = {in_progress:'läuft', queued:'in Warteschlange', pending:'in Warteschlange', waiting:'wartet', requested:'angefordert', success:'abgeschlossen', failure:'fehlgeschlagen',
         cancelled:'abgebrochen'}[run.conclusion || run.status] || run.status;
-      live.textContent = 'Paperlauf ' + run.id + ' · Versuch ' + run.run_attempt + ' · ' + state;
+      live.className = run.status === 'in_progress' ? 'paper-live' : 'paper-wait';
+      live.textContent = 'Versuch ' + run.run_attempt + ' · ' + state + (waiting.some(r => r.id !== run.id) ? ' · Folgelauf wartet' : '');
+      source.textContent = 'Lauf ' + run.id + ' · Versuch ' + run.run_attempt;
       source.href = runs + run.id + '/attempts/' + run.run_attempt;
       const next = waiting.find(item => item.id !== run.id);
       queuedLink.hidden = !next;
