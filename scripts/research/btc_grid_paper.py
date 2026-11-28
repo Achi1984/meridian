@@ -119,7 +119,12 @@ def simulate(bars):
             a["equity"]=equity
             a["peak"]=max(a["peak"],equity)
             a["drawdown"]=max(a["drawdown"],a["peak"]-equity)
-    return {"accounts":{k:{s:round(v[s],2) for s in ("equity","drawdown","fills")} for k,v in accounts.items()},
+    hold_equity = 500 + (500 / anchor) * bars[-1][3]
+    results = {}
+    for name, account in accounts.items():
+        results[name] = {key: round(account[key], 2) for key in ("equity", "drawdown", "fills")}
+        results[name]["vsHold"] = round(account["equity"] - hold_equity, 2)
+    return {"accounts": results, "holdEquity": round(hold_equity, 2),
             "decisions":decisions,"trainingFills":len(examples),"bars":max(0,len(bars)-cut)}
 
 
