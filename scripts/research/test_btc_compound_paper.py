@@ -49,5 +49,10 @@ class CompoundTest(unittest.TestCase):
                 self.assertEqual(bot["decision"]["reason"],"Am Stop geschlossen")
                 self.assertAlmostEqual(trade["exit"],gap*(1-sign*model.SLIP))
                 self.assertAlmostEqual(trade["net"]["compound"]/trade["net"]["fixed"],1.1)
+                for arm,qty in pos["qty"].items():
+                    gross=sign*qty*(trade["exit"]-trade["entry"])
+                    self.assertGreater(trade["fees"][arm],0)
+                    self.assertAlmostEqual(trade["funding"][arm],-sign*gap*.001*qty)
+                    self.assertAlmostEqual(trade["net"][arm],gross-trade["fees"][arm]+trade["funding"][arm])
                 self.assertLess(trade["net"]["fixed"],-5)
                 self.assertGreater(bot["fixed"]["drawdown"],0)

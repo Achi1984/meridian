@@ -127,6 +127,8 @@ def step(bot, history, t, sign, rate):
                 a["closed"] += 1
         if hit:
             bot["trades"].append(dict(entryBar=p["at"],exitBar=t,entry=p["entry"],exit=fill,
+                                      fees={k:q*FEE*(fill+p["entry"]) for k,q in p["qty"].items()},
+                                      funding={k:q*p["fundingPerBTC"] for k,q in p["qty"].items()},
                                       net={k:q*per_btc for k,q in p["qty"].items()}))
             reason = "Am Stop geschlossen"
             bot["position"] = None

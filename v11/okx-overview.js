@@ -85,16 +85,37 @@ function compoundRows(report,previous){
       stamp.textContent='Ausgewerteter Kerzenschluss · '+localTime.format(bot.decision.closeMs)+' Wien';
       details.append(stamp);
     }
-    details.append(detail,comparison);
+    const difference=document.createElement('p');
+    difference.textContent='Kontowert gegenüber Fixrisiko · '+signedMoney.format(number(a.equity)-number(fixed.equity))+' USDT';
+    details.append(detail,comparison,difference);
+    if(a.closed>0){
+      const costs=document.createElement('p');
+      const trades=bot.trades;
+      if(Array.isArray(trades)&&trades.length===a.closed&&trades.every(t=>
+        Number.isFinite(t.fees?.compound)&&Number.isFinite(t.funding?.compound))){
+        const fees=trades.reduce((sum,t)=>sum+t.fees.compound,0);
+        const funding=trades.reduce((sum,t)=>sum+t.funding.compound,0);
+        costs.textContent='Geschlossene Compound-Trades · Gebühren '+amount.format(fees)+' USDT · modelliertes Funding '+amount.format(funding)+' USDT';
+      }else costs.textContent='Kostenaufschlüsselung für geschlossene Trades unvollständig';
+      details.append(costs);
+    }
     return details;
   });
 }
 function gridRows(report){
-  return [['fixed','Fest'],['adaptive','Adaptiv'],['model','KI-Filter']].map(([key,name])=>{
+  const rows= [['fixed','Fest'],['adaptive','Adaptiv'],['model','KI-Filter']].map(([key,name])=>{
     const a=report.accounts[key];
     return row(name,number(a.equity)-1000,'USDT',count(a.fills)+' Ausführungen'+
-      (Number.isFinite(a.vsHold)?' · '+amount.format(a.vsHold)+' USDT ggü. Halten':''));
+      (Number.isFinite(a.vsHold)?' · '+amount.format(a.vsHold)+' USDT ggü. Halten':'')+
+      (Number.isFinite(a.drawdown)?' · Max. Drawdown '+money.format(a.drawdown)+' USDT':'')+
+      (Number.isFinite(a.fees)?' · Gebühren '+money.format(a.fees)+' USDT':''));
   });
+  if(Number.isFinite(report.holdEquity)){
+    const reference=document.createElement('p');
+    reference.textContent='Halten ab Teststart · 500 USDT in BTC und 500 USDT in Cash · Kontowert '+money.format(report.holdEquity)+' USDT';
+    rows.push(reference);
+  }
+  return rows;
 }
 function shortRows(report){
   return [['historyFilter','Mit Historienfilter'],['control','Ohne Historienfilter']].map(([key,name])=>{
@@ -149,7 +170,14 @@ export function createOkxOverview(fibonacci){
         const focused=rows.contains(document.activeElement)?document.activeElement.closest('.compound-bot')?.dataset.side:null;
         rows.replaceChildren(...render(report,rows));
         if(focused)rows.querySelector('[data-side="'+focused+'"] > summary')?.focus({preventScroll:true});
-        status.textContent=light+' '+label+' · '+localTime.format(time)+' Wien';
+        let coverage='';
+        if(render===gridRows && Number.isSafeInteger(report.bars)&&report.bars>=0)
+          coverage=' · '+report.bars+' ausgewertete 15-min-Kerzen';
+        if(render===compoundRows && Number.isSafeInteger(report.cursor)&&Number.isSafeInteger(report.start)){
+          const hours=(report.cursor-report.start)/3600000;
+          if(Number.isSafeInteger(hours)&&hours>=0)coverage=' · '+hours+' ausgewertete Stundenkerze'+(hours===1?'':'n');
+        }
+        status.textContent=light+' '+label+' · '+localTime.format(time)+' Wien'+coverage;
       }catch{
         status.textContent='⚪ Daten derzeit nicht verfügbar';
         rows.replaceChildren();
