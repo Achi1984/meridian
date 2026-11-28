@@ -1,0 +1,21 @@
+name: OKX BTC swing signal observation
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/spot-paper-advisor/okx_swing_observation.py
+      - .github/workflows/okx-swing-observation.yml
+permissions:
+  contents: read
+jobs:
+  observe:
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Observe confirmed BTC sessions
+        run: python3 scripts/spot-paper-advisor/okx_swing_observation.py | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
