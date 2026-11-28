@@ -39,7 +39,7 @@ def observe(rows, today):
     trend = regime(closes[-60:])
     macd = indicator.votes["macd"]
     target = confirmed_entry_target(0, trend, trend if trend == macd else 0)
-    return {"strategy": "grid_macd_1_base", "source": "OKX BTC-USDT spot",
+    return {"strategy": "grid_macd_1_base", "source": f"OKX {SPOT} spot",
             "lastSessionUtc": datetime.fromtimestamp(dates[-1]/1000, timezone.utc).date().isoformat(),
             "sessions": len(dates), "trend": trend, "macd": macd,
             "flatStartSignal": {-1: "SHORT", 0: "FLAT", 1: "LONG"}[target]}
