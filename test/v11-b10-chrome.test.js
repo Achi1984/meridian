@@ -55,7 +55,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
           const r=node.getBoundingClientRect();return r.top>=0&&r.left>=0&&r.right<=innerWidth&&node.scrollWidth<=node.clientWidth+1;
         }),
         statusOpen:document.getElementById('autonomy-status').open,
-        statusText:document.querySelector('#autonomy-status summary').innerText,
+        statusHeight:document.querySelector('#autonomy-status summary').getBoundingClientRect().height,
         commandHeading:document.querySelector('.account-total h1').innerText,
         primaryImmediatelyAfterHeading:document.querySelector('.section-intro').nextElementSibling.id,
         portfolioBeforeRisk:document.querySelector('#command-portfolio').compareDocumentPosition(document.querySelector('[data-decision-owner]'))&Node.DOCUMENT_POSITION_FOLLOWING,
@@ -77,7 +77,7 @@ test('V11 B16 Chrome: readable mobile hierarchy, keyboard disclosure and reachab
       assert.equal(initial.scrollY,0,'initial portfolio visibility is measured without scrolling');
       assert.ok(initial.viewport<=size.width&&initial.viewport>=size.width-20,'unexpected usable viewport '+size.width);
       assert.ok(initial.body<=initial.viewport+1&&initial.root<=initial.viewport+1,'initial page overflow '+size.width);
-      assert.equal(initial.statusOpen,false);assert.equal(initial.statusText,'');
+      assert.equal(initial.statusOpen,false);assert.equal(initial.statusHeight,0);
       assert.equal(initial.commandHeading,'Gesamtvermögen');
       assert.equal(initial.riskRow.height,0,'Command shows only account equity');
       assert.ok(initial.header<Math.min(360,size.height*0.65),'bounded readable header: '+initial.header+'px');
