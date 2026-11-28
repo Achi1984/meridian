@@ -10,7 +10,7 @@ import sys
 from subprocess import run as run_process
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "spot-paper-advisor"))
-from okx_swing_observation import DAY_MS, load_candles, observe
+from okx_swing_observation import DAY_MS, SPOT, observe
 from okx_demo_preflight import INSTRUMENT, NAMES, PreflightError, VenueError, check, get, request
 from okx_demo_round_trip import ORDER, SIZE, position, verify_position
 
@@ -127,5 +127,5 @@ def run(keys, now, candles):
 if __name__ == "__main__":
     now = datetime.now(timezone.utc)
     keys = tuple(os.environ[name] for name in NAMES)
-    candles = load_candles() if now.date() <= LAST_HOLD else []
+    candles = get("/api/v5/market/candles", keys, instId=SPOT, bar="1Dutc", limit="100") if now.date() <= LAST_HOLD else []
     print(json.dumps(run(keys, now, candles)))

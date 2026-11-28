@@ -1,14 +1,18 @@
 """Read a flat-start BTC swing signal from confirmed OKX spot sessions."""
 import json
+import os
+import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from math import isfinite
-from subprocess import check_output
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "research"))
+from okx_demo_preflight import NAMES, get
 
 from regime_breakout import regime
 from swing_indicators import DailyIndicators, confirmed_entry_target
 
 DAY_MS = 86400000
-URL = "https://eea.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1Dutc&limit=100"
+SPOT = "BTC-USDC"
 
 
 def observe(rows, today):
@@ -35,20 +39,14 @@ def observe(rows, today):
     trend = regime(closes[-60:])
     macd = indicator.votes["macd"]
     target = confirmed_entry_target(0, trend, trend if trend == macd else 0)
-    return {"strategy": "grid_macd_1_base", "source": "OKX BTC-USDT spot",
+    return {"strategy": "grid_macd_1_base", "source": f"OKX {SPOT} spot",
             "lastSessionUtc": datetime.fromtimestamp(dates[-1]/1000, timezone.utc).date().isoformat(),
             "sessions": len(dates), "trend": trend, "macd": macd,
             "flatStartSignal": {-1: "SHORT", 0: "FLAT", 1: "LONG"}[target]}
 
 
-def load_candles():
-    payload = json.loads(check_output(["curl", "--fail", "--silent", "--show-error", "--retry", "2",
-                                       "--max-time", "20", URL]))
-    if payload["code"] != "0":
-        raise ValueError("OKX candles unavailable")
-    return payload["data"]
-
-
 if __name__ == "__main__":
+    keys = tuple(os.environ[name] for name in NAMES)
+    rows = get("/api/v5/market/candles", keys, instId=SPOT, bar="1Dutc", limit="100")
     today = int(datetime.now(timezone.utc).timestamp()) // 86400 * DAY_MS
-    print(json.dumps(observe(load_candles(), today)))
+    print(json.dumps(dict(observe(rows, today), signalPair=SPOT)))
