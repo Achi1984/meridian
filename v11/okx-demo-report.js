@@ -285,7 +285,9 @@ export function createFibComparison() {
       const states={filled:'Einstieg bestätigt',closed:'Geschlossen',reserved:'Bestätigung ausständig',
         rejected:'Abgelehnt',unfilled:'Ohne Ausführung'};
       const mark=report.valuation;
-      const expanded=new Set([...body.querySelectorAll('details[open]')].map(item=>item.dataset.frame));
+      const expanded=new Set([...body.querySelectorAll('details[data-frame][open]')].map(item=>item.dataset.frame));
+      const expandedSignals=new Set([...body.querySelectorAll('details[data-signal-bar][open]')].map(item=>
+        item.closest('[data-frame]').dataset.frame+'-'+item.dataset.signalBar));
       const rows=['15m','30m','1H','4H'].map(frame=>{
         const card=document.createElement('details');
         card.dataset.frame=frame;
@@ -325,6 +327,30 @@ export function createFibComparison() {
         line('Order zur Signalkerze',currentOrder?states[currentOrder.state]:'Keine Order im Journal');
         if(currentOrder?.fill)line('Bestätigter Einstieg',currentOrder.fill+' USD');
         if(currentOrder?.exit)line('Bestätigter Ausstieg',currentOrder.exit+' USD');
+        const latestSignal=paper.at(-1);
+        if(latestSignal){
+          const order=demo.find(item=>item.bar===latestSignal.bar);
+          const stamp=ms=>new Date(ms).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien';
+          const trace=document.createElement('details');
+          const summary=document.createElement('summary');
+          summary.textContent='Verlauf des letzten Paper-Signals';
+          trace.append(summary);
+          const entries=document.createElement('ol');
+          const add=text=>{const item=document.createElement('li');item.textContent=text;entries.append(item);};
+          add('Signal am Kerzenschluss · '+stamp(latestSignal.bar+frameMinutes*60000)+' · '+side(latestSignal));
+          for(const event of latestSignal.decisions||[])add('Im Bericht um '+stamp(event.reportedAt)+' · '+event.reason);
+          if(!order)add('Keine zugehörige Demoorder im Journal');
+          else{
+            if(order.reservedAt)add('Order reserviert · '+stamp(order.reservedAt));
+            if(order.fill)add('Einstieg bestätigt · '+order.fill+' USD'+(order.entryFillAt?' · '+stamp(order.entryFillAt):''));
+            if(order.exit)add('Ausstieg bestätigt · '+order.exit+' USD'+(order.exitFillAt?' · '+stamp(order.exitFillAt):''));
+            if(order.state==='closed')add('Ergebnis nach Handelsgebühren · '+signed(num(order.afterFees))+' USDC');
+            if(!['filled','closed'].includes(order.state))add('Orderstatus · '+(states[order.state]||'Unbekannt'));
+          }
+          trace.dataset.signalBar=String(latestSignal.bar);
+          trace.open=expandedSignals.has(frame+'-'+latestSignal.bar);
+          trace.append(entries);card.append(trace);
+        }
         if(last?.state==='reserved')line('Orderabgleich','Bestätigung ausständig · weitere Einstiege gesperrt');
         line('Letzte OKX-Demoorder dieses Zeitrahmens',last?states[last.state]+' · '+side(last):'Keine Order');
         line('Demo realisiert nach Handelsgebühren',signed(demoNet)+' USDC · '+demoClosed.length+' geschlossen',demoNet);
@@ -353,9 +379,16 @@ export function createFibComparison() {
       });
       const stamp=document.createElement('small');
       stamp.textContent=(Date.now()-report.asOf>35*60000?'Stand veraltet · ':'')+'Gemeinsames OKX-Demokonto · Letzte Prüfung '+new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien · vor '+Math.max(0,Math.floor((Date.now()-report.asOf)/60000))+' Min.';
-      const focusFrame=body.contains(document.activeElement)?document.activeElement.closest('details')?.dataset.frame:null;
+      const active=body.contains(document.activeElement)?document.activeElement:null;
+      const focusFrame=active?.closest('[data-frame]')?.dataset.frame;
+      const focusSignal=active?.closest('[data-signal-bar]')?.dataset.signalBar;
       body.replaceChildren(...rows,stamp);
-      if(focusFrame)rows.find(row=>row.dataset.frame===focusFrame)?.querySelector('summary')?.focus({preventScroll:true});
+      if(focusFrame){
+        const row=rows.find(item=>item.dataset.frame===focusFrame);
+        const trace=row?.querySelector('[data-signal-bar]');
+        const owner=focusSignal&&trace?.dataset.signalBar===focusSignal?trace:row;
+        owner?.querySelector('summary')?.focus({preventScroll:true});
+      }
       lastView=fingerprint;
     } catch {lastView='';body.textContent='🟡 Fibonacci-Bericht derzeit nicht abrufbar.';}
     finally {loading=false;}

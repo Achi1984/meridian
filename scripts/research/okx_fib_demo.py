@@ -20,6 +20,27 @@ def api(*args):
     return subprocess.check_output(["gh", "api", *args], text=True).strip()
 
 
+def retain_decisions(data, observed_at):
+    """Keep changes on the paper signal before the rolling frame is replaced."""
+    if not isinstance(observed_at, int) or observed_at <= 0:
+        return
+    for trade in data["paper"]:
+        observation = data["frames"].get(trade["frame"], {})
+        reason = observation.get("decision")
+        if observation.get("bar") != trade["bar"] or not reason:
+            continue
+        events = trade.setdefault("decisions", [])
+        if not events or events[-1]["reason"] != reason:
+            events.append({"reportedAt": observed_at, "reason": reason})
+
+
+def fill_time(receipt):
+    value = receipt.get("fillTime")
+    if isinstance(value, str) and value.isascii() and value.isdecimal() and 0 < int(value) < 8640000000000000:
+        return int(value)
+    return None
+
+
 class Journal:
     def __init__(self):
         # Listing distinguishes a missing journal from a failed network/auth request.
@@ -33,9 +54,11 @@ class Journal:
             self.data = json.loads(base64.b64decode(blob["content"]))
             if self.data["instrument"] != INSTRUMENT:
                 raise ValueError("journal instrument mismatch")
+            retain_decisions(self.data, self.data.get("asOf"))
 
     def save(self):
         self.data["asOf"] = int(time.time()*1000)
+        retain_decisions(self.data, self.data["asOf"])
         encoded = base64.b64encode(json.dumps(self.data).encode()).decode()
         args = ["-f", "sha="+self.sha] if self.sha else []
         self.sha = api("-X", "PUT", RESOURCE, "-f", "branch="+BRANCH, "-f", "content="+encoded,
@@ -117,6 +140,9 @@ def reconcile(keys, trade):
     if D(row["accFillSz"])!=SIZE or row["feeCcy"]!="USDC":
         raise ValueError("unexpected entry fill")
     trade.update(state="filled",fill=row["avgPx"])
+    entry_time = fill_time(row)
+    if entry_time is not None:
+        trade["entryFillAt"] = entry_time
     try:
         algo, = get("/api/v5/trade/order-algo",keys,algoClOrdId=trade["id"]+"P")
     except VenueError as exc:
@@ -134,13 +160,16 @@ def reconcile(keys, trade):
     close, = get(ORDER,keys,instId=INSTRUMENT,ordId=ids[0])
     if (close["state"]=="filled" and close["instId"]==INSTRUMENT and close["side"]!=trade["side"]
             and D(close["accFillSz"])==SIZE and close["feeCcy"]=="USDC"):
+        exit_time = fill_time(close)
+        if exit_time is not None:
+            trade["exitFillAt"] = exit_time
         trade.update(state="closed",exit=close["avgPx"],afterFees=str(D(close["pnl"])+D(close["fee"])+D(row["fee"])))
 
 
 def execute(keys, journal, trade, price):
     cid="MerFib"+trade["frame"]+str(trade["bar"])
     order=dict(id=cid,frame=trade["frame"],side=trade["side"],state="reserved",bar=trade["bar"],
-               stop=trade["stop"],target=trade["target"])
+               stop=trade["stop"],target=trade["target"],reservedAt=int(time.time()*1000))
     journal.data["demo"].append(order)
     journal.save()
     body=dict(instId=INSTRUMENT,tdMode="cross",clOrdId=cid,side=trade["side"],ordType="ioc",
