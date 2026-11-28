@@ -235,10 +235,19 @@ export function createGridComparison() {
         value.textContent=a.equity.toLocaleString('de-AT',{minimumFractionDigits:2})+' USDT';
         value.className=a.equity>1000?'paper-gain':a.equity<1000?'paper-loss':'';
         row.append(label+' · ',value,' · '+a.fills+' Ausführungen');
+        if (Number.isFinite(a.vsHold)) {
+          const relative = document.createElement('small');
+          relative.textContent = a.vsHold.toLocaleString('de-AT', {
+            signDisplay:'exceptZero',minimumFractionDigits:2,maximumFractionDigits:2
+          })+' USDT gegenüber Halten';
+          relative.className = a.vsHold>0?'paper-gain':a.vsHold<0?'paper-loss':'';
+          row.append(document.createElement('br'),relative);
+        }
         return row;
       });
       const stamp=document.createElement('small');
-      stamp.textContent='Stand '+new Date(data.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien · '+data.bars+' bewertete Viertelstunden';
+      const phase={planned:'Geplant',running:'Im Test',final:'Beendet'}[data.phase];
+      stamp.textContent=(phase?phase+' · ':'')+'Stand '+new Date(data.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien · '+data.bars+' bewertete Viertelstunden';
       body.replaceChildren(...rows,stamp);
     } catch {body.textContent='Grid-Bericht derzeit nicht abrufbar.';}
   });
