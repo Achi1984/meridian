@@ -21,7 +21,7 @@ const expectedModules=[
   'bot-overview-model.js','bot-read-bootstrap.js','bot-read-client.js','bot-read-model.js','bot-read-view.js',
   'depot-current-model.js','depot-history-model.js','depot-history-view.js','depot-portfolio-state.js','depot-read-bootstrap.js',
   'depot-read-client.js','depot-read-model.js','depot-read-view.js',
-  'holder-comparison.js','ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','paper-advisor-view.js','paper-bot-report-bootstrap.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-group-pnl.js','paper-readiness-view.js','paper-readiness.js','paper-report-connector.js','paper-run-clock.js','pionex-history-model.js','release-update.js','research-evidence.js',
+  'holder-comparison.js','ledger-manual-client.js','ledger-manual-model.js','ledger-manual-view.js','ledger-review-client.js','ledger-review-model.js','ledger-review-view.js','okx-demo-report.js','paper-advisor-view.js','paper-bot-report-bootstrap.js','paper-cockpit-controller.js','paper-cockpit-model.js','paper-cockpit-view.js','paper-group-pnl.js','paper-readiness-view.js','paper-readiness.js','paper-report-connector.js','paper-run-clock.js','pionex-history-model.js','release-update.js','research-evidence.js',
   'solana-eight-hour.js','solana-meme-report.js',
   'spot-paper-bot-overview-controller.js','spot-paper-bot-overview-model.js','spot-paper-bot-overview-view.js',
   'spot-paper-cockpit-controller.js','spot-paper-cockpit-model.js','spot-paper-cockpit-view.js',

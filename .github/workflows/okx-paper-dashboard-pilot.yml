@@ -1,0 +1,38 @@
+name: OKX paper dashboard pilot
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/okx-paper-dashboard-pilot.yml']
+permissions:
+  contents: write
+concurrency:
+  group: okx-btc-single-demo-order
+  cancel-in-progress: false
+jobs:
+  demo:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Verify the minimum-size demo entry, reduce-only exit and PnL
+        env:
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+        run: python3 scripts/research/okx_dashboard_pilot.py
+      - name: Publish reconciled demo totals
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -eu
+          branch=paper-dashboard-data
+          file=okx-demo-pilot.json
+          path="repos/$GITHUB_REPOSITORY/contents"
+          sha=$(gh api "$path?ref=$branch" | jq -r --arg file "$file" '.[] | select(.name==$file) | .sha')
+          args=()
+          if [[ -n "$sha" ]]; then args+=(-f "sha=$sha"); fi
+          gh api --method PUT "$path/$file" -f branch="$branch" -f message="Refresh reconciled OKX demo pilot" -f content="$(base64 -w0 "$file")" "${args[@]}" >/dev/null

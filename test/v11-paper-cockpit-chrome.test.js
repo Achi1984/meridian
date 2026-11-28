@@ -223,7 +223,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           await new Promise(resolve=>setTimeout(resolve,10));
         }
         assert.deepEqual(await evaluate(`Array.from(document.querySelectorAll('#view-strategies > details'), el=>[el.id,el.open])`),
-          [['solana-scanner-live',false],['solana-meme-paper',false],['paper-advisor',false],['top100-paper',false],['paper-reports-section',false],['paper-research-section',false]]);
+          [['solana-scanner-live',false],['solana-meme-paper',false],['paper-advisor',false],['okx-demo-account',false],['top100-paper',false],['paper-reports-section',false],['paper-research-section',false]]);
         for(let i=0;i<100;i++){
           if(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status')?.textContent==='Pilot 5 · Läuft'`))break;
           await new Promise(resolve=>setTimeout(resolve,20));
@@ -539,7 +539,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`);
         assert.equal(focus,true);
         await key('Tab','Tab',9);
-        for (const selector of ['#solana-scanner-live > summary','#solana-meme-paper > summary','#paper-advisor > summary','[data-advisor-live]', '[data-advisor-file]', '#top100-paper > summary','#paper-reports-section > summary']) {
+        for (const selector of ['#solana-scanner-live > summary','#solana-meme-paper > summary','#paper-advisor > summary','[data-advisor-live]', '[data-advisor-file]', '#okx-demo-account > summary', '#top100-paper > summary','#paper-reports-section > summary']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
             true, 'live pilot control is reachable in document order: '+selector);
           await key('Tab','Tab',9);

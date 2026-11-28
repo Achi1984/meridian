@@ -1,3 +1,4 @@
+import {mountOkxDemo} from './okx-demo-report.js?v=B20-M11-FIX6';
 import {mountTop100} from './top100-report.js?v=B20-M11-FIX6';
 import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B20-M11-FIX6';
 import {createAdvisorSection} from './paper-advisor-view.js?v=B20-M11-FIX6';
@@ -55,6 +56,7 @@ function mountWorkspace(){
   refreshSolanaStatus = refresh;
   const scanner = collapsedSection('solana-scanner-live','Solana-Memecoin-Scanner · Live',solana);
   mountLiveScanner(scanner);
+  mountOkxDemo(collapsedSection('okx-demo-account','OKX-Demokonto · BTC-Papertrades',botReports));
   refreshTop100=mountTop100(collapsedSection('top100-paper','Top 100 · Ausbruch und Rücktest',botReports));
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');

@@ -12,23 +12,23 @@ EXIT = "MeridianDemoRT20261128Sell"
 ORDER = "/api/v5/trade/order"
 
 
-def lookup(keys, client_id):
+def lookup(keys, client_id, side=None):
     try:
         row, = get(ORDER, keys, instId=INSTRUMENT, clOrdId=client_id)
     except VenueError as exc:
         if exc.code == "51603":
             return None
         raise
-    side = "buy" if client_id == ENTRY else "sell"
+    side = side or ("buy" if client_id == ENTRY else "sell")
     if (row["instId"] != INSTRUMENT or row["clOrdId"] != client_id or row["side"] != side
             or Decimal(row["sz"]) != SIZE or (side == "sell" and str(row["reduceOnly"]).lower() != "true")):
         raise PreflightError("order identity mismatch")
     return row
 
 
-def await_terminal(keys, client_id):
+def await_terminal(keys, client_id, side):
     for _ in range(10):
-        row = lookup(keys, client_id)
+        row = lookup(keys, client_id, side)
         if row and row["state"] in ("filled", "canceled"):
             return row
         time.sleep(1)
@@ -44,7 +44,7 @@ def submit(keys, client_id, **fields):
             raise PreflightError("unmatched acknowledgement")
     except (OSError, PreflightError, ValueError) as exc:
         print(f"Placement response for {client_id}: {exc}", flush=True)
-    return await_terminal(keys, client_id)
+    return await_terminal(keys, client_id, fields["side"])
 
 
 def position(keys):
@@ -68,9 +68,9 @@ def verify_position(keys, expected):
     raise PreflightError(f"position mismatch, expected {expected}, observed {actual}")
 
 
-def run(keys, allow_entry):
-    entry = lookup(keys, ENTRY)
-    close = lookup(keys, EXIT)
+def run(keys, allow_entry, entry_id=ENTRY, exit_id=EXIT):
+    entry = lookup(keys, entry_id, "buy")
+    close = lookup(keys, exit_id, "sell")
     if entry is None:
         if not allow_entry or close is not None:
             raise PreflightError("no recoverable entry")
@@ -83,9 +83,9 @@ def run(keys, allow_entry):
         limit = (ask * Decimal("1.001") / tick).to_integral_value(rounding=ROUND_UP) * tick
         if limit * SIZE > 10:
             raise PreflightError("entry exceeds 10 USD demo notional cap")
-        entry = submit(keys, ENTRY, side="buy", ordType="ioc", px=format(limit, "f"))
+        entry = submit(keys, entry_id, side="buy", ordType="ioc", px=format(limit, "f"))
     elif entry["state"] not in ("filled", "canceled"):
-        entry = await_terminal(keys, ENTRY)
+        entry = await_terminal(keys, entry_id, "buy")
     if Decimal(entry["accFillSz"]) != SIZE:
         verify_position(keys, Decimal(entry["accFillSz"]))
         raise PreflightError("minimum-size demo entry did not fully fill")
@@ -93,9 +93,9 @@ def run(keys, allow_entry):
         verify_position(keys, SIZE)
         if get("/api/v5/trade/orders-pending", keys, instId=INSTRUMENT):
             raise PreflightError("unexpected open order")
-        close = submit(keys, EXIT, side="sell", ordType="market", reduceOnly=True)
+        close = submit(keys, exit_id, side="sell", ordType="market", reduceOnly=True)
     elif close["state"] not in ("filled", "canceled"):
-        close = await_terminal(keys, EXIT)
+        close = await_terminal(keys, exit_id, "sell")
     if Decimal(close["accFillSz"]) != SIZE:
         raise PreflightError("demo exit did not fully fill")
     verify_position(keys, Decimal(0))
@@ -110,6 +110,8 @@ def run(keys, allow_entry):
     print(f"OKX gross {gross}; calculated gross {modeled}; net after fees {gross + fees} USDC")
     if abs(modeled - gross) > Decimal("0.00000001"):
         raise PreflightError("realized trading PnL mismatch")
+
+    return gross, fees
 
 
 if __name__ == "__main__":
