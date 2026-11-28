@@ -105,7 +105,7 @@ export function mountPaperStatus(panel) {
 
 if (typeof document !== 'undefined') {
   const card=document.getElementById('bot-read-root')?.closest('section.card');
-  if (card) {
+  if (card && !document.getElementById('paper-status-panel')) {
     const panel=document.createElement('details');
     panel.className='card';
     panel.id='paper-status-panel';
