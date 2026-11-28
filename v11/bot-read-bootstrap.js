@@ -1,3 +1,4 @@
+import './paper-status.js?v=B20-M11-FIX6';
 import {appAccess,refreshOnOpen} from './app-access.js?v=B20-M11-FIX6';
 import {createBotReadClient} from './bot-read-client.js?v=B20-M11-FIX6';
 import {createBotReadView,renderCommandBotOverview} from './bot-read-view.js?v=B20-M11-FIX6';
