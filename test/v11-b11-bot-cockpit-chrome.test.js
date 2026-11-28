@@ -511,7 +511,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.deepEqual(await visibleRefs(),['c'.repeat(20)],'search, direction, category, TP and P/L intersect');
           assert.match(await evaluate(`document.getElementById('bot-read-root').innerText`),/1 von 7 Bots im Snapshot/);
           assert.equal(await evaluate(`document.querySelector('#bot-read-root .bot-data-summary').innerText`),globalSummary);
-          await evaluate(`document.querySelector('#nav [data-v="command"]').click();
+          await evaluate(`document.querySelector('#nav [data-v="'+document.getElementById('command-bot-overview').closest('.view').id.slice(5)+'"]').click();
             document.querySelector('#command-bot-overview .command-bot-metadata').open=true;
             document.querySelectorAll('#command-bot-overview button')[1].focus()`);
           await key('Enter','Enter',13);
@@ -686,7 +686,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.doesNotMatch(none,/Keine Bots in diesem Snapshot/);
           assert.equal(await evaluate('window.__botReads'),1,'local filter, sort, reset and navigation must not fetch');
 
-          await evaluate(`document.querySelector('#nav [data-v="command"]').click()`);
+          await evaluate(`document.querySelector('#nav [data-v="'+document.getElementById('command-bot-overview').closest('.view').id.slice(5)+'"]').click()`);
           const metadata="document.querySelector('#command-bot-overview .command-bot-metadata')";
           await evaluate(`${metadata}.open=false;
             ${metadata}.querySelector('summary').focus()`);
@@ -779,7 +779,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
           assert.equal(jump.view,'view-bots');assert.equal(jump.open,true);assert.equal(jump.focused,true);
           assert.equal(jump.query,'');assert.equal(jump.reads,1);
           await assertPopulatedLayout('populated expanded');
-          await evaluate(`document.querySelector('#nav [data-v="command"]').click();document.querySelectorAll('#command-bot-overview button')[1].focus()`);
+          await evaluate(`document.querySelector('#nav [data-v="'+document.getElementById('command-bot-overview').closest('.view').id.slice(5)+'"]').click();document.querySelectorAll('#command-bot-overview button')[1].focus()`);
           await key('Enter','Enter',13);
           assert.equal(await evaluate(`document.activeElement===document.querySelector('#bot-card-${'b'.repeat(20)} summary')`),true,'equal-loss second BTC opens exact reference');
           assert.equal(await evaluate(`document.getElementById('bot-card-${'b'.repeat(20)}').open`),true);
@@ -886,7 +886,7 @@ test('V11 B11 actual shell: mixed synthetic snapshot, investigation context and 
             await evaluate(`(()=>{
               const search=document.getElementById('bot-symbol-search');search.value='NO_MATCH';
               search.dispatchEvent(new Event('input',{bubbles:true}));
-              document.querySelector('#nav [data-v="command"]').click();
+              document.querySelector('#nav [data-v="'+document.getElementById('command-bot-overview').closest('.view').id.slice(5)+'"]').click();
               document.querySelector('#command-bot-overview .command-bot-metadata').open=true;
               const jump=document.querySelector('#command-bot-overview button');
               window.__largeJumpRef=jump.getAttribute('aria-label').match(/Referenz ([a-f0-9]{20})/)[1];

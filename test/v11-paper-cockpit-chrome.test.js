@@ -764,8 +764,8 @@ test('early Strategies navigation remains active when its module bootstrap initi
   }finally{await hosted.close();}
 });
 
-test('Command retains the live summary while Strategies can retry a failed bootstrap',async()=>{
-  const name='Command retains the live summary while Strategies can retry a failed bootstrap';
+test('Command shows only total equity while Strategies can retry a failed bootstrap',async()=>{
+  const name='Command shows only total equity while Strategies can retry a failed bootstrap';
   if(typeof WebSocket!=='function'){
     const child=runFlaggedBrowserTest(name,60000);
     assert.equal(child.status,0,child.stdout+child.stderr);
@@ -801,8 +801,10 @@ test('Command retains the live summary while Strategies can retry a failed boots
         }
         assert.fail(predicate);
       };
-      await wait("document.querySelector('#command-paper-live')?.innerText.includes('1 Pools')");
-      assert.equal(await evaluate("document.querySelectorAll('#command-paper-live button, #command-paper-live a').length"),0);
+      await wait("!!document.querySelector('#view-command .account-total')");
+      assert.deepEqual(await evaluate("Array.from(document.querySelector('#view-command').children).filter(x=>x.getClientRects().length).map(x=>x.className)"),['card account-total']);
+      assert.equal(await evaluate("document.querySelector('.account-total .portfolio-value').textContent"),'—');
+      assert.match(await evaluate("document.querySelector('.account-total p').textContent"),/Pionex.*Ledger.*OKX/);
       await evaluate("document.querySelector('[data-v=strategies]').click();true");
       await wait("document.querySelector('#strategy-load-status button')?.textContent==='Erneut laden'");
       await evaluate("document.querySelector('#strategy-load-status button').click();true");

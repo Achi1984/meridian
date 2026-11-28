@@ -46,7 +46,8 @@ export function normalizeFuturesPositions(data={}){
     asset:baseAsset(x?.symbol),
     isolatedMode:text(x?.isolatedMode),
     riskState:text(x?.riskState),
-    side:text(x?.positionSide),
+    side:x?.positionSide==='BOTH'&&num(x?.netSize)!==0&&num(x?.netSize)!=null
+      ?(num(x.netSize)>0?'LONG':'SHORT'):text(x?.positionSide),
     netSize:num(x?.netSize),
     avgPrice:num(x?.avgPrice),
     unrealizedPnl:num(x?.unrealizedPnL),

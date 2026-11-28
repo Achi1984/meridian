@@ -276,7 +276,7 @@ export function createFibComparison() {
       if (!res.ok) throw Error('report');
       const report=await res.json();
       if (!Number.isFinite(report.asOf)) throw Error('timestamp');
-      const fingerprint=report.asOf+'-'+(Date.now()-report.asOf>35*60000);
+      const fingerprint=report.asOf+'-'+Math.floor((Date.now()-report.asOf)/60000);
       if(fingerprint===lastView)return;
       const num=value=>value!=null && value!=='' && Number.isFinite(Number(value))?Number(value):NaN;
       const fmt=(v,places=4)=>Number.isFinite(v)?v.toLocaleString('de-AT',{maximumFractionDigits:places}):'—';
@@ -329,7 +329,7 @@ export function createFibComparison() {
         const name=document.createElement('strong');
         name.textContent=dot+' '+frame.replace('H',' h').replace('m',' min');
         venue.style.gridColumn='1 / -1';
-        venue.textContent=[signal,open?'Paper '+side(open):'',venue.textContent,observation.decision,stale?'Stand veraltet':''].filter(Boolean).join(' · ');
+        venue.textContent=[signal,open?'Paper '+side(open):'',venue.textContent,observation.decision].filter(Boolean).join(' · ');
         head.append(name,result,venue);
         line('Modellkonto ab 1.000 USDC',fmt(equity,6)+' USDC',equity-1000);
         line('Paper realisiert',signed(realized)+' USDC · '+closed.length+' geschlossen',realized);
@@ -341,7 +341,7 @@ export function createFibComparison() {
         return card;
       });
       const stamp=document.createElement('small');
-      stamp.textContent='Gemeinsames OKX-Demokonto · Letzte Prüfung '+new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien';
+      stamp.textContent=(Date.now()-report.asOf>35*60000?'Stand veraltet · ':'')+'Gemeinsames OKX-Demokonto · Letzte Prüfung '+new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien · vor '+Math.max(0,Math.floor((Date.now()-report.asOf)/60000))+' Min.';
       const focusFrame=body.contains(document.activeElement)?document.activeElement.closest('details')?.dataset.frame:null;
       body.replaceChildren(...rows,stamp);
       if(focusFrame)rows.find(row=>row.dataset.frame===focusFrame)?.querySelector('summary')?.focus({preventScroll:true});

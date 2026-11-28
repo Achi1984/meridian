@@ -194,3 +194,9 @@
 .compound-metrics{margin-top:4px;font-size:.87rem}
 .compound-metrics>b{font-weight:500}
 .compound-bot>p{padding:3px 10px 6px;font-size:.85rem}
+
+#app #view-command.accounts-only>:not(.account-total){display:none}
+#app .account-total .portfolio-value{display:block;font-variant-numeric:tabular-nums}
+#app .account-trades form{display:flex;flex-wrap:wrap;align-items:center;gap:.5rem}
+#app .account-trades form>*{min-height:44px;max-width:100%}
+#app .account-trades summary{min-height:44px;align-content:center;cursor:pointer;overflow-wrap:anywhere}

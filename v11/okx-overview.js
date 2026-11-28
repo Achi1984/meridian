@@ -19,7 +19,7 @@ function row(name,pnl,currency,detail){
   const title=document.createElement('strong');
   title.textContent=name;
   const value=document.createElement('strong');
-  value.textContent=amount.format(pnl)+' '+currency;
+  value.textContent='PnL '+amount.format(pnl)+' '+currency;
   value.className=pnl>0?'paper-gain':pnl<0?'paper-loss':'';
   const note=document.createElement('small');
   note.style.flexBasis='100%';
@@ -58,7 +58,7 @@ function compoundRows(report,previous){
     title.textContent=side+'-Compounder';
     const state=document.createElement('small');
     state.textContent=bot.decision?.reason || (bot.position?'Position offen':
-      Number.isFinite(report.start) && report.cursor===report.start?'Erste Stundenkerze ausständig':'Wartet');
+      Number.isFinite(report.start) && report.cursor===report.start?'Erste Auswertung nach '+localTime.format(report.start+3600000)+' Wien':'Wartet');
     const pnl=document.createElement('strong');
     const net=number(a.equity)-1000;
     pnl.textContent='PnL '+signedMoney.format(net)+' USDT';

@@ -6,7 +6,7 @@ const messages={locked:'App entsperren, um Ledger-Bestände zu laden.',loading:'
   unavailable:'Ledger-Stand konnte nicht geladen oder geprüft werden. Bitte erneut laden; fehlende Daten bedeuten keinen Nullbestand. Pionex bleibt unabhängig.',conflict:'Depot wurde zwischenzeitlich geändert. Vor erneutem Speichern neu laden.',
   write_denied:'Schreibberechtigung nicht bestätigt. Neu laden und den separaten Schreibschlüssel prüfen.',
   write_unknown:'Speicherergebnis unbekannt. Nicht erneut senden; zuerst neu laden und gespeicherten Stand vergleichen.'};
-export function mountLedgerManual(root,{access,createClient=createLedgerManualClient}={}){
+export function mountLedgerManual(root,{access,onValuation,createClient=createLedgerManualClient}={}){
   const doc=root.ownerDocument,el=(tag,text)=>{const n=doc.createElement(tag);if(text!==undefined)n.textContent=text;return n;};
   const section=el('section'),status=el('p'),content=el('div'),load=el('button','Ledger aktualisieren');
   section.className='card ledger-manual';status.setAttribute('role','status');load.type='button';
@@ -28,7 +28,7 @@ export function mountLedgerManual(root,{access,createClient=createLedgerManualCl
   tile.append(el('span','Ledger'),balance);command?.append(tile);
   let ready=false,disposed=false;
   const client=createClient({getToken:access.getToken,onLock:()=>access.lock(),onChange:s=>{
-    if(disposed)return;ready=s.status==='ready';save.disabled=!ready;load.disabled=['loading','saving','locked'].includes(s.status);
+    if(disposed)return;onValuation?.(s.status==='ready'?s.model:null);ready=s.status==='ready';save.disabled=!ready;load.disabled=['loading','saving','locked'].includes(s.status);
     status.textContent=messages[s.status]||messages.unavailable;content.replaceChildren();
     if(s.status==='locked'){quantities.value='';observed.value='';key.value='';editor.open=false;}
     if(s.status==='saving')key.value='';
