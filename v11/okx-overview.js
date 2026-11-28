@@ -43,6 +43,17 @@ function demoRows(report){
       (completed.length?' · Paper Basis '+modelResult('modelBase')+' / Filter '+modelResult('modelFiltered')+' USDC':''));
   });
 }
+function compoundRows(report){
+  return ['Long','Short'].map(side=>{
+    const bot=report.bots[side], a=bot.compound, fixed=bot.fixed;
+    const fmt=n=>number(n).toLocaleString('de-AT',{maximumFractionDigits:2});
+    return row(side+'-Compounder',number(a.equity)-1000,'USDT',
+      (bot.position?'Position offen':'Wartet')+' · Konto '+fmt(a.equity)+' USDT · nächstes Risikobudget '+
+      fmt(number(a.balance)*0.005)+' USDT · max. Drawdown '+fmt(number(a.drawdown)*100)+' % · '+
+      count(a.closed)+' geschlossen · Fixrisiko: '+fmt(number(fixed.equity)-1000)+' USDT P/L, '+
+      fmt(number(fixed.drawdown)*100)+' % Drawdown');
+  });
+}
 function gridRows(report){
   return [['fixed','Fest'],['adaptive','Adaptiv'],['model','KI-Filter']].map(([key,name])=>{
     const a=report.accounts[key];
@@ -66,6 +77,7 @@ export function createOkxOverview(fibonacci){
   root.append(heading,fibonacci);
   const groups=[
     ['BTC Long/Short · Demo','okx-filter-demo',demoRows,90],
+    ['BTC-Compounder · Futures-Paper','btc-compound-paper',compoundRows,90],
     ['BTC-Grid · Paper','btc-grid-paper',gridRows,45],
     ['Short nach Fehlausbruch · Paper','okx-rejection-paper',shortRows,360]
   ];
