@@ -3,8 +3,8 @@ import os
 from decimal import Decimal
 from pathlib import Path
 
-from okx_demo_preflight import INSTRUMENT, NAMES, PreflightError, get
-from okx_demo_round_trip import ENTRY, EXIT, SIZE, lookup
+from okx_demo_preflight import INSTRUMENT, NAMES, PreflightError, VenueError, get
+from okx_demo_round_trip import ENTRY, EXIT, ORDER, SIZE
 
 
 def verify_fill(order, fill):
@@ -28,11 +28,25 @@ def verify_fill(order, fill):
 
 def audit(keys):
     records = []
-    for client_id in (ENTRY, EXIT):
-        order = lookup(keys, client_id)
-        if order is None:
-            raise PreflightError("original demo order unavailable")
-        query = dict(instType="FUTURES", instId=INSTRUMENT, ordId=order["ordId"])
+    # Venue IDs recorded in the completed demo workflow run 46123934736.
+    for client_id, venue_id, side in ((ENTRY, "4138957914693025792", "buy"),
+                                      (EXIT, "4138957935027011584", "sell")):
+        query = dict(instType="FUTURES", instId=INSTRUMENT, ordId=venue_id)
+        try:
+            rows = get(ORDER, keys, instId=INSTRUMENT, ordId=venue_id)
+        except VenueError as exc:
+            if exc.code != "51603":
+                raise
+            rows = []
+        if not rows:
+            history = get("/api/v5/trade/orders-history", keys, instType="FUTURES", instId=INSTRUMENT)
+            rows = [row for row in history if row["ordId"] == venue_id]
+        if len(rows) != 1:
+            raise PreflightError(f"original {side} order {venue_id} unavailable in demo history")
+        order, = rows
+        if (order["ordId"] != venue_id or order["clOrdId"] != client_id or order["side"] != side
+                or order["instId"] != INSTRUMENT):
+            raise PreflightError("historical order identity mismatch")
         fills = get("/api/v5/trade/fills", keys, **query)
         if not fills:
             fills = get("/api/v5/trade/fills-history", keys, **query)
