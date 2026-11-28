@@ -158,6 +158,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
     async unlockApp(){
       verificationOwned=true;
       try{await unlockAppThroughGate(call,{pilotFetchUrls:[...followupEndpoints,...strategyStatusEndpoints],additionalFetchUrls:[
+        pilotEndpoint,pilotStatusEndpoint,top100Endpoint,swingCheckpointEndpoint,
         PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,
         SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT
       ],blockOtherRequests:true});}
@@ -196,7 +197,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         };
         await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,
           deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
-        await unlockAppThroughGate(call,{pilotFetchUrls:[...followupEndpoints,...strategyStatusEndpoints]});
+        await unlockAppThroughGate(call,{pilotFetchUrls:[...followupEndpoints,...strategyStatusEndpoints,swingCheckpointEndpoint,top100Endpoint,pilotStatusEndpoint]});
         const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
         report.evidence.observedThrough=new Date(Date.now()-298000).toISOString();
         report.valuation.cashCents='90071992547409931234';
@@ -474,7 +475,6 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.pairedSettled(),3);
         assert.equal(intercepted.progressCount(),3);
         assert.equal(intercepted.progressSettled(),3);
-        await intercepted.close();
         await evaluate(`(async()=>{
           const model=await import('./paper-cockpit-model.js?v=B20-M11-FIX6');
           const view=await import('./paper-cockpit-view.js?v=B20-M11-FIX6');
@@ -545,7 +545,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`);
         assert.equal(focus,true);
         await key('Tab','Tab',9);
-        for (const selector of ['#solana-scanner-live > summary','#solana-meme-paper > summary','#paper-advisor > summary','[data-advisor-live]', '[data-advisor-file]', '#okx-demo-account > summary', '#okx-short-study > summary', '#top100-paper > summary','#paper-reports-section > summary']) {
+        for (const selector of ['#solana-scanner-live > summary','#solana-meme-paper > summary','#paper-advisor > summary', '.advisor-detail > summary', '[data-key="v4-duel"] > summary', '[data-key="history"] > summary', '[data-key="trades"] > summary', '[data-advisor-live]', '[data-advisor-file]', '#okx-demo-account > summary', '#okx-short-study > summary', '#top100-paper > summary','#paper-reports-section > summary']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
             true, 'live pilot control is reachable in document order: '+selector);
           await key('Tab','Tab',9);
@@ -579,6 +579,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           true,'offline fixture disclosure follows the BTC/EUR refresh affordance');
         await key('Tab','Tab',9);
         const refreshTab=await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`);
+        intercepted.assertHealthy();
+        await intercepted.close();
         assert.equal(refreshTab,true,'native Tab focuses the manual report read affordance');
         await key('Tab','Tab',9);
         const tabState=await evaluate(`(()=>{
