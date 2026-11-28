@@ -128,6 +128,15 @@ export function filterText(report) {
     const fills = completed.filter(r => r.demoFilled);
     parts.push(side + ' · ' + fills.length + ' abgeschlossene Demotrades' +
       (fills.length ? ' · ' + sum(fills,'demoAfterFees') + ' USDC nach Handelsgebühren, vor Funding' : ''));
+    if (fills.length) {
+      const settled = fills.filter(r => typeof r.demoNetUSDC === 'string');
+      if (settled.length === fills.length) {
+        parts.push('Netto inkl. Funding ' + sum(settled,'demoNetUSDC') +
+          ' USDC · davon Funding ' + sum(settled,'fundingUSDC') + ' USDC');
+      } else {
+        parts.push('Funding-Abgleich offen für ' + (fills.length - settled.length) + ' Demotrade(s)');
+      }
+    }
     if (completed.length) parts.push('Papiervergleich vor Funding · Basis ' + sum(completed,'modelBase') +
       ' / Filter ' + sum(completed,'modelFiltered') + ' USDC');
     const last = trades.at(-1);
