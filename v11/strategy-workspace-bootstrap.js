@@ -17,6 +17,7 @@ let arenaRoot = document.getElementById('strategy-arena-root');
 let arena = null;
 let advisorController = null;
 let refreshSolanaStatus = null;
+let refreshScanner, refreshDemo;
 let refreshTop100 = null;
 let paperCockpit = null;
 let spotPaperCockpit = null;
@@ -54,9 +55,9 @@ function mountWorkspace(){
   advisorController.setActive(Boolean(document.querySelector('#nav button[data-v="strategies"][aria-current="page"]')));
   const {section:solana, refresh} = ensureSolanaSection(document,advisor);
   refreshSolanaStatus = refresh;
-  const scanner = collapsedSection('solana-scanner-live','Solana-Memecoin-Scanner · Live',solana);
-  mountLiveScanner(scanner);
-  mountOkxDemo(collapsedSection('okx-demo-account','OKX-Demokonto · BTC-Papertrades',botReports));
+  const scanner = collapsedSection('solana-scanner-live','Solana-Scanner',solana);
+  refreshScanner = mountLiveScanner(scanner);
+  refreshDemo = mountOkxDemo(collapsedSection('okx-demo-account','OKX-Demo · BTC Long/Short',botReports));
   refreshTop100=mountTop100(collapsedSection('top100-paper','Top 100 · Ausbruch und Rücktest',botReports));
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
@@ -123,6 +124,8 @@ function requestWorkspaceLoad(){
   if(active){
     refreshSolanaStatus?.();
     refreshTop100?.();
+    refreshDemo?.();
+    refreshScanner?.();
     advisorController?.setActive(true);
     paperCockpit?.setActive(true);
     spotPaperCockpit?.setActive(true);

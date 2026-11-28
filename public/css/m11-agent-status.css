@@ -166,3 +166,13 @@
 [data-paper-lamp=warn],#paper-status-panel [data-tone=warn]{--lamp:#ffc56b}
 [data-paper-lamp=off],#paper-status-panel [data-tone=off]{--lamp:#ff8791}
 #paper-status-panel button{min-height:44px}
+
+#view-strategies details.card:not([open]) > summary .paper-group-pnl{display:none}
+#view-strategies .strategy-lamp{display:block;font-size:.8rem;font-weight:550;line-height:1.45;color:var(--muted)}
+#view-strategies .strategy-lamp::before{width:.75em;height:.75em}
+#view-strategies #okx-demo-account > details{padding:.5rem 0}
+#view-strategies #okx-demo-account > details > summary{cursor:pointer;min-height:44px;align-content:center}
+
+#app #view-strategies .strategy-lamp{grid-column:1;grid-row:2}
+#app #view-strategies summary:has(.strategy-lamp) .paper-group-pnl{grid-row:3}
+#app #solana-meme-paper > summary:has(.strategy-lamp) .pilot-status{display:none}

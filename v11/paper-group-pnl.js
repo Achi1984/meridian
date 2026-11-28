@@ -25,3 +25,17 @@ export function paperGroupPnl(section) {
     if(note){const status=doc.createElement('em');status.textContent=note;line.append(status);}
   };
 }
+
+export function strategyLamp(section) {
+  const summary = section.querySelector?.('summary');
+  if (!summary) return () => {};
+  const badge = section.ownerDocument.createElement('small');
+  badge.className = 'strategy-lamp';
+  summary.append(badge);
+  function update(tone, label) {
+    badge.setAttribute('data-paper-lamp', tone);
+    badge.textContent = label;
+  }
+  update('unknown', 'Unbekannt');
+  return update;
+}

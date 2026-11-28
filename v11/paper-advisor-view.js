@@ -1,4 +1,4 @@
-import {paperGroupPnl} from './paper-group-pnl.js?v=B20-M11-FIX6';
+import {paperGroupPnl, strategyLamp} from './paper-group-pnl.js?v=B20-M11-FIX6';
 import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX6';
 import {appAccess} from './app-access.js?v=B20-M11-FIX6';
 
@@ -404,11 +404,12 @@ export function mountAdvisor(root, access = appAccess) {
   const fileInput = root.querySelector('[data-advisor-file]');
   const status = root.querySelector('[data-advisor-status]');
   const result = root.querySelector('[data-advisor-result]');
+  const lamp = strategyLamp(root);
   const headline=paperGroupPnl(root);headline();
   const eurResults=report=>['model','reference'].map(key=>[labels[key],Number.isFinite(report.arms[key].equityEur)?report.arms[key].equityEur-1000:null]);
   let generation = 0;
   function clear() {
-    generation++;headline();
+    generation++;headline();lamp('unknown','Unbekannt');
     fileInput.value = '';
     result.replaceChildren();
     delete result.dataset.asOf;
@@ -453,10 +454,12 @@ export function mountAdvisor(root, access = appAccess) {
       result.dataset.asOf = asOf;
       const stale = Date.now() - Date.parse(asOf) > 15 * 60 * 1000;
       headline('Netto',unit,rows,stale?'Daten veraltet':'');
+      lamp(stale ? 'warn' : 'on', stale ? 'Veraltet' : 'Daten aktuell');
       status.dataset.state = stale ? 'warning' : 'fresh';
       status.textContent = (stale ? 'Veralteter Datenstand · ' : 'Datenstand · ') + DATE.format(new Date(asOf));
     } catch {
       if (controller === request && access.isUnlocked()) {
+        lamp('unknown','Unbekannt');
         headline();
         status.dataset.state = 'warning';
         const last = result.dataset.asOf;
@@ -496,6 +499,7 @@ export function mountAdvisor(root, access = appAccess) {
       if (current !== generation || !access.isUnlocked()) return;
       if (!validAdvisorReport(report)) throw new Error('invalid report');
       renderAdvisorReport(result, report);
+      lamp('warn','Lokaler Bericht');
       headline('Netto','EUR',eurResults(report),'Lokaler Bericht');
       status.textContent = 'Lokaler Bericht · ' + DATE.format(new Date(report.asOf));
     } catch {
