@@ -8,7 +8,11 @@ import {WALLET_SCOPE,safeScopeCount,safeScopeDiagnostics} from './asset-watch-sc
 const {Pool}=pg;
 const PRIVATE_STATE_KEY='private_dashboard_v1';
 
-function num(v){const n=Number(v);return Number.isFinite(n)?n:null}
+function num(v){
+  if(typeof v!=='number' && (typeof v!=='string' || !v.trim()))return null;
+  const n=Number(v);
+  return Number.isFinite(n)?n:null;
+}
 function text(v){const s=String(v??'').trim();return s||null}
 function baseAsset(v){return String(v||'').toUpperCase().replace(/\.PERP$/,'').replace(/[-_/](USDT|USDC|USD)_?PERP$/,'').replace(/[-_/](USDT|USDC|USD)$/,'')||null}
 
@@ -48,6 +52,7 @@ export function normalizeFuturesPositions(data={}){
     riskState:text(x?.riskState),
     side:x?.positionSide==='BOTH'&&num(x?.netSize)!==0&&num(x?.netSize)!=null
       ?(num(x.netSize)>0?'LONG':'SHORT'):text(x?.positionSide),
+    positionSide:text(x?.positionSide),
     netSize:num(x?.netSize),
     avgPrice:num(x?.avgPrice),
     unrealizedPnl:num(x?.unrealizedPnL),

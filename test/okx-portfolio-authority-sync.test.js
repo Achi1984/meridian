@@ -115,3 +115,10 @@ test('health exposes only a boolean OKX authority configuration diagnostic',()=>
   assert.match(gateway,/okxPortfolioAuthorityConfigured:OKX_PORTFOLIO_AUTHORITY_CONFIGURED/);
   assert.doesNotMatch(gateway,/okxPortfolioAuthorityConfigured:[^\n]*OKX_READ_API_SECRET/);
 });
+
+test('rejects boolean and blank OKX balances while accepting real zero',()=>{
+  const nowMs=Date.now();
+  const parse=totalBal=>parseOkxAssetValuation({code:'0',data:[{ts:String(nowMs),totalBal}]},{nowMs});
+  for(const value of [false,true,' ',[]])assert.throws(()=>parse(value),/invalid_total/);
+  assert.equal(parse('0').totalUsd,0);
+});

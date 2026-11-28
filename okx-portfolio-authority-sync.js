@@ -10,7 +10,11 @@ const DEFAULT_INTERVAL_MIN=10;
 const DEFAULT_MAX_SOURCE_AGE_MS=5*60*1000;
 let pool=null,running=false,poolUrl='';
 
-const finite=v=>v===null||v===undefined||v===''?null:(Number.isFinite(Number(v))?Number(v):null);
+function finite(value){
+  if(typeof value!=='number' && (typeof value!=='string' || !/^[+-]?(?:\d+(?:\.\d+)?|\.\d+)$/.test(value.trim())))return null;
+  const parsed=Number(value);
+  return Number.isFinite(parsed)?parsed:null;
+}
 const clean=v=>String(v||'').trim();
 
 export function readOkxPortfolioAuthorityCredentials(env={}){

@@ -4,6 +4,13 @@ import {createDepotReadView} from './depot-read-view.js?v=B20-M11-FIX6';
 import {mountLedgerReview} from './ledger-review-view.js?v=B20-M11-FIX6';
 import {mountLedgerManual} from './ledger-manual-view.js?v=B20-M11-FIX6';
 
+export function displayedPositionSize(row){
+  const leg=row.side==='LONG'?row.sizeLong:row.sizeShort;
+  if(row.positionSide==='BOTH')return Number.isFinite(row.netSize)?Math.abs(row.netSize):null;
+  if(Number.isFinite(leg)&&leg!==0)return Math.abs(leg);
+  return Number.isFinite(row.netSize)?Math.abs(row.netSize):leg;
+}
+
 function mountAccountPanels(doc,root,access,now){
   const el=(tag,text)=>{const node=doc.createElement(tag);if(text!==undefined)node.textContent=text;return node;};
   const command=doc.getElementById('view-command'),card=el('section'),value=el('strong','—'),note=el('p');
@@ -58,7 +65,7 @@ function mountAccountPanels(doc,root,access,now){
       for(const r of open){
         const d=el('details'),summary=el('summary',r.symbol+' · '+r.side+' · PnL '+(Number.isFinite(r.unrealizedPnl)?fmt.format(r.unrealizedPnl):'—'));
         if(Number.isFinite(r.unrealizedPnl))summary.className=r.unrealizedPnl>0?'paper-gain':r.unrealizedPnl<0?'paper-loss':'';
-        d.append(summary,el('p','Einstieg '+(r.avgPrice??'—')+' · Markpreis '+(r.markPrice??'—')+' · Hebel '+(r.leverage??'—')+' · Größe '+(r.netSize??(r.side==='LONG'?r.sizeLong:r.sizeShort)??'—')));
+        d.append(summary,el('p','Einstieg '+(r.avgPrice??'—')+' · Markpreis '+(r.markPrice??'—')+' · Hebel '+(r.leverage??'—')+' · Größe '+(displayedPositionSize(r)??'—')));
         positions.append(d);
       }
     }
@@ -128,7 +135,10 @@ export function mountDepotReadAccess(document,window,{
             const delay=Math.max(0,state.model.expiresAt-now()+1);
             expiryTimer=schedule(()=>{
               if(disposed||generation!==expiryGeneration)return;
-              expiryTimer=null;reader.revalidate();
+              expiryTimer=null;
+              reader.revalidate();
+              const tab=document.getElementById('nav')?.querySelector?.('[aria-current="page"]')?.dataset.v;
+              if(ledgerManual&&!document.hidden&&access.isUnlocked()&&['command','depot'].includes(tab)&&!reading)void reader.refresh();
             },delay);
           }
         }});

@@ -1,7 +1,7 @@
 import {buildLedgerManualModel} from './ledger-manual-model.js?v=B20-M11-FIX6';
 const BASE='https://p01--achi-meridian--ttvk44grdlp7.code.run/api/private/';
 const PRICES='https://data-api.binance.vision/api/v3/ticker/price';
-export function createLedgerManualClient({getToken,onChange=()=>{},onLock=()=>{},fetchImpl=globalThis.fetch,now=Date.now}={}){
+export function createLedgerManualClient({getToken,onChange=()=>{},onLock=()=>{},fetchImpl=globalThis.fetch,now=Date.now,shouldRenew=()=>false}={}){
   let generation=0,controller=null,revision=null,owner=null,disposed=false,expiry=null;
   const token=()=>{try{const t=getToken();return typeof t==='string'&&t.trim()?t.trim():null;}catch{return null;}};
   const emit=s=>{if(!disposed)onChange(s);};
@@ -35,7 +35,9 @@ export function createLedgerManualClient({getToken,onChange=()=>{},onLock=()=>{}
       if(snapshot&&!model)throw Error('snapshot');
       emit({status:'ready',model});
       if(model?.priceExpiresAt)expiry=setTimeout(()=>{
-        if(id===generation&&!disposed)emit({status:'ready',model:buildLedgerManualModel(snapshot,{now:now()})});
+        if(id!==generation||disposed)return;
+        emit({status:'ready',model:buildLedgerManualModel(snapshot,{now:now()})});
+        if(token()===credential&&shouldRenew())void load();
       },Math.max(0,model.priceExpiresAt-now()+1));
     }catch(e){if(id===generation&&!disposed){revision=null;owner=null;
       if(e.status===401||e.status===403){lock();onLock();}else emit({status:'unavailable'});}}
