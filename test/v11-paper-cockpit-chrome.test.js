@@ -248,6 +248,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
               'mobile disclosure geometry at '+size.width+'px: '+JSON.stringify(header));
           }
         }
+        assert.equal(await evaluate("document.querySelector('#okx-overview').contains(document.querySelector('#fib-bots'))"),true);
+        assert.equal(await evaluate("document.querySelector('#okx-overview').closest('details')"),null);
         const overviewEvidence=evidence || process.env.V11_A2_EVIDENCE_DIR;
         if (overviewEvidence && size.width===390) {
           mkdirSync(overviewEvidence,{recursive:true});
@@ -545,7 +547,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         })()`);
         assert.equal(focus,true);
         await key('Tab','Tab',9);
-        for (const selector of ['#solana-scanner-live > summary','#solana-meme-paper > summary','#paper-advisor > summary', '.advisor-detail > summary', '[data-key="v4-duel"] > summary', '[data-key="history"] > summary', '[data-key="trades"] > summary', '[data-advisor-live]', '[data-advisor-file]', '#okx-demo-account > summary', '#okx-short-study > summary', '#top100-paper > summary','#paper-reports-section > summary']) {
+        for (const selector of [...['15m','30m','1H','4H'].map(frame=>'#fib-bots [data-frame="'+frame+'"] > summary'),'#solana-scanner-live > summary','#solana-meme-paper > summary','#paper-advisor > summary', '.advisor-detail > summary', '[data-key="v4-duel"] > summary', '[data-key="history"] > summary', '[data-key="trades"] > summary', '[data-advisor-live]', '[data-advisor-file]', '#okx-demo-account > summary', '#okx-short-study > summary', '#top100-paper > summary','#paper-reports-section > summary']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
             true, 'live pilot control is reachable in document order: '+selector);
           await key('Tab','Tab',9);

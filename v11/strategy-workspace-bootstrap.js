@@ -1,3 +1,4 @@
+import {createOkxOverview} from './okx-overview.js?v=B20-M11-FIX6';
 import {mountOkxDemo, createShortComparison, createGridComparison, createFibComparison} from './okx-demo-report.js?v=B20-M11-FIX6';
 import {mountTop100} from './top100-report.js?v=B20-M11-FIX6';
 import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B20-M11-FIX6';
@@ -92,7 +93,20 @@ function mountWorkspace(){
   const reports=collapsedSection('paper-reports-section','Berichte und Vergleiche',botReports);
   history.append(host8hRoot);
   reports.append(botReports,pairedReports,history);
-  reports.append(createGridComparison(),createFibComparison());
+  reports.append(createGridComparison());
+  const overview=createOkxOverview(createFibComparison());
+  scanner.before(overview);
+  const commandIntro=document.querySelector('#view-command > div');
+  if(commandIntro){
+    const shortcut=document.createElement('button');
+    shortcut.type='button';
+    shortcut.textContent='OKX-Paperbots ansehen';
+    shortcut.addEventListener('click',()=>{
+      document.querySelector('#nav button[data-v="strategies"]')?.click();
+      overview.scrollIntoView({block:'start'});
+    });
+    commandIntro.append(shortcut);
+  }
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';

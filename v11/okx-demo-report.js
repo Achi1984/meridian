@@ -255,15 +255,18 @@ export function createGridComparison() {
 }
 
 export function createFibComparison() {
-  const card=document.createElement('details');
-  const title=document.createElement('summary');
-  title.textContent='OKX-Demo · Fibonacci';
+  const card=document.createElement('section');
+  card.className='card';
+  card.id='fib-bots';
+  const title=document.createElement('h2');
+  title.textContent='Fibonacci-Bots · OKX-Demo';
   const body=document.createElement('div');
   card.append(title,body);
   let loading=false;
-  let timer;
+  body.textContent='Botstatus wird geladen …';
+  let lastView='';
   async function refresh(){
-    if (!card.open || loading) return;
+    if (!card.isConnected || document.hidden || !card.getClientRects().length || loading) return;
     loading=true;
     try {
       const res=await fetch(source.replace('okx-demo-pilot.json','fib-demo.json'),{
@@ -273,6 +276,8 @@ export function createFibComparison() {
       if (!res.ok) throw Error('report');
       const report=await res.json();
       if (!Number.isFinite(report.asOf)) throw Error('timestamp');
+      const fingerprint=report.asOf+'-'+(Date.now()-report.asOf>35*60000);
+      if(fingerprint===lastView)return;
       const num=value=>value!=null && value!=='' && Number.isFinite(Number(value))?Number(value):NaN;
       const fmt=(v,places=4)=>Number.isFinite(v)?v.toLocaleString('de-AT',{maximumFractionDigits:places}):'—';
       const signed=v=>(v>0?'+':'')+fmt(v,6);
@@ -299,9 +304,7 @@ export function createFibComparison() {
         const stale=Date.now()-report.asOf>35*60000;
         const uncertain=last?.state==='reserved'||last?.state==='rejected';
         const dot=stale||uncertain?'🟡':'🟢';
-        const state=last && ['reserved','filled','rejected'].includes(last.state)?'OKX · '+states[last.state]:
-          open?'Paper · '+side(open):signal;
-        head.textContent=dot+' '+frame.replace('H',' h').replace('m',' min')+' · '+state+(stale?' · Stand veraltet':'');
+        head.style.cssText='display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 6px;padding:8px 10px;font-size:1rem;letter-spacing:normal;line-height:1.35;min-height:44px;border-top:1px solid var(--line,#334155);cursor:pointer';
         card.append(head);
         function line(label,value,tone=0){
           const row=document.createElement('p');
@@ -318,6 +321,16 @@ export function createFibComparison() {
         const floating=open?(open.side==='buy'?1:-1)*(num(mark?.price)-num(open.entry))*num(mark?.sizeBTC)-
           (num(mark?.price)+num(open.entry))*num(mark?.sizeBTC)*num(mark?.feeRate):0;
         const equity=paper.some(t=>t.state==='data_gap')?NaN:1000+realized+floating;
+        const result=document.createElement('small');
+        result.textContent='Paper-P/L '+signed(equity-1000)+' USDC';
+        result.className=equity>1000?'paper-gain':equity<1000?'paper-loss':'';
+        const venue=document.createElement('small');
+        venue.textContent=last?'OKX · '+states[last.state]+' · '+side(last):'OKX · Keine Order';
+        const name=document.createElement('strong');
+        name.textContent=dot+' '+frame.replace('H',' h').replace('m',' min');
+        venue.style.gridColumn='1 / -1';
+        venue.textContent=[signal,open?'Paper '+side(open):'',venue.textContent,stale?'Stand veraltet':''].filter(Boolean).join(' · ');
+        head.append(name,result,venue);
         line('Modellkonto ab 1.000 USDC',fmt(equity,6)+' USDC',equity-1000);
         line('Paper realisiert',signed(realized)+' USDC · '+closed.length+' geschlossen',realized);
         if(open){
@@ -329,16 +342,14 @@ export function createFibComparison() {
       });
       const stamp=document.createElement('small');
       stamp.textContent='Gemeinsames OKX-Demokonto · Letzte Prüfung '+new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien';
+      const focusFrame=body.contains(document.activeElement)?document.activeElement.closest('details')?.dataset.frame:null;
       body.replaceChildren(...rows,stamp);
-    } catch {body.textContent='🟡 Fibonacci-Bericht derzeit nicht abrufbar.';}
+      if(focusFrame)rows.find(row=>row.dataset.frame===focusFrame)?.querySelector('summary')?.focus({preventScroll:true});
+      lastView=fingerprint;
+    } catch {lastView='';body.textContent='🟡 Fibonacci-Bericht derzeit nicht abrufbar.';}
     finally {loading=false;}
   }
-  card.addEventListener('toggle',()=>{
-    clearInterval(timer);
-    if(card.open){
-      void refresh();
-      timer=setInterval(()=>{if (!document.hidden && card.isConnected) void refresh();},60000);
-    }
-  });
+  new IntersectionObserver(entries=>{if(entries.some(item=>item.isIntersecting))void refresh();}).observe(card);
+  setInterval(refresh,60000);
   return card;
 }
