@@ -1,0 +1,26 @@
+name: OKX BTC spot breakout and retest study
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/research/okx_spot_retest.py
+      - .github/workflows/okx-spot-retest-study.yml
+permissions:
+  contents: read
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compare confirmed BTC-USDC signals and cost stress
+        env:
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+        run: python3 scripts/research/okx_spot_retest.py | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
