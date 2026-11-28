@@ -69,6 +69,7 @@ window.fetch=async(url,init)=>{
     {headers:{'content-type':'application/json'}});
  }
  if(String(url)===${JSON.stringify(swingCheckpointEndpoint)})return new Response('{}',{status:503});
+ if (["https://api.github.com/repos/Achi1984/meridian/contents/okx-filter-demo.json?ref=paper-dashboard-data","https://api.github.com/repos/Achi1984/meridian/contents/okx-swing-demo.json?ref=paper-dashboard-data","https://api.github.com/repos/Achi1984/meridian/actions/workflows/solana-meme-paper-bot.yml/runs?branch=main&per_page=1","https://api.github.com/repos/Achi1984/meridian/actions/runs?branch=paper%2Fovernight-staged-exits&per_page=30","https://api.github.com/repos/Achi1984/meridian/actions/runs?branch=paper%2Fholder-token2022-forward&per_page=30","https://api.github.com/repos/Achi1984/meridian/actions/runs?branch=paper%2Ftop100-confirmation-20261127&per_page=30"].includes(String(url))) return new Response('{}',{status:503});
  window.__botReads++;
  if(window.__botReadMode==='error')throw new Error('synthetic private failure');
  if(window.__botReadMode==='unauthorized')return new Response('',{status:401});
