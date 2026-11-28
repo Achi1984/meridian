@@ -44,7 +44,7 @@ export function mountBotReadAccess(document,window,{
         }};
       }});
     unsubscribe=access.subscribe(s=>{if(!disposed&&s?.status==='unlocked')view?.revalidate();});
-    stopAutoRefresh=refreshOnOpen(document,access,['command', 'bots'],()=>{if(!reading)client?.refresh();},now);
+    stopAutoRefresh=refreshOnOpen(document,access,['command', 'depot', 'bots'],()=>{if(!reading)client?.refresh();},now);
   }catch{
     stopAutoRefresh();cancelExpiry();unregister();unsubscribe();
     try{client?.dispose();}catch{}
