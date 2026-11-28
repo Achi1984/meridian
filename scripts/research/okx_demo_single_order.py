@@ -74,5 +74,6 @@ if __name__ == "__main__":
     credentials = tuple(os.environ[name] for name in NAMES)
     if not all(credentials):
         raise SystemExit("demo credentials missing")
-    submit = (os.environ.get("GITHUB_RUN_NUMBER"), os.environ.get("GITHUB_RUN_ATTEMPT")) == ("1", "1")
+    # Run 1 stopped on a balance/exposure GET before reaching the order endpoint.
+    submit = (os.environ.get("GITHUB_RUN_NUMBER"), os.environ.get("GITHUB_RUN_ATTEMPT")) == ("2", "1")
     run(credentials, submit)
