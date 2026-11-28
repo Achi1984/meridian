@@ -80,7 +80,9 @@ def settle(account, orders, bar, scale):
         if qty<=0:
             continue
         account["btc"]+=side*qty
-        account["cash"]-=side*qty*limit+qty*limit*FEE
+        fee=qty*limit*FEE
+        account["cash"]-=side*qty*limit+fee
+        account["fees"]+=fee
         account["fills"]+=1
     return account["cash"]+account["btc"]*close
 
@@ -92,7 +94,7 @@ def simulate(bars):
     for i in range(16,min(cut,len(bars))):
         window=bars[i-16:i]
         price=window[-1][3]
-        account={"btc":500/price,"cash":500,"fills":0}
+        account={"btc":500/price,"cash":500,"fills":0,"fees":0.0}
         orders=quotes(window,account,False,price)
         held=500+account["btc"]*bars[i][3]
         gain=settle(account,orders,bars[i],1)-held
@@ -100,7 +102,7 @@ def simulate(bars):
             drift,vol,shock=features(window)
             examples.append(((drift,vol*100,shock/4),gain))
     anchor=bars[min(len(bars),cut)-1][3]
-    accounts={k:{"btc":500/anchor,"cash":500,"fills":0,"equity":1000,"peak":1000,"drawdown":0}
+    accounts={k:{"btc":500/anchor,"cash":500,"fills":0,"fees":0.0,"equity":1000,"peak":1000,"drawdown":0}
               for k in ("fixed","adaptive","model")}
     decisions={"full":0,"half":0,"pause":0}
     for i in range(cut,len(bars)):
@@ -123,6 +125,7 @@ def simulate(bars):
     results = {}
     for name, account in accounts.items():
         results[name] = {key: round(account[key], 2) for key in ("equity", "drawdown", "fills")}
+        results[name]["fees"] = round(account["fees"], 6)
         results[name]["vsHold"] = round(account["equity"] - hold_equity, 2)
     return {"accounts": results, "holdEquity": round(hold_equity, 2),
             "decisions":decisions,"trainingFills":len(examples),"bars":max(0,len(bars)-cut)}
