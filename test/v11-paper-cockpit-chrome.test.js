@@ -248,6 +248,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
               'mobile disclosure geometry at '+size.width+'px: '+JSON.stringify(header));
           }
         }
+        assert.equal(await evaluate("document.querySelector('#okx-overview').contains(document.querySelector('#fib-bots'))"),true);
+        assert.equal(await evaluate("document.querySelector('#okx-overview').closest('details')"),null);
         const overviewEvidence=evidence || process.env.V11_A2_EVIDENCE_DIR;
         if (overviewEvidence && size.width===390) {
           mkdirSync(overviewEvidence,{recursive:true});
