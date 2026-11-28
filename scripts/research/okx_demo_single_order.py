@@ -89,6 +89,6 @@ if __name__ == "__main__":
     credentials = tuple(os.environ[name] for name in NAMES)
     if not all(credentials):
         raise SystemExit("demo credentials missing")
-    # Only the third manual run may submit this original, previously rejected intent.
-    submit = (os.environ.get("GITHUB_RUN_NUMBER"), os.environ.get("GITHUB_RUN_ATTEMPT")) == ("3", "1")
+    # Run 3 received OKX 50123. Run 4 checks the revised demo key permissions.
+    submit = (os.environ.get("GITHUB_RUN_NUMBER"), os.environ.get("GITHUB_RUN_ATTEMPT")) == ("4", "1")
     run(credentials, submit)
