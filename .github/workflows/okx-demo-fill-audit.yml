@@ -1,0 +1,28 @@
+name: OKX demo fill audit
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - scripts/research/okx_demo_fill_audit.py
+      - .github/workflows/okx-demo-fill-audit.yml
+permissions:
+  contents: read
+concurrency:
+  group: okx-demo-fill-audit
+  cancel-in-progress: false
+jobs:
+  demo:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Reconcile historical fills against order records
+        env:
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+        run: python3 scripts/research/okx_demo_fill_audit.py
