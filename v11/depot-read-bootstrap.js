@@ -11,7 +11,9 @@ function mountAccountPanels(doc,root,access,now){
   card.append(el('h1','Gesamtvermögen'),value,note);
   command.prepend(card);command.classList.add('accounts-only');
   const sourceDetails=command.querySelector('.command-source-details');
-  if(sourceDetails)root.append(sourceDetails);
+  const context=command.querySelector('.command-context-details');
+  const botOverview=command.querySelector('[aria-labelledby="command-bots-heading"]');
+  for(const section of [botOverview,context,sourceDetails])if(section)root.after(section);
   const panel=el('section'),positions=el('div'),list=el('div'),form=el('form');
   panel.className='card account-trades';panel.append(el('h3','Pionex · Meine Trades'),positions,el('h4','Letzte Ausführungen'),form,list);
   const market=el('select'),symbol=el('input'),submit=el('button','Ausführungen laden');
@@ -96,7 +98,7 @@ function mountAccountPanels(doc,root,access,now){
       {value:state.model.totalUsd,until:state.model.expiresAt}:null;
       if(state.status==='locked'){resetFills();snapshot(null);ledger=null;okx=null;}
       render();},
-    dispose(){resetFills();clearTimeout(expiry);card.remove();panel.remove();if(sourceDetails)command.append(sourceDetails);command.classList.remove('accounts-only');}};
+    dispose(){resetFills();clearTimeout(expiry);card.remove();panel.remove();for(const section of [botOverview,context,sourceDetails])if(section)command.append(section);command.classList.remove('accounts-only');}};
 }
 
 // Use the authenticated reader for visible Pionex snapshots.
