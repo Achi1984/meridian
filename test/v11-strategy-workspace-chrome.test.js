@@ -400,12 +400,12 @@ test('M11 Strategies native shell, synthetic Arena and responsive evidence at fi
           const history=document.getElementById('paper-history-section');
           const research=document.getElementById('paper-research-section');
           return {reportsClosed:host.closest('#paper-reports-section')?.open===false,
-            hostFirst:!!(host.compareDocumentPosition(history)&Node.DOCUMENT_POSITION_FOLLOWING),
+            hostArchived:history.contains(host),
             historyClosed:!history.open,researchClosed:!research.open,
             legacyGrouped:!!history.querySelector('#spot-paper-cockpit-root')&&!!history.querySelector('#paper-cockpit-root'),
             researchGrouped:!!research.querySelector('#paper-readiness-root')&&!!research.querySelector('#strategy-catalog')&&!!research.querySelector('#strategy-arena-root')};
         })()`);
-        assert.deepEqual(paperLayout,{reportsClosed:true,hostFirst:true,historyClosed:true,researchClosed:true,legacyGrouped:true,researchGrouped:true});
+        assert.deepEqual(paperLayout,{reportsClosed:true,hostArchived:true,historyClosed:true,researchClosed:true,legacyGrouped:true,researchGrouped:true});
         await evaluate(`document.querySelector('#paper-research-section > summary').click()`);
         const comparisonMounted=await evaluate(`new Promise(resolve=>{
           const deadline=performance.now()+2500;
