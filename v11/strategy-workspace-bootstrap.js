@@ -1,4 +1,4 @@
-import {mountOkxDemo, createShortComparison, createGridComparison} from './okx-demo-report.js?v=B20-M11-FIX6';
+import {mountOkxDemo, createShortComparison, createGridComparison, createFibComparison} from './okx-demo-report.js?v=B20-M11-FIX6';
 import {mountTop100} from './top100-report.js?v=B20-M11-FIX6';
 import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B20-M11-FIX6';
 import {createAdvisorSection} from './paper-advisor-view.js?v=B20-M11-FIX6';
@@ -92,7 +92,7 @@ function mountWorkspace(){
   const reports=collapsedSection('paper-reports-section','Berichte und Vergleiche',botReports);
   history.append(host8hRoot);
   reports.append(botReports,pairedReports,history);
-  reports.append(createGridComparison());
+  reports.append(createGridComparison(),createFibComparison());
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';

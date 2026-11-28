@@ -1,0 +1,30 @@
+name: OKX Fibonacci demo
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/research/okx_fib_demo.py', '.github/workflows/okx-fib-demo.yml']
+  schedule:
+    - cron: '3,18,33,48 * * * *'
+permissions:
+  contents: write
+concurrency:
+  group: okx-btc-single-demo-order
+  cancel-in-progress: false
+jobs:
+  fibonacci:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python -m unittest discover -s scripts/research -p test_okx_fib_demo.py
+      - name: Scan four timeframes and reconcile demo receipts
+        env:
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+          GH_TOKEN: ${{ github.token }}
+        run: python scripts/research/okx_fib_demo.py
