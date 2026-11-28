@@ -261,7 +261,8 @@ export function createFibComparison() {
   const body=document.createElement('div');
   card.append(title,body);
   let loading=false;
-  card.addEventListener('toggle',async()=>{
+  let timer;
+  async function refresh(){
     if (!card.open || loading) return;
     loading=true;
     try {
@@ -272,30 +273,72 @@ export function createFibComparison() {
       if (!res.ok) throw Error('report');
       const report=await res.json();
       if (!Number.isFinite(report.asOf)) throw Error('timestamp');
+      const num=value=>value!=null && value!=='' && Number.isFinite(Number(value))?Number(value):NaN;
+      const fmt=(v,places=4)=>Number.isFinite(v)?v.toLocaleString('de-AT',{maximumFractionDigits:places}):'—';
+      const signed=v=>(v>0?'+':'')+fmt(v,6);
+      const side=t=>t.side==='buy'?'Long':'Short';
+      const states={filled:'Einstieg bestätigt',closed:'Geschlossen',reserved:'Bestätigung ausständig',
+        rejected:'Abgelehnt',unfilled:'Ohne Ausführung'};
+      const mark=report.valuation;
+      const expanded=new Set([...body.querySelectorAll('details[open]')].map(item=>item.dataset.frame));
       const rows=['15m','30m','1H','4H'].map(frame=>{
+        const card=document.createElement('details');
+        card.dataset.frame=frame;
+        card.open=expanded.has(frame);
+        const head=document.createElement('summary');
         const observation=report.frames[frame];
-        const current=report.demo.filter(t=>t.frame===frame).at(-1);
-        const row=document.createElement('p');
-        const label=document.createElement('strong');
-        label.textContent=frame.replace('H',' h').replace('m',' min');
-        const stale=Date.now()-report.asOf>35*60000;
-        const labels={reserved:'Order wird geprüft',filled:'Demo-Einstieg bestätigt',
-          closed:'Letzter Demotrade geschlossen',rejected:'Order abgelehnt',unfilled:'Order ohne Ausführung'};
-        const signal={buy:'Long-Signal',sell:'Short-Signal',wait:'Wartet auf Signal'}[observation.signal];
+        const signal={buy:'Long-Signal',sell:'Short-Signal',wait:'Wartet'}[observation.signal];
+        const demo=report.demo.filter(t=>t.frame===frame);
+        const last=demo.at(-1);
         const paper=report.paper.filter(t=>t.frame===frame);
-        const detail=document.createElement('small');
-        detail.textContent=paper.filter(t=>t.state==='open').length+' offen · '+
-          paper.filter(t=>t.state==='closed').length+' geschlossen im Papervergleich';
-        const lamp=document.createElement('span');
-        lamp.textContent=stale?'🟡 Stand veraltet':'🟢 '+signal;
-        row.append(label,' · ',lamp,document.createElement('br'),current?(labels[current.state]+' · '):'',detail);
-        return row;
+        const open=paper.find(t=>t.state==='open');
+        const closed=paper.filter(t=>t.state==='closed');
+        const realized=closed.reduce((sum,t)=>sum+num(t.net),0);
+        const demoClosed=demo.filter(t=>t.state==='closed');
+        const demoNet=demoClosed.reduce((sum,t)=>sum+num(t.afterFees),0);
+        const stale=Date.now()-report.asOf>35*60000;
+        const uncertain=last?.state==='reserved'||last?.state==='rejected';
+        const dot=stale||uncertain?'🟡':'🟢';
+        const state=last && ['reserved','filled','rejected'].includes(last.state)?'OKX · '+states[last.state]:
+          open?'Paper · '+side(open):signal;
+        head.textContent=dot+' '+frame.replace('H',' h').replace('m',' min')+' · '+state+(stale?' · Stand veraltet':'');
+        card.append(head);
+        function line(label,value,tone=0){
+          const row=document.createElement('p');
+          const strong=document.createElement('strong');
+          strong.textContent=value;
+          if(tone)strong.className=tone>0?'paper-gain':'paper-loss';
+          row.append(label+' · ',strong);
+          card.append(row);
+        }
+        line('Signal',signal);
+        line('OKX-Demo',last?states[last.state]+' · '+side(last):'Keine Order');
+        line('Demo realisiert nach Handelsgebühren',signed(demoNet)+' USDC · '+demoClosed.length+' geschlossen',demoNet);
+        if(last?.fill)line('Demo-Einstieg / Stop / Ziel',[last.fill,last.stop,last.target].map(x=>fmt(num(x))).join(' / ')+' USD');
+        const floating=open?(open.side==='buy'?1:-1)*(num(mark?.price)-num(open.entry))*num(mark?.sizeBTC)-
+          (num(mark?.price)+num(open.entry))*num(mark?.sizeBTC)*num(mark?.feeRate):0;
+        const equity=paper.some(t=>t.state==='data_gap')?NaN:1000+realized+floating;
+        line('Modellkonto ab 1.000 USDC',fmt(equity,6)+' USDC',equity-1000);
+        line('Paper realisiert',signed(realized)+' USDC · '+closed.length+' geschlossen',realized);
+        if(open){
+          line('Paper-Einstieg / Stop / Ziel',[open.entry,open.stop,open.target].map(x=>fmt(num(x))).join(' / ')+' USD');
+          line('Paper offen inkl. geschätzter Gebühren',signed(floating)+' USDC',floating);
+          if(mark)line('BTC am 15-min-Schluss',fmt(num(mark.price))+' USD · '+new Date(mark.closeMs).toLocaleTimeString('de-AT',{timeZone:'Europe/Vienna'}));
+        }
+        return card;
       });
       const stamp=document.createElement('small');
-      stamp.textContent='Letzte Prüfung '+new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien';
+      stamp.textContent='Gemeinsames OKX-Demokonto · Letzte Prüfung '+new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien';
       body.replaceChildren(...rows,stamp);
     } catch {body.textContent='🟡 Fibonacci-Bericht derzeit nicht abrufbar.';}
     finally {loading=false;}
+  }
+  card.addEventListener('toggle',()=>{
+    clearInterval(timer);
+    if(card.open){
+      void refresh();
+      timer=setInterval(()=>{if (!document.hidden && card.isConnected) void refresh();},60000);
+    }
   });
   return card;
 }

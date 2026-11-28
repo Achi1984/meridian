@@ -176,6 +176,9 @@ def main():
             if trade["frame"]==frame:
                 mark_paper(trade,bars,interval)
         ts=bars[-1][0]
+        if frame == "15m":
+            data["valuation"] = {"price": str(bars[-1][4]), "closeMs": ts + interval,
+                                 "sizeBTC": str(SIZE), "feeRate": str(FEE)}
         if data["frames"].get(frame,{}).get("bar")==ts:
             continue
         setup=signal(bars,tick)
