@@ -1,0 +1,28 @@
+name: OKX BTC short filter observation
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '17 0 * * *'
+  push:
+    branches: [main]
+    paths:
+      - scripts/spot-paper-advisor/okx_short_filter.py
+      - .github/workflows/okx-short-filter.yml
+permissions:
+  contents: read
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compare short entry decisions
+        env:
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+        run: python3 scripts/spot-paper-advisor/okx_short_filter.py | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
