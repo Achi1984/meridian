@@ -5,6 +5,7 @@ import hmac
 import json
 import os
 import sys
+import time
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 from http.client import HTTPSConnection
@@ -19,9 +20,19 @@ class PreflightError(Exception):
     pass
 
 
+class RateLimited(PreflightError):
+    pass
+
+
 def get(path, credentials, **query):
     target = path + ("?" + urlencode(query) if query else "")
-    return request("GET", target, credentials)
+    for delay in (2, 4, 8, 0):
+        try:
+            return request("GET", target, credentials)
+        except RateLimited:
+            if not delay:
+                raise
+            time.sleep(delay)
 
 
 def request(method, target, credentials, body="", expires=None):
@@ -38,6 +49,8 @@ def request(method, target, credentials, body="", expires=None):
     try:
         connection.request(method, target, body=body or None, headers=headers)
         response = connection.getresponse()
+        if response.status == 429:
+            raise RateLimited("HTTP 429")
         if response.status != 200:
             raise PreflightError("HTTP " + str(response.status))
         payload = json.load(response)
