@@ -548,7 +548,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         await key('Tab','Tab',9);
         for (const selector of ['#solana-scanner-live > summary',...(archivedSolana?[]:['#solana-meme-paper > summary']),'#paper-advisor > summary','[data-advisor-live]', '[data-advisor-file]', '#okx-demo-account > summary', '#okx-short-study > summary', '#top100-paper > summary','#paper-reports-section > summary']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
-            true, 'expected '+selector+'; focused '+await evaluate("document.activeElement?.outerHTML?.slice(0,180)"));
+            true, 'expected '+selector+'; focused '+await evaluate("JSON.stringify({focus:document.activeElement?.parentElement?.id,sections:[...document.querySelectorAll('#view-strategies > details')].map(d=>d.id),solana:document.querySelector('#solana-meme-paper')?.parentElement?.id,summary:document.querySelector('#solana-meme-paper > summary')?.getBoundingClientRect()?.height})"));
           await key('Tab','Tab',9);
         }
         assert.equal(await evaluate("document.querySelector('#paper-history-section').contains(document.querySelector('#spot-paper-host8h-root'))"),true);
