@@ -103,7 +103,18 @@ export function mountPaperStatus(panel) {
   refresh();
 }
 
-if(typeof document!=='undefined') {
-  const panel=document.getElementById('paper-status-panel');
-  if(panel) mountPaperStatus(panel);
+if (typeof document !== 'undefined') {
+  const card=document.getElementById('bot-read-root')?.closest('section.card');
+  if (card) {
+    const style=document.createElement('link');
+    style.rel='stylesheet';
+    style.href=new URL('./paper-status.css',import.meta.url).href;
+    document.head.append(style);
+    const panel=document.createElement('details');
+    panel.className='card';
+    panel.id='paper-status-panel';
+    panel.innerHTML='<summary>Paperbots · Laufstatus <output aria-live="polite"></output></summary><div data-status-rows></div><button type="button">Status aktualisieren</button>';
+    card.before(panel);
+    mountPaperStatus(panel);
+  }
 }

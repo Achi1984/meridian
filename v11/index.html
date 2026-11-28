@@ -601,7 +601,6 @@
     #app .command-ledger[hidden]{display:none}
     #app .command-ledger strong{color:var(--reading-blue);font-variant-numeric:tabular-nums}
   </style>
-<link rel="stylesheet" href="./paper-status.css">
 </head>
 <body>
 <section id="app-access-gate" class="app-access-gate" aria-labelledby="app-access-heading">
@@ -750,10 +749,6 @@
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
       <div class="eyebrow">RISIKO &amp; KONTROLLE</div><h1 id="bots-heading">Bots</h1>
-      <details class="card" id="paper-status-panel">
-        <summary>Paperbots · Laufstatus <output aria-live="polite"></output></summary>
-        <div data-status-rows></div><button type="button">Status aktualisieren</button>
-      </details>
       <section class="card card-muted" aria-labelledby="bots-status-heading">
         <h2 id="bots-status-heading">Deine Bots</h2>
         <div id="bot-read-root"></div>
