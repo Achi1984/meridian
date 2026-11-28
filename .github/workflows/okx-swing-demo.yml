@@ -1,0 +1,33 @@
+name: OKX BTC swing demo pilot
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/okx-swing-demo.yml']
+  schedule:
+    - cron: '17 0,12 28-30 11 *'
+    - cron: '17 0,12 1-7 12 *'
+permissions:
+  contents: write
+concurrency:
+  group: okx-btc-single-demo-order
+  cancel-in-progress: false
+jobs:
+  pilot:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 4
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - id: window
+        run: echo "year=$(date -u +%Y)" >> "$GITHUB_OUTPUT"
+      - if: steps.window.outputs.year == '2026'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+        shell: bash
+        run: python3 scripts/research/okx_swing_demo.py | tee -a "$GITHUB_STEP_SUMMARY"

@@ -5,8 +5,9 @@ export const VERIFY_ENDPOINT='https://p01--achi-meridian--ttvk44grdlp7.code.run/
 const TEST_PASSWORD='synthetic-browser-gate-password';
 const delay=ms=>new Promise(resolve=>setTimeout(resolve,ms));
 
-export async function unlockAppThroughGate(call,{additionalFetchUrls=[],blockOtherRequests=false}={}){
+export async function unlockAppThroughGate(call,{additionalFetchUrls=[],pilotFetchUrls=[],blockOtherRequests=false}={}){
  const additional=new Set(additionalFetchUrls);
+ const pilotReads=new Set([...pionexReadEndpoints,...pilotFetchUrls]);
  assert.ok(Array.isArray(additionalFetchUrls)&&additional.size===additionalFetchUrls.length&&
   typeof blockOtherRequests==='boolean');
  for(const url of additional)assert.ok(typeof url==='string'&&url.startsWith('https://')&&!url.includes('*')&&url!==VERIFY_ENDPOINT,
@@ -17,7 +18,7 @@ export async function unlockAppThroughGate(call,{additionalFetchUrls=[],blockOth
  off=call.onEvent('Fetch.requestPaused',event=>{
   void (async()=>{
    if(additional.has(event.request.url))return; // The existing exact-route fixture owns this event.
-   if(pionexReadEndpoints.includes(event.request.url)){await servePilotFixture(call,event);return;}
+   if(pilotReads.has(event.request.url)){await servePilotFixture(call,event);return;}
    if(event.request.url!==VERIFY_ENDPOINT)throw Error('Unexpected app verification URL');
    if(event.request.method==='OPTIONS'){
     await call('Fetch.fulfillRequest',{requestId:event.requestId,responseCode:204,responseHeaders:[
@@ -38,7 +39,7 @@ export async function unlockAppThroughGate(call,{additionalFetchUrls=[],blockOth
    verified=true;
   })().catch(error=>{failure=error;});
  });
- await call('Fetch.enable',{patterns:patterns([VERIFY_ENDPOINT,...pionexReadEndpoints,...additional])});
+ await call('Fetch.enable',{patterns:patterns([VERIFY_ENDPOINT,...pilotReads,...additional])});
  try{
   const initial=await call('Runtime.evaluate',{expression:`({
    hidden:document.getElementById('app').hidden,
