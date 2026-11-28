@@ -43,15 +43,43 @@ function demoRows(report){
       (completed.length?' · Paper Basis '+modelResult('modelBase')+' / Filter '+modelResult('modelFiltered')+' USDC':''));
   });
 }
-function compoundRows(report){
+const money=new Intl.NumberFormat('de-AT',{minimumFractionDigits:2,maximumFractionDigits:2});
+const signedMoney=new Intl.NumberFormat('de-AT',{minimumFractionDigits:2,maximumFractionDigits:2,signDisplay:'exceptZero'});
+function compoundRows(report,previous){
   return ['Long','Short'].map(side=>{
     const bot=report.bots[side], a=bot.compound, fixed=bot.fixed;
-    const fmt=n=>number(n).toLocaleString('de-AT',{maximumFractionDigits:2});
-    return row(side+'-Compounder',number(a.equity)-1000,'USDT',
-      (bot.position?'Position offen':'Wartet')+' · Konto '+fmt(a.equity)+' USDT · nächstes Risikobudget '+
-      fmt(number(a.balance)*0.005)+' USDT · max. Drawdown '+fmt(number(a.drawdown)*100)+' % · '+
-      count(a.closed)+' geschlossen · Fixrisiko: '+fmt(number(fixed.equity)-1000)+' USDT P/L, '+
-      fmt(number(fixed.drawdown)*100)+' % Drawdown');
+    const details=document.createElement('details');
+    details.className='compound-bot';
+    details.dataset.side=side;
+    details.open=Boolean(previous.querySelector('[data-side="'+side+'"][open]'));
+    const summary=document.createElement('summary');
+    const title=document.createElement('strong');
+    title.className='compound-direction';
+    title.textContent=side+'-Compounder';
+    const state=document.createElement('small');
+    state.textContent=bot.position?'Position offen':'Wartet';
+    const pnl=document.createElement('strong');
+    const net=number(a.equity)-1000;
+    pnl.textContent='PnL '+signedMoney.format(net)+' USDT';
+    pnl.className=net>0?'paper-gain':net<0?'paper-loss':'';
+    const head=document.createElement('div');
+    head.className='compound-head';
+    head.append(title,state,pnl);
+    const metrics=document.createElement('div');
+    metrics.className='compound-metrics';
+    const balance=document.createElement('b'), risk=document.createElement('b');
+    balance.textContent='Konto '+money.format(number(a.equity))+' USDT';
+    risk.textContent='Risiko '+money.format(number(a.balance)*0.005)+' USDT';
+    metrics.append(balance,risk);
+    summary.append(head,metrics);
+    const detail=document.createElement('p');
+    const percent=n=>number(n*100).toLocaleString('de-AT',{maximumFractionDigits:2})+' %';
+    detail.textContent='Max. Drawdown '+percent(number(a.drawdown))+' · '+count(a.closed)+' Trades geschlossen';
+    const comparison=document.createElement('p');
+    comparison.textContent='Vergleich mit 5 USDT Fixrisiko · PnL '+signedMoney.format(number(fixed.equity)-1000)+
+      ' USDT · max. Drawdown '+percent(number(fixed.drawdown));
+    details.append(summary,detail,comparison);
+    return details;
   });
 }
 function gridRows(report){
@@ -111,7 +139,9 @@ export function createOkxOverview(fibonacci){
           light=report.phase==='running'?'🟢':report.phase==='final'?'🔴':'🟡';
           if(report.phase!=='final' && Date.now()-time>maxMinutes*60000){light='🟡';label='Stand veraltet';}
         }
-        rows.replaceChildren(...render(report));
+        const focused=rows.contains(document.activeElement)?document.activeElement.closest('.compound-bot')?.dataset.side:null;
+        rows.replaceChildren(...render(report,rows));
+        if(focused)rows.querySelector('[data-side="'+focused+'"] > summary')?.focus({preventScroll:true});
         status.textContent=light+' '+label+' · '+localTime.format(time)+' Wien';
       }catch{
         status.textContent='⚪ Daten derzeit nicht verfügbar';
