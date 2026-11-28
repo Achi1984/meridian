@@ -26,40 +26,53 @@ def verify_fill(order, fill):
     return price, fee, pnl
 
 
+def audit_order(keys, client_id, venue_id, side):
+    query = dict(instType="FUTURES", instId=INSTRUMENT, ordId=venue_id)
+    try:
+        rows = get(ORDER, keys, instId=INSTRUMENT, ordId=venue_id)
+    except VenueError as exc:
+        if exc.code != "51603":
+            raise
+        rows = []
+    if not rows:
+        history = get("/api/v5/trade/orders-history", keys, instType="FUTURES", instId=INSTRUMENT)
+        rows = [row for row in history if row["ordId"] == venue_id]
+    fills = get("/api/v5/trade/fills", keys, **query)
+    if not fills:
+        fills = get("/api/v5/trade/fills-history", keys, **query)
+    if len(fills) != 1:
+        raise PreflightError(f"{len(rows)} matching order records, "
+                             f"{len(fills)} executions after querying recent and archived fills")
+    if not rows:
+        # Exact order-level figures captured by the original workflow, run 46123934736.
+        snapshots = {"buy": ("59813.9", "-0.002990695", "0"),
+                     "sell": ("59758", "-0.0029879", "-0.00559")}
+        price, fee, pnl = snapshots[side]
+        rows = [dict(ordId=venue_id, clOrdId=client_id, side=side, instId=INSTRUMENT,
+                     state="filled", accFillSz=str(SIZE), avgPx=price, feeCcy="USDC", fee=fee, pnl=pnl)]
+        print(f"{side}: matching exchange execution to the captured original order")
+    order, = rows
+    if (order["ordId"] != venue_id or order["clOrdId"] != client_id or order["side"] != side
+            or order["instId"] != INSTRUMENT):
+        raise PreflightError("historical order identity mismatch")
+    return verify_fill(order, fills[0])
+
+
 def audit(keys):
     records = []
+    diagnostics = []
     # Venue IDs recorded in the completed demo workflow run 46123934736.
     for client_id, venue_id, side in ((ENTRY, "4138957914693025792", "buy"),
                                       (EXIT, "4138957935027011584", "sell")):
-        query = dict(instType="FUTURES", instId=INSTRUMENT, ordId=venue_id)
         try:
-            rows = get(ORDER, keys, instId=INSTRUMENT, ordId=venue_id)
-        except VenueError as exc:
-            if exc.code != "51603":
-                raise
-            rows = []
-        if not rows:
-            history = get("/api/v5/trade/orders-history", keys, instType="FUTURES", instId=INSTRUMENT)
-            rows = [row for row in history if row["ordId"] == venue_id]
-        fills = get("/api/v5/trade/fills", keys, **query)
-        if not fills:
-            fills = get("/api/v5/trade/fills-history", keys, **query)
-        if len(fills) != 1:
-            raise PreflightError(f"{side} order {venue_id}: {len(rows)} matching order records, "
-                                 f"{len(fills)} executions after querying recent and archived fills")
-        if not rows:
-            # Exact order-level figures captured by the original workflow, run 46123934736.
-            snapshots = {"buy": ("59813.9", "-0.002990695", "0"),
-                         "sell": ("59758", "-0.0029879", "-0.00559")}
-            price, fee, pnl = snapshots[side]
-            rows = [dict(ordId=venue_id, clOrdId=client_id, side=side, instId=INSTRUMENT,
-                         state="filled", accFillSz=str(SIZE), avgPx=price, feeCcy="USDC", fee=fee, pnl=pnl)]
-            print(f"{side}: matching exchange execution to the captured original order")
-        order, = rows
-        if (order["ordId"] != venue_id or order["clOrdId"] != client_id or order["side"] != side
-                or order["instId"] != INSTRUMENT):
-            raise PreflightError("historical order identity mismatch")
-        records.append(verify_fill(order, fills[0]))
+            result = audit_order(keys, client_id, venue_id, side)
+        except (PreflightError, OSError, ValueError, ArithmeticError, KeyError, TypeError) as exc:
+            diagnostics.append(f"{side} {venue_id}: {exc}")
+        else:
+            records.append(result)
+            diagnostics.append(f"{side} {venue_id}: execution verified")
+    if len(records) != 2:
+        raise PreflightError("\n".join(diagnostics))
     buy, sell = records
     gross = (sell[0] - buy[0]) * SIZE
     if abs(gross - (buy[2] + sell[2])) > Decimal("0.00000001"):
@@ -79,8 +92,15 @@ def audit(keys):
 
 
 if __name__ == "__main__":
-    report = audit(tuple(os.environ[name] for name in NAMES))
+    try:
+        report = audit(tuple(os.environ[name] for name in NAMES))
+        status = 0
+    except PreflightError as exc:
+        report = "### OKX-Demotrade · Abgleich unvollständig\n\n" + "\n".join(
+            f"- {line}" for line in str(exc).splitlines())
+        status = 1
     print(report)
     if os.environ.get("GITHUB_STEP_SUMMARY"):
         with Path(os.environ["GITHUB_STEP_SUMMARY"]).open("a", encoding="utf-8") as summary:
             summary.write(report)
+    raise SystemExit(status)
