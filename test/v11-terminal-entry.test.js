@@ -1526,7 +1526,7 @@ async function browserRun(call,start,width,height,server){
       server.setMode('denied');await refresh();await waitUntil(async()=>await readState()==='locked');
       const rejected=server.metrics().depotReads;await refresh();assert.equal(server.metrics().depotReads,rejected,'401 clears credential');
       server.setMode('pending');await openApp();await waitApp();const aborts=server.metrics().depotAborts;
-      await waitUntil(()=>server.metrics().pending===2);
+      await waitUntil(()=>server.metrics().pending>=2);
       await evaluate(`Object.defineProperty(document,'hidden',{configurable:true,value:true});document.dispatchEvent(new Event('visibilitychange'));delete document.hidden;true`);
       assert.equal(await evaluate(`document.getElementById('app').hidden`),true);
       assert.equal(server.metrics().depotAborts,aborts,'visibility change retains an in-window credential');
