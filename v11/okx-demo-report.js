@@ -253,3 +253,49 @@ export function createGridComparison() {
   });
   return card;
 }
+
+export function createFibComparison() {
+  const card=document.createElement('details');
+  const title=document.createElement('summary');
+  title.textContent='OKX-Demo · Fibonacci';
+  const body=document.createElement('div');
+  card.append(title,body);
+  let loading=false;
+  card.addEventListener('toggle',async()=>{
+    if (!card.open || loading) return;
+    loading=true;
+    try {
+      const res=await fetch(source.replace('okx-demo-pilot.json','fib-demo.json'),{
+        headers:{Accept:'application/vnd.github.raw+json'},cache:'no-store',credentials:'omit',
+        signal:AbortSignal.timeout(10000)
+      });
+      if (!res.ok) throw Error('report');
+      const report=await res.json();
+      if (!Number.isFinite(report.asOf)) throw Error('timestamp');
+      const rows=['15m','30m','1H','4H'].map(frame=>{
+        const observation=report.frames[frame];
+        const current=report.demo.filter(t=>t.frame===frame).at(-1);
+        const row=document.createElement('p');
+        const label=document.createElement('strong');
+        label.textContent=frame.replace('H',' h').replace('m',' min');
+        const stale=Date.now()-report.asOf>35*60000;
+        const labels={reserved:'Order wird geprüft',filled:'Demo-Einstieg bestätigt',
+          closed:'Letzter Demotrade geschlossen',rejected:'Order abgelehnt',unfilled:'Order ohne Ausführung'};
+        const signal={buy:'Long-Signal',sell:'Short-Signal',wait:'Wartet auf Signal'}[observation.signal];
+        const paper=report.paper.filter(t=>t.frame===frame);
+        const detail=document.createElement('small');
+        detail.textContent=paper.filter(t=>t.state==='open').length+' offen · '+
+          paper.filter(t=>t.state==='closed').length+' geschlossen im Papervergleich';
+        const lamp=document.createElement('span');
+        lamp.textContent=stale?'🟡 Stand veraltet':'🟢 '+signal;
+        row.append(label,' · ',lamp,document.createElement('br'),current?(labels[current.state]+' · '):'',detail);
+        return row;
+      });
+      const stamp=document.createElement('small');
+      stamp.textContent='Letzte Prüfung '+new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien';
+      body.replaceChildren(...rows,stamp);
+    } catch {body.textContent='🟡 Fibonacci-Bericht derzeit nicht abrufbar.';}
+    finally {loading=false;}
+  });
+  return card;
+}
