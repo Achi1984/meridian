@@ -1,14 +1,18 @@
 """Read a flat-start BTC swing signal from confirmed OKX spot sessions."""
 import json
+import os
+import sys
+from pathlib import Path
 from datetime import datetime, timezone
 from math import isfinite
-from urllib.request import urlopen
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "research"))
+from okx_demo_preflight import NAMES, get
 
 from regime_breakout import regime
 from swing_indicators import DailyIndicators, confirmed_entry_target
 
 DAY_MS = 86400000
-URL = "https://eea.okx.com/api/v5/market/candles?instId=BTC-USDT&bar=1Dutc&limit=100"
+SPOT = "BTC-USDC"
 
 
 def observe(rows, today):
@@ -42,9 +46,7 @@ def observe(rows, today):
 
 
 if __name__ == "__main__":
-    with urlopen(URL, timeout=20) as response:
-        payload = json.load(response)
-    if payload["code"] != "0":
-        raise ValueError("OKX candles unavailable")
+    keys = tuple(os.environ[name] for name in NAMES)
+    rows = get("/api/v5/market/candles", keys, instId=SPOT, bar="1Dutc", limit="100")
     today = int(datetime.now(timezone.utc).timestamp()) // 86400 * DAY_MS
-    print(json.dumps(observe(payload["data"], today)))
+    print(json.dumps(dict(observe(rows, today), signalPair=SPOT)))
