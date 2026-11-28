@@ -145,6 +145,7 @@ export function mountCommandPaper(doc, access) {
       const accounts = swingAccounts(state);
       if (snapshot && state.lastTick < snapshot.lastTick) throw Error('Older checkpoint');
       snapshot = state;
+      card.hidden = state.lastTick-state.start >= 72*3600;
       updateSwingClock(clock, state);
       const summary = swingStatus(state);
       status.textContent = summary.text;
@@ -236,7 +237,10 @@ export function mountSwingCard(section, add, load = read) {
       status.className = summary.tone;
       body.replaceChildren();
       const models = rows.map(row => [row.key === 'fixed' ? 'Festziel' : 'Teilverkauf', row.realized]);
-      if (state.lastTick-state.start >= 72*3600) lamp('off','Beendet');
+      if (state.lastTick-state.start >= 72*3600) {
+        lamp('off','Beendet');
+        section.ownerDocument.getElementById('paper-history-section')?.append(section);
+      }
       else if (summary.tone) lamp('warn','Stand prüfen');
       else if (summary.note.startsWith('Nachbeobachtung')) lamp('warn','Beobachtet');
       else lamp('on','Aktiv');

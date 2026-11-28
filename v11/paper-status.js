@@ -75,9 +75,10 @@ export function mountPaperStatus(panel) {
       const results=await Promise.all(sources.map(async ([name,load])=>{
         try {return [name,await load()];} catch {return [name,uncertain];}
       }));
-      results.sort((a,b)=>Number(b[1][0]==='on')-Number(a[1][0]==='on'));
+      const visible = results.filter(([,state])=>state[0]!=='off');
+      visible.sort((a,b)=>Number(b[1][0]==='on')-Number(a[1][0]==='on'));
       const fragment=document.createDocumentFragment();
-      for (const [name,[tone,label,detail,stamp]] of results) {
+      for (const [name,[tone,label,detail,stamp]] of visible) {
         const row=document.createElement('div');
         const title=document.createElement('strong');
         title.textContent=name;
@@ -93,7 +94,7 @@ export function mountPaperStatus(panel) {
       count.replaceChildren();
       const groups = [['on','aktiv'],['warn','prüfen'],['off','beendet'],['unknown','unklar']];
       for (const [tone,label] of groups) {
-        const total = results.filter(([,status])=>status[0]===tone).length;
+        const total = visible.filter(([,status])=>status[0]===tone).length;
         if (!total && tone!=='on') continue;
         const item = document.createElement('span');
         item.dataset.tone = tone;
