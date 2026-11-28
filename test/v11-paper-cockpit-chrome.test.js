@@ -1,5 +1,5 @@
 import {pionexReadEndpoints} from './helpers/pilot-log-fixture.mjs';
-import {servePilotFixture, pilotEndpoint, pilotStatusEndpoint, top100Endpoint, followupEndpoints, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
+import {strategyStatusEndpoints, servePilotFixture, pilotEndpoint, pilotStatusEndpoint, top100Endpoint, followupEndpoints, swingCheckpointEndpoint} from './helpers/pilot-log-fixture.mjs';
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {existsSync,mkdirSync,writeFileSync} from 'node:fs';
@@ -458,7 +458,9 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
-        const approvedExternal=new Set([...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,top100Endpoint,...followupEndpoints,swingCheckpointEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
+        assert.equal(await evaluate("document.querySelector('#okx-demo-account > summary [data-paper-lamp]')?.textContent"),'Aktiv');
+        assert.equal(await evaluate("document.querySelector('#solana-scanner-live > summary [data-paper-lamp]')?.textContent"),'Scan aktuell');
+        const approvedExternal=new Set([...strategyStatusEndpoints,...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,top100Endpoint,...followupEndpoints,swingCheckpointEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
           SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
           SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
         assert.ok(resources.every(url=>new URL(url).origin===new URL(hosted.url).origin ||
