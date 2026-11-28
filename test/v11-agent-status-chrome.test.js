@@ -64,6 +64,7 @@ test('real V11 status panel: mobile, keyboard, expiry and fail-closed lifecycle'
         assert.equal(state.requests.length,0,'page load makes no status or private data reads');
         assert.equal(state.css,true);
         await unlockAppThroughGate(call);
+        await evaluate('document.querySelector("#nav [data-v=depot]").click()');
         await tabTo('.command-source-details > summary');
         await key('Enter','Enter',13);
         await tabTo('#autonomy-status > summary');
