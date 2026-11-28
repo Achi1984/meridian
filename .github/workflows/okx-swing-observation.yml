@@ -10,6 +10,7 @@ permissions:
   contents: read
 jobs:
   observe:
+    if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
@@ -17,5 +18,9 @@ jobs:
         with:
           persist-credentials: false
       - name: Observe confirmed BTC sessions
+        env:
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
         run: python3 scripts/spot-paper-advisor/okx_swing_observation.py | tee -a "$GITHUB_STEP_SUMMARY"
         shell: bash
