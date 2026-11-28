@@ -57,7 +57,8 @@ function compoundRows(report,previous){
     title.className='compound-direction';
     title.textContent=side+'-Compounder';
     const state=document.createElement('small');
-    state.textContent=bot.position?'Position offen':'Wartet';
+    state.textContent=bot.decision?.reason || (bot.position?'Position offen':
+      Number.isFinite(report.start) && report.cursor===report.start?'Erste Stundenkerze ausständig':'Wartet');
     const pnl=document.createElement('strong');
     const net=number(a.equity)-1000;
     pnl.textContent='PnL '+signedMoney.format(net)+' USDT';
@@ -78,7 +79,13 @@ function compoundRows(report,previous){
     const comparison=document.createElement('p');
     comparison.textContent='Vergleich mit 5 USDT Fixrisiko · PnL '+signedMoney.format(number(fixed.equity)-1000)+
       ' USDT · max. Drawdown '+percent(number(fixed.drawdown));
-    details.append(summary,detail,comparison);
+    details.append(summary);
+    if(Number.isFinite(bot.decision?.closeMs)){
+      const stamp=document.createElement('p');
+      stamp.textContent='Ausgewerteter Kerzenschluss · '+localTime.format(bot.decision.closeMs)+' Wien';
+      details.append(stamp);
+    }
+    details.append(detail,comparison);
     return details;
   });
 }
