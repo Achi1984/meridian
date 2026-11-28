@@ -105,7 +105,7 @@ function mountWorkspace(){
       document.querySelector('#nav button[data-v="strategies"]')?.click();
       overview.scrollIntoView({block:'start'});
     });
-    commandIntro.after(shortcut);
+    commandIntro.append(shortcut);
   }
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
   const threeWayRoot=document.createElement('section');
