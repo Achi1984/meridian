@@ -1,4 +1,4 @@
-import {paperGroupPnl} from './paper-group-pnl.js?v=B20-M11-FIX6';
+import {paperGroupPnl, strategyLamp} from './paper-group-pnl.js?v=B20-M11-FIX6';
 import {updateRunClock} from './paper-run-clock.js?v=B20-M11-FIX6';
 const repo = 'Achi1984/meridian';
 const workflow = 'solana-meme-paper-bot.yml';
@@ -187,6 +187,7 @@ export function mountSwingCard(section, add, load = read) {
   status.setAttribute('role','status');
   const body = add(card,'div','');
   const clock = add(card,'meridian-run-clock','');
+  const lamp = strategyLamp(section);
   const headline=paperGroupPnl(section);headline();
   const decisions = add(card,'details','');
   add(decisions,'summary','Einstiegsgründe');
@@ -235,6 +236,10 @@ export function mountSwingCard(section, add, load = read) {
       status.className = summary.tone;
       body.replaceChildren();
       const models = rows.map(row => [row.key === 'fixed' ? 'Festziel' : 'Teilverkauf', row.realized]);
+      if (state.lastTick-state.start >= 72*3600) lamp('off','Beendet');
+      else if (summary.tone) lamp('warn','Stand prüfen');
+      else if (summary.note.startsWith('Nachbeobachtung')) lamp('warn','Beobachtet');
+      else lamp('on','Aktiv');
       headline('Realisiert', 'USDC', models, summary.note);
       for (const row of rows) {
         const line = add(body,'p','');
@@ -256,6 +261,7 @@ export function mountSwingCard(section, add, load = read) {
       if (previous) {
         const summary = swingStatus(previous.state, true);
         status.textContent = summary.text;
+        lamp('warn','Stand prüfen');
         headline('Realisiert', 'USDC', previous.models, summary.note);
       } else {
         headline();
@@ -520,6 +526,7 @@ export function mountSolanaReport(section) {
 }
 
 export function mountLiveScanner(section) {
+  const lamp = strategyLamp(section);
   const doc = section.ownerDocument;
   function add(parent, tag, text) {
     const element = doc.createElement(tag);
@@ -558,6 +565,8 @@ export function mountLiveScanner(section) {
     }
     const age = Math.max(0, Math.floor((Date.now()/1000-latest.asOf)/60));
     status.className = age >= 30 || failed || latest.warnings.length ? 'paper-wait' : 'paper-live';
+    lamp(status.className === 'paper-live' ? 'on' : 'warn', status.className === 'paper-live' ? 'Scan aktuell' : 'Stand prüfen');
+    if (!section.open) return;
     status.textContent = 'Vor ' + age + ' Min. · ' +
       latest.sampled + ' geprüft · ' + latest.qualified + ' in der Vorauswahl' +
       (age >= 30 ? ' · Daten veraltet' : '') + (failed ? ' · Aktualisierung fehlgeschlagen' : '') +
@@ -629,7 +638,7 @@ export function mountLiveScanner(section) {
     if (gaps) add(result,'p','Fehlende Marktdaten bei ' + gaps + ' Kandidaten.');
   }
   async function refresh() {
-    if (pending || !section.open || doc.hidden) return;
+    if (pending || doc.hidden) return;
     pending = true;
     try {
       const s = await read(api+'/contents/solana-scanner-live.json?ref=paper-dashboard-data',true);
@@ -651,5 +660,5 @@ export function mountLiveScanner(section) {
   select.addEventListener('change',render);
   section.addEventListener('toggle',activate);
   doc.addEventListener('visibilitychange',activate);
-  return activate;
+  return refresh;
 }

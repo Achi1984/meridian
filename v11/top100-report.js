@@ -1,4 +1,4 @@
-import {paperGroupPnl} from './paper-group-pnl.js?v=B20-M11-FIX6';
+import {paperGroupPnl, strategyLamp} from './paper-group-pnl.js?v=B20-M11-FIX6';
 const runId = 45678525838;
 const repo = 'Achi1984/meridian';
 const source = 'https://api.github.com/repos/' + repo + '/contents/top100-' + runId + '.json?ref=paper-dashboard-data';
@@ -117,6 +117,7 @@ export function mountTop100(section) {
   const archive = add(section,'details','');
   add(archive,'summary','Vorheriger Pilotlauf');
   mountPilot(archive);
+  const lamp = strategyLamp(section);
   const headline = paperGroupPnl(section);
   headline();
   const api = 'https://api.github.com/repos/' + repo;
@@ -138,12 +139,18 @@ export function mountTop100(section) {
           if (run.path === '.github/workflows/top100-breakout.yml' && run.head_branch === followupBranch && count(run.id))
             id = Math.max(id,run.id);
         }
-      } catch { /* The known campaign has its own versioned report. */ }
+        const run = feed.workflow_runs.find(r=>r.id===id && r.head_branch===followupBranch && r.path==='.github/workflows/top100-breakout.yml');
+        if (run?.status === 'completed') lamp('off',run.conclusion === 'success' ? 'Beendet' : 'Gestoppt');
+        else if (run?.status === 'in_progress') lamp('on','Aktiv');
+        else if (run && ['queued','pending','waiting','requested'].includes(run.status)) lamp('warn','Wartet');
+        else lamp('unknown','Unbekannt');
+      } catch { lamp('unknown','Unbekannt'); /* The known campaign has its own versioned report. */ }
       link.href = 'https://github.com/' + repo + '/actions/runs/' + id;
       if (last && last.id !== id) { last = null; accounts.replaceChildren(); headline(); }
       const report = await read(api + '/contents/top100-followup-' + id + '.json?ref=paper-dashboard-data',true);
       const rows = followupRows(report,id);
       if (last && report.asOf < last.asOf) throw Error('older report');
+      if (report.stage === 'final') lamp('off','Beendet');
       const stage = {initial:'Startbericht', first:'Zwischenbericht', final:'Abschlussbericht'}[report.stage];
       const values = rows.map(a=>[a.name,a.equity === null ? null : a.equity-1000]);
       last = {id,asOf:report.asOf,values,stage};

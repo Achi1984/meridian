@@ -1,3 +1,5 @@
+import {strategyLamp} from './paper-group-pnl.js?v=B20-M11-FIX6';
+import {okxStatus} from './paper-status.js?v=B20-M11-FIX6';
 const source = 'https://api.github.com/repos/Achi1984/meridian/contents/okx-demo-pilot.json?ref=paper-dashboard-data';
 const amount = number => number.toLocaleString('de-AT', {maximumFractionDigits: 8});
 
@@ -44,15 +46,28 @@ export function mountOkxDemo(section) {
   swing.setAttribute('role', 'status');
   const bots = doc.createElement('p');
   bots.setAttribute('role', 'status');
-  section.append(bots, swing, status, button);
+  const lamp = strategyLamp(section);
+  const concise = doc.createElement('p');
+  const details = doc.createElement('details');
+  const title = doc.createElement('summary');
+  title.textContent = 'Details';
+  details.append(title, bots, swing, status);
+  section.append(concise, details, button);
   async function loadBots() {
     try {
       const response = await fetch(source.replace('okx-demo-pilot.json', 'okx-filter-demo.json'),
         {credentials:'omit', cache:'no-store', headers:{Accept:'application/vnd.github.raw+json'},
          signal:AbortSignal.timeout(10000)});
       if (!response.ok) throw Error('unavailable');
-      bots.textContent = filterText(await response.json());
+      const report = await response.json();
+      bots.textContent = filterText(report);
+      const [tone,label,detail] = okxStatus(report);
+      lamp(tone,label);
+      const fills = Object.values(report.sessions).filter(r=>r.state==='closed' && r.demoFilled);
+      concise.textContent = detail + ' · ' + fills.length + ' abgeschlossene Demotrades';
     } catch {
+      lamp('unknown','Unbekannt');
+      concise.textContent = 'Demobericht nicht verfügbar.';
       bots.textContent = 'BTC Long/Short · Demobericht derzeit nicht verfügbar.';
     }
   }
@@ -91,16 +106,18 @@ export function mountOkxDemo(section) {
     if (button.disabled) return;
     button.disabled = true;
     try {
-      await Promise.all([loadBots(), loadSwing(), loadPilot()]);
+      await Promise.all([loadBots(), ...(details.open ? [loadSwing(),loadPilot()] : [])]);
     } finally {
       button.disabled = false;
     }
   }
+  details.addEventListener('toggle', () => { if (details.open) { void loadSwing(); void loadPilot(); } });
   button.addEventListener('click', refresh);
   status.textContent = 'Bericht beim Öffnen laden.';
   section.addEventListener('toggle', () => {
     if (section.open) refresh();
   });
+  return refresh;
 }
 
 export function filterText(report) {
