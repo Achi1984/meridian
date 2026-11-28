@@ -1339,8 +1339,9 @@ async function browserRun(call,start,width,height,server){
       assert.equal(bots.activeProcessPlaceholder,null,'snapshot rows do not imply active bot processes');
       assert.equal(bots.staticStatusCells,0,'freshness and read-only context appears with the current snapshot');
       initialReads=server.metrics().reads;
-      assert.equal(bots.controls,10,'shared access plus TP and P/L data filters expose no redundant Bot credentials');
+      assert.equal(bots.controls,11,'read-only paper refresh plus the existing bot filters');
       assert.deepEqual(bots.controlDetails,[
+        {tag:'button',id:'',type:'button',label:'Status aktualisieren',hidden:false,disabled:false},
         {tag:'input',id:'bot-symbol-search',type:'search',label:'Symbol suchen',hidden:false,disabled:false},
         {tag:'select',id:'bot-direction-filter',type:'select-one',label:'Richtung',hidden:false,disabled:false},
         {tag:'select',id:'bot-category-filter',type:'select-one',label:'Kontraktart',hidden:false,disabled:false},
