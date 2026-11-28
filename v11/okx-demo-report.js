@@ -329,7 +329,7 @@ export function createFibComparison() {
         const name=document.createElement('strong');
         name.textContent=dot+' '+frame.replace('H',' h').replace('m',' min');
         venue.style.gridColumn='1 / -1';
-        venue.textContent=[signal,open?'Paper '+side(open):'',venue.textContent,stale?'Stand veraltet':''].filter(Boolean).join(' · ');
+        venue.textContent=[signal,open?'Paper '+side(open):'',venue.textContent,observation.decision,stale?'Stand veraltet':''].filter(Boolean).join(' · ');
         head.append(name,result,venue);
         line('Modellkonto ab 1.000 USDC',fmt(equity,6)+' USDC',equity-1000);
         line('Paper realisiert',signed(realized)+' USDC · '+closed.length+' geschlossen',realized);
