@@ -1,32 +1,32 @@
 {
   "accounts": {
     "fixed": {
-      "equity": 1000,
-      "drawdown": 0,
-      "fills": 0,
-      "vsHold": 0.0
+      "equity": 999.77,
+      "drawdown": 2.03,
+      "fills": 5,
+      "vsHold": -0.13
     },
     "adaptive": {
-      "equity": 1000,
-      "drawdown": 0,
+      "equity": 999.9,
+      "drawdown": 1.9,
       "fills": 0,
       "vsHold": 0.0
     },
     "model": {
-      "equity": 1000,
-      "drawdown": 0,
+      "equity": 999.9,
+      "drawdown": 1.9,
       "fills": 0,
       "vsHold": 0.0
     }
   },
-  "holdEquity": 1000.0,
+  "holdEquity": 999.9,
   "decisions": {
     "full": 0,
     "half": 0,
-    "pause": 0
+    "pause": 3
   },
   "trainingFills": 119,
-  "bars": 0,
-  "asOf": 1795881640239,
+  "bars": 12,
+  "asOf": 1795893101167,
   "phase": "running"
 }
