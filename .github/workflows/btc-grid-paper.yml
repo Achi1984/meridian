@@ -1,0 +1,48 @@
+name: BTC Spot Grid A-B-C
+on:
+  push:
+    branches: [main, paper/grid-abc]
+    paths: ['scripts/research/btc_grid_paper.py', '.github/workflows/btc-grid-paper.yml', 'scripts/research/okx_rejection_paper.py']
+  schedule:
+    - cron: '7,22,37,52 * * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency: btc-grid-paper-${{ github.ref_name }}
+jobs:
+  compare:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Evaluate fixed paper cohort
+        run: |
+          if [ "$(date -u +%s)" -gt 1796140800 ]; then exit 0; fi
+          python scripts/research/btc_grid_paper.py > report.json
+          cat report.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('report.json') != '' && success()
+        with:
+          name: btc-grid-comparison
+          path: report.json
+      - name: Publish summary for dashboard
+        if: github.ref == 'refs/heads/main' && hashFiles('report.json') != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch=paper-dashboard-data
+          path=btc-grid-paper.json
+          api="repos/$GITHUB_REPOSITORY/contents"
+          sha=$(gh api "$api?ref=$branch" | jq -r --arg p "$path" '.[] | select(.name==$p) | .sha')
+          args=()
+          if [[ -n "$sha" ]]; then
+            gh api -H 'Accept: application/vnd.github.raw+json' "$api/$path?ref=$branch" > previous.json
+            if jq -e --slurpfile next report.json '.asOf >= $next[0].asOf' previous.json >/dev/null; then exit 0; fi
+            args+=(-f "sha=$sha")
+          fi
+          gh api -X PUT "$api/$path" -f branch="$branch" -f message="Update grid comparison" \
+            -f content="$(base64 -w0 report.json)" "${args[@]}" >/dev/null

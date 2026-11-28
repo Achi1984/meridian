@@ -212,3 +212,35 @@ export function createShortComparison(study) {
   study.append(status,accounts,retry);
   return refresh;
 }
+
+export function createGridComparison() {
+  const card=document.createElement('details');
+  const title=document.createElement('summary');
+  title.textContent='BTC-Grid · Fest, adaptiv und KI';
+  const body=document.createElement('div');
+  card.append(title,body);
+  card.addEventListener('toggle',async()=>{
+    if(!card.open)return;
+    try {
+      const url=source.replace('okx-demo-pilot.json','btc-grid-paper.json');
+      const response=await fetch(url,{credentials:'omit',cache:'no-store',signal:AbortSignal.timeout(10000),headers:{Accept:'application/vnd.github.raw+json'}});
+      if(!response.ok)throw Error('report');
+      const data=await response.json();
+      const names={fixed:'A · Fest',adaptive:'B · Adaptiv',model:'C · KI-Filter'};
+      const rows=Object.entries(names).map(([key,label])=>{
+        const a=data.accounts[key];
+        if(!Number.isFinite(a.equity)||!Number.isSafeInteger(a.fills))throw Error('account');
+        const row=document.createElement('p');
+        const value=document.createElement('strong');
+        value.textContent=a.equity.toLocaleString('de-AT',{minimumFractionDigits:2})+' USDT';
+        value.className=a.equity>1000?'paper-gain':a.equity<1000?'paper-loss':'';
+        row.append(label+' · ',value,' · '+a.fills+' Ausführungen');
+        return row;
+      });
+      const stamp=document.createElement('small');
+      stamp.textContent='Stand '+new Date(data.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien · '+data.bars+' bewertete Viertelstunden';
+      body.replaceChildren(...rows,stamp);
+    } catch {body.textContent='Grid-Bericht derzeit nicht abrufbar.';}
+  });
+  return card;
+}
