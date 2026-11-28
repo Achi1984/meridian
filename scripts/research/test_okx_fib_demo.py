@@ -40,3 +40,52 @@ class FibDemoTests(unittest.TestCase):
         with patch.object(fib,"read_order",return_value=None):
             fib.reconcile((),journal.data["demo"][0])
         self.assertEqual(journal.data["demo"][0]["state"],"reserved")
+
+    def test_late_entry_requires_fresh_confirmation_and_intact_levels(self):
+        close = 4 * 3600000
+        quarter = fib.QUARTER
+        trade = dict(frame="4H", bar=0, side="buy", entry="100", stop="95", target="120")
+        def row(t, o, h, l, c, confirmed):
+            return [str(t),o,h,l,c,None,None,None,confirmed]
+        rows = [row(close,"100","103","99","102","1"),
+                row(close+quarter,"102","103","101","102","0")]
+        def decision(data, price="102", delay=18):
+            return fib.entry_decision(trade, data, D(price), close+delay*60000)
+        self.assertEqual(decision(rows), "Einstieg freigegeben")
+        self.assertIn("Bestätigung", decision(rows,"99"))
+        self.assertIn("Gebühren", decision(rows,"118"))
+        self.assertIn("abgelaufen", decision(rows,delay=30))
+        self.assertIn("Kursdaten", decision(rows[1:]))
+        rows[0][3] = "95"
+        self.assertIn("berührt", decision(rows))
+        trade.update(frame="15m",bar=close-quarter)
+        self.assertIn("abgelaufen", decision(rows))
+
+    def test_recheck_existing_paper_signal_once_even_after_restart(self):
+        from contextlib import ExitStack
+        close = 4 * 3600000
+        paper = dict(frame="4H", bar=0, side="buy", entry="100", stop="95",
+                     target="120", state="open", next=close)
+        journal = Mock()
+        journal.data = dict(frames={"4H": {"bar": 0,"signal": "buy"}}, paper=[paper], demo=[])
+        rows = [[close,"100","103","99","102",0,0,0,"1"],
+                [close+fib.QUARTER,"102","103","101","102",0,0,0,"0"]]
+        def venue(path,*args,**kwargs):
+            if path.endswith("/instruments"):
+                return [{"tickSz":"0.1"}]
+            return rows if path.endswith("/candles") else []
+        def submit(keys, journal, trade, price):
+            journal.data["demo"].append(dict(frame="4H",bar=0,state="unfilled"))
+        with ExitStack() as mocks:
+            for name, value in dict(FRAMES={"4H":240}, NAMES=()).items():
+                mocks.enter_context(patch.object(fib,name,value))
+            for name, value in dict(Journal=journal,candles=[(0,100,101,99,100)],
+                                    check=None,quote=(0,D(101),D(102))).items():
+                mocks.enter_context(patch.object(fib,name,return_value=value))
+            mocks.enter_context(patch.object(fib.time,"time",return_value=close/1000+18*60))
+            mocks.enter_context(patch.object(fib,"get",side_effect=venue))
+            execute=mocks.enter_context(patch.object(fib,"execute",side_effect=submit))
+            fib.main()
+            fib.main()
+            execute.assert_called_once()
+            self.assertEqual(len(journal.data["paper"]),1)
