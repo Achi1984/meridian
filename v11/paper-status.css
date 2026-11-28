@@ -1,5 +1,4 @@
-#paper-status-panel header{display:flex;align-items:center;justify-content:space-between;gap:8px;flex-wrap:wrap}
-#paper-status-panel h2{margin:0}
+#paper-status-panel>summary{min-height:44px;align-content:center;cursor:pointer;font-weight:650}
 #paper-status-panel output{font-variant-numeric:tabular-nums;font-size:.85rem}
 #paper-status-panel [data-status-rows]>div{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:3px 10px;align-items:center;border-top:1px solid var(--line);padding:10px 0}
 #paper-status-panel [data-status-rows]{margin:10px 0}

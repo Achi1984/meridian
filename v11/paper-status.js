@@ -69,7 +69,7 @@ export function mountPaperStatus(panel) {
   const view=panel.closest('.view');
   let last=0;
   async function refresh(force=false) {
-    if (view.hidden || document.hidden || button.disabled || (!force && Date.now()-last<600000)) return;
+    if (!panel.open || view.hidden || document.hidden || button.disabled || (!force && Date.now()-last<600000)) return;
     button.disabled=true;
     try {
       const results=await Promise.all(sources.map(async ([name,load])=>{
@@ -95,6 +95,7 @@ export function mountPaperStatus(panel) {
       last=Date.now();
     } finally {button.disabled=false;}
   }
+  panel.addEventListener('toggle',()=>refresh());
   button.addEventListener('click',()=>refresh(true));
   new MutationObserver(()=>refresh()).observe(view,{attributes:true,attributeFilter:['hidden','class']});
   document.addEventListener('visibilitychange',()=>refresh());

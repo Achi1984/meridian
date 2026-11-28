@@ -750,10 +750,10 @@
     </section>
     <section id="view-bots" class="view" aria-labelledby="bots-heading" hidden>
       <div class="eyebrow">RISIKO &amp; KONTROLLE</div><h1 id="bots-heading">Bots</h1>
-      <section class="card" id="paper-status-panel" aria-labelledby="paper-status-title">
-        <header><h2 id="paper-status-title">Paperbots</h2><output aria-live="polite">Status wird geladen</output></header>
+      <details class="card" id="paper-status-panel">
+        <summary>Paperbots · Laufstatus <output aria-live="polite"></output></summary>
         <div data-status-rows></div><button type="button">Status aktualisieren</button>
-      </section>
+      </details>
       <section class="card card-muted" aria-labelledby="bots-status-heading">
         <h2 id="bots-status-heading">Deine Bots</h2>
         <div id="bot-read-root"></div>
