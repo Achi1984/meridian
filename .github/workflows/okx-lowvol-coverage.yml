@@ -1,0 +1,26 @@
+name: OKX Low-Volatility V2 account coverage
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - research/okx_lowvol_coverage.py
+      - .github/workflows/okx-lowvol-coverage.yml
+permissions:
+  contents: read
+jobs:
+  observe:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Compare the strategy universe with account listings
+        env:
+          OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
+          OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
+          OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
+        run: python3 research/okx_lowvol_coverage.py | tee -a "$GITHUB_STEP_SUMMARY"
+        shell: bash
