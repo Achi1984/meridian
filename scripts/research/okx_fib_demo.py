@@ -168,7 +168,7 @@ def main():
     contracts=get("/api/v5/account/instruments",keys,instType="FUTURES",instId=INSTRUMENT)
     contract,=contracts
     tick=D(contract["tickSz"])
-    signals=[]
+    candidates=[]
     for frame,minutes in FRAMES.items():
         bars=candles(keys,frame)
         interval=minutes*60000
@@ -186,27 +186,78 @@ def main():
         if setup and not any(t["frame"]==frame and t["state"]=="open" for t in data["paper"]):
             trade=dict(**setup,frame=frame,bar=ts,next=ts+interval,state="open")
             data["paper"].append(trade)
-            if 0<=time.time()*1000-ts-interval<900000:
-                signals.append(trade)
-    journal.save()
     for trade in data["demo"]:
         if trade["state"] in ("reserved","filled"):
             reconcile(keys,trade)
             journal.save()
-    if not signals or any(t["state"] in ("reserved","filled") for t in data["demo"]):
+    for trade in reversed(data["paper"]):
+        observation=data["frames"][trade["frame"]]
+        if observation["bar"] != trade["bar"] or trade["state"] != "open":
+            continue
+        if any(d["bar"]==trade["bar"] and d["frame"]==trade["frame"] for d in data["demo"]):
+            observation["decision"]="Order bereits erfasst"
+        elif entry_age(trade, int(time.time()*1000)) is None:
+            observation["decision"]="Einstiegsfenster abgelaufen"
+        else:
+            candidates.append(trade)
+    journal.save()
+    if not candidates:
         return
-    if any(D(p["pos"]) for p in get("/api/v5/account/positions",keys,instId=INSTRUMENT)):
-        return
-    if get("/api/v5/trade/orders-pending",keys,instId=INSTRUMENT):
+    blocked = (any(t["state"] in ("reserved","filled") for t in data["demo"])
+               or any(D(p["pos"]) for p in get("/api/v5/account/positions",keys,instId=INSTRUMENT))
+               or bool(get("/api/v5/trade/orders-pending",keys,instId=INSTRUMENT)))
+    if blocked:
+        for trade in candidates:
+            data["frames"][trade["frame"]]["decision"]="Gemeinsamer Handelsplatz belegt"
+        journal.save()
         return
     check(keys)
+    rows=get("/api/v5/market/candles",keys,instId=INSTRUMENT,bar="15m",limit="4")
     _,bid,ask=quote(keys)
-    for t in signals:
-        long=t["side"]=="buy"
-        price=ask if long else bid
-        if worthwhile(price,D(t["stop"]),D(t["target"]),1 if long else -1):
-            execute(keys,journal,t,price)
+    # Preserve the original longer-frame priority when multiple frames qualify.
+    for trade in sorted(candidates,key=lambda t: -FRAMES[t["frame"]]):
+        price=ask if trade["side"]=="buy" else bid
+        reason=entry_decision(trade, rows, price, int(time.time()*1000))
+        data["frames"][trade["frame"]]["decision"]=reason
+        if reason=="Einstieg freigegeben":
+            execute(keys,journal,trade,price)
             break
+    journal.save()
+
+
+QUARTER = 15 * 60000
+
+
+def entry_age(trade, now):
+    interval = FRAMES[trade["frame"]] * 60000
+    age = now - (trade["bar"] + interval)
+    if 0 <= age < min(interval, 2 * QUARTER):
+        return age
+
+
+def entry_decision(trade, rows, price, now):
+    age = entry_age(trade, now)
+    if age is None:
+        return "Einstiegsfenster abgelaufen"
+    close = now - age
+    current = close + (age // QUARTER) * QUARTER
+    bars = sorted((int(r[0]), *map(D, r[1:5]), r[8]) for r in rows if int(r[0]) >= close)
+    if ([b[0] for b in bars] != list(range(close, current + 1, QUARTER))
+            or any(b[5] != ("0" if b[0] == current else "1") for b in bars)
+            or any(not 0 < l <= min(o,c) <= max(o,c) <= h for _,o,h,l,c,_ in bars)):
+        return "Wartet auf aktuelle 15-min-Kursdaten"
+    sign = 1 if trade["side"] == "buy" else -1
+    stop, target = D(trade["stop"]), D(trade["target"])
+    lower, upper = sorted((stop, target))
+    if any(l <= lower or h >= upper for _,_,h,l,_,_ in bars):
+        return "Stop oder Ziel bereits berührt"
+    if age >= QUARTER:
+        _, opening, _, _, closing, _ = bars[-2]
+        if min(sign*(closing-opening), sign*(closing-D(trade["entry"])), sign*(price-D(trade["entry"]))) <= 0:
+            return "Später Einstieg ohne erneute Bestätigung"
+    if not worthwhile(price, stop, target, sign):
+        return "Chance/Risiko nach Gebühren zu gering"
+    return "Einstieg freigegeben"
 
 
 if __name__=="__main__":
