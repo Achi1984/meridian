@@ -29,17 +29,18 @@ def decide(signal, rate, interest, now, instrument):
     if now - latest > 10 * MINUTE or abs(earlier - target) > 5 * MINUTE:
         raise ValueError("missing hourly open interest pair")
     veto = funding < 0 and history[latest] > history[earlier]
-    return dict(baselineShort=signal == "SHORT", filteredShort=signal == "SHORT" and not veto,
+    long_veto = funding > 0 and history[latest] > history[earlier]
+    return dict(baselineLong=signal == "LONG", filteredLong=signal == "LONG" and not long_veto,
+                longVeto=long_veto, baselineShort=signal == "SHORT", filteredShort=signal == "SHORT" and not veto,
                 fundingRate=str(funding), fundingTs=int(rate["ts"]), oiTs=latest,
                 oiContracts=str(history[latest]), priorOiTs=earlier, priorOiContracts=str(history[earlier]),
                 vetoCondition=veto)
 
 
-def main():
+def observation(keys):
     from okx_swing_observation import DAY_MS, NAMES, SPOT, get, observe
     from okx_demo_preflight import INSTRUMENT
 
-    keys = tuple(os.environ[name] for name in NAMES)
     rows = get("/api/v5/market/candles", keys, instId=SPOT, bar="1Dutc", limit="100")
     now = time.time_ns() // 1_000_000
     signal = observe(rows, now // DAY_MS * DAY_MS)
@@ -57,13 +58,15 @@ def main():
     history = {t: v for t, v in history.items() if ts - 3_600_000 * 3 <= int(t) < ts}
     history[str(ts)] = str(count)
     path.write_text(json.dumps(history))
-    result = dict(baselineShort=signal["flatStartSignal"] == "SHORT",
+    result = dict(baselineLong=signal["flatStartSignal"] == "LONG", filteredLong=None,
+                  baselineShort=signal["flatStartSignal"] == "SHORT",
                   filteredShort=None, status="WAITING_FOR_HOURLY_PAIR", oiTs=ts, oiContracts=str(count))
     if any(abs(ts - int(t) - 60 * MINUTE) <= 5 * MINUTE for t in history):
         result = dict(decide(signal["flatStartSignal"], funding[0], history.items(), decision, INSTRUMENT),
                       status="EVALUATED")
-    print(json.dumps(dict(signal, instrument=INSTRUMENT, decisionTs=decision, **result)))
+    return dict(signal, instrument=INSTRUMENT, decisionTs=decision, **result)
 
 
 if __name__ == "__main__":
-    main()
+    from okx_swing_observation import NAMES
+    print(json.dumps(observation(tuple(os.environ[name] for name in NAMES))))
