@@ -2,7 +2,7 @@
 import json
 from datetime import datetime, timezone
 from math import isfinite
-from urllib.request import urlopen
+from subprocess import check_output
 
 from regime_breakout import regime
 from swing_indicators import DailyIndicators, confirmed_entry_target
@@ -41,10 +41,14 @@ def observe(rows, today):
             "flatStartSignal": {-1: "SHORT", 0: "FLAT", 1: "LONG"}[target]}
 
 
-if __name__ == "__main__":
-    with urlopen(URL, timeout=20) as response:
-        payload = json.load(response)
+def load_candles():
+    payload = json.loads(check_output(["curl", "--fail", "--silent", "--show-error", "--retry", "2",
+                                       "--max-time", "20", URL]))
     if payload["code"] != "0":
         raise ValueError("OKX candles unavailable")
+    return payload["data"]
+
+
+if __name__ == "__main__":
     today = int(datetime.now(timezone.utc).timestamp()) // 86400 * DAY_MS
-    print(json.dumps(observe(payload["data"], today)))
+    print(json.dumps(observe(load_candles(), today)))
