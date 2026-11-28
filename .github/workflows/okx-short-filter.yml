@@ -1,4 +1,5 @@
 name: OKX BTC Long and Short demo bots
+run-name: "${{ github.workflow }} · ${{ github.event_name }} #${{ github.run_number }}"
 on:
   workflow_dispatch:
   schedule:

@@ -18,6 +18,7 @@ let arena = null;
 let advisorController = null;
 let refreshSolanaStatus = null;
 let refreshScanner, refreshDemo;
+let refreshShortStudy;
 let refreshTop100 = null;
 let paperCockpit = null;
 let spotPaperCockpit = null;
@@ -58,6 +59,8 @@ function mountWorkspace(){
   const scanner = collapsedSection('solana-scanner-live','Solana-Scanner',solana);
   refreshScanner = mountLiveScanner(scanner);
   refreshDemo = mountOkxDemo(collapsedSection('okx-demo-account','OKX-Demo · BTC Long/Short',botReports));
+  const shortStudy=collapsedSection('okx-short-study','Short nach Fehlausbruch',botReports);
+  refreshShortStudy=createShortComparison(shortStudy);
   refreshTop100=mountTop100(collapsedSection('top100-paper','Top 100 · Ausbruch und Rücktest',botReports));
   const pairedReports=collapsedSection('paired-paper-report-section','Gepaarter Paper-Vergleich');
   const pairedSourceStatus=document.createElement('p');
@@ -87,9 +90,8 @@ function mountWorkspace(){
   paperCockpit=mountPaperCockpit(paperRoot,document,window);
 
   const reports=collapsedSection('paper-reports-section','Berichte und Vergleiche',botReports);
-  const shortStudy=createShortComparison();
-  reports.append(host8hRoot,botReports,pairedReports,history);
-  reports.append(shortStudy);
+  history.append(host8hRoot);
+  reports.append(botReports,pairedReports,history);
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
@@ -126,6 +128,7 @@ function requestWorkspaceLoad(){
   if(active){
     refreshSolanaStatus?.();
     refreshTop100?.();
+    refreshShortStudy?.();
     refreshDemo?.();
     refreshScanner?.();
     advisorController?.setActive(true);

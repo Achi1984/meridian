@@ -163,10 +163,8 @@ export function filterText(report) {
   return parts.join(' · ');
 }
 
-export function createShortComparison() {
-  const study=document.createElement('details');
-  const title=document.createElement('summary');
-  title.textContent='Short nach Fehlausbruch · Papervergleich';
+export function createShortComparison(study) {
+  const lamp=strategyLamp(study);
   const status=document.createElement('p');
   status.setAttribute('role','status');
   const accounts=document.createElement('div');
@@ -175,7 +173,7 @@ export function createShortComparison() {
   retry.textContent='Vergleich aktualisieren';
   const money=new Intl.NumberFormat('de-AT',{minimumFractionDigits:2,maximumFractionDigits:2});
   async function refresh() {
-    if(retry.disabled || !study.open) return;
+    if(retry.disabled) return;
     retry.disabled=true;
     try {
       const response=await fetch('https://api.github.com/repos/Achi1984/meridian/contents/okx-rejection-paper.json?ref=paper-dashboard-data',{
@@ -197,14 +195,20 @@ export function createShortComparison() {
       }
       accounts.replaceChildren(...rows);
       const stale=report.phase!=='final' && Date.now()-time>6*3600000;
+      const planned=report.phase==='planned';
+      if (planned && Date.now()<Date.UTC(2026,10,28,16)) lamp('warn','Start 17:00 Uhr');
+      else if(stale || planned) lamp('warn',planned?'Erster Lauf ausstehend':'Stand veraltet');
+      else if(report.phase==='final') lamp('off','Beendet');
+      else lamp('on','Aktiv');
       status.textContent=phases[report.phase]+' · '+new Date(time).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien'+(stale?' · Stand veraltet':'');
     } catch {
       accounts.replaceChildren();
+      lamp('unknown','Daten fehlen');
       status.textContent='Vergleich derzeit nicht abrufbar.';
     } finally { retry.disabled=false; }
   }
   retry.addEventListener('click',refresh);
-  study.addEventListener('toggle',refresh);
-  study.append(title,status,accounts,retry);
-  return study;
+  study.addEventListener('toggle',()=>{if(study.open) refresh();});
+  study.append(status,accounts,retry);
+  return refresh;
 }
