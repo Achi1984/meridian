@@ -1,3 +1,4 @@
+import {pionexReadGet} from './pionex-read-client.js';
 import {latestPilotReport} from "./paper-advisor-gateway.js";
 import http from "node:http";
 import fs from "node:fs/promises";
@@ -732,6 +733,25 @@ const server=http.createServer(async(req,res)=>{
     if(req.method==="GET"&&u.pathname==="/api/private/dashboard"){
       const data=await stateGet(PRIVATE_STATE_KEY);
       return data?writeJson(res,200,{private:true,data},origin||""):writeJson(res,503,{error:"private_dashboard_unavailable"},origin||"");
+    }
+    if(req.method==="GET"&&u.pathname==="/api/private/pionex-fills"){
+      if(!authorizedRead(req))return writeJson(res,401,{error:"read_token_required"},origin||"");
+      const market=u.searchParams.get("market"),symbol=u.searchParams.get("symbol")||"";
+      if(!["spot","futures"].includes(market)||!/^[A-Z0-9]{1,20}_[A-Z0-9]{1,12}(?:_PERP)?$/.test(symbol))
+        return writeJson(res,400,{error:"invalid_pair"},origin||"");
+      try{
+        const result=await pionexReadGet(market==="spot"?"/api/v1/trade/fills":"/uapi/v1/trade/fills",{symbol},{
+          apiKey:process.env.PIONEX_READ_API_KEY||process.env.PIONEX_API_KEY,
+          apiSecret:process.env.PIONEX_READ_API_SECRET||process.env.PIONEX_API_SECRET});
+        if(!Array.isArray(result.data?.fills))throw Error("missing fills");
+        const fills=result.data.fills.slice(0,100).map(f=>{
+          if(f.symbol!==symbol||!["BUY","SELL"].includes(f.side)||!Number.isSafeInteger(f.timestamp)||
+             ![f.price,f.size,f.fee].every(x=>typeof x==="string"&&/^-?[0-9]+(?:\.[0-9]+)?$/.test(x))||
+             typeof f.feeCoin!=="string")throw Error("invalid fill");
+          return {side:f.side,price:f.price,size:f.size,fee:f.fee,feeCoin:f.feeCoin,timestamp:f.timestamp};
+        });
+        return writeJson(res,200,{private:true,market,symbol,fills},origin||"");
+      }catch{return writeJson(res,502,{error:"pionex_fills_unavailable"},origin||"");}
     }
     if(req.method==="GET"&&u.pathname==="/api/private/pionex-history"){
       return writeJson(res,200,await readPionexHistory(pool(),{rangeMs:portfolioHistoryRangeMs(u.searchParams.get("range"))}),origin||"");
