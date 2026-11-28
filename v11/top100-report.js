@@ -150,7 +150,13 @@ export function mountTop100(section) {
       const report = await read(api + '/contents/top100-followup-' + id + '.json?ref=paper-dashboard-data',true);
       const rows = followupRows(report,id);
       if (last && report.asOf < last.asOf) throw Error('older report');
-      if (report.stage === 'final') lamp('off','Beendet');
+      if (report.stage === 'final') {
+        lamp('off','Beendet');
+        doc.getElementById?.('paper-history-section')?.append(section);
+      } else {
+        const reports = doc.getElementById?.('paper-reports-section');
+        if (reports && section.parentElement !== reports.parentElement) reports.before(section);
+      }
       const stage = {initial:'Startbericht', first:'Zwischenbericht', final:'Abschlussbericht'}[report.stage];
       const values = rows.map(a=>[a.name,a.equity === null ? null : a.equity-1000]);
       last = {id,asOf:report.asOf,values,stage};

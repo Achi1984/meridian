@@ -1,0 +1,25 @@
+name: OKX Altcoin Short Papervergleich
+on:
+  push:
+    branches: [main, paper/okx-altcoin-rejection]
+    paths: ['scripts/research/okx_rejection_paper.py', '.github/workflows/okx-rejection-paper.yml']
+  schedule:
+    - cron: '12 */4 * * *'
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  compare:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Evaluate fixed paper cohort
+        run: |
+          if [ "$(date -u +%s)" -gt 1797120000 ]; then exit 0; fi
+          python scripts/research/okx_rejection_paper.py > report.json
+          cat report.json >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@v4
+        if: hashFiles('report.json') != '' && success()
+        with:
+          name: short-paper-comparison
+          path: report.json
