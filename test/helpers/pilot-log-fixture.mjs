@@ -27,8 +27,8 @@ export async function servePilotFixture(call, event, payload) {
   if (followup) payload = url === followupEndpoints[0] ? {workflow_runs:[]} : null;
   if (strategyStatus) payload = url === strategyStatusEndpoints[0]
     ? {schema:1,asOf:Math.floor(Date.now()/1000),qualified:0,warnings:[],candidates:[],sampled:0}
-    : {instrument:'BTC-USD_UM_XPERP-310328',asOf:new Date().toISOString(),sessions:{},
-       observation:{flatStartSignal:'FLAT',decisionTs:Date.now()}};
+    : {instrument:'BTC-USD_UM_XPERP-310328',asOf:new Date().toISOString(),sessions:{test:{state:'tracking',signal:'LONG',demoFilled:false}},
+       observation:{flatStartSignal:'FLAT',decisionTs:Date.now()-1000}};
   if(pionex)payload={};
   if (checkpoint) payload = {start:1000,lastTick:1600,candidates:{pool:{}},positions:{},cash:{fixed:1e9,runner:1e9}};
   if (runStatus) payload = {workflow_runs:[{id:55,run_number:5,status:'in_progress'}]};

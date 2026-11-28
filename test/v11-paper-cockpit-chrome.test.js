@@ -69,7 +69,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
   pilot.trades = [];
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
-      if(verificationOwned&&(pionexReadEndpoints.includes(event.request.url)||followupEndpoints.includes(event.request.url)))return;
+      if(verificationOwned&&(pionexReadEndpoints.includes(event.request.url)||followupEndpoints.includes(event.request.url)||strategyStatusEndpoints.includes(event.request.url)))return;
       if (await servePilotFixture(call, event, pilot)) return;
       if(new URL(event.request.url).origin===localOrigin){
         await call('Fetch.continueRequest',{requestId:event.requestId});
@@ -157,7 +157,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
     assertHealthy(){if(failure)throw failure;},
     async unlockApp(){
       verificationOwned=true;
-      try{await unlockAppThroughGate(call,{pilotFetchUrls:followupEndpoints,additionalFetchUrls:[
+      try{await unlockAppThroughGate(call,{pilotFetchUrls:[...followupEndpoints,...strategyStatusEndpoints],additionalFetchUrls:[
         PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,
         SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT
       ],blockOtherRequests:true});}
@@ -196,7 +196,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         };
         await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,
           deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
-        await unlockAppThroughGate(call,{pilotFetchUrls:followupEndpoints});
+        await unlockAppThroughGate(call,{pilotFetchUrls:[...followupEndpoints,...strategyStatusEndpoints]});
         const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
         report.evidence.observedThrough=new Date(Date.now()-298000).toISOString();
         report.valuation.cashCents='90071992547409931234';
@@ -229,6 +229,12 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           await new Promise(resolve=>setTimeout(resolve,20));
         }
         assert.equal(await evaluate(`document.querySelector('#solana-meme-paper .pilot-status').closest('details').open===false`),true);
+        for (let i=0;i<100;i++) {
+          if (await evaluate("document.querySelector('#okx-demo-account [data-paper-lamp=on]') && !!document.querySelector('#solana-scanner-live [data-paper-lamp=on]')")) break;
+          await new Promise(resolve=>setTimeout(resolve,20));
+        }
+        assert.equal(await evaluate("document.querySelector('#okx-demo-account > summary [data-paper-lamp]')?.textContent"),'Aktiv');
+        assert.equal(await evaluate("document.querySelector('#solana-scanner-live > summary [data-paper-lamp]')?.textContent"),'Scan aktuell');
         if(size.mobile){
           // Read resting hit boxes once the view's entrance transform has finished.
           await evaluate(`Promise.all(document.querySelector('#view-strategies').getAnimations().map(a=>a.finished)).then(()=>true)`);
@@ -458,8 +464,6 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           document.querySelector('#spot-paper-host8h-root button')?.disabled===false`),true,
           'generated host8h transport result settles with an enabled keyboard refresh before interception ends');
         const resources=await evaluate(`performance.getEntriesByType('resource').map(row=>row.name)`);
-        assert.equal(await evaluate("document.querySelector('#okx-demo-account > summary [data-paper-lamp]')?.textContent"),'Aktiv');
-        assert.equal(await evaluate("document.querySelector('#solana-scanner-live > summary [data-paper-lamp]')?.textContent"),'Scan aktuell');
         const approvedExternal=new Set([...strategyStatusEndpoints,...pionexReadEndpoints,pilotEndpoint,pilotStatusEndpoint,top100Endpoint,...followupEndpoints,swingCheckpointEndpoint,VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,
           SPOT_PAPER_HOST8H_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_REPORT_ENDPOINT,
           SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]);
