@@ -40,6 +40,17 @@ def get(path, credentials, **query):
         connection.close()
 
 
+def report_btc_contracts(credentials):
+    fields = ("instId", "instType", "state", "ctType", "settleCcy", "expTime",
+              "ctVal", "ctValCcy", "minSz", "lotSz")
+    for kind in ("FUTURES", "SWAP"):
+        rows = get("/api/v5/account/instruments", credentials, instType=kind)
+        contracts = [row for row in rows if row["instId"].startswith("BTC-")]
+        print(f"BTC inventory {kind}: {len(contracts)}")
+        for row in sorted(contracts, key=lambda item: item["instId"]):
+            print("BTC contract " + json.dumps({field: row.get(field) for field in fields}))
+
+
 def check(credentials):
     configs = get("/api/v5/account/config", credentials)
     if len(configs) != 1:
@@ -52,6 +63,7 @@ def check(credentials):
     instruments = get("/api/v5/account/instruments", credentials, instType="SWAP", instId=INSTRUMENT)
     if not any(row["instId"] == INSTRUMENT and row["state"] == "live" and row["ctType"] == "linear"
                and row["settleCcy"] == "USDT" for row in instruments):
+        report_btc_contracts(credentials)
         raise PreflightError("BTC USDT swap unavailable in account")
     positions = get("/api/v5/account/positions", credentials, instId=INSTRUMENT)
     if any(Decimal(p["pos"]) != 0 for p in positions):
