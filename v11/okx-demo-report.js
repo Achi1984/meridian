@@ -35,5 +35,8 @@ export function mountOkxDemo(section) {
     }
   }
   button.addEventListener('click', refresh);
-  refresh();
+  status.textContent = 'Bericht beim Öffnen laden.';
+  section.addEventListener('toggle', () => {
+    if (section.open) refresh();
+  });
 }
