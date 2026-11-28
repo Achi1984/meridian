@@ -124,8 +124,26 @@ def run(keys, now, candles):
     return run(keys, now, candles)
 
 
+def publish_report(result, now):
+    path = "repos/Achi1984/meridian/contents/okx-swing-demo.json"
+    branch = "paper-dashboard-data"
+    # The pilot workflow serializes runs. A SHA check also rejects a concurrent edit.
+    listing = run_process(["gh", "api", "--paginate", "repos/Achi1984/meridian/contents?ref=" + branch,
+                           "--jq", '.[] | select(.name == "okx-swing-demo.json") | .sha'],
+                          capture_output=True, text=True, check=True)
+    report = dict(result, asOf=now.isoformat(), runId=int(os.environ["GITHUB_RUN_ID"]))
+    body = base64.b64encode(json.dumps(report, allow_nan=False).encode()).decode()
+    args = ["gh", "api", "--silent", "--method", "PUT", path, "-f", "branch=" + branch,
+            "-f", "message=Publish BTC swing demo observation", "-f", "content=" + body]
+    if listing.stdout.strip():
+        args.extend(["-f", "sha=" + listing.stdout.strip()])
+    run_process(args, check=True)
+
+
 if __name__ == "__main__":
     now = datetime.now(timezone.utc)
     keys = tuple(os.environ[name] for name in NAMES)
     candles = get("/api/v5/market/candles", keys, instId=SPOT, bar="1Dutc", limit="100") if now.date() <= LAST_HOLD else []
-    print(json.dumps(run(keys, now, candles)))
+    result = run(keys, now, candles)
+    print(json.dumps(result), flush=True)
+    publish_report(result, datetime.now(timezone.utc))
