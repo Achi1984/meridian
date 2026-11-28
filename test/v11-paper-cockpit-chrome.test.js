@@ -79,7 +79,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
       if(![VERIFY_ENDPOINT,PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,
         SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT]
         .includes(event.request.url)){
-        failure=new Error('Unexpected external request blocked by Paper cockpit fixture');
+        failure=new Error('Unexpected external request blocked by Paper cockpit fixture ' + new URL(event.request.url).pathname);
         await call('Fetch.failRequest',{requestId:event.requestId,errorReason:'BlockedByClient'});
         return;
       }
