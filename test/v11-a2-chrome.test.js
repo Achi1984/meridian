@@ -40,7 +40,7 @@ const probe = `(() => {
       check(n.left >= 0 && n.right <= innerWidth + 1 && n.bottom <= innerHeight + 1, 'nav viewport');
     }
   }
-  tabs[0].click();
+  tabs.find(tab=>tab.dataset.v==='depot').click();
   const disclosure = document.querySelector('details.command-source-details');
   disclosure.open = true;
   const controls = [...document.querySelectorAll('button[data-preview-state]')];
@@ -74,7 +74,8 @@ const probe = `(() => {
   check(fits(status) && fits(text) && document.body.scrollWidth <= innerWidth + 1, 'long unknown source');
   text.textContent = 'Prüfung fehlgeschlagen. '.repeat(30);
   check(fits(status) && fits(text), 'long error text');
-  const last = document.querySelector('#view-command > :last-child');
+  tabs[0].click();
+  const last = document.querySelector('#view-command .account-total');
   window.scrollTo(0, document.documentElement.scrollHeight);
   check(last.getBoundingClientRect().bottom <= nav.getBoundingClientRect().top + 1, 'bottom content clearance');
   return {width: innerWidth, viewport: document.documentElement.clientWidth, cycles: 20, states, failures};
@@ -115,7 +116,7 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
         await key('Enter', 'Enter');
         assert.equal(await evaluate('document.activeElement.closest(".view").id'), 'view-' + view, 'native Enter navigation');
       }
-      await evaluate('document.querySelector("#nav button").click(); document.querySelector("details.command-source-details").open = false; document.querySelector("details.command-source-details > summary").focus()');
+      await evaluate('document.querySelector("#nav button[data-v=depot]").click(); document.querySelector("details.command-source-details").open = false; document.querySelector("details.command-source-details > summary").focus()');
       await key(' ', 'Space');
       assert.equal(await evaluate('document.querySelector("details.command-source-details").open'), true, 'native Space opens disclosure');
       assert.equal(await evaluate('getComputedStyle(document.querySelector("details.command-source-details > summary")).outlineStyle'), 'solid', 'keyboard disclosure focus indicator');
@@ -131,10 +132,10 @@ test('A2 Chrome: focus, fail-closed states, contrast and layout at 320/375/390/4
           const image = await call('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false});
           writeFileSync(join(evidence, `v11-a2-${width}-${state}.png`), Buffer.from(image.data, 'base64'));
         }
-        await evaluate('document.querySelector("details.command-source-details").open = false; window.scrollTo(0,0)');
+        await evaluate('document.querySelector("details.command-source-details").open = false; document.querySelector("#nav button[data-v=command]").click(); window.scrollTo(0,0)');
         const image = await call('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false});
         writeFileSync(join(evidence, `v11-a2-${width}-command.png`), Buffer.from(image.data, 'base64'));
-        await evaluate('document.querySelector(".command-source-details").open = true; document.querySelector("#autonomy-status").open = true; window.scrollTo(0,0)');
+        await evaluate('document.querySelector("#nav button[data-v=depot]").click(); document.querySelector(".command-source-details").open = true; document.querySelector("#autonomy-status").open = true; window.scrollTo(0,0)');
         const expanded = await call('Page.captureScreenshot', {format: 'png', captureBeyondViewport: true});
         writeFileSync(join(evidence, `v11-b2-${width}-autonomy-expanded.png`), Buffer.from(expanded.data, 'base64'));
         await evaluate('document.querySelector("#autonomy-status").open = false; document.querySelector(".command-source-details").open = false');
