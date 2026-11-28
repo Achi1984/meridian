@@ -9,7 +9,7 @@ export const followupEndpoints = [
   'https://api.github.com/repos/Achi1984/meridian/actions/runs?branch=paper%2Ftop100-confirmation-20261127&event=push&per_page=20',
   'https://api.github.com/repos/Achi1984/meridian/contents/top100-followup-46069348362.json?ref=paper-dashboard-data'
 ];
-export const strategyStatusEndpoints = ['solana-scanner-live', 'okx-filter-demo', 'okx-rejection-paper'].map(name =>
+export const strategyStatusEndpoints = ['solana-scanner-live', 'okx-filter-demo', 'okx-rejection-paper', 'fib-demo'].map(name =>
   'https://api.github.com/repos/Achi1984/meridian/contents/' + name + '.json?ref=paper-dashboard-data');
 export const swingCheckpointEndpoint = 'https://api.github.com/repos/Achi1984/meridian/contents/studies/swing48/45624335706/state.json?ref=paper%2Fsecond-wave-48h-data';
 
@@ -31,6 +31,8 @@ export async function servePilotFixture(call, event, payload) {
        observation:{flatStartSignal:'FLAT',decisionTs:Date.now()-1000}};
   if(url === strategyStatusEndpoints[2]) payload={phase:'running',asOf:new Date().toISOString(),
     historyFilter:{open:0,closed:0,equity:1000},control:{open:0,closed:0,equity:1000}};
+  if(url === strategyStatusEndpoints[3]) payload={asOf:Date.now(),paper:[],demo:[],
+    frames:Object.fromEntries(['15m','30m','1H','4H'].map(frame=>[frame,{signal:'wait'}]))};
   if(pionex)payload={};
   if (checkpoint) payload = {start:1000,lastTick:1600,candidates:{pool:{}},positions:{},cash:{fixed:1e9,runner:1e9}};
   if (runStatus) payload = {workflow_runs:[{id:55,run_number:5,status:'in_progress'}]};

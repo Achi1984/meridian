@@ -92,7 +92,8 @@ function mountWorkspace(){
   const reports=collapsedSection('paper-reports-section','Berichte und Vergleiche',botReports);
   history.append(host8hRoot);
   reports.append(botReports,pairedReports,history);
-  reports.append(createGridComparison(),createFibComparison());
+  reports.append(createGridComparison());
+  scanner.before(createFibComparison());
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
