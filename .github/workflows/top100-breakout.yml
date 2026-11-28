@@ -1,4 +1,5 @@
 name: Top 100 follow-up · three paper accounts
+run-name: Top 100 · unabhängiger 8-Stunden-Vergleich Nr. ${{ github.run_number }}
 on:
   push:
     branches: [paper/top100-confirmation-20261127]
@@ -22,12 +23,7 @@ jobs:
           file="top100-followup-$GITHUB_RUN_ID.json"
           python scripts/research/top100_followup_report.py direction/state.json initial > "$RUNNER_TEMP/report.json"
           api="repos/$GITHUB_REPOSITORY/contents/$file"
-          args=()
-          if [[ 'initial' != 'initial' ]]; then
-            sha=$(gh api "$api?ref=paper-dashboard-data" --jq '.sha')
-            args+=(-f "sha=$sha")
-          fi
-          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish initial Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" "${args[@]}" >/dev/null
+          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish initial Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" >/dev/null
       - run: python scripts/research/top100_paper.py direction 1
       - uses: actions/upload-artifact@v4
         if: always()
@@ -43,12 +39,8 @@ jobs:
           file="top100-followup-$GITHUB_RUN_ID.json"
           python scripts/research/top100_followup_report.py direction/state.json first > "$RUNNER_TEMP/report.json"
           api="repos/$GITHUB_REPOSITORY/contents/$file"
-          args=()
-          if [[ 'first' != 'initial' ]]; then
-            sha=$(gh api "$api?ref=paper-dashboard-data" --jq '.sha')
-            args+=(-f "sha=$sha")
-          fi
-          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish first Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" "${args[@]}" >/dev/null
+          sha=$(gh api "$api?ref=paper-dashboard-data" --jq '.sha')
+          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish first Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" -f "sha=$sha" >/dev/null
   finish:
     needs: first
     runs-on: ubuntu-latest
@@ -73,9 +65,5 @@ jobs:
           file="top100-followup-$GITHUB_RUN_ID.json"
           python scripts/research/top100_followup_report.py direction/state.json final > "$RUNNER_TEMP/report.json"
           api="repos/$GITHUB_REPOSITORY/contents/$file"
-          args=()
-          if [[ 'final' != 'initial' ]]; then
-            sha=$(gh api "$api?ref=paper-dashboard-data" --jq '.sha')
-            args+=(-f "sha=$sha")
-          fi
-          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish final Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" "${args[@]}" >/dev/null
+          sha=$(gh api "$api?ref=paper-dashboard-data" --jq '.sha')
+          gh api -X PUT "$api" -f branch=paper-dashboard-data -f message="Publish final Top 100 paper checkpoint" -f content="$(base64 -w0 "$RUNNER_TEMP/report.json")" -f "sha=$sha" >/dev/null
