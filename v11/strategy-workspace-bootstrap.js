@@ -90,7 +90,8 @@ function mountWorkspace(){
   const shortStudy=document.createElement('a');
   shortStudy.textContent='Short nach Fehlausbruch · Papervergleich';
   shortStudy.href='https://github.com/Achi1984/meridian/actions/workflows/okx-rejection-paper.yml';
-  reports.append(host8hRoot,botReports,pairedReports,history,shortStudy);
+  reports.append(host8hRoot,botReports,pairedReports,history);
+  reports.append(shortStudy);
   const research=collapsedSection('paper-research-section','Strategieforschung und weitere Paper-Modelle');
   const threeWayRoot=document.createElement('section');
   threeWayRoot.id='spot-paper-three-way-root';
