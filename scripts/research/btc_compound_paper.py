@@ -75,11 +75,14 @@ def setup(history, t, sign):
         return max(b[1] for group in leg for b in group), min(b[2] for group in leg for b in group)
     earlier, recent = extremes(legs[:3]), extremes(legs[3:])
     if any(sign*(b-a)<=0 for a,b in zip(earlier,recent)):
-        return None
+        return None, "4h-Trend fehlt"
     pull, confirm = history[t-2*HOUR], history[t-HOUR]
-    if sign*(pull[3]-pull[0]) >= 0 or sign*(confirm[3]-pull[1 if sign==1 else 2]) <= 0:
-        return None
-    return min(pull[2],confirm[2]) if sign==1 else max(pull[1],confirm[1])
+    if sign*(pull[3]-pull[0]) >= 0:
+        return None, "Wartet auf Rücksetzer"
+    if sign*(confirm[3]-pull[1 if sign==1 else 2]) <= 0:
+        return None, "Bestätigung fehlt"
+    stop = min(pull[2],confirm[2]) if sign==1 else max(pull[1],confirm[1])
+    return stop, "Signal bestätigt"
 
 
 def trail(history,t,sign):
@@ -93,16 +96,21 @@ def step(bot, history, t, sign, rate):
     o,h,l,c = history[t]
     p = bot["position"]
     if p:
+        reason = "Position gehalten"
         p["fundingPerBTC"] -= sign*o*rate
     else:
-        stop = setup(history,t,sign)
+        stop, reason = setup(history,t,sign)
         entry = o*(1+sign*SLIP)
-        if stop is not None and sign*(o-stop)>0:
+        if stop is not None and sign*(o-stop)<=0:
+            reason = "Eröffnung jenseits des Stops"
+        elif stop is not None:
             stop_fill = stop*(1-sign*SLIP)
             unit = sign*(entry-stop_fill) + FEE*(entry+stop_fill)
             qty = {k:min((a["balance"]*.005 if k=="compound" else 5)/unit,
                          a["balance"]/entry) for k,a in ((k,bot[k]) for k in ("compound","fixed"))}
+            reason = "Risikobudget erschöpft"
             if min(qty.values())>0:
+                reason = "Position eröffnet"
                 p = bot["position"] = dict(at=t,entry=entry,stop=stop,qty=qty,fundingPerBTC=0.)
     hit = p and (l<=p["stop"] if sign==1 else h>=p["stop"])
     if p:
@@ -120,10 +128,12 @@ def step(bot, history, t, sign, rate):
         if hit:
             bot["trades"].append(dict(entryBar=p["at"],exitBar=t,entry=p["entry"],exit=fill,
                                       net={k:q*per_btc for k,q in p["qty"].items()}))
+            reason = "Am Stop geschlossen"
             bot["position"] = None
         else:
             level = trail(history,t,sign)
             p["stop"] = max(p["stop"],level) if sign==1 else min(p["stop"],level)
+    bot["decision"] = {"closeMs": t+HOUR, "reason": reason}
 
 
 def main():
