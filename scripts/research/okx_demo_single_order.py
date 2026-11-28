@@ -4,7 +4,7 @@ import os
 import time
 from decimal import Decimal, ROUND_DOWN
 
-from okx_demo_preflight import INSTRUMENT, NAMES, PreflightError, check, get, request
+from okx_demo_preflight import INSTRUMENT, NAMES, PreflightError, VenueError, check, get, request
 
 CLIENT_ID = "MeridianBTCdemo20261128A"
 SIZE = "0.0001"
@@ -40,6 +40,15 @@ def cancel_and_check(credentials):
 
 def run(credentials, submit):
     if submit:
+        try:
+            existing = get(ORDER, credentials, **IDENTITY)
+        except VenueError as error:
+            if error.code != "51603":
+                raise
+        else:
+            if not existing:
+                raise PreflightError("ambiguous lookup before placement")
+            return run(credentials, False)
         contract = check(credentials)
         book, = get("/api/v5/market/books", credentials, instId=INSTRUMENT, sz="1")
         bid = Decimal(book["bids"][0][0])
@@ -56,8 +65,14 @@ def run(credentials, submit):
         try:
             order_id = post(ORDER, payload, credentials, int(time.time() * 1000) + 5000)
             print(f"Demo placement acknowledged: {order_id}", flush=True)
-        finally:
-            final = cancel_and_check(credentials)
+        except Exception as error:
+            print(f"Demo placement failed: {error}", flush=True)
+            try:
+                cancel_and_check(credentials)
+            finally:
+                check(credentials)
+            raise
+        final = cancel_and_check(credentials)
     else:
         final = cancel_and_check(credentials)
     positions = get("/api/v5/account/positions", credentials, instId=INSTRUMENT)
@@ -74,6 +89,6 @@ if __name__ == "__main__":
     credentials = tuple(os.environ[name] for name in NAMES)
     if not all(credentials):
         raise SystemExit("demo credentials missing")
-    # Run 1 stopped on a balance/exposure GET before reaching the order endpoint.
-    submit = (os.environ.get("GITHUB_RUN_NUMBER"), os.environ.get("GITHUB_RUN_ATTEMPT")) == ("2", "1")
+    # Only the third manual run may submit this original, previously rejected intent.
+    submit = (os.environ.get("GITHUB_RUN_NUMBER"), os.environ.get("GITHUB_RUN_ATTEMPT")) == ("3", "1")
     run(credentials, submit)
