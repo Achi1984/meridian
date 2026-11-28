@@ -21,20 +21,29 @@ class PreflightError(Exception):
 
 def get(path, credentials, **query):
     target = path + ("?" + urlencode(query) if query else "")
+    return request("GET", target, credentials)
+
+
+def request(method, target, credentials, body="", expires=None):
     key, secret, passphrase = credentials
     stamp = datetime.now(timezone.utc).isoformat(timespec="milliseconds").replace("+00:00", "Z")
-    digest = hmac.new(secret.encode(), (stamp + "GET" + target).encode(), hashlib.sha256)
+    digest = hmac.new(secret.encode(), (stamp + method + target + body).encode(), hashlib.sha256)
     headers = {"x-simulated-trading": "1", "OK-ACCESS-KEY": key, "OK-ACCESS-TIMESTAMP": stamp,
                "OK-ACCESS-SIGN": base64.b64encode(digest.digest()).decode(), "OK-ACCESS-PASSPHRASE": passphrase}
+    if body:
+        headers["Content-Type"] = "application/json"
+    if expires:
+        headers["expTime"] = str(expires)
     connection = HTTPSConnection(HOST, timeout=12)
     try:
-        connection.request("GET", target, headers=headers)
+        connection.request(method, target, body=body or None, headers=headers)
         response = connection.getresponse()
         if response.status != 200:
             raise PreflightError("HTTP " + str(response.status))
         payload = json.load(response)
         if payload["code"] != "0" or not isinstance(payload["data"], list):
-            raise PreflightError("API request rejected")
+            items = payload.get("data") or [{}]
+            raise PreflightError("OKX rejected request: %s/%s" % (payload.get("code"), items[0].get("sCode", "")))
         return payload["data"]
     finally:
         connection.close()
@@ -86,6 +95,7 @@ def check(credentials):
           f"pending standard orders (returned)={len(orders)}. Orders sent: 0.")
     if available <= 0 or open_positions or orders:
         raise PreflightError("requires positive available USDC and clear initial exposure")
+    return contract
 
 
 if __name__ == "__main__":
