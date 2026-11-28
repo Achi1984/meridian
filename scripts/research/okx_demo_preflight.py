@@ -1,4 +1,4 @@
-"""Check the EEA demo account and BTC swap using authenticated GET requests."""
+"""Check the EEA demo account and BTC X-Perp using authenticated GET requests."""
 import base64
 import hashlib
 import hmac
@@ -6,12 +6,12 @@ import json
 import os
 import sys
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from http.client import HTTPSConnection
 from urllib.parse import urlencode
 
 HOST = "eea.okx.com"
-INSTRUMENT = "BTC-USDT-SWAP"
+INSTRUMENT = "BTC-USD_UM_XPERP-310328"
 NAMES = ("OKX_DEMO_API_KEY", "OKX_DEMO_SECRET_KEY", "OKX_DEMO_PASSPHRASE")
 
 
@@ -60,17 +60,32 @@ def check(credentials):
         raise PreflightError("demo key requires trade permission and withdrawal disabled")
     if configs[0]["posMode"] != "net_mode":
         raise PreflightError("rehearsal expects net position mode")
-    instruments = get("/api/v5/account/instruments", credentials, instType="SWAP", instId=INSTRUMENT)
-    if not any(row["instId"] == INSTRUMENT and row["state"] == "live" and row["ctType"] == "linear"
-               and row["settleCcy"] == "USDT" for row in instruments):
+    instruments = get("/api/v5/account/instruments", credentials, instType="FUTURES", instId=INSTRUMENT)
+    expected = {"instId": INSTRUMENT, "instType": "FUTURES", "state": "live",
+                "ctType": "linear", "settleCcy": "USDC", "ctValCcy": "BTC"}
+    if len(instruments) != 1 or not all(instruments[0].get(k) == v for k, v in expected.items()):
         report_btc_contracts(credentials)
-        raise PreflightError("BTC USDT swap unavailable in account")
+        raise PreflightError("BTC USDC X-Perp unavailable or contract specifications changed")
+    contract = instruments[0]
+    if (Decimal(contract["ctVal"]), Decimal(contract["minSz"]), Decimal(contract["lotSz"])) != (
+            Decimal("1"), Decimal("0.0001"), Decimal("0.0001")):
+        raise PreflightError("BTC X-Perp size specifications changed")
+    balances = get("/api/v5/account/balance", credentials, ccy="USDC")
+    if len(balances) != 1:
+        raise PreflightError("demo balance response unavailable")
+    usdc = [row for row in balances[0]["details"] if row["ccy"] == "USDC"]
+    if len(usdc) > 1:
+        raise PreflightError("ambiguous USDC demo balance")
+    available = Decimal(usdc[0]["availBal"]) if usdc else Decimal(0)
+    if not available.is_finite():
+        raise PreflightError("invalid available demo balance")
     positions = get("/api/v5/account/positions", credentials, instId=INSTRUMENT)
-    if any(Decimal(p["pos"]) != 0 for p in positions):
-        raise PreflightError("existing BTC swap exposure")
-    if get("/api/v5/trade/orders-pending", credentials, instId=INSTRUMENT):
-        raise PreflightError("existing BTC swap order")
-    print("Demo authentication, target instrument and initial position checked. Orders sent: 0.")
+    open_positions = sum(Decimal(row["pos"]) != 0 for row in positions)
+    orders = get("/api/v5/trade/orders-pending", credentials, instId=INSTRUMENT)
+    print(f"Demo {INSTRUMENT}: available USDC={available}, open positions={open_positions}, "
+          f"pending standard orders (returned)={len(orders)}. Orders sent: 0.")
+    if available <= 0 or open_positions or orders:
+        raise PreflightError("requires positive available USDC and clear initial exposure")
 
 
 if __name__ == "__main__":
@@ -81,5 +96,5 @@ if __name__ == "__main__":
         check(credentials)
     except PreflightError as error:
         sys.exit("Demo preflight stopped: " + str(error))
-    except (ValueError, OSError, KeyError, ArithmeticError, TypeError):
+    except (InvalidOperation, ValueError, OSError, KeyError, ArithmeticError, TypeError):
         sys.exit("Demo preflight stopped: network or response format error")
