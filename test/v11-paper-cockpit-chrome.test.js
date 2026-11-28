@@ -69,7 +69,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
   pilot.trades = [];
   const off=call.onEvent('Fetch.requestPaused',event=>{
     void (async()=>{
-      if(verificationOwned&&pionexReadEndpoints.includes(event.request.url))return;
+      if(verificationOwned&&(pionexReadEndpoints.includes(event.request.url)||followupEndpoints.includes(event.request.url)))return;
       if (await servePilotFixture(call, event, pilot)) return;
       if(new URL(event.request.url).origin===localOrigin){
         await call('Fetch.continueRequest',{requestId:event.requestId});
@@ -157,7 +157,7 @@ async function interceptGeneratedPaperReport(call,report,localOrigin){
     assertHealthy(){if(failure)throw failure;},
     async unlockApp(){
       verificationOwned=true;
-      try{await unlockAppThroughGate(call,{additionalFetchUrls:[
+      try{await unlockAppThroughGate(call,{pilotFetchUrls:followupEndpoints,additionalFetchUrls:[
         PAPER_REPORT_ENDPOINT,SPOT_PAPER_HOST8H_REPORT_ENDPOINT,
         SPOT_PAPER_PAIRED_REPORT_ENDPOINT,SPOT_PAPER_PAIRED_PROGRESS_ENDPOINT
       ],blockOtherRequests:true});}
@@ -196,7 +196,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         };
         await call('Emulation.setDeviceMetricsOverride',{width:size.width,height:size.height,
           deviceScaleFactor:1,mobile:size.mobile,screenWidth:size.width,screenHeight:size.height});
-        await unlockAppThroughGate(call);
+        await unlockAppThroughGate(call,{pilotFetchUrls:followupEndpoints});
         const report=projectOperatorReport(reportFixtures.readOnlyCheckpoint());
         report.evidence.observedThrough=new Date(Date.now()-298000).toISOString();
         report.valuation.cashCents='90071992547409931234';
