@@ -20,6 +20,16 @@ class PreflightError(Exception):
     pass
 
 
+class VenueError(PreflightError):
+    def __init__(self, status, method, path, payload):
+        items = payload.get("data")
+        first = items[0] if isinstance(items, list) and items and isinstance(items[0], dict) else {}
+        self.code = str(payload.get("code", ""))
+        subcode = str(first.get("sCode", ""))
+        codes = "/".join(c for c in (self.code, subcode) if c.isascii() and c.isdecimal())
+        super().__init__(f"{method} {path.split('?')[0]}: HTTP {status}, OKX {codes or 'unknown'}")
+
+
 class RateLimited(PreflightError):
     pass
 
@@ -51,12 +61,14 @@ def request(method, target, credentials, body="", expires=None):
         response = connection.getresponse()
         if response.status == 429:
             raise RateLimited("HTTP 429")
-        if response.status != 200:
-            raise PreflightError("HTTP " + str(response.status))
-        payload = json.load(response)
-        if payload["code"] != "0" or not isinstance(payload["data"], list):
-            items = payload.get("data") or [{}]
-            raise PreflightError("OKX rejected request: %s/%s" % (payload.get("code"), items[0].get("sCode", "")))
+        try:
+            payload = json.load(response)
+        except (ValueError, UnicodeError):
+            raise PreflightError(f"HTTP {response.status}: invalid OKX response") from None
+        if not isinstance(payload, dict):
+            raise PreflightError(f"HTTP {response.status}: invalid OKX response")
+        if response.status != 200 or payload.get("code") != "0" or not isinstance(payload.get("data"), list):
+            raise VenueError(response.status, method, target, payload)
         return payload["data"]
     finally:
         connection.close()
