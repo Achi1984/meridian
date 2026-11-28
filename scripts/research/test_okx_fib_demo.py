@@ -89,3 +89,30 @@ class FibDemoTests(unittest.TestCase):
             fib.main()
             execute.assert_called_once()
             self.assertEqual(len(journal.data["paper"]),1)
+
+
+class JournalTraceTests(unittest.TestCase):
+    def test_legacy_signal_history_survives_new_bar_and_retries(self):
+        trade = {"frame": "4H", "bar": 100}
+        data = {"paper": [trade], "frames": {"4H": {"bar": 100, "decision": "Einstiegsfenster abgelaufen"}}}
+        fib.retain_decisions(data, 200)
+        fib.retain_decisions(data, 201)
+        data["frames"]["4H"] = {"bar": 300, "decision": "Andere Kerze"}
+        fib.retain_decisions(data, 400)
+        self.assertEqual(trade["decisions"], [{"reportedAt": 200, "reason": "Einstiegsfenster abgelaufen"}])
+
+    def test_missing_fill_timestamp_stays_unknown(self):
+        for value in (None, "", "0", "NaN", "-1"):
+            self.assertIsNone(fib.fill_time({"fillTime": value}))
+        self.assertEqual(fib.fill_time({"fillTime": "1795886382162"}), 1795886382162)
+
+    def test_closed_demo_records_venue_receipts_and_fees(self):
+        trade = dict(id="demo1", side="buy", state="reserved")
+        entry = dict(state="filled", accFillSz=str(fib.SIZE), feeCcy="USDC", avgPx="100", fee="-0.01", fillTime="1000")
+        protection = dict(instId=fib.INSTRUMENT, algoClOrdId="demo1P", state="effective", ordIdList=["exit1"])
+        exit_fill = dict(state="filled", instId=fib.INSTRUMENT, side="sell", accFillSz=str(fib.SIZE),
+                         feeCcy="USDC", avgPx="110", pnl="1", fee="-0.02", fillTime="2000")
+        with patch.object(fib,"read_order",return_value=entry), patch.object(fib,"get",side_effect=[[protection],[exit_fill]]):
+            fib.reconcile((),trade)
+        self.assertEqual((trade["state"],trade["entryFillAt"],trade["exitFillAt"],trade["afterFees"]),
+                         ("closed",1000,2000,"0.97"))
