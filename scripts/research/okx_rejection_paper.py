@@ -120,7 +120,8 @@ def main():
         if not funding or min(int(r["fundingTime"]) for r in funding) > START:
             raise ValueError(symbol + " funding history incomplete")
         rates[symbol] = [(int(r["fundingTime"]),float(r["realizedRate"])) for r in funding]
-    print(json.dumps({"asOf":datetime.fromtimestamp(now/1000,timezone.utc).isoformat(),
+    phase = "planned" if now < START else "final" if now >= END else "running"
+    print(json.dumps({"phase":phase,"asOf":datetime.fromtimestamp(now/1000,timezone.utc).isoformat(),
                       "historyFilter":evaluate(series,rates,True,now),
                       "control":evaluate(series,rates,False,now)}, indent=2))
 
