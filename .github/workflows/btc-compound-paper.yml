@@ -1,0 +1,42 @@
+name: BTC Long and Short Compounders
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['scripts/research/btc_compound_paper.py', '.github/workflows/btc-compound-paper.yml']
+  schedule:
+    - cron: '8 * * * *'
+permissions:
+  contents: write
+concurrency:
+  group: btc-compound-paper
+  cancel-in-progress: false
+jobs:
+  paper:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - run: python -m unittest discover -s scripts/research -p test_btc_compound_paper.py
+      - name: Advance and publish both paired accounts
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch=paper-dashboard-data
+          api="repos/$GITHUB_REPOSITORY/contents"
+          path=btc-compound-paper.json
+          sha=$(gh api "$api?ref=$branch" --jq '.[] | select(.name=="btc-compound-paper.json") | .sha')
+          args=()
+          if [[ -n "$sha" ]]; then
+            gh api "$api/$path?ref=$branch" > blob.json
+            jq -e --arg sha "$sha" '.sha==$sha' blob.json >/dev/null
+            jq -r .content blob.json | base64 -d > previous.json
+            args+=(-f "sha=$sha")
+          fi
+          python scripts/research/btc_compound_paper.py > report.json
+          base64 -w0 report.json > encoded.txt
+          gh api -X PUT "$api/$path" -f branch="$branch" -f message="Update BTC compound paper accounts" -F content=@encoded.txt "${args[@]}" >/dev/null
