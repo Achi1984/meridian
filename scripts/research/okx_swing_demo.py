@@ -1,4 +1,5 @@
 """Run one signal-driven BTC X-Perp round trip in the EEA demo account."""
+import base64
 import json
 import os
 import time
@@ -6,6 +7,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal, ROUND_CEILING, ROUND_FLOOR
 from pathlib import Path
 import sys
+from subprocess import check_output, run as run_process
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "spot-paper-advisor"))
 from okx_swing_observation import DAY_MS, observe
@@ -22,9 +24,13 @@ def order(keys, client_id):
     try:
         row, = get(ORDER, keys, instId=INSTRUMENT, clOrdId=client_id)
     except VenueError as exc:
-        if exc.code == "51603":
+        if exc.code != "51603":
+            raise
+        history = get("/api/v5/trade/orders-history", keys, instType="FUTURES", instId=INSTRUMENT)
+        matches = [item for item in history if item["clOrdId"] == client_id]
+        if not matches:
             return None
-        raise
+        row, = matches
     if (row["instId"] != INSTRUMENT or row["clOrdId"] != client_id
             or row["side"] not in ("buy", "sell") or Decimal(row["sz"]) != SIZE
             or str(row["reduceOnly"]).lower() != str(client_id == EXIT).lower()
@@ -60,6 +66,15 @@ def entry_price(book, tick, side, now_ms):
     return format(limit, "f")
 
 
+def reserve_entry(signal):
+    # A create-only receipt survives venue history expiry and ambiguous acknowledgements.
+    path = "repos/Achi1984/meridian/contents/okx-swing-demo-20261128-intent.json"
+    content = base64.b64encode(json.dumps(signal).encode()).decode()
+    run_process(["gh", "api", "--silent", "--method", "PUT", path, "-f", "branch=paper-dashboard-data",
+                 "-f", "message=Reserve the single BTC swing demo entry", "-f", "content=" + content],
+                check=True)
+
+
 def run(keys, now, candles):
     today = now.date()
     entry = order(keys, ENTRY)
@@ -73,6 +88,7 @@ def run(keys, now, candles):
         return dict(action="closed", feesUSDC=str(fees),
                     realizedAfterTradingFeesUSDC=str(Decimal(exit_order["pnl"]) + fees))
     if not entry and today > LAST_ENTRY:
+        verify_position(keys, Decimal(0))
         return dict(action="entry window ended")
     signal = {}
     if today <= LAST_HOLD:
@@ -85,6 +101,7 @@ def run(keys, now, candles):
         side = "buy" if direction == "LONG" else "sell"
         book, = get("/api/v5/market/books", keys, instId=INSTRUMENT, sz="1")
         price = entry_price(book, Decimal(check_contract["tickSz"]), side, time.time() * 1000)
+        reserve_entry(signal)
         entry = place(keys, ENTRY, side=side, ordType="ioc", px=price)
     if Decimal(entry["accFillSz"]) == 0:
         verify_position(keys, Decimal(0))
@@ -93,7 +110,10 @@ def run(keys, now, candles):
         raise PreflightError("unexpected entry size")
     sign = 1 if entry["side"] == "buy" else -1
     verify_position(keys, sign * SIZE)
-    fills = get("/api/v5/trade/fills-history", keys, instType="FUTURES", instId=INSTRUMENT, limit="1")
+    query = dict(instType="FUTURES", instId=INSTRUMENT, limit="1")
+    fills = get("/api/v5/trade/fills", keys, **query)
+    if not fills:
+        fills = get("/api/v5/trade/fills-history", keys, **query)
     if not fills or fills[0]["ordId"] != entry["ordId"] or get(
             "/api/v5/trade/orders-pending", keys, instId=INSTRUMENT):
         raise PreflightError("campaign no longer has exclusive ownership of position")
@@ -108,7 +128,6 @@ if __name__ == "__main__":
     now = datetime.now(timezone.utc)
     keys = tuple(os.environ[name] for name in NAMES)
     if now.date() <= LAST_HOLD:
-        from subprocess import check_output
         from okx_swing_observation import URL
         payload = json.loads(check_output(["curl", "--fail", "--silent", "--show-error", "--retry", "2",
                                            "--max-time", "20", URL]))

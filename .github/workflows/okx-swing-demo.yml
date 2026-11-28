@@ -8,7 +8,7 @@ on:
     - cron: '17 0,12 28-30 11 *'
     - cron: '17 0,12 1-7 12 *'
 permissions:
-  contents: read
+  contents: write
 concurrency:
   group: okx-btc-single-demo-order
   cancel-in-progress: false
@@ -25,6 +25,7 @@ jobs:
         run: echo "year=$(date -u +%Y)" >> "$GITHUB_OUTPUT"
       - if: steps.window.outputs.year == '2026'
         env:
+          GH_TOKEN: ${{ github.token }}
           OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
           OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
           OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}

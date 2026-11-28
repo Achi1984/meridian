@@ -17,6 +17,7 @@ class SwingDemoTest(unittest.TestCase):
         for name, effect in (
                 ("order", lambda keys, cid: self.rows.get(cid)),
                 ("observe", lambda *args: self.signal),
+                ("reserve_entry", lambda signal: None),
                 ("check", lambda keys: {"tickSz": "0.1"}),
                 ("get", self.get), ("place", self.place),
                 ("verify_position", lambda keys, expected: self.assertEqual(expected, self.pos))):
