@@ -1,4 +1,4 @@
-import {createOkxOverview} from './okx-overview.js';
+import {createOkxOverview} from './okx-overview.js?v=B20-M11-FIX6';
 import {mountOkxDemo, createShortComparison, createGridComparison, createFibComparison} from './okx-demo-report.js?v=B20-M11-FIX6';
 import {mountTop100} from './top100-report.js?v=B20-M11-FIX6';
 import {ensureSolanaSection, mountLiveScanner} from './solana-meme-report.js?v=B20-M11-FIX6';
