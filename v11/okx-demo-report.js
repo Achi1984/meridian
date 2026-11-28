@@ -342,7 +342,9 @@ export function createFibComparison() {
       });
       const stamp=document.createElement('small');
       stamp.textContent='Gemeinsames OKX-Demokonto · Letzte Prüfung '+new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien';
+      const focusFrame=body.contains(document.activeElement)?document.activeElement.closest('details')?.dataset.frame:null;
       body.replaceChildren(...rows,stamp);
+      if(focusFrame)rows.find(row=>row.dataset.frame===focusFrame)?.querySelector('summary')?.focus({preventScroll:true});
       lastView=fingerprint;
     } catch {lastView='';body.textContent='🟡 Fibonacci-Bericht derzeit nicht abrufbar.';}
     finally {loading=false;}
