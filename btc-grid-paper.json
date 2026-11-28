@@ -3,19 +3,23 @@
     "fixed": {
       "equity": 1000,
       "drawdown": 0,
-      "fills": 0
+      "fills": 0,
+      "vsHold": 0.0
     },
     "adaptive": {
       "equity": 1000,
       "drawdown": 0,
-      "fills": 0
+      "fills": 0,
+      "vsHold": 0.0
     },
     "model": {
       "equity": 1000,
       "drawdown": 0,
-      "fills": 0
+      "fills": 0,
+      "vsHold": 0.0
     }
   },
+  "holdEquity": 1000.0,
   "decisions": {
     "full": 0,
     "half": 0,
@@ -23,6 +27,6 @@
   },
   "trainingFills": 119,
   "bars": 0,
-  "asOf": 1795881162024,
-  "phase": "planned"
+  "asOf": 1795881640239,
+  "phase": "running"
 }
