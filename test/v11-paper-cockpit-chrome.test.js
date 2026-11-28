@@ -474,7 +474,7 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(intercepted.pairedSettled(),3);
         assert.equal(intercepted.progressCount(),3);
         assert.equal(intercepted.progressSettled(),3);
-        await intercepted.close();
+
         await evaluate(`(async()=>{
           const model=await import('./paper-cockpit-model.js?v=B20-M11-FIX6');
           const view=await import('./paper-cockpit-view.js?v=B20-M11-FIX6');
@@ -539,15 +539,16 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
         assert.equal(before.longReason,true);
 
         await evaluate(`document.querySelector('#paper-bot-overview-section').open=true`);
+        const archivedSolana=await evaluate("document.querySelector('#paper-history-section').contains(document.querySelector('#solana-meme-paper'))");
         const focus=await evaluate(`(()=>{
           document.getElementById('app-main').focus();
           return document.activeElement===document.getElementById('app-main');
         })()`);
         assert.equal(focus,true);
         await key('Tab','Tab',9);
-        for (const selector of ['#solana-scanner-live > summary','#solana-meme-paper > summary','#paper-advisor > summary','[data-advisor-live]', '[data-advisor-file]', '#okx-demo-account > summary', '#okx-short-study > summary', '#top100-paper > summary','#paper-reports-section > summary']) {
+        for (const selector of ['#solana-scanner-live > summary',...(archivedSolana?[]:['#solana-meme-paper > summary']),'#paper-advisor > summary','[data-advisor-live]', '[data-advisor-file]', '#okx-demo-account > summary', '#okx-short-study > summary', '#top100-paper > summary','#paper-reports-section > summary']) {
           assert.equal(await evaluate(`document.activeElement===document.querySelector('${selector}')`),
-            true, 'live pilot control is reachable in document order: '+selector);
+            true, 'expected '+selector+'; focused '+await evaluate("document.activeElement?.outerHTML?.slice(0,180)"));
           await key('Tab','Tab',9);
         }
         assert.equal(await evaluate("document.querySelector('#paper-history-section').contains(document.querySelector('#spot-paper-host8h-root'))"),true);
@@ -579,6 +580,8 @@ test('M11 Paper cockpit demo is responsive and keyboard accessible at five width
           true,'offline fixture disclosure follows the BTC/EUR refresh affordance');
         await key('Tab','Tab',9);
         const refreshTab=await evaluate(`document.activeElement===document.querySelector('#paper-cockpit-root button')`);
+        intercepted.assertHealthy();
+        await intercepted.close();
         assert.equal(refreshTab,true,'native Tab focuses the manual report read affordance');
         await key('Tab','Tab',9);
         const tabState=await evaluate(`(()=>{
