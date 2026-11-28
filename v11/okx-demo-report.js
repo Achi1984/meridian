@@ -304,7 +304,7 @@ export function createFibComparison() {
         const stale=Date.now()-report.asOf>35*60000;
         const uncertain=last?.state==='reserved'||last?.state==='rejected';
         const dot=stale||uncertain?'🟡':'🟢';
-        head.style.cssText='display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 6px;padding:8px 0;min-height:44px;border-top:1px solid var(--line,#334155);cursor:pointer';
+        head.style.cssText='display:grid;grid-template-columns:minmax(0,1fr) auto;align-items:center;gap:2px 6px;padding:8px 10px;font-size:1rem;letter-spacing:normal;line-height:1.35;min-height:44px;border-top:1px solid var(--line,#334155);cursor:pointer';
         card.append(head);
         function line(label,value,tone=0){
           const row=document.createElement('p');
