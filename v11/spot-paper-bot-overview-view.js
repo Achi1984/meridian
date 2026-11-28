@@ -239,6 +239,10 @@ function renderBot(document, parent, bot, disclosures, disclosureStates) {
   if (bot.strategy !== bot.label) node(document, summary, 'small', bot.strategy);
   const status = node(document, summary, 'span', summaryStatus(bot),
     'spot-paper-bot-status tone-muted');
+  const tone = bot.reportSnapshot ? 'unknown' : bot.state === 'COMPLETED' ? 'off' :
+    bot.state === 'RUNNING' && freshnessPresentation(bot) === 'Aktuell' ? 'on' :
+    ['RUNNING','PAUSED','PREPARED'].includes(bot.state) ? 'warn' : 'unknown';
+  status.setAttribute('data-paper-lamp', tone);
   status.setAttribute('style',
     'display:inline-flex;align-items:center;max-width:100%;padding:2px 7px;border:1px solid currentColor;border-radius:999px;font-size:11px;line-height:1.4;white-space:normal;overflow-wrap:anywhere;transform:none;transition:none');
   const summaryPnl = bot.metrics.netPnl;
