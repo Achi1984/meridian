@@ -89,6 +89,6 @@ if __name__ == "__main__":
     credentials = tuple(os.environ[name] for name in NAMES)
     if not all(credentials):
         raise SystemExit("demo credentials missing")
-    # Run 3 received OKX 50123. Run 4 checks the revised demo key permissions.
-    submit = (os.environ.get("GITHUB_RUN_NUMBER"), os.environ.get("GITHUB_RUN_ATTEMPT")) == ("4", "1")
+    # Run 4 was rejected. Authorize one retest after the owner updated asset permissions.
+    submit = (os.environ.get("GITHUB_RUN_NUMBER"), os.environ.get("GITHUB_RUN_ATTEMPT")) == ("5", "1")
     run(credentials, submit)
