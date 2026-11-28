@@ -47,3 +47,21 @@ class FilterDemoTests(unittest.TestCase):
             self.assertEqual(orders["MerF20261127I"]["side"], "buy" if side=="LONG" else "sell")
             self.assertTrue(orders["MerF20261127O"]["closing"])
             self.assertEqual(D(trade["demoAfterFees"]), D("-.006"))
+
+
+class FundingTest(unittest.TestCase):
+    def test_complete_and_incomplete_intervals(self):
+        trade = dict(openedMs=60000, entryOrder="open", exitOrder="close")
+        def bill(i, kind, order="", change="0"):
+            return dict(instId=bot.INSTRUMENT, ccy="USDC", billId=str(i), type=kind,
+                        ordId=order, balChg=change)
+        opening, closing = bill(1, "2", "open"), bill(5, "2", "close")
+        for pages, expected in [
+            ([[closing], [opening]], D(0)),
+            ([[closing, bill(4,"8",change="-.02")], [bill(2,"8",change=".01"), opening]], D("-.01")),
+            ([[closing], []], None), ([[opening]], None),
+            ([[closing, bill(3, "2", "other"), opening]], None),
+            ([[closing], [closing, opening]], None),
+        ]:
+            with self.subTest(pages=pages), patch.object(bot, "get", side_effect=pages):
+                self.assertEqual(bot.funding_between_orders((), trade), expected)

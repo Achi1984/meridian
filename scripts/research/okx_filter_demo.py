@@ -175,5 +175,51 @@ def run(keys, journal):
     finish(keys, journal, trade)
 
 
+def funding_between_orders(keys, trade):
+    # Both order bills must be visible in the same uninterrupted account-ledger interval.
+    params = dict(instType="FUTURES", ccy="USDC", begin=str(trade["openedMs"]-60_000), limit="100")
+    close_seen = False
+    total = D(0)
+    last = None
+    for _ in range(10):
+        rows = get("/api/v5/account/bills-archive", keys, **params)
+        if not rows:
+            return None
+        for row in rows:
+            bill = int(row["billId"])
+            if last is not None and bill >= last:
+                return None
+            last = bill
+            if row["instId"] != INSTRUMENT or row["ccy"] != "USDC":
+                continue
+            if row["type"] == "2":
+                if row["ordId"] == trade["exitOrder"] and not close_seen:
+                    close_seen = True
+                elif row["ordId"] == trade["entryOrder"]:
+                    return total if close_seen else None
+                elif close_seen:
+                    return None
+            elif close_seen and row["type"] == "8":
+                change = D(row["balChg"])
+                if not change.is_finite():
+                    raise ValueError("invalid funding bill")
+                total += change
+        params["after"] = str(last)
+    return None
+
+
+def reconcile_funding(keys, journal):
+    for trade in journal.data["sessions"].values():
+        if trade["state"] != "closed" or not trade["demoFilled"] or "demoNetUSDC" in trade:
+            continue
+        funding = funding_between_orders(keys, trade)
+        if funding is not None:
+            trade.update(fundingUSDC=str(funding), demoNetUSDC=str(D(trade["demoAfterFees"])+funding))
+            journal.save()
+
+
 if __name__ == "__main__":
-    run(tuple(os.environ[n] for n in NAMES), Journal())
+    keys = tuple(os.environ[n] for n in NAMES)
+    journal = Journal()
+    run(keys, journal)
+    reconcile_funding(keys, journal)
