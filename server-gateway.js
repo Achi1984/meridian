@@ -468,9 +468,17 @@ const server=http.createServer(async(req,res)=>{
       }
     }
     if(req.method==="GET"&&u.pathname==="/gateway-health"){
+      const identity={
+        ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),terminalBuild:String(RELEASE.terminalBuild||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,
+      };
+      const diagnosticAccess=authorizedRead(req);
+      if(!diagnosticAccess&&!u.searchParams.has("smoke")){
+        const present=await pool()?.query("SELECT 1 FROM meridian_state WHERE key=$1 LIMIT 1",[PRIVATE_STATE_KEY]);
+        return writeJson(res,200,{...identity,privateData:Boolean(present?.rowCount)},origin||"");
+      }
       const [current,shareState,m15,h1,h4,d1]=await Promise.all([
         stateGet(PRIVATE_STATE_KEY),
-        stateGet(ASSET_WATCH_SHARE_STATE_KEY),
+        diagnosticAccess?stateGet(ASSET_WATCH_SHARE_STATE_KEY):null,
         marketKlinesSnapshot({symbol:'BTC',interval:'15m',limit:180}),
         marketKlinesSnapshot({symbol:'BTC',interval:'1h',limit:200}),
         marketKlinesSnapshot({symbol:'BTC',interval:'4h',limit:240}),
@@ -482,12 +490,15 @@ const server=http.createServer(async(req,res)=>{
         '4h':{snapshot:h4,minRows:101},
         '1d':{snapshot:d1,minRows:211}
       });
-      return writeJson(res,200,{
-        ok:true,version:String(RELEASE.version||RELEASE.ui||""),buildId:String(RELEASE.buildId||""),terminalBuild:String(RELEASE.terminalBuild||""),engine:String(RELEASE.engine||""),ruleset:String(RELEASE.ruleset||""),deploymentSha:DEPLOYMENT_SHA||null,uptimeSec:Math.floor(process.uptime()),internalPort:INTERNAL_PORT,
+      const basicHealth={...identity,
         privateData:!!current,privateReadConfigured:/^[a-f0-9]{64}$/.test(READ_TOKEN_HASH),privateReadAuthSource:READ_AUTH_SOURCE,privateWriteConfigured:/^[a-f0-9]{64}$/.test(WRITE_TOKEN_HASH),
         pionexReadConfigured:PIONEX_READ_CONFIGURED,pionexBotReadConfigured:PIONEX_BOT_READ_CONFIGURED,okxPortfolioAuthorityConfigured:OKX_PORTFOLIO_AUTHORITY_CONFIGURED,
+        marketFeedCore
+      };
+      if(!diagnosticAccess)return writeJson(res,200,basicHealth,origin||"");
+      return writeJson(res,200,{
+        ...basicHealth,
         assetWatchShareConfigured:assetWatchShareEnabled(shareState),
-        marketFeedCore,
         pionexAccountStatus:String(accountSync.status||"UNKNOWN"),
         pionexAccountLastSuccessAt:accountSync.lastSuccessAt||null,
         pionexFuturesPositionCount:Array.isArray(account.futuresPositions)?account.futuresPositions.length:0,

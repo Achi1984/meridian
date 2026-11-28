@@ -27,7 +27,8 @@ export function mountLedgerManual(root,{access,onValuation,createClient=createLe
   tile.className='command-ledger';tile.hidden=true;
   tile.append(el('span','Ledger'),balance);command?.append(tile);
   let ready=false,disposed=false;
-  const client=createClient({getToken:access.getToken,onLock:()=>access.lock(),onChange:s=>{
+  const client=createClient({shouldRenew:()=>!doc.hidden&&!editor.open&&access.isUnlocked()&&
+    ['command','depot'].includes(doc.querySelector('#nav [aria-current="page"]')?.dataset.v),getToken:access.getToken,onLock:()=>access.lock(),onChange:s=>{
     if(disposed)return;onValuation?.(s.status==='ready'?s.model:null);ready=s.status==='ready';save.disabled=!ready;load.disabled=['loading','saving','locked'].includes(s.status);
     status.textContent=messages[s.status]||messages.unavailable;content.replaceChildren();
     if(s.status==='locked'){quantities.value='';observed.value='';key.value='';editor.open=false;}

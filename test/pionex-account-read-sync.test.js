@@ -271,3 +271,16 @@ test('Pionex account runtime contains no mutation HTTP paths',()=>{
   assert.doesNotMatch(client,/method:'POST'|method:'DELETE'|method:'PUT'|method:'PATCH'/);
   assert.doesNotMatch(sync,/trade\/order|assets\/transfer|account\/leverage.*post|isolatedMode.*post/);
 });
+
+test('keeps missing futures metrics separate from actual zero and hedge quantities',()=>{
+  const [hedge, flatPnl]=normalizeFuturesPositions({positions:[
+    {symbol:'BTC_USDT_PERP',positionSide:'LONG',sizeLong:'2',netSize:null,unrealizedPnL:' '},
+    {symbol:'BTC_USDT_PERP',positionSide:'BOTH',netSize:'-3',unrealizedPnL:'0'}
+  ]});
+  assert.equal(hedge.sizeLong,2);
+  assert.equal(hedge.netSize,null);
+  assert.equal(hedge.unrealizedPnl,null);
+  assert.equal(flatPnl.positionSide,'BOTH');
+  assert.equal(flatPnl.side,'SHORT');
+  assert.equal(flatPnl.unrealizedPnl,0);
+});

@@ -314,8 +314,19 @@ export function createFibComparison() {
           row.append(label+' · ',strong);
           card.append(row);
         }
+        const frameMinutes={'15m':15,'30m':30,'1H':60,'4H':240}[frame];
+        const currentOrder=demo.find(order=>order.bar===observation.bar);
+        if(Number.isSafeInteger(observation.bar)){
+          const close=new Date(observation.bar+frameMinutes*60000);
+          line('Ausgewerteter Kerzenschluss',close.toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien');
+        }
         line('Signal',signal);
-        line('OKX-Demo',last?states[last.state]+' · '+side(last):'Keine Order');
+        if(observation.decision)line('Einstiegsentscheidung',observation.decision);
+        line('Order zur Signalkerze',currentOrder?states[currentOrder.state]:'Keine Order im Journal');
+        if(currentOrder?.fill)line('Bestätigter Einstieg',currentOrder.fill+' USD');
+        if(currentOrder?.exit)line('Bestätigter Ausstieg',currentOrder.exit+' USD');
+        if(last?.state==='reserved')line('Orderabgleich','Bestätigung ausständig · weitere Einstiege gesperrt');
+        line('Letzte OKX-Demoorder dieses Zeitrahmens',last?states[last.state]+' · '+side(last):'Keine Order');
         line('Demo realisiert nach Handelsgebühren',signed(demoNet)+' USDC · '+demoClosed.length+' geschlossen',demoNet);
         if(last?.fill)line('Demo-Einstieg / Stop / Ziel',[last.fill,last.stop,last.target].map(x=>fmt(num(x))).join(' / ')+' USD');
         const floating=open?(open.side==='buy'?1:-1)*(num(mark?.price)-num(open.entry))*num(mark?.sizeBTC)-
@@ -325,7 +336,7 @@ export function createFibComparison() {
         result.textContent='Paper-P/L '+signed(equity-1000)+' USDC';
         result.className=equity>1000?'paper-gain':equity<1000?'paper-loss':'';
         const venue=document.createElement('small');
-        venue.textContent=last?'OKX · '+states[last.state]+' · '+side(last):'OKX · Keine Order';
+        venue.textContent=currentOrder?'OKX · '+states[currentOrder.state]+' · '+side(currentOrder):'OKX · Keine Order';
         const name=document.createElement('strong');
         name.textContent=dot+' '+frame.replace('H',' h').replace('m',' min');
         venue.style.gridColumn='1 / -1';
