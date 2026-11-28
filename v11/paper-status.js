@@ -69,7 +69,7 @@ export function mountPaperStatus(panel) {
   const view=panel.closest('.view');
   let last=0;
   async function refresh(force=false) {
-    if (!panel.open || view.hidden || document.hidden || button.disabled || (!force && Date.now()-last<600000)) return;
+    if (view.hidden || document.hidden || button.disabled || (!force && Date.now()-last<600000)) return;
     button.disabled=true;
     try {
       const results=await Promise.all(sources.map(async ([name,load])=>{
@@ -90,8 +90,16 @@ export function mountPaperStatus(panel) {
         fragment.append(row);
       }
       rows.replaceChildren(fragment);
-      const known=results.filter(([,s])=>s[0]!=='unknown');
-      count.textContent=known.length ? results.filter(([,s])=>s[0]==='on').length+' aktiv'+(known.length<results.length?' · '+(results.length-known.length)+' unbekannt':'') : 'Status unbekannt';
+      count.replaceChildren();
+      const groups = [['on','aktiv'],['warn','prüfen'],['off','beendet'],['unknown','unklar']];
+      for (const [tone,label] of groups) {
+        const total = results.filter(([,status])=>status[0]===tone).length;
+        if (!total && tone!=='on') continue;
+        const item = document.createElement('span');
+        item.dataset.tone = tone;
+        item.textContent = total+' '+label;
+        count.append(item);
+      }
       last=Date.now();
     } finally {button.disabled=false;}
   }
@@ -109,7 +117,7 @@ if (typeof document !== 'undefined') {
     const panel=document.createElement('details');
     panel.className='card';
     panel.id='paper-status-panel';
-    panel.innerHTML='<summary>Paperbots · Laufstatus <output aria-live="polite"></output></summary><div data-status-rows></div><button type="button">Status aktualisieren</button>';
+    panel.innerHTML='<summary>Paperbots · Laufstatus <output aria-live="polite">Status wird geladen …</output></summary><div data-status-rows></div><button type="button">Status aktualisieren</button>';
     card.before(panel);
     mountPaperStatus(panel);
   }
