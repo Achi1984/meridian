@@ -1,4 +1,4 @@
-name: OKX BTC short filter observation
+name: OKX BTC Long and Short demo bots
 on:
   workflow_dispatch:
   schedule:
@@ -8,29 +8,35 @@ on:
     paths:
       - scripts/spot-paper-advisor/okx_short_filter.py
       - .github/workflows/okx-short-filter.yml
-concurrency: okx-demo-short-filter
+      - scripts/research/okx_filter_demo.py
+concurrency:
+  group: okx-btc-single-demo-order
+  cancel-in-progress: false
 permissions:
-  contents: read
+  contents: write
 jobs:
   observe:
     if: github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
-    timeout-minutes: 3
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
+      - name: Verify paired execution and duplicate-signal handling
+        run: python3 -m unittest discover -s scripts/research -p test_okx_filter_demo.py
       - uses: actions/cache/restore@v4
         with:
           path: btc-demo-oi-history.json
           key: btc-demo-oi-v1-${{ github.run_id }}-${{ github.run_attempt }}
           restore-keys: btc-demo-oi-v1-
-      - name: Compare short entry decisions
+      - name: Run the paired BTC demo pilot
         env:
+          GH_TOKEN: ${{ github.token }}
           OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
           OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}
           OKX_DEMO_PASSPHRASE: ${{ secrets.OKX_DEMO_PASSPHRASE }}
-        run: python3 scripts/spot-paper-advisor/okx_short_filter.py | tee -a "$GITHUB_STEP_SUMMARY"
+        run: python3 scripts/research/okx_filter_demo.py | tee -a "$GITHUB_STEP_SUMMARY"
         shell: bash
       - uses: actions/cache/save@v4
         with:

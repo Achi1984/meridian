@@ -25,6 +25,7 @@ jobs:
         run: echo "year=$(date -u +%Y)" >> "$GITHUB_OUTPUT"
       - if: steps.window.outputs.year == '2026'
         env:
+          OKX_SWING_MANAGE_ONLY: "1"
           GH_TOKEN: ${{ github.token }}
           OKX_DEMO_API_KEY: ${{ secrets.OKX_DEMO_API_KEY }}
           OKX_DEMO_SECRET_KEY: ${{ secrets.OKX_DEMO_SECRET_KEY }}

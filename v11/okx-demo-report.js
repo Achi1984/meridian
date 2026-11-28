@@ -3,7 +3,7 @@ const amount = number => number.toLocaleString('de-AT', {maximumFractionDigits: 
 
 const swingSource = source.replace('okx-demo-pilot.json', 'okx-swing-demo.json');
 const actions = new Map([
-  ['wait', 'Wartet auf Einstieg'], ['hold', 'Position offen'],
+  ['pilot superseded', 'Einstiege an Long/Short-Demopilot übergeben'], ['wait', 'Wartet auf Einstieg'], ['hold', 'Position offen'],
   ['entry unfilled', 'Einstieg ohne Ausführung'], ['entry window ended', 'Einstiegsfenster beendet'],
   ['closed', 'Trade abgeschlossen']
 ]);
@@ -42,7 +42,20 @@ export function mountOkxDemo(section) {
   button.textContent = 'Demokonto aktualisieren';
   const swing = doc.createElement('p');
   swing.setAttribute('role', 'status');
-  section.append(swing, status, button);
+  const bots = doc.createElement('p');
+  bots.setAttribute('role', 'status');
+  section.append(bots, swing, status, button);
+  async function loadBots() {
+    try {
+      const response = await fetch(source.replace('okx-demo-pilot.json', 'okx-filter-demo.json'),
+        {credentials:'omit', cache:'no-store', headers:{Accept:'application/vnd.github.raw+json'},
+         signal:AbortSignal.timeout(10000)});
+      if (!response.ok) throw Error('unavailable');
+      bots.textContent = filterText(await response.json());
+    } catch {
+      bots.textContent = 'BTC Long/Short · Demobericht derzeit nicht verfügbar.';
+    }
+  }
   async function loadPilot() {
     try {
       const response = await fetch(source, {credentials:'omit', cache:'no-store',
@@ -78,7 +91,7 @@ export function mountOkxDemo(section) {
     if (button.disabled) return;
     button.disabled = true;
     try {
-      await Promise.all([loadSwing(), loadPilot()]);
+      await Promise.all([loadBots(), loadSwing(), loadPilot()]);
     } finally {
       button.disabled = false;
     }
@@ -88,4 +101,38 @@ export function mountOkxDemo(section) {
   section.addEventListener('toggle', () => {
     if (section.open) refresh();
   });
+}
+
+export function filterText(report) {
+  const obs = report.observation;
+  if (report.instrument !== 'BTC-USD_UM_XPERP-310328' ||
+      !['FLAT', 'LONG', 'SHORT'].includes(obs?.flatStartSignal) ||
+      !Number.isFinite(Date.parse(report.asOf))) throw Error('invalid report');
+  const rows = Object.values(report.sessions);
+  const states = {reserved:'Orderbestätigung ausstehend', tracking:'Ausstieg wird überwacht',
+    exit_due:'Abschluss wird abgeglichen', closed:'Abgeschlossen'};
+  const parts = ['BTC Long/Short · OKX-Demo',
+    'Stand ' + new Date(report.asOf).toLocaleString('de-AT',{timeZone:'Europe/Vienna'}) + ' (Wien)',
+    'Signal ' + obs.flatStartSignal];
+  if (obs.status !== 'EVALUATED') parts.push('Filter wartet auf Stundenvergleich');
+  else if (obs.flatStartSignal !== 'FLAT') {
+    parts.push((obs.filteredLong || obs.filteredShort) ? 'Einstieg zugelassen' : 'Einstieg gefiltert');
+  }
+  const sum = (items, field) => amount(items.reduce((total, r) => {
+    if (typeof r[field] !== 'string' || !Number.isFinite(Number(r[field]))) throw Error('invalid PnL');
+    return total + Number(r[field]);
+  }, 0));
+  for (const side of ['LONG','SHORT']) {
+    const trades = rows.filter(r => r.signal === side);
+    const completed = trades.filter(r => r.state === 'closed');
+    const fills = completed.filter(r => r.demoFilled);
+    parts.push(side + ' · ' + fills.length + ' abgeschlossene Demotrades' +
+      (fills.length ? ' · ' + sum(fills,'demoAfterFees') + ' USDC nach Handelsgebühren, vor Funding' : ''));
+    if (completed.length) parts.push('Papiervergleich vor Funding · Basis ' + sum(completed,'modelBase') +
+      ' / Filter ' + sum(completed,'modelFiltered') + ' USDC');
+    const last = trades.at(-1);
+    if (last) parts.push('Letztes Signal ' + last.day + ' · ' + states[last.state] +
+      (last.demoFilled ? ' · Einstieg ausgeführt' : last.accepted ? ' · kein bestätigter Fill' : ' · ausgelassen'));
+  }
+  return parts.join(' · ');
 }

@@ -87,6 +87,8 @@ def run(keys, now, candles):
         fees = Decimal(entry["fee"]) + Decimal(exit_order["fee"])
         return dict(action="closed", feesUSDC=str(fees),
                     realizedAfterTradingFeesUSDC=str(Decimal(exit_order["pnl"]) + fees))
+    if not entry and os.environ.get('OKX_SWING_MANAGE_ONLY') == '1':
+        return dict(action='pilot superseded')
     if not entry and today > LAST_ENTRY:
         verify_position(keys, Decimal(0))
         return dict(action="entry window ended")
