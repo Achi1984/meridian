@@ -162,3 +162,49 @@ export function filterText(report) {
   }
   return parts.join(' · ');
 }
+
+export function createShortComparison() {
+  const study=document.createElement('details');
+  const title=document.createElement('summary');
+  title.textContent='Short nach Fehlausbruch · Papervergleich';
+  const status=document.createElement('p');
+  status.setAttribute('role','status');
+  const accounts=document.createElement('div');
+  const retry=document.createElement('button');
+  retry.type='button';
+  retry.textContent='Vergleich aktualisieren';
+  const money=new Intl.NumberFormat('de-AT',{minimumFractionDigits:2,maximumFractionDigits:2});
+  async function refresh() {
+    if(retry.disabled || !study.open) return;
+    retry.disabled=true;
+    try {
+      const response=await fetch('https://api.github.com/repos/Achi1984/meridian/contents/okx-rejection-paper.json?ref=paper-dashboard-data',{
+        cache:'no-store',credentials:'omit',headers:{Accept:'application/vnd.github.raw+json'},signal:AbortSignal.timeout(10000)});
+      if(!response.ok) throw Error('unavailable');
+      const report=await response.json();
+      const time=Date.parse(report.asOf);
+      const phases={planned:'Geplant',running:'Paperlauf',final:'Abgeschlossen'};
+      if(!Number.isFinite(time)||!Object.hasOwn(phases,report.phase)) throw Error('report');
+      const rows=[];
+      for(const [name,a] of [['Mit Historienfilter',report.historyFilter],['Ohne Historienfilter',report.control]]) {
+        if(!Number.isFinite(a?.equity)||![a.open,a.closed].every(n=>Number.isSafeInteger(n)&&n>=0)) throw Error('account');
+        const row=document.createElement('p');
+        const value=document.createElement('strong');
+        value.textContent=money.format(a.equity)+' USDT';
+        value.className=a.equity>1000?'paper-gain':a.equity<1000?'paper-loss':'';
+        row.append(name+' · ',value,document.createElement('br'),a.closed+' geschlossen · '+a.open+' offen');
+        rows.push(row);
+      }
+      accounts.replaceChildren(...rows);
+      const stale=report.phase!=='final' && Date.now()-time>6*3600000;
+      status.textContent=phases[report.phase]+' · '+new Date(time).toLocaleString('de-AT',{timeZone:'Europe/Vienna'})+' Wien'+(stale?' · Stand veraltet':'');
+    } catch {
+      accounts.replaceChildren();
+      status.textContent='Vergleich derzeit nicht abrufbar.';
+    } finally { retry.disabled=false; }
+  }
+  retry.addEventListener('click',refresh);
+  study.addEventListener('toggle',refresh);
+  study.append(title,status,accounts,retry);
+  return study;
+}
